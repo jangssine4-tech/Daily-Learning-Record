@@ -409,7 +409,14 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
 
     <!-- ─── SCHEDULE ─── -->
     <div class="view active" id="view-schedule">
-      <div class="page-top"><h2 id="schedule-day-title">오늘 시간표</h2><p>학생 이름을 클릭하면 일지 작성 화면으로 이동합니다</p></div>
+      <div class="page-top">
+        <h2 id="schedule-day-title">오늘 시간표</h2>
+        <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:3px">✅ 등원</span>
+          <span style="font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:3px">❌ 결석</span>
+          <span style="font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:3px">📋 일지 보기(저장 후 활성)</span>
+        </div>
+      </div>
       <div class="cp">
         <div id="schedule-list"></div>
       </div>
@@ -502,7 +509,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
         <div class="fs">
           <div class="fs-title">💬 선생님 코멘트 & 전달</div>
           <div class="field"><div class="fl">선생님 코멘트</div><textarea class="fi" id="r-comment" placeholder="수업에서 특이사항, 칭찬, 개선점을 자유롭게 적어주세요"></textarea></div>
-          <div class="field" style="margin-bottom:0"><div class="fl">📌 가정 학습 안내</div><textarea class="fi" id="r-memo" placeholder="다음 수업 안내, 준비물, 특이사항 등"></textarea></div>
+          <div class="field" style="margin-bottom:0"><div class="fl">📌 전달 사항</div><textarea class="fi" id="r-memo" placeholder="다음 수업 안내, 준비물, 특이사항 등"></textarea></div>
         </div>
 
         <button class="btn btn-green btn-block" id="r-save-btn" onclick="saveReport()">💾 일지 저장</button>
@@ -1201,24 +1208,31 @@ function renderSchedule(){
       // 상태별 스타일
       const presentActive=!isAbsent&&hasDone;
       const absentActive=isAbsent;
-      return `<div class="s-card" style="${cardBg}">
-        <div class="s-card-name" style="cursor:pointer" onclick="startReport('${s.id}')">
+      // Card clickable only if report saved (hasDone)
+      const cardClickable=hasDone&&!isAbsent;
+      return `<div class="s-card" style="${cardBg}${cardClickable?';cursor:pointer':''}">
+        <div class="s-card-name" ${cardClickable?`onclick="startReport('${s.id}')" style="cursor:pointer"`:'style="cursor:default"'}>
           <span class="s-card-dot ${isAbsent?'dot-absent':hasDone?'dot-done':'dot-ok'}"></span>
           <span style="font-weight:700">${s.name}</span>
           ${studentTimeStr?`<span style="font-size:10px;color:var(--mint2);background:rgba(0,184,148,.1);border-radius:5px;padding:1px 5px;margin-left:4px;font-weight:600">${studentTimeStr}</span>`:''}
         </div>
-        <div class="s-card-sub" style="margin-bottom:7px;cursor:pointer" onclick="startReport('${s.id}')">${s.level||'?'} · ${cls?cls.name:'-'}</div>
-        <!-- 출결 버튼 (토글) -->
-        <div style="display:flex;gap:5px">
-          <button onclick="markAttendance('${s.id}','present')"
-            style="flex:1;padding:4px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;
-              ${presentActive?'background:var(--mint);color:#fff;border:1.5px solid var(--mint)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
-            ✅ 등원
+        <div class="s-card-sub" style="margin-bottom:7px;font-size:11px">${s.level||'?'} · ${cls?cls.name:'-'}</div>
+        <!-- 출결 버튼: 아이콘만 표시 -->
+        <div style="display:flex;gap:4px">
+          <button onclick="markAttendance('${s.id}','present')" title="등원"
+            style="flex:1;padding:5px 0;border-radius:6px;font-size:16px;cursor:pointer;transition:all .15s;
+              ${presentActive?'background:var(--mint);border:1.5px solid var(--mint)':'background:#fff;border:1.5px solid var(--border)'}">
+            ✅
           </button>
-          <button onclick="markAttendance('${s.id}','absent')"
-            style="flex:1;padding:4px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;
-              ${absentActive?'background:var(--red);color:#fff;border:1.5px solid var(--red)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
-            ❌ 결석
+          <button onclick="markAttendance('${s.id}','absent')" title="결석"
+            style="flex:1;padding:5px 0;border-radius:6px;font-size:16px;cursor:pointer;transition:all .15s;
+              ${absentActive?'background:#fde;border:1.5px solid var(--red)':'background:#fff;border:1.5px solid var(--border)'}">
+            ❌
+          </button>
+          <button onclick="${cardClickable?`startReport('${s.id}')`:'toast(\'일지 저장 후 조회 가능합니다\')'}" title="일지${hasDone?' 보기':'작성'}"
+            style="flex:1;padding:5px 0;border-radius:6px;font-size:16px;cursor:pointer;transition:all .15s;
+              ${hasDone&&!isAbsent?'background:rgba(33,150,243,.1);border:1.5px solid var(--blue)':'background:#fff;border:1.5px solid var(--border)'}">
+            📋
           </button>
         </div>
       </div>`;
@@ -1325,8 +1339,13 @@ function onRStudentSelect(){
   infoBar.style.display='block';
 
   // Auto-suggest progress from last report
-  const lastReport=reports.find(r=>r.studentId===id);
+  const lastReport=reports.find(r=>r.studentId===id&&!r.absent);
   if(lastReport&&lastReport.progress) $('r-progress').value=suggestNextProgress(lastReport.progress);
+  // Auto-load last 전달사항(memo) into today's form
+  if(lastReport&&lastReport.memo){
+    const memoEl=$('r-memo');
+    if(memoEl&&!memoEl.value) memoEl.value=lastReport.memo;
+  }
 
   // Eval module from class
   const module=(cls&&cls.evalModule)?cls.evalModule:'NONE';
@@ -1420,16 +1439,22 @@ async function saveReport(){
   const praise=[...document.querySelectorAll('#praise-tags .praise-tag.on')].map(t=>t.textContent);
   const days=[...document.querySelectorAll('#view-write .day-pill.on')].map(d=>d.textContent);
 
+  // Clean evalState: remove undefined/null values for Firestore
+  const cleanEval={};
+  Object.entries(evalState).forEach(([k,v])=>{if(v!==undefined&&v!==null)cleanEval[k]=v;});
+
   const data={
     studentId,studentName:s?.name||'',classId:s?.classId||'',
-    date:$('r-date').value,teacher:$('r-teacher').value,
-    days:days.join(','),level:$('r-level').value,progress:$('r-progress').value,
+    date:$('r-date').value||todayISO(),teacher:$('r-teacher').value||'',
+    days:days.join(','),level:($('r-level').value||'').trim(),progress:($('r-progress').value||'').trim(),
     absent:false,absentReason:'',
-    reviewTestItems:$('r-review-items').value,reviewTest:$('r-review').value,
-    attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,
+    reviewTestItems:($('r-review-items').value||'').trim(),reviewTest:$('r-review').value||'',
+    attitude:$('r-attitude').value||'',dailyQuiz:($('r-quiz').value||'').trim(),
     homework:hwMap[hwState]||'',
-    evalModule:currentEvalModule,evalItems:{...evalState},...sectionFb,
-    praise,comment:$('r-comment').value,memo:$('r-memo').value,
+    evalModule:currentEvalModule||'',evalItems:cleanEval,...sectionFb,
+    praise:Array.isArray(praise)?praise:[],
+    comment:($('r-comment').value||'').trim(),
+    memo:($('r-memo').value||'').trim(),
     createdAt:new Date().toISOString()
   };
 
@@ -1736,14 +1761,17 @@ function renderStudents(){
       const timeStr=pData?(typeof pData==='object'?pData.time||`${pData.period||''}교시`:pData):'';
       return `<span style="white-space:nowrap">${d}${timeStr?` <small style="color:var(--txt3)">${timeStr}</small>`:''}</span>`;
     }).join(' ');
-    const sibStr=(s.siblings||[]).map(x=>`${x.name}(${x.grade})`).join(', ')||'-';
+    const sibStr=(s.siblings||[]).length
+      ?(s.siblings||[]).map(x=>`<span style="color:${x.enrolled===false?'var(--red)':'var(--txt2)'};font-size:11px">${x.name}(${x.grade})${x.enrolled===false?' ⚠':''}${' '}</span>`).join('')
+      :'-';
+    const memoTitle=s.memo?`title="${s.memo.replace(/"/g,'&quot;')}"`:'';
     return `<tr onclick="openStudentModal('${s.id}')">
-      <td><strong>${s.name}</strong></td>
+      <td><strong ${memoTitle} style="${s.memo?'cursor:help;border-bottom:1px dotted var(--txt3)':''}">${s.name}</strong></td>
       <td>${c?c.name:'-'}</td>
       <td style="white-space:nowrap;font-size:12px">${getStudentLevel(s)||'-'}</td>
       <td>${grade||'-'}</td>
       <td style="font-size:11px;line-height:1.8">${periodsStr||'-'}</td>
-      <td style="font-size:11px;color:var(--txt3)">${sibStr}</td>
+      <td>${sibStr}</td>
       <td style="font-size:12px">${s.phoneMom||'-'}</td>
       <td><span class="badge bg-navy">${cnt}</span></td>
       <td><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();openStudentModal('${s.id}')">편집</button></td>
@@ -1771,6 +1799,13 @@ function renderPeriodInputs(){
   const selectedDays=[...document.querySelectorAll('#s-days .day-pill.on')].map(d=>d.dataset.d||d.textContent);
   const wrap=$('period-inputs-wrap');
   if(!selectedDays.length){wrap.innerHTML='';return}
+  // Save existing values before re-render
+  const existing={};
+  DAYS.forEach(d=>{
+    const sel=document.getElementById('period-sel-'+d);
+    const ti=document.getElementById('period-time-'+d);
+    if(sel||ti) existing[d]={period:sel?sel.value:'',time:ti?ti.value:''};
+  });
   wrap.innerHTML=`<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:7px">교시 및 시간 설정</div>`+
     selectedDays.map(d=>`
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
@@ -1781,6 +1816,16 @@ function renderPeriodInputs(){
         </select>
         <input type="text" class="fi" id="period-time-${d}" placeholder="직접입력(예:14:30)" style="flex:1;font-size:12px;padding:7px 9px">
       </div>`).join('');
+  // Restore existing values for days that already had data
+  setTimeout(()=>{
+    Object.entries(existing).forEach(([d,v])=>{
+      if(!v.period&&!v.time) return;
+      const sel=document.getElementById('period-sel-'+d);
+      const ti=document.getElementById('period-time-'+d);
+      if(sel&&v.period) sel.value=v.period;
+      if(ti&&v.time) ti.value=v.time;
+    });
+  },10);
 }
 function updatePeriodTime(day){
   const sel=document.getElementById('period-sel-'+day);
@@ -1842,12 +1887,17 @@ function addSiblingRow(data){
   const wrap=$('sibling-wrap');
   const div=document.createElement('div');
   div.id=`sib-${i}`;
-  div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap';
+  const enrolled=data?.enrolled!==false; // default true
   div.innerHTML=`
-    <input type="text" class="fi" id="sib-name-${i}" placeholder="이름" value="${data?.name||''}" style="flex:2">
-    <select class="fi" id="sib-grade-${i}" style="flex:1;padding:8px 20px 8px 8px">
+    <input type="text" class="fi" id="sib-name-${i}" placeholder="이름" value="${data?.name||''}" style="flex:2;min-width:80px">
+    <select class="fi" id="sib-grade-${i}" style="width:70px;padding:8px 18px 8px 6px;font-size:12px">
       <option value="">학년</option>${GRADE_ORDER.map(g=>`<option value="${g}" ${data?.grade===g?'selected':''}>${g}</option>`).join('')}
     </select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;cursor:pointer">
+      <input type="checkbox" id="sib-enrolled-${i}" ${enrolled?'checked':''} style="width:14px;height:14px">
+      재원중
+    </label>
     <button class="btn btn-red btn-xs" onclick="document.getElementById('sib-${i}').remove()">✕</button>`;
   wrap.appendChild(div);
 }
@@ -1869,7 +1919,8 @@ async function saveStudent(){
   document.querySelectorAll('[id^="sib-name-"]').forEach(el=>{
     const i=el.id.replace('sib-name-','');
     const n=el.value.trim(),g=document.getElementById('sib-grade-'+i)?.value||'';
-    if(n) siblings.push({name:n,grade:g});
+    const enrolled=document.getElementById('sib-enrolled-'+i)?.checked!==false;
+    if(n) siblings.push({name:n,grade:g,enrolled});
   });
   const data={name,level,customLevel:$('s-custom-level').value.trim(),grade:$('s-grade').value,enrollYear:parseInt($('s-enroll-year').value)||new Date().getFullYear(),classId:$('s-class').value,days,periods:periods2,phoneMom:$('s-phone-mom').value.trim(),school:$('s-school').value.trim(),enrollDate:$('s-enroll-date').value,siblings,memo:$('s-memo').value.trim(),updatedAt:new Date().toISOString()};
   const id=$('s-id').value;
