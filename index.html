@@ -1127,11 +1127,29 @@ function renderSchedule(){
     return;
   }
 
+  // Helper: convert "HH:MM" or "HH:MM~HH:MM" to sortable minutes
+  function timeToMin(t){
+    if(!t) return 9999;
+    const m=t.match(/(\d{1,2}):(\d{2})/);
+    return m?parseInt(m[1])*60+parseInt(m[2]):9999;
+  }
+
   const html=sortedPeriods.map(p=>{
-    const sList=byPeriod[p];
+    let sList=[...byPeriod[p]];
     totalCount+=sList.length;
     const pNum=parseInt(p)||0;
-    // Time: from student data first, then fallback to global periods config
+
+    // Sort students within period by their individual time (ascending)
+    sList.sort((a,b)=>{
+      const getPTime=s=>{
+        const pd=(s.periods||{})[dayName];
+        if(!pd) return 9999;
+        if(typeof pd==='object') return timeToMin(pd.time||'');
+        return 9999;
+      };
+      return getPTime(a)-getPTime(b);
+    });
+
     const timeFromStudent=periodTimeMap[p]||'';
     const periodInfo=periods.find(x=>x.period===pNum);
     const timeDisplay=timeFromStudent||(periodInfo?periodInfo.time:'');
@@ -1139,13 +1157,12 @@ function renderSchedule(){
     const todayStr=todayISO();
 
     const cards=sList.map(s=>{
-      const hasDone=reports.some(r=>r.studentId===s.id&&r.date===todayStr&&!r.absent);
-      const isAbsent=reports.some(r=>r.studentId===s.id&&r.date===todayStr&&r.absent);
-      const dotCls=isAbsent?'dot-absent':hasDone?'dot-done':'dot-ok';
-      const cardCls=isAbsent?'s-card absent':'s-card';
+      const todayReport=reports.find(r=>r.studentId===s.id&&r.date===todayStr);
+      const hasDone=todayReport&&!todayReport.absent;
+      const isAbsent=todayReport&&todayReport.absent;
       const cls=classes.find(c=>c.id===s.classId);
 
-      // Extract this student's specific period+time for today
+      // Extract student's time for today
       const pData=(s.periods||{})[dayName];
       let studentTimeStr='';
       if(pData){
@@ -1158,13 +1175,33 @@ function renderSchedule(){
         }
       }
 
-      return `<div class="${cardCls}" onclick="startReport('${s.id}')">
+      // Attendance state styling
+      const cardBg=isAbsent
+        ?'background:#fef2f2;border-color:var(--red)'
+        :hasDone
+          ?'background:#f0fdf9;border-color:var(--mint)'
+          :'';
+
+      return `<div class="s-card" style="${cardBg}" onclick="startReport('${s.id}')">
         <div class="s-card-name">
-          <span class="s-card-dot ${dotCls}"></span>
+          <span class="s-card-dot ${isAbsent?'dot-absent':hasDone?'dot-done':'dot-ok'}"></span>
           <span style="font-weight:700">${s.name}</span>
           ${studentTimeStr?`<span style="font-size:10px;color:var(--mint2);background:rgba(0,184,148,.1);border-radius:5px;padding:1px 5px;margin-left:4px;font-weight:600">${studentTimeStr}</span>`:''}
         </div>
-        <div class="s-card-sub">${s.level||'?'} · ${cls?cls.name:'-'}</div>
+        <div class="s-card-sub" style="margin-bottom:7px">${s.level||'?'} · ${cls?cls.name:'-'}</div>
+        <!-- 출결 버튼 -->
+        <div style="display:flex;gap:5px" onclick="event.stopPropagation()">
+          <button onclick="markAttendance('${s.id}','present')"
+            style="flex:1;padding:4px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;
+              ${!isAbsent&&hasDone?'background:var(--mint);color:#fff;border:1.5px solid var(--mint)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
+            ✅ 등원
+          </button>
+          <button onclick="markAttendance('${s.id}','absent')"
+            style="flex:1;padding:4px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;
+              ${isAbsent?'background:var(--red);color:#fff;border:1.5px solid var(--red)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
+            ❌ 결석
+          </button>
+        </div>
       </div>`;
     }).join('');
 
@@ -1185,6 +1222,72 @@ function renderSchedule(){
 function startReport(studentId){
   goto('write');
   const el=$('r-student');if(el){el.value=studentId;onRStudentSelect();}
+}
+
+// 오늘 시간표에서 출결 바로 처리
+async function markAttendance(studentId, status){
+  const todayStr=todayISO();
+  const s=students.find(x=>x.id===studentId);
+  if(!s) return;
+
+  // 이미 오늘 기록이 있는지 확인
+  const existing=reports.find(r=>r.studentId===studentId&&r.date===todayStr);
+
+  loading(true);
+  try{
+    if(status==='present'){
+      if(existing){
+        // 기존 기록이 결석이면 등원으로 업데이트
+        if(existing.absent){
+          await db.collection('reports').doc(existing.id).update({absent:false,absentReason:'',updatedAt:new Date().toISOString()});
+          // 보강 계획표에서도 제거
+          const mk=makeups.find(m=>m.studentId===studentId&&m.absentDate===todayStr);
+          if(mk) await db.collection('makeups').doc(mk.id).delete();
+        }
+        // 이미 등원 기록이면 → 일지 작성 화면으로 이동
+        else { loading(false); startReport(studentId); return; }
+      } else {
+        // 기록 없으면 → 일지 작성 화면으로 이동
+        loading(false); startReport(studentId); return;
+      }
+    } else {
+      // 결석 처리
+      if(existing){
+        if(!existing.absent){
+          await db.collection('reports').doc(existing.id).update({absent:true,updatedAt:new Date().toISOString()});
+        }
+        // 이미 결석이면 아무것도 안 함
+      } else {
+        // 새 결석 기록 생성
+        const cls=classes.find(c=>c.id===s.classId);
+        const newReport={
+          studentId,studentName:s.name,classId:s.classId||'',
+          date:todayStr,teacher:s.teacher||teachers[0]||'',
+          days:'',level:getStudentLevel(s),progress:'',
+          absent:true,absentReason:'',
+          reviewTest:'',attitude:'',dailyQuiz:'',homework:'',
+          evalModule:'',evalItems:{},praise:[],comment:'',memo:'',
+          createdAt:new Date().toISOString()
+        };
+        await db.collection('reports').add(newReport);
+        // 보강 계획표에 자동 추가
+        const mkData={
+          studentId,studentName:s.name,classId:s.classId||'',
+          absentDate:todayStr,absentReason:'',
+          makeupStatus:'pending',makeupDate:'',makeupNote:'',
+          createdAt:new Date().toISOString()
+        };
+        await db.collection('makeups').add(mkData);
+        await loadMakeups();
+      }
+    }
+    await loadReports();
+    renderSchedule();
+    toast(status==='present'?`✅ ${s.name} 등원 처리`:`❌ ${s.name} 결석 처리`);
+  } catch(e){
+    toast('오류: '+e.message);
+  }
+  loading(false);
 }
 
 function onRStudentSelect(){
