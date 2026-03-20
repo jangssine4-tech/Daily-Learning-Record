@@ -509,7 +509,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
         <div class="fs">
           <div class="fs-title">💬 선생님 코멘트 & 전달</div>
           <div class="field"><div class="fl">선생님 코멘트</div><textarea class="fi" id="r-comment" placeholder="수업에서 특이사항, 칭찬, 개선점을 자유롭게 적어주세요"></textarea></div>
-          <div class="field" style="margin-bottom:0"><div class="fl">📌 전달 사항</div><textarea class="fi" id="r-memo" placeholder="다음 수업 안내, 준비물, 특이사항 등"></textarea></div>
+          <div class="field" style="margin-bottom:0"><div class="fl">📌 전달 사항 <span style="font-size:10px;color:var(--txt3)">(이전 일지 자동 불러옴)</span></div><textarea class="fi" id="r-memo" placeholder="" style="min-height:60px"></textarea></div>
         </div>
 
         <button class="btn btn-green btn-block" id="r-save-btn" onclick="saveReport()">💾 일지 저장</button>
@@ -1093,13 +1093,11 @@ function renderSchedule(){
     return;
   }
 
-  // Group students by period for today
-  // periods field can be: {period:N, time:"HH:MM"} (new) or "N교시" string (legacy)
-  const byPeriod={};  // key = period number (string) or '미설정'
-  const periodTimeMap={};  // period num → display time
+  // ── 교시별 단일 박스 + 30분 구분선 렌더링 ──
+  function timeToMin(t){if(!t)return 9999;const m=t.match(/(\d{1,2}):(\d{2})/);return m?parseInt(m[1])*60+parseInt(m[2]):9999;}
 
-  // byGroup key = "교시:HH:MM 시작30분블록" or "교시:미설정"
-  // periodTimeMap: pKey -> representative time string
+  // byPeriodNum: pKey(숫자 or '미설정') → { pNum, blocks:{ '14:00~14:30':[s,...], ... }, firstTime }
+  const byPeriodNum={};
   students.forEach(s=>{
     if(!(s.days||[]).includes(dayName)) return;
     const pData=(s.periods||{})[dayName];
@@ -1108,143 +1106,90 @@ function renderSchedule(){
       if(typeof pData==='object'){pNum=pData.period||0;pTime=pData.time||'';}
       else{pNum=parseInt(pData)||0;}
     }
-    // 30분 블록 계산
-    let groupKey='미설정';
-    if(pNum){
-      if(pTime){
-        const m=pTime.match(/(\d{1,2}):(\d{2})/);
-        if(m){
-          const h=parseInt(m[1]),min=parseInt(m[2]);
-          const block=min<30?0:30;
-          const blockEnd=block+30;
-          const endH=blockEnd>=60?h+1:h;
-          const endMin=blockEnd>=60?blockEnd-60:blockEnd;
-          const pad=n=>String(n).padStart(2,'0');
-          const blockLabel=`${pad(h)}:${pad(block)}~${pad(endH)}:${pad(endMin)}`;
-          groupKey=`${pNum}|${pad(h)}:${pad(block)}|${blockLabel}`;
-          periodTimeMap[String(pNum)]=pTime;
-        } else {
-          groupKey=`${pNum}|99:00|시간미설정`;
-        }
-      } else {
-        groupKey=`${pNum}|99:00|시간미설정`;
+    const pKey=pNum?String(pNum):'미설정';
+    if(!byPeriodNum[pKey]) byPeriodNum[pKey]={pNum,blocks:{},firstTime:'99:99'};
+    let blockLabel='시간미설정';
+    if(pTime){
+      const m=pTime.match(/(\d{1,2}):(\d{2})/);
+      if(m){
+        const h=parseInt(m[1]),min=parseInt(m[2]);
+        const b=min<30?0:30,be=b+30;
+        const eh=be>=60?h+1:h,em=be>=60?be-60:be;
+        const pad=n=>String(n).padStart(2,'0');
+        blockLabel=`${pad(h)}:${pad(b)}~${pad(eh)}:${pad(em)}`;
+        if(pTime<byPeriodNum[pKey].firstTime) byPeriodNum[pKey].firstTime=pTime;
       }
     }
-    if(!byPeriod[groupKey]) byPeriod[groupKey]=[];
-    byPeriod[groupKey].push(s);
+    if(!byPeriodNum[pKey].blocks[blockLabel]) byPeriodNum[pKey].blocks[blockLabel]=[];
+    byPeriodNum[pKey].blocks[blockLabel].push(s);
   });
 
-  const sortedPeriods=Object.keys(byPeriod).sort((a,b)=>{
-    if(a==='미설정') return 1;
-    if(b==='미설정') return -1;
-    const [pa,ta]=a.split('|'); const [pb,tb]=b.split('|');
-    if(parseInt(pa)!==parseInt(pb)) return parseInt(pa)-parseInt(pb);
-    return ta.localeCompare(tb);
+  const sortedPeriodNums=Object.keys(byPeriodNum).sort((a,b)=>{
+    if(a==='미설정') return 1; if(b==='미설정') return -1;
+    return parseInt(a)-parseInt(b);
   });
 
   let totalCount=0;
-  if(!sortedPeriods.length){
+  if(!sortedPeriodNums.length){
     $('schedule-list').innerHTML=`<div class="empty"><div class="ei">📅</div><div class="et">오늘 등록된 학생이 없어요</div><div class="es">학생 등록에서 요일과 교시를 설정해주세요</div></div>`;
     return;
   }
 
-  // Helper: convert "HH:MM" or "HH:MM~HH:MM" to sortable minutes
-  function timeToMin(t){
-    if(!t) return 9999;
-    const m=t.match(/(\d{1,2}):(\d{2})/);
-    return m?parseInt(m[1])*60+parseInt(m[2]):9999;
+  const todayStr=todayISO();
+
+  function makeCard(s){
+    const tr=reports.find(r=>r.studentId===s.id&&r.date===todayStr);
+    const hasDone=!!(tr&&!tr.absent);
+    const isAbsent=!!(tr&&tr.absent);
+    const cls=classes.find(x=>x.id===s.classId);
+    const pData=(s.periods||{})[dayName];
+    let tStr='';
+    if(pData){if(typeof pData==='object'){const t=pData.time||'';const pn=pData.period||'';tStr=t?t:(pn?pn+'교시':'');}else tStr=String(pData);}
+    const cardBg=isAbsent?'background:#fef2f2;border-color:var(--red)':hasDone?'background:#f0fdf9;border-color:var(--mint)':'';
+    totalCount++;
+    return `<div class="s-card" style="${cardBg}${hasDone&&!isAbsent?';cursor:pointer':''}" ${hasDone&&!isAbsent?`onclick="startReport('${s.id}')"`:''}>
+      <div class="s-card-name">
+        <span class="s-card-dot ${isAbsent?'dot-absent':hasDone?'dot-done':'dot-ok'}"></span>
+        <span style="font-weight:700">${s.name}</span>
+        ${tStr?`<span style="font-size:10px;color:var(--mint2);background:rgba(0,184,148,.1);border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:600">${tStr}</span>`:''}
+      </div>
+      <div class="s-card-sub" style="margin-bottom:5px">${s.level||'?'} · ${cls?cls.name:'-'}</div>
+      <div style="display:flex;gap:3px">
+        <button onclick="event.stopPropagation();markAttendance('${s.id}','present')" title="등원"
+          style="flex:1;padding:2px 0;border-radius:5px;font-size:11px;cursor:pointer;line-height:1.6;
+            ${hasDone&&!isAbsent?'background:var(--mint);border:1.5px solid var(--mint)':'background:#fff;border:1.5px solid var(--border)'}">✅</button>
+        <button onclick="event.stopPropagation();markAttendance('${s.id}','absent')" title="결석"
+          style="flex:1;padding:2px 0;border-radius:5px;font-size:11px;cursor:pointer;line-height:1.6;
+            ${isAbsent?'background:#fde;border:1.5px solid var(--red)':'background:#fff;border:1.5px solid var(--border)'}">❌</button>
+      </div>
+    </div>`;
   }
 
-  const html=sortedPeriods.map(p=>{
-    let sList=[...byPeriod[p]];
-    totalCount+=sList.length;
-    // Parse group key: "교시|HH:MM|표시레이블" or "미설정"
-    let pNum=0, blockLabel='';
-    if(p!=='미설정'){
-      const parts=p.split('|');
-      pNum=parseInt(parts[0])||0;
-      blockLabel=parts[2]||'';
-    }
-
-    // Students already time-sorted (each has same 30-min block, sort by exact time)
-    sList.sort((a,b)=>{
-      const getPTime=s=>{
-        const pd=(s.periods||{})[dayName];
-        if(!pd) return 9999;
-        if(typeof pd==='object') return timeToMin(pd.time||'');
-        return 9999;
-      };
-      return getPTime(a)-getPTime(b);
+  const html=sortedPeriodNums.map(pKey=>{
+    const group=byPeriodNum[pKey];
+    const pNum=group.pNum;
+    const allStudents=Object.values(group.blocks).flat();
+    // Sort blocks chronologically
+    const sortedBlocks=Object.keys(group.blocks).sort((a,b)=>{
+      if(a==='시간미설정') return 1; if(b==='시간미설정') return -1;
+      return a.localeCompare(b);
     });
-
-    const todayStr=todayISO();
-
-    const cards=sList.map(s=>{
-      const todayReport=reports.find(r=>r.studentId===s.id&&r.date===todayStr);
-      const hasDone=todayReport&&!todayReport.absent;
-      const isAbsent=todayReport&&todayReport.absent;
-      const cls=classes.find(c=>c.id===s.classId);
-
-      // Extract student's time for today
-      const pData=(s.periods||{})[dayName];
-      let studentTimeStr='';
-      if(pData){
-        if(typeof pData==='object'){
-          const t=pData.time||'';
-          const pn=pData.period||'';
-          studentTimeStr=t?t:(pn?pn+'교시':'');
-        } else {
-          studentTimeStr=String(pData);
-        }
-      }
-
-      // Attendance state styling
-      const cardBg=isAbsent
-        ?'background:#fef2f2;border-color:var(--red)'
-        :hasDone
-          ?'background:#f0fdf9;border-color:var(--mint)'
-          :'';
-
-      // 상태별 스타일
-      const presentActive=!isAbsent&&hasDone;
-      const absentActive=isAbsent;
-      // Card clickable only if report saved (hasDone)
-      const cardClickable=hasDone&&!isAbsent;
-      return `<div class="s-card" style="${cardBg}${cardClickable?';cursor:pointer':''}">
-        <div class="s-card-name" ${cardClickable?`onclick="startReport('${s.id}')" style="cursor:pointer"`:'style="cursor:default"'}>
-          <span class="s-card-dot ${isAbsent?'dot-absent':hasDone?'dot-done':'dot-ok'}"></span>
-          <span style="font-weight:700">${s.name}</span>
-          ${studentTimeStr?`<span style="font-size:10px;color:var(--mint2);background:rgba(0,184,148,.1);border-radius:5px;padding:1px 5px;margin-left:4px;font-weight:600">${studentTimeStr}</span>`:''}
-        </div>
-        <div class="s-card-sub" style="margin-bottom:7px;font-size:11px">${s.level||'?'} · ${cls?cls.name:'-'}</div>
-        <!-- 출결 버튼: 아이콘만 표시 -->
-        <div style="display:flex;gap:4px">
-          <button onclick="markAttendance('${s.id}','present')" title="등원"
-            style="flex:1;padding:5px 0;border-radius:6px;font-size:16px;cursor:pointer;transition:all .15s;
-              ${presentActive?'background:var(--mint);border:1.5px solid var(--mint)':'background:#fff;border:1.5px solid var(--border)'}">
-            ✅
-          </button>
-          <button onclick="markAttendance('${s.id}','absent')" title="결석"
-            style="flex:1;padding:5px 0;border-radius:6px;font-size:16px;cursor:pointer;transition:all .15s;
-              ${absentActive?'background:#fde;border:1.5px solid var(--red)':'background:#fff;border:1.5px solid var(--border)'}">
-            ❌
-          </button>
-          <button onclick="${cardClickable?`startReport('${s.id}')`:'toast(\'일지 저장 후 조회 가능합니다\')'}" title="일지${hasDone?' 보기':'작성'}"
-            style="flex:1;padding:5px 0;border-radius:6px;font-size:16px;cursor:pointer;transition:all .15s;
-              ${hasDone&&!isAbsent?'background:rgba(33,150,243,.1);border:1.5px solid var(--blue)':'background:#fff;border:1.5px solid var(--border)'}">
-            📋
-          </button>
-        </div>
-      </div>`;
+    const innerHTML=sortedBlocks.map((blk,idx)=>{
+      const sList=[...group.blocks[blk]].sort((a,b)=>timeToMin((a.periods?.[dayName]?.time)||'')-timeToMin((b.periods?.[dayName]?.time)||''));
+      const divider=idx>0?`<div style="position:relative;height:1px;background:var(--border);margin:8px -1px;"><span style="position:absolute;left:50%;transform:translateX(-50%);top:-9px;background:var(--surface);padding:0 8px;font-size:10px;font-weight:700;color:var(--txt3);white-space:nowrap">${blk}</span></div>`:'';
+      const firstBlkLabel=idx===0&&blk!=='시간미설정'?`<div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px">${blk}</div>`:'';
+      return `${divider}${firstBlkLabel}<div class="student-cards">${sList.map(s=>makeCard(s)).join('')}</div>`;
     }).join('');
 
-    const headerTitle=p==='미설정'?'교시 미설정':(blockLabel&&blockLabel!=='시간미설정'?`${pNum}교시 · ${blockLabel}`:pNum+'교시');
+    const headerTitle=pKey==='미설정'?'교시 미설정':pNum+'교시';
+    const ft=group.firstTime!=='99:99'?group.firstTime:'';
+    const timeNote=ft?`<span style="font-size:11px;font-weight:400;color:var(--txt3);margin-left:5px">${ft.split(':')[0]}:00~</span>`:'';
     return `<div class="period-block">
       <div class="period-header">
-        <div class="period-num" style="font-size:${pNum>9?'11px':'14px'}">${p==='미설정'?'?':pNum}</div>
-        <div><div style="font-size:13px;font-weight:700">${headerTitle}</div><div class="period-time">${sList.length}명</div></div>
+        <div class="period-num" style="font-size:${pNum>9?'11px':'14px'}">${pKey==='미설정'?'?':pNum}</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">${headerTitle}${timeNote}</div><div class="period-time">${allStudents.length}명</div></div>
       </div>
-      <div class="student-cards">${cards}</div>
+      ${innerHTML}
     </div>`;
   }).join('');
 
