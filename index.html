@@ -1144,8 +1144,26 @@ function renderSchedule(){
       const dotCls=isAbsent?'dot-absent':hasDone?'dot-done':'dot-ok';
       const cardCls=isAbsent?'s-card absent':'s-card';
       const cls=classes.find(c=>c.id===s.classId);
+
+      // Extract this student's specific period+time for today
+      const pData=(s.periods||{})[dayName];
+      let studentTimeStr='';
+      if(pData){
+        if(typeof pData==='object'){
+          const t=pData.time||'';
+          const pn=pData.period||'';
+          studentTimeStr=t?t:(pn?pn+'교시':'');
+        } else {
+          studentTimeStr=String(pData);
+        }
+      }
+
       return `<div class="${cardCls}" onclick="startReport('${s.id}')">
-        <div class="s-card-name"><span class="s-card-dot ${dotCls}"></span>${s.name}</div>
+        <div class="s-card-name">
+          <span class="s-card-dot ${dotCls}"></span>
+          <span style="font-weight:700">${s.name}</span>
+          ${studentTimeStr?`<span style="font-size:10px;color:var(--mint2);background:rgba(0,184,148,.1);border-radius:5px;padding:1px 5px;margin-left:4px;font-weight:600">${studentTimeStr}</span>`:''}
+        </div>
         <div class="s-card-sub">${s.level||'?'} · ${cls?cls.name:'-'}</div>
       </div>`;
     }).join('');
