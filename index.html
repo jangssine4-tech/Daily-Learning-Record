@@ -279,6 +279,13 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
 /* Praise tags gold version */
 .praise-tag.on{background:var(--gold);border-color:var(--gold);color:#fff}
 
+/* ══ DRAG AND DROP ══ */
+.drag-handle{cursor:grab;color:var(--txt3);padding:4px;flex-shrink:0}
+.drag-handle:active{cursor:grabbing}
+.cls-drag-item{transition:opacity .15s,transform .15s}
+.cls-drag-item.dragging{opacity:.5;transform:scale(.98)}
+.cls-drag-item.drag-over{border-top:2px solid var(--mint)!important}
+
 /* ══ RESPONSIVE ══ */
 @media(max-width:700px){
   #sidebar{position:fixed;top:0;left:0;bottom:0;transform:translateX(-100%);z-index:200}
@@ -427,19 +434,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
           <div id="r-student-info" style="display:none;background:var(--surface2);border-radius:var(--r);padding:10px 13px;margin-bottom:10px;font-size:12px">
             <span id="r-si-name" style="font-weight:700"></span>&nbsp;<span id="r-si-meta" style="color:var(--txt3)"></span>
           </div>
-          <!-- 결석 -->
-          <div class="field">
-            <div class="fl">결석 여부</div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
-                <input type="checkbox" id="r-absent" onchange="onAbsentChange()" style="width:16px;height:16px"> 오늘 결석
-              </label>
-            </div>
-          </div>
-          <div id="absent-reason-wrap" style="display:none" class="field">
-            <div class="fl">결석 사유</div>
-            <input type="text" class="fi" id="r-absent-reason" placeholder="예) 개인사정, 여행, 학교행사 등">
-          </div>
+<!-- 결석항목제거 --><input type="hidden" id="r-absent"><input type="hidden" id="r-absent-reason"><div id="absent-reason-wrap" style="display:none"></div>
           <div class="r2">
             <div class="field"><div class="fl">단계</div><input type="text" class="fi" id="r-level" placeholder="자동입력"></div>
             <div class="field"><div class="fl">진도</div><input type="text" class="fi" id="r-progress" placeholder="예) Unit 5 Lesson 2"></div>
@@ -458,7 +453,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
 
         <!-- 공통 평가 -->
         <div class="fs">
-          <div class="fs-title">📝 공통 평가</div>
+          <div class="fs-title">📝 수업 관찰</div>
           <div class="field">
             <div class="fl">복습 테스트 (Review Test)</div>
             <input type="text" class="fi" id="r-review-items" placeholder="예) Unit 5 단어 20개">
@@ -511,6 +506,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
         </div>
 
         <button class="btn btn-green btn-block" id="r-save-btn" onclick="saveReport()">💾 일지 저장</button>
+        <div id="r-after-save" style="display:none;margin-top:10px"></div>
         <div style="height:6px"></div>
         <button class="btn btn-outline btn-block" onclick="resetWriteForm()">초기화</button>
         <div style="height:24px"></div>
@@ -1095,30 +1091,48 @@ function renderSchedule(){
   const byPeriod={};  // key = period number (string) or '미설정'
   const periodTimeMap={};  // period num → display time
 
+  // byGroup key = "교시:HH:MM 시작30분블록" or "교시:미설정"
+  // periodTimeMap: pKey -> representative time string
   students.forEach(s=>{
     if(!(s.days||[]).includes(dayName)) return;
     const pData=(s.periods||{})[dayName];
-    let pKey='미설정', pNum=0, pTime='';
+    let pNum=0, pTime='';
     if(pData){
-      if(typeof pData==='object'){
-        pNum=pData.period||0;
-        pTime=pData.time||'';
-        pKey=pNum?String(pNum):'미설정';
+      if(typeof pData==='object'){pNum=pData.period||0;pTime=pData.time||'';}
+      else{pNum=parseInt(pData)||0;}
+    }
+    // 30분 블록 계산
+    let groupKey='미설정';
+    if(pNum){
+      if(pTime){
+        const m=pTime.match(/(\d{1,2}):(\d{2})/);
+        if(m){
+          const h=parseInt(m[1]),min=parseInt(m[2]);
+          const block=min<30?0:30;
+          const blockEnd=block+30;
+          const endH=blockEnd>=60?h+1:h;
+          const endMin=blockEnd>=60?blockEnd-60:blockEnd;
+          const pad=n=>String(n).padStart(2,'0');
+          const blockLabel=`${pad(h)}:${pad(block)}~${pad(endH)}:${pad(endMin)}`;
+          groupKey=`${pNum}|${pad(h)}:${pad(block)}|${blockLabel}`;
+          periodTimeMap[String(pNum)]=pTime;
+        } else {
+          groupKey=`${pNum}|99:00|시간미설정`;
+        }
       } else {
-        // legacy: "2교시" string
-        pNum=parseInt(pData)||0;
-        pKey=pNum?String(pNum):'미설정';
+        groupKey=`${pNum}|99:00|시간미설정`;
       }
     }
-    if(pNum&&pTime) periodTimeMap[pKey]=pTime;
-    if(!byPeriod[pKey]) byPeriod[pKey]=[];
-    byPeriod[pKey].push(s);
+    if(!byPeriod[groupKey]) byPeriod[groupKey]=[];
+    byPeriod[groupKey].push(s);
   });
 
   const sortedPeriods=Object.keys(byPeriod).sort((a,b)=>{
     if(a==='미설정') return 1;
     if(b==='미설정') return -1;
-    return parseInt(a)-parseInt(b);
+    const [pa,ta]=a.split('|'); const [pb,tb]=b.split('|');
+    if(parseInt(pa)!==parseInt(pb)) return parseInt(pa)-parseInt(pb);
+    return ta.localeCompare(tb);
   });
 
   let totalCount=0;
@@ -1137,9 +1151,15 @@ function renderSchedule(){
   const html=sortedPeriods.map(p=>{
     let sList=[...byPeriod[p]];
     totalCount+=sList.length;
-    const pNum=parseInt(p)||0;
+    // Parse group key: "교시|HH:MM|표시레이블" or "미설정"
+    let pNum=0, blockLabel='';
+    if(p!=='미설정'){
+      const parts=p.split('|');
+      pNum=parseInt(parts[0])||0;
+      blockLabel=parts[2]||'';
+    }
 
-    // Sort students within period by their individual time (ascending)
+    // Students already time-sorted (each has same 30-min block, sort by exact time)
     sList.sort((a,b)=>{
       const getPTime=s=>{
         const pd=(s.periods||{})[dayName];
@@ -1150,10 +1170,6 @@ function renderSchedule(){
       return getPTime(a)-getPTime(b);
     });
 
-    const timeFromStudent=periodTimeMap[p]||'';
-    const periodInfo=periods.find(x=>x.period===pNum);
-    const timeDisplay=timeFromStudent||(periodInfo?periodInfo.time:'');
-    const timeLabel=timeDisplay?` · ${timeDisplay}`:'';
     const todayStr=todayISO();
 
     const cards=sList.map(s=>{
@@ -1182,33 +1198,37 @@ function renderSchedule(){
           ?'background:#f0fdf9;border-color:var(--mint)'
           :'';
 
-      return `<div class="s-card" style="${cardBg}" onclick="startReport('${s.id}')">
-        <div class="s-card-name">
+      // 상태별 스타일
+      const presentActive=!isAbsent&&hasDone;
+      const absentActive=isAbsent;
+      return `<div class="s-card" style="${cardBg}">
+        <div class="s-card-name" style="cursor:pointer" onclick="startReport('${s.id}')">
           <span class="s-card-dot ${isAbsent?'dot-absent':hasDone?'dot-done':'dot-ok'}"></span>
           <span style="font-weight:700">${s.name}</span>
           ${studentTimeStr?`<span style="font-size:10px;color:var(--mint2);background:rgba(0,184,148,.1);border-radius:5px;padding:1px 5px;margin-left:4px;font-weight:600">${studentTimeStr}</span>`:''}
         </div>
-        <div class="s-card-sub" style="margin-bottom:7px">${s.level||'?'} · ${cls?cls.name:'-'}</div>
-        <!-- 출결 버튼 -->
-        <div style="display:flex;gap:5px" onclick="event.stopPropagation()">
+        <div class="s-card-sub" style="margin-bottom:7px;cursor:pointer" onclick="startReport('${s.id}')">${s.level||'?'} · ${cls?cls.name:'-'}</div>
+        <!-- 출결 버튼 (토글) -->
+        <div style="display:flex;gap:5px">
           <button onclick="markAttendance('${s.id}','present')"
             style="flex:1;padding:4px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;
-              ${!isAbsent&&hasDone?'background:var(--mint);color:#fff;border:1.5px solid var(--mint)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
+              ${presentActive?'background:var(--mint);color:#fff;border:1.5px solid var(--mint)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
             ✅ 등원
           </button>
           <button onclick="markAttendance('${s.id}','absent')"
             style="flex:1;padding:4px 0;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;
-              ${isAbsent?'background:var(--red);color:#fff;border:1.5px solid var(--red)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
+              ${absentActive?'background:var(--red);color:#fff;border:1.5px solid var(--red)':'background:#fff;color:var(--txt3);border:1.5px solid var(--border)'}">
             ❌ 결석
           </button>
         </div>
       </div>`;
     }).join('');
 
+    const headerTitle=p==='미설정'?'교시 미설정':(blockLabel&&blockLabel!=='시간미설정'?`${pNum}교시 · ${blockLabel}`:pNum+'교시');
     return `<div class="period-block">
       <div class="period-header">
-        <div class="period-num">${p==='미설정'?'?':pNum}</div>
-        <div><div style="font-size:13px;font-weight:700">${p==='미설정'?'교시 미설정':pNum+'교시'}${timeLabel}</div><div class="period-time">${sList.length}명</div></div>
+        <div class="period-num" style="font-size:${pNum>9?'11px':'14px'}">${p==='미설정'?'?':pNum}</div>
+        <div><div style="font-size:13px;font-weight:700">${headerTitle}</div><div class="period-time">${sList.length}명</div></div>
       </div>
       <div class="student-cards">${cards}</div>
     </div>`;
@@ -1224,69 +1244,70 @@ function startReport(studentId){
   const el=$('r-student');if(el){el.value=studentId;onRStudentSelect();}
 }
 
-// 오늘 시간표에서 출결 바로 처리
+// 오늘 시간표 출결 토글
 async function markAttendance(studentId, status){
   const todayStr=todayISO();
   const s=students.find(x=>x.id===studentId);
   if(!s) return;
-
-  // 이미 오늘 기록이 있는지 확인
   const existing=reports.find(r=>r.studentId===studentId&&r.date===todayStr);
-
   loading(true);
   try{
     if(status==='present'){
-      if(existing){
-        // 기존 기록이 결석이면 등원으로 업데이트
-        if(existing.absent){
-          await db.collection('reports').doc(existing.id).update({absent:false,absentReason:'',updatedAt:new Date().toISOString()});
-          // 보강 계획표에서도 제거
-          const mk=makeups.find(m=>m.studentId===studentId&&m.absentDate===todayStr);
-          if(mk) await db.collection('makeups').doc(mk.id).delete();
-        }
-        // 이미 등원 기록이면 → 일지 작성 화면으로 이동
-        else { loading(false); startReport(studentId); return; }
+      // 토글: 이미 등원이면 → 취소(기록삭제 or 미처리), 아니면 등원
+      if(existing&&!existing.absent){
+        // 등원 상태 → 클릭하면 미처리로 되돌림 (기록 삭제)
+        await db.collection('reports').doc(existing.id).delete();
+        reports=reports.filter(r=>r.id!==existing.id);
+        toast(`↩️ ${s.name} 등원 취소`);
+      } else if(existing&&existing.absent){
+        // 결석 → 등원으로 전환, 보강 계획표 삭제
+        await db.collection('reports').doc(existing.id).update({absent:false,updatedAt:new Date().toISOString()});
+        existing.absent=false;
+        const mk=makeups.find(m=>m.studentId===studentId&&m.absentDate===todayStr);
+        if(mk){await db.collection('makeups').doc(mk.id).delete();makeups=makeups.filter(m=>m.id!==mk.id);}
+        toast(`✅ ${s.name} 등원 전환`);
       } else {
-        // 기록 없으면 → 일지 작성 화면으로 이동
-        loading(false); startReport(studentId); return;
-      }
-    } else {
-      // 결석 처리
-      if(existing){
-        if(!existing.absent){
-          await db.collection('reports').doc(existing.id).update({absent:true,updatedAt:new Date().toISOString()});
-        }
-        // 이미 결석이면 아무것도 안 함
-      } else {
-        // 새 결석 기록 생성
-        const cls=classes.find(c=>c.id===s.classId);
-        const newReport={
+        // 기록 없음 → 등원 기록 생성
+        const newDoc=await db.collection('reports').add({
           studentId,studentName:s.name,classId:s.classId||'',
           date:todayStr,teacher:s.teacher||teachers[0]||'',
           days:'',level:getStudentLevel(s),progress:'',
-          absent:true,absentReason:'',
+          absent:false,absentReason:'',
           reviewTest:'',attitude:'',dailyQuiz:'',homework:'',
           evalModule:'',evalItems:{},praise:[],comment:'',memo:'',
           createdAt:new Date().toISOString()
-        };
-        await db.collection('reports').add(newReport);
-        // 보강 계획표에 자동 추가
-        const mkData={
-          studentId,studentName:s.name,classId:s.classId||'',
-          absentDate:todayStr,absentReason:'',
-          makeupStatus:'pending',makeupDate:'',makeupNote:'',
-          createdAt:new Date().toISOString()
-        };
-        await db.collection('makeups').add(mkData);
-        await loadMakeups();
+        });
+        reports.unshift({id:newDoc.id,studentId,studentName:s.name,date:todayStr,absent:false});
+        toast(`✅ ${s.name} 등원`);
+      }
+    } else {
+      // 결석 토글
+      if(existing&&existing.absent){
+        // 이미 결석 → 결석 취소 (기록 삭제 + 보강 계획 삭제)
+        await db.collection('reports').doc(existing.id).delete();
+        reports=reports.filter(r=>r.id!==existing.id);
+        const mk=makeups.find(m=>m.studentId===studentId&&m.absentDate===todayStr);
+        if(mk){await db.collection('makeups').doc(mk.id).delete();makeups=makeups.filter(m=>m.id!==mk.id);}
+        toast(`↩️ ${s.name} 결석 취소`);
+      } else if(existing&&!existing.absent){
+        // 등원 상태 → 결석으로 전환
+        await db.collection('reports').doc(existing.id).update({absent:true,updatedAt:new Date().toISOString()});
+        existing.absent=true;
+        // 보강 계획 추가
+        const newMk=await db.collection('makeups').add({studentId,studentName:s.name,classId:s.classId||'',absentDate:todayStr,absentReason:'',makeupStatus:'pending',makeupDate:'',makeupNote:'',createdAt:new Date().toISOString()});
+        makeups.push({id:newMk.id,studentId,studentName:s.name,absentDate:todayStr,makeupStatus:'pending'});
+        toast(`❌ ${s.name} 결석 처리`);
+      } else {
+        // 기록 없음 → 결석 생성 + 보강 계획 추가
+        const newDoc=await db.collection('reports').add({studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:s.teacher||teachers[0]||'',days:'',level:getStudentLevel(s),progress:'',absent:true,absentReason:'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',evalModule:'',evalItems:{},praise:[],comment:'',memo:'',createdAt:new Date().toISOString()});
+        reports.unshift({id:newDoc.id,studentId,studentName:s.name,date:todayStr,absent:true});
+        const newMk=await db.collection('makeups').add({studentId,studentName:s.name,classId:s.classId||'',absentDate:todayStr,absentReason:'',makeupStatus:'pending',makeupDate:'',makeupNote:'',createdAt:new Date().toISOString()});
+        makeups.push({id:newMk.id,studentId,studentName:s.name,absentDate:todayStr,makeupStatus:'pending'});
+        toast(`❌ ${s.name} 결석`);
       }
     }
-    await loadReports();
     renderSchedule();
-    toast(status==='present'?`✅ ${s.name} 등원 처리`:`❌ ${s.name} 결석 처리`);
-  } catch(e){
-    toast('오류: '+e.message);
-  }
+  }catch(e){toast('오류: '+e.message);}
   loading(false);
 }
 
@@ -1336,7 +1357,7 @@ function renderEvalForm(module){
   const cfg=EVAL_MODULES[module]||customModules[module];if(!cfg)return;
   const starSVG=(id,n)=>`<svg class="eval-star-svg" onclick="setStar('${id}',${n},this)" viewBox="0 0 24 24" id="star-${id}-${n}">
     <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" fill="#dde4ee" stroke="#dde4ee" stroke-width="1"/></svg>`;
-  area.innerHTML=`<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--txt3);margin:2px 0 8px">📊 ${cfg.label} 평가 영역</div>`+
+  area.innerHTML=`<div></div>`+
     cfg.sections.map(sec=>`
     <div class="fs" style="margin-bottom:11px">
       <div class="fs-title" style="font-size:13px">
@@ -1385,13 +1406,13 @@ async function saveReport(){
   const studentId=$('r-student').value;
   if(!studentId){toast('⚠️ 학생을 선택해주세요');return}
   const s=students.find(x=>x.id===studentId);
-  const absent=$('r-absent').checked;
   const hwMap={y:'완료',p:'일부 제출',n:'미제출'};
 
   // Collect section feedbacks
   const sectionFb={};
-  if(currentEvalModule&&EVAL_MODULES[currentEvalModule]){
-    EVAL_MODULES[currentEvalModule].sections.forEach(sec=>{
+  const modCfg=currentEvalModule?(EVAL_MODULES[currentEvalModule]||customModules[currentEvalModule]):null;
+  if(modCfg){
+    modCfg.sections.forEach(sec=>{
       const el=document.getElementById('fb-'+sec.id);
       if(el) sectionFb['fb_'+sec.id]=el.value.trim();
     });
@@ -1403,7 +1424,7 @@ async function saveReport(){
     studentId,studentName:s?.name||'',classId:s?.classId||'',
     date:$('r-date').value,teacher:$('r-teacher').value,
     days:days.join(','),level:$('r-level').value,progress:$('r-progress').value,
-    absent,absentReason:absent?$('r-absent-reason').value:'',
+    absent:false,absentReason:'',
     reviewTestItems:$('r-review-items').value,reviewTest:$('r-review').value,
     attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,
     homework:hwMap[hwState]||'',
@@ -1412,19 +1433,48 @@ async function saveReport(){
     createdAt:new Date().toISOString()
   };
 
-  loading(true);$('r-save-btn').disabled=true;
-  await db.collection('reports').add(data);
-
-  // If absent → create makeup plan
-  if(absent){
-    const mkData={studentId,studentName:s?.name||'',classId:s?.classId||'',absentDate:data.date,absentReason:data.absentReason,makeupStatus:'pending',makeupDate:'',makeupNote:'',createdAt:new Date().toISOString()};
-    await db.collection('makeups').add(mkData);
-    await loadMakeups();
+  loading(true);
+  const btn=$('r-save-btn');if(btn)btn.disabled=true;
+  try{
+    const docRef=await db.collection('reports').add(data);
+    data.id=docRef.id;
+    // Update local cache immediately without full reload
+    reports.unshift({id:docRef.id,...data});
+    loading(false);
+    // Show kakao send UI
+    showAfterSaveUI(data);
+    toast('✅ 일지 저장 완료!');
+  }catch(e){
+    loading(false);
+    if(btn)btn.disabled=false;
+    toast('❌ 저장 실패: '+e.message);
   }
+}
 
-  await loadReports();renderSchedule();renderHistory();
-  resetWriteForm();loading(false);
-  toast('✅ 일지 저장 완료!');goto('schedule');
+function showAfterSaveUI(reportData){
+  const el=$('r-after-save');
+  if(!el)return;
+  el.style.display='block';
+  el.innerHTML=`
+    <div style="background:linear-gradient(135deg,#1a2744,#2e3f6e);border-radius:var(--r-lg);padding:16px;margin-bottom:10px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:4px">✅ ${reportData.studentName} 일지 저장 완료!</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:14px">${reportData.date}</div>
+      <button onclick="sendKakao('${reportData.id}')" style="width:100%;background:#fee500;color:#3c1e1e;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">
+        💬 카카오톡으로 전송하기 (복사)
+      </button>
+      <button onclick="goToScheduleAfterSave()" style="width:100%;background:transparent;border:1.5px solid rgba(255,255,255,.2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);cursor:pointer">
+        📅 오늘 시간표로 돌아가기
+      </button>
+    </div>`;
+  // scroll to the save buttons area
+  el.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function goToScheduleAfterSave(){
+  resetWriteForm();
+  // refresh schedule in background
+  loadReports().then(()=>{renderSchedule();});
+  goto('schedule');
 }
 
 function resetWriteForm(){
@@ -1442,9 +1492,10 @@ function resetWriteForm(){
   document.querySelectorAll('#review-btns .rt-btn').forEach(b=>b.classList.remove('on','on-2','on-1'));
   document.querySelectorAll('#attitude-btns .rt-btn').forEach(b=>b.classList.remove('on','on-2','on-1'));
   renderEvalForm('');
-  $('r-save-btn').disabled=false;
-  const s=todayISO();$('r-date').value=s;
-  $('r-header-meta').innerHTML='';
+  const btn=$('r-save-btn');if(btn)btn.disabled=false;
+  const todayStr=todayISO();$('r-date').value=todayStr;
+  const hm=$('r-header-meta');if(hm)hm.innerHTML='';
+  const ras=$('r-after-save');if(ras){ras.style.display='none';ras.innerHTML='';}
 }
 function $a(id){return document.getElementById(id)}
 function $(id){return document.getElementById(id)||(id.includes('.')?document.querySelector(id):null)}
@@ -1564,20 +1615,28 @@ ${r.memo?`\n📢 전달 사항:\n${r.memo}`:''}
 }
 
 /* ════ CLASSES ════ */
+let dragSrcId=null;
+
 function renderClasses(){
   const el=$('class-list');
   if(!classes.length){el.innerHTML=`<div class="empty"><div class="ei">🏫</div><div class="et">클래스가 없습니다</div></div>`;return}
-  // Sort by sortOrder
   const sorted=[...classes].sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
   el.innerHTML=sorted.map((c,idx)=>{
     const cnt=students.filter(s=>s.classId===c.id).length;
     const mod=EVAL_MODULES[c.evalModule]||customModules[c.evalModule];
-    const isFirst=idx===0, isLast=idx===sorted.length-1;
-    return `<div class="card" style="padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
-      <!-- 순서 버튼 -->
-      <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">
-        <button onclick="moveClass('${c.id}',-1)" style="width:24px;height:24px;border-radius:5px;background:${isFirst?'var(--border)':'var(--surface2)'};border:1px solid var(--border);font-size:12px;cursor:${isFirst?'not-allowed':'pointer'};color:${isFirst?'var(--txt3)':'var(--txt2)'}" ${isFirst?'disabled':''}>▲</button>
-        <button onclick="moveClass('${c.id}',1)" style="width:24px;height:24px;border-radius:5px;background:${isLast?'var(--border)':'var(--surface2)'};border:1px solid var(--border);font-size:12px;cursor:${isLast?'not-allowed':'pointer'};color:${isLast?'var(--txt3)':'var(--txt2)'}" ${isLast?'disabled':''}>▼</button>
+    return `<div class="card cls-drag-item" id="clsdrag-${c.id}"
+        style="padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px"
+        draggable="true"
+        ondragstart="clsDragStart(event,'${c.id}')"
+        ondragover="clsDragOver(event,'${c.id}')"
+        ondragleave="clsDragLeave(event)"
+        ondrop="clsDrop(event,'${c.id}')"
+        ondragend="clsDragEnd(event)">
+      <!-- 드래그 핸들 -->
+      <div class="drag-handle" title="드래그하여 순서 변경">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+        </svg>
       </div>
       <div style="width:38px;height:38px;background:rgba(0,184,148,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏫</div>
       <div style="flex:1;cursor:pointer" onclick="openClassModal('${c.id}')">
@@ -1590,22 +1649,46 @@ function renderClasses(){
   }).join('');
 }
 
-async function moveClass(id, dir){
+function clsDragStart(e,id){
+  dragSrcId=id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
+}
+function clsDragOver(e,id){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  if(id!==dragSrcId){
+    document.querySelectorAll('.cls-drag-item').forEach(el=>el.classList.remove('drag-over'));
+    e.currentTarget.classList.add('drag-over');
+  }
+}
+function clsDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+function clsDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.cls-drag-item').forEach(el=>el.classList.remove('drag-over'));
+}
+async function clsDrop(e,targetId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!dragSrcId||dragSrcId===targetId)return;
   const sorted=[...classes].sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-  const idx=sorted.findIndex(c=>c.id===id);
-  const swapIdx=idx+dir;
-  if(swapIdx<0||swapIdx>=sorted.length) return;
-  // Swap sortOrder
-  const a=sorted[idx], b=sorted[swapIdx];
-  const tmpOrder=a.sortOrder??idx;
-  const bOrder=b.sortOrder??swapIdx;
+  const srcIdx=sorted.findIndex(x=>x.id===dragSrcId);
+  const tgtIdx=sorted.findIndex(x=>x.id===targetId);
+  if(srcIdx<0||tgtIdx<0)return;
+  // Reorder array
+  const moved=sorted.splice(srcIdx,1)[0];
+  sorted.splice(tgtIdx,0,moved);
+  // Save new sortOrders
   loading(true);
   const batch=db.batch();
-  batch.update(db.collection('classes').doc(a.id),{sortOrder:bOrder});
-  batch.update(db.collection('classes').doc(b.id),{sortOrder:tmpOrder});
+  sorted.forEach((cls,i)=>batch.update(db.collection('classes').doc(cls.id),{sortOrder:i}));
   await batch.commit();
   await loadClasses();renderClasses();
   loading(false);
+  toast('✅ 순서 저장됨');
+  dragSrcId=null;
 }
 
 function openClassModal(id){
