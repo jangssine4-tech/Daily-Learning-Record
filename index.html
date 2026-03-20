@@ -410,6 +410,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
 
     <!-- ─── WRITE ─── -->
     <div class="view" id="view-write">
+      <div style="max-width:480px;margin:0 auto">
       <div class="page-top"><h2>학습 일지 작성</h2><p>오늘의 수업 내용을 입력하세요</p></div>
       <div class="cp">
 
@@ -514,6 +515,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
         <button class="btn btn-outline btn-block" onclick="resetWriteForm()">초기화</button>
         <div style="height:24px"></div>
       </div>
+      </div><!-- /max-width wrapper -->
     </div>
 
     <!-- ─── HISTORY ─── -->
@@ -1032,7 +1034,23 @@ function setFormDates(){
 
 /* ════ DATA LOAD ════ */
 async function loadStudents(){const s=await db.collection('students').orderBy('name').get();students=s.docs.map(d=>({id:d.id,...d.data()}));populateStudentSelects();}
-async function loadClasses(){const s=await db.collection('classes').orderBy('name').get();classes=s.docs.map(d=>({id:d.id,...d.data()}));populateClassSelects();}
+async function loadClasses(){
+  const s=await db.collection('classes').orderBy('sortOrder','asc').get().catch(async()=>{
+    // fallback if sortOrder index doesn't exist yet
+    const s2=await db.collection('classes').orderBy('name').get();
+    return s2;
+  });
+  classes=s.docs.map(d=>({id:d.id,...d.data()}));
+  // assign sortOrder to existing classes that don't have it
+  let needsUpdate=false;
+  classes.forEach((c,i)=>{if(c.sortOrder===undefined){c.sortOrder=i;needsUpdate=true;}});
+  if(needsUpdate){
+    const batch=db.batch();
+    classes.forEach((c,i)=>batch.update(db.collection('classes').doc(c.id),{sortOrder:i}));
+    await batch.commit();
+  }
+  populateClassSelects();
+}
 async function loadReports(){const s=await db.collection('reports').orderBy('date','desc').limit(500).get();reports=s.docs.map(d=>({id:d.id,...d.data()}));}
 async function loadMakeups(){const s=await db.collection('makeups').orderBy('absentDate','desc').get();makeups=s.docs.map(d=>({id:d.id,...d.data()}));}
 async function loadConsultations(){const s=await db.collection('consultations').orderBy('date','desc').get();consultations=s.docs.map(d=>({id:d.id,...d.data()}));}
@@ -1073,17 +1091,34 @@ function renderSchedule(){
   }
 
   // Group students by period for today
-  const byPeriod={};
+  // periods field can be: {period:N, time:"HH:MM"} (new) or "N교시" string (legacy)
+  const byPeriod={};  // key = period number (string) or '미설정'
+  const periodTimeMap={};  // period num → display time
+
   students.forEach(s=>{
     if(!(s.days||[]).includes(dayName)) return;
-    const p=(s.periods||{})[dayName]||'교시미설정';
-    if(!byPeriod[p]) byPeriod[p]=[];
-    byPeriod[p].push(s);
+    const pData=(s.periods||{})[dayName];
+    let pKey='미설정', pNum=0, pTime='';
+    if(pData){
+      if(typeof pData==='object'){
+        pNum=pData.period||0;
+        pTime=pData.time||'';
+        pKey=pNum?String(pNum):'미설정';
+      } else {
+        // legacy: "2교시" string
+        pNum=parseInt(pData)||0;
+        pKey=pNum?String(pNum):'미설정';
+      }
+    }
+    if(pNum&&pTime) periodTimeMap[pKey]=pTime;
+    if(!byPeriod[pKey]) byPeriod[pKey]=[];
+    byPeriod[pKey].push(s);
   });
 
   const sortedPeriods=Object.keys(byPeriod).sort((a,b)=>{
-    const na=parseInt(a)||99, nb=parseInt(b)||99;
-    return na-nb;
+    if(a==='미설정') return 1;
+    if(b==='미설정') return -1;
+    return parseInt(a)-parseInt(b);
   });
 
   let totalCount=0;
@@ -1096,8 +1131,11 @@ function renderSchedule(){
     const sList=byPeriod[p];
     totalCount+=sList.length;
     const pNum=parseInt(p)||0;
+    // Time: from student data first, then fallback to global periods config
+    const timeFromStudent=periodTimeMap[p]||'';
     const periodInfo=periods.find(x=>x.period===pNum);
-    const timeLabel=periodInfo?` · ${periodInfo.time}`:'';
+    const timeDisplay=timeFromStudent||(periodInfo?periodInfo.time:'');
+    const timeLabel=timeDisplay?` · ${timeDisplay}`:'';
     const todayStr=todayISO();
 
     const cards=sList.map(s=>{
@@ -1114,8 +1152,8 @@ function renderSchedule(){
 
     return `<div class="period-block">
       <div class="period-header">
-        <div class="period-num">${pNum||'?'}</div>
-        <div><div style="font-size:13px;font-weight:700">${pNum}교시${timeLabel}</div><div class="period-time">${sList.length}명</div></div>
+        <div class="period-num">${p==='미설정'?'?':pNum}</div>
+        <div><div style="font-size:13px;font-weight:700">${p==='미설정'?'교시 미설정':pNum+'교시'}${timeLabel}</div><div class="period-time">${sList.length}명</div></div>
       </div>
       <div class="student-cards">${cards}</div>
     </div>`;
@@ -1408,19 +1446,45 @@ ${r.memo?`\n📢 전달 사항:\n${r.memo}`:''}
 function renderClasses(){
   const el=$('class-list');
   if(!classes.length){el.innerHTML=`<div class="empty"><div class="ei">🏫</div><div class="et">클래스가 없습니다</div></div>`;return}
-  el.innerHTML=classes.map(c=>{
+  // Sort by sortOrder
+  const sorted=[...classes].sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+  el.innerHTML=sorted.map((c,idx)=>{
     const cnt=students.filter(s=>s.classId===c.id).length;
-    const mod=EVAL_MODULES[c.evalModule];
-    return `<div class="card" style="padding:13px 15px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:11px" onclick="openClassModal('${c.id}')">
-      <div style="width:40px;height:40px;background:rgba(0,184,148,.1);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0">🏫</div>
-      <div style="flex:1">
+    const mod=EVAL_MODULES[c.evalModule]||customModules[c.evalModule];
+    const isFirst=idx===0, isLast=idx===sorted.length-1;
+    return `<div class="card" style="padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+      <!-- 순서 버튼 -->
+      <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">
+        <button onclick="moveClass('${c.id}',-1)" style="width:24px;height:24px;border-radius:5px;background:${isFirst?'var(--border)':'var(--surface2)'};border:1px solid var(--border);font-size:12px;cursor:${isFirst?'not-allowed':'pointer'};color:${isFirst?'var(--txt3)':'var(--txt2)'}" ${isFirst?'disabled':''}>▲</button>
+        <button onclick="moveClass('${c.id}',1)" style="width:24px;height:24px;border-radius:5px;background:${isLast?'var(--border)':'var(--surface2)'};border:1px solid var(--border);font-size:12px;cursor:${isLast?'not-allowed':'pointer'};color:${isLast?'var(--txt3)':'var(--txt2)'}" ${isLast?'disabled':''}>▼</button>
+      </div>
+      <div style="width:38px;height:38px;background:rgba(0,184,148,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏫</div>
+      <div style="flex:1;cursor:pointer" onclick="openClassModal('${c.id}')">
         <div style="font-size:14px;font-weight:700">${c.name}</div>
         <div style="font-size:11px;color:var(--txt3);margin-top:2px">담임: ${c.teacher||'-'} · 보조: ${c.assistantTeacher||'-'} · ${cnt}명 · ${(c.days||[]).join(',')||'요일미설정'}</div>
         <div style="margin-top:4px">${mod?`<span class="badge ${mod.badgeCls}">${mod.label}</span>`:'<span class="badge bg-gray">모듈없음</span>'}</div>
       </div>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2" style="cursor:pointer;flex-shrink:0" onclick="openClassModal('${c.id}')"><path d="M9 18l6-6-6-6"/></svg>
     </div>`;
   }).join('');
+}
+
+async function moveClass(id, dir){
+  const sorted=[...classes].sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+  const idx=sorted.findIndex(c=>c.id===id);
+  const swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=sorted.length) return;
+  // Swap sortOrder
+  const a=sorted[idx], b=sorted[swapIdx];
+  const tmpOrder=a.sortOrder??idx;
+  const bOrder=b.sortOrder??swapIdx;
+  loading(true);
+  const batch=db.batch();
+  batch.update(db.collection('classes').doc(a.id),{sortOrder:bOrder});
+  batch.update(db.collection('classes').doc(b.id),{sortOrder:tmpOrder});
+  await batch.commit();
+  await loadClasses();renderClasses();
+  loading(false);
 }
 
 function openClassModal(id){
@@ -1443,7 +1507,7 @@ async function saveClass(){
   const data={name,teacher:$('cls-teacher').value,assistantTeacher:$('cls-asst').value,evalModule:$('cls-module').value,days,memo:$('cls-memo').value.trim(),updatedAt:new Date().toISOString()};
   const id=$('cls-id').value;
   if(id) await db.collection('classes').doc(id).update(data);
-  else await db.collection('classes').add({...data,createdAt:new Date().toISOString()});
+  else await db.collection('classes').add({...data,sortOrder:classes.length,createdAt:new Date().toISOString()});
   await loadClasses();renderClasses();populateClassSelects();closeM('class');loading(false);toast('✅ 저장됨');
 }
 async function deleteClass(){
