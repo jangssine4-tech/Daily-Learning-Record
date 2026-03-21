@@ -3025,25 +3025,40 @@ function renderRevSummary(yr){
   if(!el) return;
   const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   const curMoNow=new Date().getMonth(); // 0-indexed current month
+  const curYrNow=new Date().getFullYear();
   const activeStudents2=students.filter(s=>['재원','신규'].includes(s.status||'재원'));
 
   const monthData=months.map((m,i)=>{
     const mo=i+1;
-    const revs=revenues.filter(r=>{const d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()+1===mo;});
-    const exps=expenses.filter(e=>{const d=new Date(e.date||e.createdAt);return d.getFullYear()===yr&&d.getMonth()+1===mo;});
+    const revs=revenues.filter(r=>{const d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()+1===mo&&!r.isManualMeta;});
+    const exps=expenses.filter(e=>{
+      if(e.revYear&&e.revMonth) return e.revYear===yr&&e.revMonth===mo;
+      const d=new Date(e.date||e.createdAt);return d.getFullYear()===yr&&d.getMonth()+1===mo;
+    });
     const totalRev=revs.reduce((s,r)=>s+(parseInt(r.amount)||0),0);
     const totalExp=exps.reduce((s,e)=>s+(parseInt(e.amount)||0),0);
     const paidCount=new Set(revs.map(r=>r.studentId)).size;
-    return {m,mo,totalRev,totalExp,net:totalRev-totalExp,paidCount};
+    // hasData: this month has at least one revenue or expense record
+    const hasData=revs.length>0||exps.length>0;
+    return {m,mo,totalRev,totalExp,net:totalRev-totalExp,paidCount,hasData};
   });
 
-  // Helper: only show value for past/current months
-  const pastCell=(i,val,style)=>i<=curMoNow
-    ?`<td style="text-align:center;${style||''}">${val}</td>`
-    :`<td></td>`;
-  const pastCellR=(i,val,style)=>i<=curMoNow
-    ?`<td style="text-align:right;${style||''}">${val}</td>`
-    :`<td></td>`;
+  // Helper: show value only if month has actual data AND is not in future
+  // Future = yr > curYrNow, or yr===curYrNow && i > curMoNow
+  const isFuture=(i)=>(yr>curYrNow)||(yr===curYrNow&&i>curMoNow);
+  const hasDataForMonth=(i)=>monthData[i].hasData;
+
+  // For student/level counts: show only if month has revenue data (payment recorded)
+  const cell=(i,val,style,requireData=true)=>{
+    if(isFuture(i)) return '<td></td>';
+    if(requireData&&!hasDataForMonth(i)) return '<td></td>';
+    return '<td style="text-align:center;'+(style||'')+'">'+val+'</td>';
+  };
+  const cellR=(i,val,style,requireData=true)=>{
+    if(isFuture(i)) return '<td></td>';
+    if(requireData&&!hasDataForMonth(i)) return '<td></td>';
+    return '<td style="text-align:right;'+(style||'')+'">'+val+'</td>';
+  };
 
   // Level counts
   const getLevelCount=(fn)=>activeStudents2.filter(fn).length;
@@ -3058,7 +3073,7 @@ function renderRevSummary(yr){
   const quitN=students.filter(s=>s.status==='퇴원').length;
   const restN=students.filter(s=>s.status==='휴원').length;
 
-  const htmlRows_student=[
+  const studentRows=[
     ['재원생',activeStudents2.length,'font-weight:700'],
     ['신규 등록',newN,'color:var(--mint)'],
     ['퇴원생',quitN,'color:var(--red)'],
@@ -3066,58 +3081,50 @@ function renderRevSummary(yr){
     ['순증감',newN-quitN,(newN-quitN)>=0?'color:var(--mint)':'color:var(--red)'],
   ];
 
-  const htmlRows_level=[
-    ['Phonics',phonicsN],['Basic',basicN],['Grammar',grammarN],
-    ['Prime/Advanced',primeN],['Elite',eliteN],['중등',midN],['고등',highN],
-    ['합계',activeStudents2.length,'font-weight:700;background:var(--surface2)'],
+  const levelRows=[
+    ['Phonics',phonicsN,''],['Basic',basicN,''],['Grammar',grammarN,''],
+    ['Prime/Advanced',primeN,''],['Elite',eliteN,''],['중등',midN,''],['고등',highN,''],
+    ['합계',activeStudents2.length,'font-weight:700'],
   ];
 
-  const htmlRows_revenue=[
-    {label:'목표 수강료',fn:(d)=>'-'},
-    {label:'실제 수강료',fn:(d)=>d.totalRev?(d.totalRev.toLocaleString()+'원'):'₩0',style:'color:var(--mint);font-weight:600'},
-    {label:'미납 금액',fn:(d,i)=>{const mo=i+1;const unpaidN=activeStudents2.filter(s=>!revenues.some(r=>r.studentId===s.id&&new Date(r.paidDate).getMonth()+1===mo&&new Date(r.paidDate).getFullYear()===yr)).length;return unpaidN+'명';},style:'color:var(--red)'},
-    {label:'달성률',fn:(d)=>'-'},
-    {label:'미납 건수',fn:(d,i)=>{const mo=i+1;return activeStudents2.filter(s=>!revenues.some(r=>r.studentId===s.id&&new Date(r.paidDate).getMonth()+1===mo&&new Date(r.paidDate).getFullYear()===yr)).length+'건';}},
-    {label:'지출 합계',fn:(d)=>d.totalExp?(d.totalExp.toLocaleString()+'원'):'₩0',style:'color:var(--red)'},
-    {label:'순수익',fn:(d)=>d.net.toLocaleString()+'원',style:(d)=>d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700',rowStyle:'background:var(--surface2)'},
-  ];
-
-  const monthTH=months.map(m=>`<th style="text-align:center">${m}</th>`).join('');
-  const monthTHR=months.map(m=>`<th style="text-align:right">${m}</th>`).join('');
+  const monthTH=months.map(m=>`<th style="text-align:center;min-width:52px">${m}</th>`).join('');
+  const monthTHR=months.map(m=>`<th style="text-align:right;min-width:52px">${m}</th>`).join('');
 
   el.innerHTML=`
   <div class="expense-section">
-    <h4>👥 원생 현황 (${yr}년)</h4>
+    <h4>👥 원생 현황 (${yr}년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납 데이터가 있는 달만 표시</span></h4>
     <div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">
       <thead><tr><th>항목</th>${monthTH}</tr></thead>
-      <tbody>${htmlRows_student.map(([label,valFn,style])=>`<tr>
-        <td style="${style||''}">${label}</td>
-        ${months.map((_,i)=>pastCell(i,typeof valFn==='function'?valFn(i):valFn,style||'')).join('')}
+      <tbody>${studentRows.map(([label,val,style])=>`<tr>
+        <td style="${style}">${label}</td>
+        ${months.map((_,i)=>cell(i,val,style)).join('')}
       </tr>`).join('')}</tbody>
     </table></div>
   </div>
   <div class="expense-section">
-    <h4>📊 레벨별 원생 현황 (${yr}년)</h4>
+    <h4>📊 레벨별 원생 현황 (${yr}년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납 데이터가 있는 달만 표시</span></h4>
     <div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">
       <thead><tr><th>레벨</th>${monthTH}</tr></thead>
-      <tbody>${htmlRows_level.map(([label,val,style])=>`<tr style="${style&&style.includes('background')?style:''}">
-        <td style="${style&&!style.includes('background')?style:''}">${label}</td>
-        ${months.map((_,i)=>pastCell(i,val,style&&!style.includes('background')?style:'')).join('')}
+      <tbody>${levelRows.map(([label,val,style])=>`<tr>
+        <td style="${style}">${label}</td>
+        ${months.map((_,i)=>cell(i,val,style)).join('')}
       </tr>`).join('')}</tbody>
     </table></div>
   </div>
   <div class="expense-section">
-    <h4>💰 매출 현황 (${yr}년)</h4>
+    <h4>💰 매출 현황 (${yr}년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납/지출 데이터가 있는 달만 표시</span></h4>
     <div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">
       <thead><tr><th>항목</th>${monthTHR}</tr></thead>
-      <tbody>${htmlRows_revenue.map(row=>`<tr style="${row.rowStyle||''}">
-        <td>${row.label}</td>
-        ${monthData.map((d,i)=>{
-          const val=typeof row.fn==='function'?row.fn(d,i):'-';
-          const style=typeof row.style==='function'?row.style(d):(row.style||'');
-          return pastCellR(i,val,style);
-        }).join('')}
-      </tr>`).join('')}</tbody>
+      <tbody>
+        <tr><td>실제 수강료</td>${monthData.map((d,i)=>cellR(i,d.totalRev?d.totalRev.toLocaleString()+'원':'₩0','color:var(--mint);font-weight:600')).join('')}</tr>
+        <tr><td>미납 금액</td>${monthData.map((d,i)=>{
+          const mo=i+1;
+          const unpaidN=activeStudents2.filter(s=>!revenues.some(r=>r.studentId===s.id&&!r.isManualMeta&&new Date(r.paidDate).getMonth()+1===mo&&new Date(r.paidDate).getFullYear()===yr)).length;
+          return cellR(i,unpaidN+'명','color:var(--red)');
+        }).join('')}</tr>
+        <tr><td>지출 합계</td>${monthData.map((d,i)=>cellR(i,d.totalExp?d.totalExp.toLocaleString()+'원':'₩0','color:var(--red)')).join('')}</tr>
+        <tr style="background:var(--surface2)"><td style="font-weight:700">순수익</td>${monthData.map((d,i)=>cellR(i,d.net.toLocaleString()+'원',d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700')).join('')}</tr>
+      </tbody>
     </table></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
@@ -3144,44 +3151,6 @@ function renderRevSummary(yr){
   </div>`;
   // Load saved analysis data
   loadAnalysisData(yr);
-}
-
-function openGoalEditModal(yr){
-  const overlay=document.createElement('div');
-  overlay.className='mo';overlay.style.display='flex';
-  // Load goal targets from Firestore
-  db.collection('goalTargets').doc(String(yr)).get().then(doc=>{
-    const saved=doc.exists?doc.data():{};
-    const defaultTargets={'총 재원생 수 (명)':50,'신규 등록생 수 (명)':20,'Phonics 레벨 인원':8,'Basic 레벨 인원':10,'Grammar 레벨 인원':10,'중등부 인원':12,'고등부 인원':5,'퇴원율 (%)':5,'월 평균 수강료 수입 (만원)':1000,'연간 수강료 수입 (만원)':12000};
-    const labels=Object.keys(defaultTargets);
-    overlay.innerHTML=`<div class="ms"><div class="mh"></div>
-      <div class="mt">✏️ ${yr}년 연간 목표 설정</div>
-      <div style="margin-bottom:14px">
-        ${labels.map(l=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
-          <span style="font-size:13px">${l}</span>
-          <input type="number" id="gt-${l.replace(/[^a-zA-Z0-9가-힣]/g,'_')}" value="${saved[l]||defaultTargets[l]}" style="width:90px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;text-align:right;font-size:13px">
-        </div>`).join('')}
-      </div>
-      <button class="btn btn-green btn-block" onclick="saveGoalTargets(${yr},this.closest('.mo'))">저장</button>
-      <div style="height:6px"></div>
-      <button class="btn btn-outline btn-block" onclick="this.closest('.mo').remove()">취소</button>
-    </div>`;
-    overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
-    document.body.appendChild(overlay);
-  }).catch(()=>{overlay.remove();});
-  document.body.appendChild(overlay);
-}
-async function saveGoalTargets(yr,overlay){
-  const labels=['총 재원생 수 (명)','신규 등록생 수 (명)','Phonics 레벨 인원','Basic 레벨 인원','Grammar 레벨 인원','중등부 인원','고등부 인원','퇴원율 (%)','월 평균 수강료 수입 (만원)','연간 수강료 수입 (만원)'];
-  const data={};
-  labels.forEach(l=>{
-    const inp=overlay.querySelector('#gt-'+l.replace(/[^a-zA-Z0-9가-힣]/g,'_'));
-    if(inp) data[l]=parseInt(inp.value)||0;
-  });
-  await db.collection('goalTargets').doc(String(yr)).set({...data,updatedAt:new Date().toISOString()});
-  overlay.remove();
-  renderRevGoals(yr);
-  toast('✅ 목표 저장됨');
 }
 
 async function saveAnalysis(type,key,val){
