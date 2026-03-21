@@ -2064,159 +2064,129 @@ function saveReportAsImage(reportId){
   const r=reports.find(x=>x.id===reportId);if(!r)return;
   const mod=r.evalModule?EVAL_MODULES[r.evalModule]:null;
 
-  // Build star display
-  const starDisplay=(val)=>{
+  function stars(val){
     if(!val||val===0) return '<span style="color:#ccc">☆☆☆</span>';
-    const filled='<span style="color:#f5a623">★</span>'.repeat(val);
-    const empty='<span style="color:#ddd">☆</span>'.repeat(3-val);
-    const label=val===3?' 매우잘함':val===2?' 잘함':' 노력필요';
-    return filled+empty+`<span style="font-size:11px;color:#888;margin-left:3px">${label}</span>`;
-  };
-
-  // Build eval sections HTML
-  let evalSectionsHTML='';
-  if(mod&&r.evalItems){
-    evalSectionsHTML=`<div style="margin-top:14px">
-      <div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #e8f0fe">📊 ${mod.label} 평가</div>`;
-    mod.sections.forEach(sec=>{
-      evalSectionsHTML+=`<div style="margin-bottom:10px">
-        <div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:5px;background:#eff6ff;padding:4px 8px;border-radius:5px">${sec.title}</div>`;
-      sec.items.forEach(item=>{
-        const v=r.evalItems[item.key]||0;
-        evalSectionsHTML+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 4px;border-bottom:1px solid #f0f0f0;font-size:12px">
-          <span style="color:#374151">${item.label}</span>
-          <span>${starDisplay(v)}</span>
-        </div>`;
-      });
-      const fb=r['fb_'+sec.id];
-      if(fb) evalSectionsHTML+=`<div style="background:#f8fafc;border-left:3px solid #60a5fa;padding:6px 10px;font-size:11px;color:#555;margin-top:5px;border-radius:0 5px 5px 0;line-height:1.5">${fb}</div>`;
-      evalSectionsHTML+=`</div>`;
-    });
-    evalSectionsHTML+=`</div>`;
+    var f='<span style="color:#f5a623">★</span>'.repeat(val);
+    var e='<span style="color:#ddd">☆</span>'.repeat(3-val);
+    var lbl=val===3?' 매우잘함':val===2?' 잘함':' 노력필요';
+    return f+e+'<span style="font-size:11px;color:#888;margin-left:3px">'+lbl+'</span>';
   }
 
-  // Homework icon
-  const hwIcon=r.homework==='완료'?'✅ 완료':r.homework==='미제출'?'❌ 미제출':r.homework==='일부 제출'?'📋 일부 제출':(r.homework||'-');
+  function infoRow(label,val){
+    if(!val) return '';
+    return '<div style="display:flex;padding:6px 4px;border-bottom:1px solid #f0f0f0;font-size:12px">'
+      +'<span style="color:#9ca3af;min-width:90px;flex-shrink:0;font-weight:600">'+label+'</span>'
+      +'<span style="color:#1f2937;font-weight:500">'+val+'</span></div>';
+  }
 
-  // Praise
-  const praiseHTML=Array.isArray(r.praise)&&r.praise.length
-    ?`<div style="background:#fffbeb;border-radius:8px;padding:10px 12px;margin-top:12px;border:1px solid #fde68a">
-        <span style="font-size:12px;font-weight:700;color:#92400e">🏆 오늘의 칭찬</span>
-        <div style="font-size:13px;color:#78350f;margin-top:4px">${r.praise.join(' · ')}</div>
-      </div>`
-    :'';
+  // Eval sections
+  var evalHTML='';
+  if(mod&&r.evalItems){
+    evalHTML='<div style="margin-top:14px">'
+      +'<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #e8f0fe">📊 '+mod.label+' 평가</div>';
+    mod.sections.forEach(function(sec){
+      evalHTML+='<div style="margin-bottom:10px">'
+        +'<div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:5px;background:#eff6ff;padding:4px 8px;border-radius:5px">'+sec.title+'</div>';
+      sec.items.forEach(function(item){
+        var v=r.evalItems[item.key]||0;
+        evalHTML+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 4px;border-bottom:1px solid #f0f0f0;font-size:12px">'
+          +'<span style="color:#374151">'+item.label+'</span>'
+          +'<span>'+stars(v)+'</span></div>';
+      });
+      var fb=r['fb_'+sec.id];
+      if(fb) evalHTML+='<div style="background:#f8fafc;border-left:3px solid #60a5fa;padding:6px 10px;font-size:11px;color:#555;margin-top:5px;border-radius:0 5px 5px 0;line-height:1.5">'+fb+'</div>';
+      evalHTML+='</div>';
+    });
+    evalHTML+='</div>';
+  }
 
-  // Comment
-  const commentHTML=r.comment
-    ?`<div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bbf7d0">
-        <span style="font-size:12px;font-weight:700;color:#166534">💬 선생님 코멘트</span>
-        <div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6">${r.comment}</div>
-      </div>`
-    :'';
+  var hwIcon=r.homework==='완료'?'✅ 완료':r.homework==='미제출'?'❌ 미제출':r.homework==='일부 제출'?'📋 일부 제출':(r.homework||'-');
 
-  // Memo
-  const memoHTML=r.memo
-    ?`<div style="background:#eff6ff;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bfdbfe">
-        <span style="font-size:12px;font-weight:700;color:#1e40af">📢 전달 사항</span>
-        <div style="font-size:13px;color:#1e3a8a;margin-top:4px;line-height:1.6">${r.memo}</div>
-      </div>`
-    :'';
+  var praiseHTML='';
+  if(Array.isArray(r.praise)&&r.praise.length){
+    praiseHTML='<div style="background:#fffbeb;border-radius:8px;padding:10px 12px;margin-top:12px;border:1px solid #fde68a">'
+      +'<span style="font-size:12px;font-weight:700;color:#92400e">🏆 오늘의 칭찬</span>'
+      +'<div style="font-size:13px;color:#78350f;margin-top:4px">'+r.praise.join(' · ')+'</div></div>';
+  }
 
-  // Info rows helper
-  const infoRow=(label,val)=>val?`<div style="display:flex;padding:6px 4px;border-bottom:1px solid #f0f0f0;font-size:12px">
-    <span style="color:#9ca3af;min-width:90px;flex-shrink:0;font-weight:600">${label}</span>
-    <span style="color:#1f2937;font-weight:500">${val}</span>
-  </div>`:'';
+  var commentHTML='';
+  if(r.comment){
+    commentHTML='<div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bbf7d0">'
+      +'<span style="font-size:12px;font-weight:700;color:#166534">💬 선생님 코멘트</span>'
+      +'<div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6">'+r.comment+'</div></div>';
+  }
 
-  // Build the card HTML
-  const cardHTML=`
-  <div id="report-image-card" style="
-    width:380px;
-    background:white;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
-    padding:0;
-    border-radius:16px;
-    overflow:hidden;
-    box-shadow:0 4px 20px rgba(0,0,0,0.12);
-  ">
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#0b2c5c 0%,#1e40af 100%);padding:20px 20px 16px;color:white">
-      <div style="font-size:11px;font-weight:600;letter-spacing:1px;opacity:0.7;margin-bottom:6px">englisheye</div>
-      <div style="font-size:20px;font-weight:800;margin-bottom:3px">${r.studentName}</div>
-      <div style="font-size:13px;opacity:0.85">${r.date} · ${r.teacher||'선생님'}</div>
-      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
-        ${r.level?`<span style="background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">${r.level}</span>`:''}
-        ${r.progress?`<span style="background:rgba(96,165,250,0.3);border-radius:20px;padding:3px 10px;font-size:11px">${r.progress}</span>`:''}
-        ${r.absent?'<span style="background:rgba(239,68,68,0.4);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">⚠️ 결석</span>':''}
-      </div>
-    </div>
+  var memoHTML='';
+  if(r.memo){
+    memoHTML='<div style="background:#eff6ff;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bfdbfe">'
+      +'<span style="font-size:12px;font-weight:700;color:#1e40af">📢 전달 사항</span>'
+      +'<div style="font-size:13px;color:#1e3a8a;margin-top:4px;line-height:1.6">'+r.memo+'</div></div>';
+  }
 
-    <!-- Body -->
-    <div style="padding:16px 18px">
+  var levelBadge=r.level
+    ?'<span style="background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">'+r.level+'</span>':'' ;
+  var progressBadge=r.progress
+    ?'<span style="background:rgba(96,165,250,0.3);border-radius:20px;padding:3px 10px;font-size:11px">'+r.progress+'</span>':'';
+  var absentBadge=r.absent
+    ?'<span style="background:rgba(239,68,68,0.4);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">⚠️ 결석</span>':'';
 
-      <!-- 수업 관찰 -->
-      <div style="margin-bottom:14px">
-        <div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #e8f0fe">📝 수업 관찰</div>
-        ${infoRow('복습 테스트', r.reviewTest?(r.reviewTest+(r.reviewTestItems?' ('+r.reviewTestItems+')':'')):'') }
-        ${infoRow('수업 태도', r.attitude)}
-        ${infoRow('Daily Quiz', r.dailyQuiz)}
-        ${infoRow('숙제', hwIcon)}
-      </div>
+  var cardHTML='<div id="ric" style="width:380px;background:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12)">'
+    // Header
+    +'<div style="background:linear-gradient(135deg,#0b2c5c 0%,#1e40af 100%);padding:20px 20px 16px;color:white">'
+      +'<div style="font-size:11px;font-weight:600;letter-spacing:1px;opacity:0.7;margin-bottom:6px">englisheye</div>'
+      +'<div style="font-size:20px;font-weight:800;margin-bottom:3px">'+r.studentName+'</div>'
+      +'<div style="font-size:13px;opacity:0.85">'+r.date+' · '+(r.teacher||'선생님')+'</div>'
+      +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+levelBadge+progressBadge+absentBadge+'</div>'
+    +'</div>'
+    // Body
+    +'<div style="padding:16px 18px">'
+      +'<div style="margin-bottom:14px">'
+        +'<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #e8f0fe">📝 수업 관찰</div>'
+        +infoRow('복습 테스트', r.reviewTest?(r.reviewTest+(r.reviewTestItems?' ('+r.reviewTestItems+')':'')):'')
+        +infoRow('수업 태도', r.attitude)
+        +infoRow('Daily Quiz', r.dailyQuiz)
+        +infoRow('숙제', hwIcon)
+      +'</div>'
+      +evalHTML
+      +praiseHTML
+      +commentHTML
+      +memoHTML
+    +'</div>'
+    // Footer
+    +'<div style="background:#f8fafc;padding:12px 18px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af">'
+      +'잉글리시아이 학원 · 학습 일지'
+    +'</div>'
+  +'</div>';
 
-      <!-- 평가 -->
-      ${evalSectionsHTML}
-
-      <!-- 칭찬 / 코멘트 / 전달 -->
-      ${praiseHTML}
-      ${commentHTML}
-      ${memoHTML}
-
-    </div>
-
-    <!-- Footer -->
-    <div style="background:#f8fafc;padding:12px 18px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af">
-      잉글리시아이 학원 · 학습 일지
-    </div>
-  </div>`;
-
-  // Create off-screen container
-  const container=document.createElement('div');
-  container.style.cssText='position:fixed;top:-9999px;left:-9999px;z-index:-1;background:transparent';
+  var container=document.createElement('div');
+  container.style.cssText='position:fixed;top:-9999px;left:-9999px;z-index:-1;';
   container.innerHTML=cardHTML;
   document.body.appendChild(container);
+  var card=container.querySelector('#ric');
 
-  const card=container.querySelector('#report-image-card');
-
-  // Wait for fonts/images to render
-  setTimeout(()=>{
+  setTimeout(function(){
     if(typeof html2canvas==='undefined'){
-      toast('❌ html2canvas 로딩 중입니다. 잠시 후 다시 시도하세요.');
+      toast('❌ 잠시 후 다시 시도하세요.');
       document.body.removeChild(container);
       return;
     }
     toast('📷 이미지 생성 중...');
-    html2canvas(card,{
-      scale:2,
-      useCORS:true,
-      backgroundColor:null,
-      logging:false,
-      width:card.offsetWidth,
-      height:card.offsetHeight,
-    }).then(canvas=>{
+    html2canvas(card,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}).then(function(canvas){
       document.body.removeChild(container);
-      // Download as PNG
-      const link=document.createElement('a');
-      link.download=`일지_${r.studentName}_${r.date}.png`;
+      var link=document.createElement('a');
+      link.download='일지_'+r.studentName+'_'+r.date+'.png';
       link.href=canvas.toDataURL('image/png');
       link.click();
-      toast('✅ 이미지 저장 완료! 카카오톡에서 이미지로 전송하세요 📤');
-    }).catch(err=>{
+      toast('✅ 저장 완료! 카카오톡에서 이미지로 전송하세요 📤');
+    }).catch(function(err){
       document.body.removeChild(container);
       console.error(err);
       toast('❌ 이미지 생성 실패. 스크린샷을 이용해주세요.');
     });
-  }, 300);
+  },300);
 }
+
+function sendKakao(reportId){
   const r=reports.find(x=>x.id===reportId);if(!r)return;
   const mod=r.evalModule?EVAL_MODULES[r.evalModule]:null;
   let evalText='';
@@ -2238,16 +2208,16 @@ function saveReportAsImage(reportId){
 👤 학생: ${r.studentName}
 📖 단계: ${r.level||'-'} · ${r.progress||'-'}
 👩‍🏫 담당: ${r.teacher||'-'}
-${r.absent?`\n⚠️ 결석 (${r.absentReason||'사유 없음'})\n`:''}
+${r.absent?('\n⚠️ 결석 ('+( r.absentReason||'사유 없음')+')\n'):''}
 [공통 평가]
 • 복습 테스트: ${r.reviewTest||'-'} (${r.reviewTestItems||''})
 • 수업 태도: ${r.attitude||'-'}
 • Daily Quiz: ${r.dailyQuiz||'-'}
 • 숙제: ${r.homework||'-'}
 ${evalText}
-${praise?`\n🏆 오늘의 칭찬: ${praise}`:''}
-${r.comment?`\n💬 선생님 코멘트:\n${r.comment}`:''}
-${r.memo?`\n📢 전달 사항:\n${r.memo}`:''}
+${praise?('\n🏆 오늘의 칭찬: '+praise):''}
+${r.comment?('\n💬 선생님 코멘트:\n'+r.comment):''}
+${r.memo?('\n📢 전달 사항:\n'+r.memo):''}
 
 ⭐ 잉글리시아이 학원`;
 
