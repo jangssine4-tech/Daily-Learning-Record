@@ -1080,6 +1080,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
   </div>
   <div class="field" style="margin-bottom:18px"><div class="fl">메모</div><input class="fi" id="rev-memo" placeholder="3월 수업료 등"></div>
   <button class="btn btn-green btn-block" onclick="saveRevenue()">저장</button><div style="height:6px"></div>
+  <div id="rev-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteCurrentRevenue()">🗑 이 수납 내역 삭제</button><div style="height:6px"></div></div>
   <button class="btn btn-outline btn-block" onclick="closeM('revenue')">취소</button><div style="height:6px"></div>
 </div></div>
 
@@ -2744,10 +2745,16 @@ function renderRevMonthly(yr,mo){
 
   let rowNum=1;
   const rows=activeStudents.map(s=>{
-    const sRevs=list.filter(r=>r.studentId===s.id&&!r.extraType);
+    // Get real payment records only (exclude manual meta records from saveRevManual)
+    const sRevs=list.filter(r=>r.studentId===s.id&&!r.extraType&&!r.isManualMeta);
+    // Also check meta records separately for manualLesson/manualAbsent
+    const sMetaRevs=list.filter(r=>r.studentId===s.id&&r.isManualMeta);
     const paid=sRevs.length>0;
     const paidAmt=sRevs.reduce((sum,r)=>sum+(parseInt(r.amount)||0),0);
-    const lastRev=sRevs[0];
+    // lastRev = the most recent real payment record
+    const lastRev=sRevs.sort((a,b)=>b.paidDate>a.paidDate?1:-1)[0];
+    // manualLesson/manualAbsent: check lastRev first, then meta records
+    const metaRec=sMetaRevs[0];
     const rowStyle=paid?'':'background:#fff8f8';
     // Joy/Wise/Pride → look up Basic tier fees
     const rawLevel=getStudentLevel(s);
@@ -2759,9 +2766,9 @@ function renderRevMonthly(yr,mo){
     const monthReps=reports.filter(r=>r.studentId===s.id&&r.date&&new Date(r.date).getFullYear()===yr&&new Date(r.date).getMonth()===mo-1);
     const lessonDays=monthReps.filter(r=>!r.absent).length;
     const absentDays=monthReps.filter(r=>r.absent).length;
-    // Allow manual override stored in revenue memo fields
-    const manualLesson=lastRev?.manualLesson;
-    const manualAbsent=lastRev?.manualAbsent;
+    // manualLesson/manualAbsent: stored on lastRev or meta record
+    const manualLesson=lastRev?.manualLesson??metaRec?.manualLesson;
+    const manualAbsent=lastRev?.manualAbsent??metaRec?.manualAbsent;
     return `<tr style="${rowStyle}">
       <td style="color:var(--txt3);text-align:center;font-size:11px">${rowNum++}</td>
       <td onclick="openStudentModal('${s.id}')" style="cursor:pointer;text-align:center;font-weight:700">${s.name}</td>
@@ -2784,7 +2791,11 @@ function renderRevMonthly(yr,mo){
       <td style="font-size:11px;text-align:center">${lastRev?.extra1Amount?(parseInt(lastRev.extra1Amount)||0).toLocaleString()+'원':'-'}</td>
       <td style="font-size:11px;text-align:center;color:var(--gold)">${lastRev?.extra2Type||'-'}</td>
       <td style="font-size:11px;text-align:center">${lastRev?.extra2Amount?(parseInt(lastRev.extra2Amount)||0).toLocaleString()+'원':'-'}</td>
-      <td style="text-align:center"><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();openRevenueModal('${lastRev?.id||''}','${s.id}')" title="수납 등록/수정">💰</button></td>
+      <td style="text-align:center">
+        <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();openRevenueModal('${lastRev?.id||''}','${s.id}')" title="${lastRev?'수납 수정':'수납 등록'}" style="${lastRev?'background:var(--surface2)':''}">
+          ${lastRev?'✏️ 수정':'💰 등록'}
+        </button>
+      </td>
     </tr>`;
   }).join('');
 
@@ -3331,8 +3342,23 @@ async function deleteExpense(id){
 function openRevenueModal(id, presetStudentId){
   $('rev-id').value=id||'';
   const r=id?revenues.find(x=>x.id===id):null;
+
+  // Show/hide delete button
+  const delWrap=document.getElementById('rev-del-wrap');
+  if(delWrap) delWrap.style.display=(id&&r)?'block':'none';
+
+  // Modal title
+  const mt=document.querySelector('#modal-revenue .mt');
+  if(mt) mt.textContent=id?'수납 수정':'수납 등록';
+
   $('rev-student').value=r?.studentId||presetStudentId||'';
-  $('rev-paid-date').value=r?.paidDate||todayISO();
+
+  // Default paidDate: use the currently selected yr/mo-01 (not today)
+  const selYr=parseInt($('rev-year')?.value)||new Date().getFullYear();
+  const selMo=parseInt($('rev-month')?.value)||new Date().getMonth()+1;
+  const defaultDate=`${selYr}-${String(selMo).padStart(2,'0')}-01`;
+  $('rev-paid-date').value=r?.paidDate||defaultDate;
+
   $('rev-amount').value=r?.amount||'';
   $('rev-method').value=r?.method||'계좌이체';
   $('rev-memo').value=r?.memo||'';
@@ -3366,12 +3392,58 @@ async function saveRevManual(studentId,field,val,yr,mo){
 async function saveRevenue(){
   const sId=$('rev-student').value;if(!sId){toast('⚠️ 학생 선택 필수');return}
   const s=students.find(x=>x.id===sId);
+  const selYr=parseInt($('rev-year')?.value)||new Date().getFullYear();
+  const selMo=parseInt($('rev-month')?.value)||new Date().getMonth()+1;
   loading(true);
-  const data={studentId:sId,studentName:s?.name||'',paidDate:$('rev-paid-date').value,amount:parseInt($('rev-amount').value)||0,method:$('rev-method').value,memo:$('rev-memo').value.trim(),extra1Type:$('rev-extra1-type').value,extra1Amount:parseInt($('rev-extra1-amount').value)||0,extra1Date:$('rev-extra1-date').value,extra1Method:$('rev-extra1-method').value,extra2Type:$('rev-extra2-type').value,extra2Amount:parseInt($('rev-extra2-amount').value)||0,extra2Date:$('rev-extra2-date').value,extra2Method:$('rev-extra2-method').value,updatedAt:new Date().toISOString()};
-  const id=$('rev-id').value;
-  if(id) await db.collection('revenues').doc(id).update(data);
-  else await db.collection('revenues').add({...data,createdAt:new Date().toISOString()});
+
+  const data={
+    studentId:sId,studentName:s?.name||'',
+    paidDate:$('rev-paid-date').value,
+    amount:parseInt($('rev-amount').value)||0,
+    method:$('rev-method').value,
+    memo:$('rev-memo').value.trim(),
+    extra1Type:$('rev-extra1-type').value,
+    extra1Amount:parseInt($('rev-extra1-amount').value)||0,
+    extra1Date:$('rev-extra1-date').value,
+    extra1Method:$('rev-extra1-method').value,
+    extra2Type:$('rev-extra2-type').value,
+    extra2Amount:parseInt($('rev-extra2-amount').value)||0,
+    extra2Date:$('rev-extra2-date').value,
+    extra2Method:$('rev-extra2-method').value,
+    updatedAt:new Date().toISOString()
+  };
+
+  let id=$('rev-id').value;
+
+  // If no id, check for existing real payment record this student/month (prevent duplicate)
+  if(!id){
+    const existingRev=revenues.find(r=>
+      r.studentId===sId &&
+      !r.isManualMeta &&
+      !r.extraType &&
+      new Date(r.paidDate).getFullYear()===selYr &&
+      new Date(r.paidDate).getMonth()===selMo-1
+    );
+    if(existingRev){
+      // Update existing instead of creating duplicate
+      id=existingRev.id;
+      toast('⚠️ 이미 수납 내역이 있어 수정합니다');
+    }
+  }
+
+  if(id){
+    await db.collection('revenues').doc(id).update(data);
+  } else {
+    await db.collection('revenues').add({...data,createdAt:new Date().toISOString()});
+  }
   await loadRevenues();renderRevenue();closeM('revenue');loading(false);toast('✅ 저장됨');
+}
+async function deleteCurrentRevenue(){
+  const id=$('rev-id').value;
+  if(!id||!confirm('이 수납 내역을 삭제할까요?'))return;
+  loading(true);
+  await db.collection('revenues').doc(id).delete();
+  await loadRevenues();renderRevenue();closeM('revenue');loading(false);toast('🗑️ 삭제됨');
 }
 async function deleteRevenue(id){
   if(!confirm('삭제?'))return;
