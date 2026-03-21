@@ -279,6 +279,12 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
 /* Praise tags gold version */
 .praise-tag.on{background:var(--gold);border-color:var(--gold);color:#fff}
 
+/* ══ REVENUE SCROLL ══ */
+#rev-monthly-scroll{scrollbar-width:thin;scrollbar-color:var(--border2) var(--surface2)}
+#rev-monthly-scroll::-webkit-scrollbar{height:10px;width:10px}
+#rev-monthly-scroll::-webkit-scrollbar-track{background:var(--surface2);border-radius:4px}
+#rev-monthly-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+#rev-monthly-scroll::-webkit-scrollbar-thumb:hover{background:var(--txt3)}
 /* ══ REVENUE TABS ══ */
 .rev-tab{padding:10px 16px;font-size:12px;font-weight:600;color:var(--txt3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .15s}
 .rev-tab:hover{color:var(--txt2);background:var(--surface2)}
@@ -663,14 +669,15 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
           </div>
           <div class="rev-summary" id="rev-summary"></div>
           <!-- Tuition detail table with sticky header -->
-          <div style="overflow:auto;max-height:calc(100vh - 280px);-webkit-overflow-scrolling:touch;margin-bottom:14px;scrollbar-width:thin">
+          <div id="rev-monthly-scroll" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 280px);margin-bottom:0;scrollbar-width:auto;position:relative">
             <table class="tbl" style="min-width:1400px;font-size:11px;border-collapse:separate;border-spacing:0">
               <thead style="position:sticky;top:0;z-index:10">
                 <tr style="background:var(--navy);color:#fff">
+                  <th style="white-space:nowrap;position:sticky;left:0;background:var(--navy);z-index:11">수납/삭제</th>
                   <th style="white-space:nowrap">번호</th>
                   <th style="white-space:nowrap">이름</th>
                   <th style="white-space:nowrap">학년</th>
-                  <th style="white-space:nowrap">수업시수</th>
+                  <th style="white-space:nowrap">수업일수</th>
                   <th style="white-space:nowrap">결석</th>
                   <th style="white-space:nowrap">단계</th>
                   <th style="white-space:nowrap">교재비</th>
@@ -678,14 +685,8 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
                   <th style="white-space:nowrap">할인</th>
                   <th style="white-space:nowrap">실납부액</th>
                   <th style="white-space:nowrap">결제수단</th>
-                  <th style="white-space:nowrap">기타비1</th>
-                  <th style="white-space:nowrap">결제금액1</th>
-                  <th style="white-space:nowrap">결제일1</th>
-                  <th style="white-space:nowrap">기타비2</th>
-                  <th style="white-space:nowrap">결제금액2</th>
-                  <th style="white-space:nowrap">결제일2</th>
+                  <th style="white-space:nowrap">결제일</th>
                   <th style="white-space:nowrap">메모</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody id="rev-monthly-tbody"></tbody>
@@ -734,14 +735,33 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
       </div>
       <!-- Fees panel -->
       <div id="ref-panel-fees">
-        <div class="toolbar">
-          <button class="btn btn-green btn-sm" onclick="openRefItemModal()">+ 추가</button>
-        </div>
-        <div class="cp" style="padding-top:10px;overflow-x:auto">
-          <table class="rev-tbl" style="min-width:700px">
-            <thead><tr><th>학년</th><th>단계</th><th>교재비</th><th>기본 교육비</th><th>부교재</th><th>부교재비</th><th></th></tr></thead>
-            <tbody id="ref-fees-tbody"></tbody>
-          </table>
+        <div class="cp" style="padding-top:10px">
+          <!-- 교육비 기준 설정 -->
+          <div class="expense-section">
+            <h4>💰 교육비 기준 설정
+              <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('tuition')">+ 추가</button>
+            </h4>
+            <div style="overflow-x:auto">
+              <table class="rev-tbl" style="min-width:600px">
+                <colgroup><col style="width:80px"><col style="width:150px"><col style="width:120px"><col style="width:130px"><col></colgroup>
+                <thead><tr style="background:var(--navy);color:#fff"><th>학년</th><th>단계</th><th style="text-align:right">기본 교육비</th><th style="text-align:right">할인 교육비</th><th></th></tr></thead>
+                <tbody id="ref-tuition-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- 교재비 기준 설정 -->
+          <div class="expense-section">
+            <h4>📚 교재비 기준 설정
+              <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('textbook')">+ 추가</button>
+            </h4>
+            <div style="overflow-x:auto">
+              <table class="rev-tbl" style="min-width:600px">
+                <colgroup><col style="width:80px"><col style="width:150px"><col style="width:120px"><col style="width:140px"><col style="width:120px"><col></colgroup>
+                <thead><tr style="background:var(--navy);color:#fff"><th>학년</th><th>단계</th><th style="text-align:right">교재비</th><th>부교재명</th><th style="text-align:right">부교재비</th><th></th></tr></thead>
+                <tbody id="ref-textbook-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Curriculum panel -->
@@ -761,7 +781,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
       <div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div>
       <div class="cp">
         <div class="card" style="overflow:hidden">
-          <div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div>
+          <div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div>
         </div>
       </div>
     </div>
@@ -1338,6 +1358,8 @@ async function bootApp(){
   loading(true);
   setHdrDate();setFormDates();
   await Promise.all([loadTeachers(),loadClasses(),loadStudents(),loadReports(),loadMakeups(),loadConsultations(),loadRevenues(),loadExpenses(),loadRefItems(),loadUsers(),loadPeriods(),loadCustomModules()]);
+  // Load new consults
+  try{const snc=await db.collection('newConsults').orderBy('date','desc').get();newConsults=snc.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
   populateAll();renderSchedule();renderRevYearMonth();
   loading(false);
 }
@@ -1400,8 +1422,14 @@ function populateTeacherSelects(){
   // Use teachers array (from config) + user names for teacher/admin roles
   const userTeachers=users.filter(u=>['teacher','admin'].includes(u.role)).map(u=>u.name);
   const allTeachers=[...new Set([...teachers,...userTeachers])].filter(Boolean);
-  const opts=allTeachers.map(t=>`<option>${t}</option>`).join('');
-  ['r-teacher','cls-teacher','cls-asst','con-teacher'].forEach(id=>{const el=$(id);if(el)el.innerHTML=(id==='cls-asst'?'<option value="">없음</option>':'')+opts;});
+  const opts=allTeachers.map(t=>`<option value="${t}">${t}</option>`).join('');
+  // Update class teacher dropdowns
+  ['r-teacher','cls-teacher','cls-asst','con-teacher'].forEach(id=>{
+    const el=$(id);if(!el)return;
+    const cur=el.value;
+    el.innerHTML=(id==='cls-asst'?'<option value="">없음</option>':'')+opts;
+    if(cur) el.value=cur;
+  });
   renderTeacherSettings();
 }
 
@@ -1412,7 +1440,9 @@ function renderSchedule(){
   $('schedule-day-title').textContent=`오늘 시간표 · ${['월','화','수','목','금','토','일'][today.getDay()===0?6:today.getDay()-1]||''}요일`;
   document.getElementById('snav-today-cnt').textContent=0;
 
-  if(!['월','화','수','목','금'].includes(dayName)){
+  // Check makeup students for today (even weekends)
+  const todayMakeupCheck=makeups.filter(m=>m.makeupDate===todayISO()&&m.makeupStatus==='scheduled');
+  if(!['월','화','수','목','금'].includes(dayName)&&todayMakeupCheck.length===0){
     $('schedule-list').innerHTML=`<div class="empty"><div class="ei">📅</div><div class="et">오늘은 수업이 없어요</div><div class="es">평일에 시간표가 표시됩니다</div></div>`;
     return;
   }
@@ -1450,8 +1480,8 @@ function renderSchedule(){
       if(typeof pData==='object'){pNum=pData.period||0;pTime=pData.time||'';}
       else{pNum=parseInt(pData)||0;}
     }
-    // For makeup students: use time-based grouping under key "보강"
-    const pKey=s._isMakeup?(pTime?'보강_'+pTime.replace(':',''):'보강'):(pNum?String(pNum):'미설정');
+    // For makeup students: group by period if same time as regular, else own group
+    const pKey=s._isMakeup?(pTime?('보강_'+pTime):(pNum?String(pNum):'미설정')):(pNum?String(pNum):'미설정');
     if(!byPeriodNum[pKey]) byPeriodNum[pKey]={pNum,blocks:{},firstTime:'99:99'};
     let blockLabel='시간미설정';
     if(pTime){
@@ -1939,7 +1969,16 @@ function renderHistory(){
     </tr>`;
   }).join('');
 
-  el.innerHTML=`<table class="hist-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+  // Summary row: 수업일수 + 결석일수 totals
+  const totalLesson=list.filter(r=>!r.absent).length;
+  const totalAbsent=list.filter(r=>r.absent).length;
+  const summaryRow=`<tr style="background:var(--navy);color:#fff;font-weight:700;position:sticky;bottom:0">
+    <td colspan="3" style="text-align:right;padding:8px 10px">합계</td>
+    <td colspan="2"></td>
+    <td style="text-align:center;color:#8fffdf">수업 ${totalLesson}일 / 결석 ${totalAbsent}일</td>
+    <td colspan="${2+evalHeaders.length}"></td>
+  </tr>`;
+  el.innerHTML=`<table class="hist-table"><thead>${thead}</thead><tbody>${tbody}${summaryRow}</tbody></table>`;
 }
 
 async function deleteReport(id){
@@ -2480,11 +2519,102 @@ function renderNewConsult(){
 }
 
 function openNewConsultModal(id){
-  // Reuse consult modal but prefill for new student
-  openConsultModal(id);
-  // Mark as new consult type
-  const typeEl=$('con-type');
-  if(typeEl&&!id) typeEl.value='방문';
+  const nc=typeof newConsults!=='undefined'?newConsults:[];
+  const n=id?nc.find(x=>x.id===id):null;
+  const overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.innerHTML=`<div class="ms" style="max-height:90vh;overflow-y:auto"><div class="mh"></div>
+    <div class="mt">${id?'신규 상담 수정':'신규 상담 기록'}</div>
+    <input type="hidden" id="newcon-id" value="${id||''}">
+    <div class="r2">
+      <div class="field"><div class="fl">상담일</div><input type="date" class="fi" id="newcon-date" value="${n?.date||new Date().toISOString().split('T')[0]}"></div>
+      <div class="field"><div class="fl">상담 교사</div>
+        <select class="fi" id="newcon-teacher">
+          ${teachers.map(t=>`<option ${n?.teacher===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="r2">
+      <div class="field"><div class="fl">학생(예정) 이름</div><input class="fi" id="newcon-name" value="${n?.prospectName||''}" placeholder="홍길동"></div>
+      <div class="field"><div class="fl">학년</div>
+        <select class="fi" id="newcon-grade">
+          <option value="">선택</option>
+          ${['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'].map(g=>`<option ${n?.grade===g?'selected':''}>${g}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="r2">
+      <div class="field"><div class="fl">학교</div><input class="fi" id="newcon-school" value="${n?.school||''}" placeholder="군포대아초등학교"></div>
+      <div class="field"><div class="fl">학부모 연락처</div><input class="fi" id="newcon-phone" value="${n?.phone||''}" placeholder="010-0000-0000" type="tel"></div>
+    </div>
+    <div class="r2">
+      <div class="field"><div class="fl">상담 유형</div>
+        <select class="fi" id="newcon-type">
+          <option ${n?.type==='전화'?'selected':''}>전화</option>
+          <option ${n?.type==='방문'?'selected':''}>방문</option>
+          <option ${n?.type==='문자'?'selected':''}>문자</option>
+          <option ${n?.type==='카카오톡'?'selected':''}>카카오톡</option>
+        </select>
+      </div>
+      <div class="field"><div class="fl">유입 경로</div>
+        <select class="fi" id="newcon-inflow">
+          <option value="">선택</option>
+          ${['지인 소개','현수막/전단지','블로그','당근','기타'].map(r=>`<option ${n?.inflow===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field"><div class="fl">관심 단계</div>
+      <select class="fi" id="newcon-level">
+        <option value="">선택</option>
+        ${Object.keys(CURRICULUM).map(lv=>`<option ${n?.level===lv?'selected':''}>${lv}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><div class="fl">상담 내용</div><textarea class="fi" id="newcon-content" style="min-height:80px" placeholder="상담 내용을 입력하세요">${n?.content||''}</textarea></div>
+    <div class="field"><div class="fl">특이사항/요구사항</div><textarea class="fi" id="newcon-memo" style="min-height:60px" placeholder="특이사항, 요구사항 등">${n?.memo||''}</textarea></div>
+    <div class="r2">
+      <div class="field"><div class="fl">상담 결과</div>
+        <select class="fi" id="newcon-result">
+          <option value="">선택</option>
+          ${['등록 예정','등록 완료','재상담 필요','미등록'].map(r=>`<option ${n?.result===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><div class="fl">다음 상담 예정일</div><input type="date" class="fi" id="newcon-nextdate" value="${n?.nextDate||''}"></div>
+    </div>
+    <div style="height:14px"></div>
+    <button class="btn btn-green btn-block" onclick="saveNewConsult(this.closest('.mo'))">저장</button>
+    <div style="height:6px"></div>
+    <button class="btn btn-outline btn-block" onclick="this.closest('.mo').remove()">취소</button>
+    <div style="height:6px"></div>
+  </div>`;
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+}
+async function saveNewConsult(overlay){
+  loading(true);
+  const id=overlay.querySelector('#newcon-id').value;
+  const data={
+    date:overlay.querySelector('#newcon-date').value,
+    teacher:overlay.querySelector('#newcon-teacher').value,
+    prospectName:overlay.querySelector('#newcon-name').value.trim(),
+    grade:overlay.querySelector('#newcon-grade').value,
+    school:overlay.querySelector('#newcon-school').value.trim(),
+    phone:overlay.querySelector('#newcon-phone').value.trim(),
+    type:overlay.querySelector('#newcon-type').value,
+    inflow:overlay.querySelector('#newcon-inflow').value,
+    level:overlay.querySelector('#newcon-level').value,
+    content:overlay.querySelector('#newcon-content').value.trim(),
+    memo:overlay.querySelector('#newcon-memo').value.trim(),
+    result:overlay.querySelector('#newcon-result').value,
+    nextDate:overlay.querySelector('#newcon-nextdate').value,
+    updatedAt:new Date().toISOString()
+  };
+  if(id) await db.collection('newConsults').doc(id).update(data);
+  else await db.collection('newConsults').add({...data,createdAt:new Date().toISOString()});
+  // Reload
+  const snap=await db.collection('newConsults').orderBy('date','desc').get();
+  newConsults=snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderNewConsult();
+  overlay.remove();loading(false);toast('✅ 신규 상담 저장됨');
 }
 
 function renderConsult(){
@@ -2594,41 +2724,54 @@ function renderRevMonthly(yr,mo){
 
   let rowNum=1;
   const rows=activeStudents.map(s=>{
-    const sRevs=list.filter(r=>r.studentId===s.id);
+    const sRevs=list.filter(r=>r.studentId===s.id&&!r.extraType);
     const paid=sRevs.length>0;
     const paidAmt=sRevs.reduce((sum,r)=>sum+(parseInt(r.amount)||0),0);
     const lastRev=sRevs[0];
     const rowStyle=paid?'':'background:#fff8f8';
-    return `<tr style="${rowStyle}" onclick="paid?openRevenueModal('${lastRev?.id||''}'):openRevenueModal(null,'${s.id}')">
-      <td style="color:var(--txt3);text-align:center">${rowNum++}</td>
-      <td><strong>${s.name}</strong></td>
-      <td style="font-size:11px">${s.grade||'-'}</td>
-      <td style="font-size:11px;text-align:center">${s.level||'-'}</td>
-      <td style="font-size:11px">${getStudentLevel(s)||'-'}</td>
-      <td style="text-align:right;font-weight:600">${paidAmt>0?paidAmt.toLocaleString()+'원':'-'}</td>
-      <td style="text-align:center;font-size:11px">${lastRev?.memo||'-'}</td>
-      <td style="text-align:right;font-weight:600;color:${paid?'var(--mint)':'var(--red)'}">${paid?paidAmt.toLocaleString()+'원':'미납'}</td>
-      <td style="text-align:right">${paidAmt>0?paidAmt.toLocaleString()+'원':'-'}</td>
-      <td style="font-size:11px">${lastRev?.paidDate||'-'}</td>
-      <td style="font-size:11px"><span class="badge bg-gray">${lastRev?.method||'-'}</span></td>
-      <td style="font-size:11px;color:var(--txt3)">${sRevs.length>1?sRevs.length+'건':(lastRev?.memo||'-')}</td>
-      <td onclick="event.stopPropagation()">
-        <button class="btn btn-green btn-xs" onclick="openRevenueModal(null,'${s.id}')">+</button>
-        ${lastRev?`<button class="btn btn-red btn-xs" onclick="deleteRevenue('${lastRev.id}')">✕</button>`:''}
+    const refItem=refItems.find(ri=>ri.level&&getStudentLevel(s).includes(ri.level.trim()));
+    const tbFee=refItem?parseInt(refItem.textbookFee)||0:0;
+    const baseFee=refItem?parseInt(refItem.baseFee)||0:0;
+    // Auto-calc from reports: count lesson days and absences this month
+    const monthReps=reports.filter(r=>r.studentId===s.id&&r.date&&new Date(r.date).getFullYear()===yr&&new Date(r.date).getMonth()===mo-1);
+    const lessonDays=monthReps.filter(r=>!r.absent).length;
+    const absentDays=monthReps.filter(r=>r.absent).length;
+    // Allow manual override stored in revenue memo fields
+    const manualLesson=lastRev?.manualLesson;
+    const manualAbsent=lastRev?.manualAbsent;
+    return `<tr style="${rowStyle}">
+      <td style="text-align:center;white-space:nowrap">
+        <button class="btn btn-green btn-xs" onclick="openRevenueModal(null,'${s.id}')" title="수납 등록">+수납</button>
+        ${lastRev?`<button class="btn btn-red btn-xs" style="margin-top:2px" onclick="event.stopPropagation();deleteRevenue('${lastRev.id}')" title="삭제">✕</button>`:''}
       </td>
+      <td style="color:var(--txt3);text-align:center">${rowNum++}</td>
+      <td onclick="openStudentModal('${s.id}')" style="cursor:pointer"><strong>${s.name}</strong></td>
+      <td style="font-size:11px">${s.grade||'-'}</td>
+      <td style="text-align:center">
+        <input type="number" class="rev-inline-input" value="${manualLesson!==undefined?manualLesson:lessonDays}" min="0" max="40" style="width:38px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 2px" title="수기 수정 가능" onchange="saveRevManual('${s.id}','lesson',this.value,${yr},${mo})" onclick="event.stopPropagation()">
+      </td>
+      <td style="text-align:center">
+        <input type="number" class="rev-inline-input" value="${manualAbsent!==undefined?manualAbsent:absentDays}" min="0" max="40" style="width:38px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 2px" title="수기 수정 가능" onchange="saveRevManual('${s.id}','absent',this.value,${yr},${mo})" onclick="event.stopPropagation()">
+      </td>
+      <td style="font-size:11px;white-space:nowrap">${getStudentLevel(s)||'-'}</td>
+      <td style="text-align:right;font-size:11px">${tbFee?tbFee.toLocaleString()+'원':'-'}</td>
+      <td style="text-align:right;font-size:11px">${baseFee?baseFee.toLocaleString()+'원':'-'}</td>
+      <td style="font-size:11px;color:var(--gold)">${s.discount||'-'}</td>
+      <td style="text-align:right;font-weight:600;color:${paid?'var(--mint)':'var(--red)'}">${paid?paidAmt.toLocaleString()+'원':'미납'}</td>
+      <td style="font-size:11px">${lastRev?`<span class="badge bg-gray">${lastRev.method}</span>`:'-'}</td>
+      <td style="font-size:11px">${lastRev?.paidDate||'-'}</td>
+      <td style="font-size:11px;color:var(--txt3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastRev?.memo||'-'}</td>
     </tr>`;
   }).join('');
 
   // Totals row
-  const totalRow=`<tr style="background:var(--surface2);font-weight:700">
-    <td colspan="5" style="text-align:right;padding-right:8px">합계</td>
-    <td style="text-align:right;color:var(--mint)">${totalRev.toLocaleString()}원</td>
+  const totalRow=`<tr style="background:var(--surface2);font-weight:700;position:sticky;bottom:0;z-index:5">
+    <td></td><td colspan="2" style="text-align:right">합계</td>
+    <td colspan="3"></td>
+    <td colspan="2"></td>
     <td></td>
     <td style="text-align:right;color:var(--mint)">${totalRev.toLocaleString()}원</td>
-    <td style="text-align:right">${totalRev.toLocaleString()}원</td>
-    <td></td>
-    <td style="font-size:11px">카드: ${cardTotal.toLocaleString()} / 현금: ${cashTotal.toLocaleString()} / 이체: ${transferTotal.toLocaleString()}</td>
-    <td></td><td></td>
+    <td style="font-size:11px" colspan="3">카드: ${cardTotal.toLocaleString()} / 현금: ${cashTotal.toLocaleString()} / 이체: ${transferTotal.toLocaleString()}</td>
   </tr>`;
   tb.innerHTML=rows+totalRow;
 }
@@ -2836,6 +2979,44 @@ function renderRevSummary(yr){
   loadAnalysisData(yr);
 }
 
+function openGoalEditModal(yr){
+  const overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  // Load goal targets from Firestore
+  db.collection('goalTargets').doc(String(yr)).get().then(doc=>{
+    const saved=doc.exists?doc.data():{};
+    const defaultTargets={'총 재원생 수 (명)':50,'신규 등록생 수 (명)':20,'Phonics 레벨 인원':8,'Basic 레벨 인원':10,'Grammar 레벨 인원':10,'중등부 인원':12,'고등부 인원':5,'퇴원율 (%)':5,'월 평균 수강료 수입 (만원)':1000,'연간 수강료 수입 (만원)':12000};
+    const labels=Object.keys(defaultTargets);
+    overlay.innerHTML=`<div class="ms"><div class="mh"></div>
+      <div class="mt">✏️ ${yr}년 연간 목표 설정</div>
+      <div style="margin-bottom:14px">
+        ${labels.map(l=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px">${l}</span>
+          <input type="number" id="gt-${l.replace(/[^a-zA-Z0-9가-힣]/g,'_')}" value="${saved[l]||defaultTargets[l]}" style="width:90px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;text-align:right;font-size:13px">
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-green btn-block" onclick="saveGoalTargets(${yr},this.closest('.mo'))">저장</button>
+      <div style="height:6px"></div>
+      <button class="btn btn-outline btn-block" onclick="this.closest('.mo').remove()">취소</button>
+    </div>`;
+    overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+    document.body.appendChild(overlay);
+  }).catch(()=>{overlay.remove();});
+  document.body.appendChild(overlay);
+}
+async function saveGoalTargets(yr,overlay){
+  const labels=['총 재원생 수 (명)','신규 등록생 수 (명)','Phonics 레벨 인원','Basic 레벨 인원','Grammar 레벨 인원','중등부 인원','고등부 인원','퇴원율 (%)','월 평균 수강료 수입 (만원)','연간 수강료 수입 (만원)'];
+  const data={};
+  labels.forEach(l=>{
+    const inp=overlay.querySelector('#gt-'+l.replace(/[^a-zA-Z0-9가-힣]/g,'_'));
+    if(inp) data[l]=parseInt(inp.value)||0;
+  });
+  await db.collection('goalTargets').doc(String(yr)).set({...data,updatedAt:new Date().toISOString()});
+  overlay.remove();
+  renderRevGoals(yr);
+  toast('✅ 목표 저장됨');
+}
+
 async function saveAnalysis(type,key,val){
   const yr=new Date().getFullYear();
   await db.collection('analysis').doc(String(yr)).set({[type+'_'+key]:parseInt(val)||0},{merge:true});
@@ -2873,22 +3054,31 @@ function renderRevGoals(yr){
   const newC=students.filter(s=>s.status==='신규').length;
   const dropRate=students.length>0?Math.round(students.filter(s=>s.status==='퇴원').length/students.length*100):0;
 
+  // Load saved targets (async - use defaults for now, will update)
+  const savedTargets=(window._goalTargets)||{};
+  db.collection('goalTargets').doc(String(yr)).get().then(doc=>{
+    if(doc.exists){window._goalTargets={...doc.data()};if(currentRevTab==='goals')renderRevGoals(yr);}
+  }).catch(()=>{});
+
+  const T=(label,def)=>savedTargets[label]!==undefined?savedTargets[label]:def;
   const goals=[
-    {label:'총 재원생 수 (명)',target:50,current:students.length},
-    {label:'신규 등록생 수 (명)',target:20,current:newC},
-    {label:'Phonics 레벨 인원',target:8,current:phonicsC},
-    {label:'Basic 레벨 인원',target:10,current:basicC},
-    {label:'Grammar 레벨 인원',target:10,current:grammarC},
-    {label:'중등부 인원',target:12,current:midC},
-    {label:'고등부 인원',target:5,current:highC},
-    {label:'퇴원율 (%)',target:5,current:dropRate,lower:true},
-    {label:'월 평균 수강료 수입 (만원)',target:1000,current:Math.round(avgMoRev/10000)},
-    {label:'연간 수강료 수입 (만원)',target:12000,current:Math.round(totalRevYr/10000)},
+    {label:'총 재원생 수 (명)',target:T('총 재원생 수 (명)',50),current:students.length},
+    {label:'신규 등록생 수 (명)',target:T('신규 등록생 수 (명)',20),current:newC},
+    {label:'Phonics 레벨 인원',target:T('Phonics 레벨 인원',8),current:phonicsC},
+    {label:'Basic 레벨 인원',target:T('Basic 레벨 인원',10),current:basicC},
+    {label:'Grammar 레벨 인원',target:T('Grammar 레벨 인원',10),current:grammarC},
+    {label:'중등부 인원',target:T('중등부 인원',12),current:midC},
+    {label:'고등부 인원',target:T('고등부 인원',5),current:highC},
+    {label:'퇴원율 (%)',target:T('퇴원율 (%)',5),current:dropRate,lower:true},
+    {label:'월 평균 수강료 수입 (만원)',target:T('월 평균 수강료 수입 (만원)',1000),current:Math.round(avgMoRev/10000)},
+    {label:'연간 수강료 수입 (만원)',target:T('연간 수강료 수입 (만원)',12000),current:Math.round(totalRevYr/10000)},
   ];
 
   el.innerHTML=`
   <div class="expense-section">
-    <h4>🎯 ${yr}년 연간 목표 & 달성 현황</h4>
+    <h4>🎯 ${yr}년 연간 목표 & 달성 현황
+      <button class="btn btn-outline btn-xs" style="float:right" onclick="openGoalEditModal(${yr})">✏️ 연간 목표 편집</button>
+    </h4>
     <table class="rev-tbl">
       <thead><tr><th>목표 항목</th><th style="text-align:center">연간 목표</th><th style="text-align:center">현재 달성</th><th style="text-align:center">달성률</th><th>상태</th></tr></thead>
       <tbody>${goals.map(g=>{
@@ -2896,7 +3086,7 @@ function renderRevGoals(yr){
         const color=g.lower?(pct<=100?'var(--mint)':pct<=150?'var(--gold)':'var(--red)'):(pct>=100?'var(--mint)':pct>=70?'var(--gold)':'var(--red)');
         return `<tr>
           <td>${g.label}</td>
-          <td style="text-align:center;font-weight:600">${g.target}</td>
+          <td style="text-align:center;font-weight:600" data-goal-label="${g.label}">${g.target}</td>
           <td style="text-align:center;font-weight:700;color:${color}">${g.current}</td>
           <td style="text-align:center">
             <div style="background:var(--border);border-radius:4px;height:6px;width:100%">
@@ -2974,17 +3164,30 @@ function switchRefTab(tab){
 }
 
 function renderRefFees(){
-  const tb=document.getElementById('ref-fees-tbody');if(!tb)return;
-  if(!refItems.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--txt3)">+ 추가 버튼을 눌러 기준 데이터를 입력하세요</td></tr>`;return}
-  tb.innerHTML=refItems.map(item=>`<tr onclick="openRefItemModal('${item.id}')" style="cursor:pointer">
-    <td>${item.grade||'-'}</td>
-    <td style="font-weight:600">${item.level||'-'}</td>
-    <td style="text-align:right">${(parseInt(item.textbookFee)||0).toLocaleString()}원</td>
-    <td style="text-align:right;font-weight:600;color:var(--mint)">${(parseInt(item.baseFee)||0).toLocaleString()}원</td>
-    <td>${item.supMaterial||'-'}</td>
-    <td style="text-align:right">${(parseInt(item.supFee)||0).toLocaleString()}원</td>
-    <td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem('${item.id}')">삭제</button></td>
-  </tr>`).join('');
+  // 교육비 기준
+  const tbT=document.getElementById('ref-tuition-tbody');
+  const tbB=document.getElementById('ref-textbook-tbody');
+  const tuitionItems=refItems.filter(i=>i.refType==='tuition'||(!i.refType&&i.baseFee));
+  const textbookItems=refItems.filter(i=>i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial)));
+  if(tbT){
+    tbT.innerHTML=tuitionItems.length?tuitionItems.map(item=>`<tr onclick="openRefItemModal('tuition','${item.id}')" style="cursor:pointer">
+      <td>${item.grade||'-'}</td>
+      <td style="font-weight:600">${item.level||'-'}</td>
+      <td style="text-align:right;font-weight:600;color:var(--mint)">${(parseInt(item.baseFee)||0).toLocaleString()}원</td>
+      <td style="text-align:right;color:var(--gold)">${(parseInt(item.discountFee)||0).toLocaleString()}원</td>
+      <td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem('${item.id}')">삭제</button></td>
+    </tr>`).join(''):`<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--txt3)">+ 추가 버튼으로 교육비 기준을 입력하세요</td></tr>`;
+  }
+  if(tbB){
+    tbB.innerHTML=textbookItems.length?textbookItems.map(item=>`<tr onclick="openRefItemModal('textbook','${item.id}')" style="cursor:pointer">
+      <td>${item.grade||'-'}</td>
+      <td style="font-weight:600">${item.level||'-'}</td>
+      <td style="text-align:right;font-weight:600;color:var(--blue)">${(parseInt(item.textbookFee)||0).toLocaleString()}원</td>
+      <td>${item.supMaterial||'-'}</td>
+      <td style="text-align:right">${(parseInt(item.supFee)||0).toLocaleString()}원</td>
+      <td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem('${item.id}')">삭제</button></td>
+    </tr>`).join(''):`<tr><td colspan="6" style="text-align:center;padding:14px;color:var(--txt3)">+ 추가 버튼으로 교재비 기준을 입력하세요</td></tr>`;
+  }
 }
 
 function renderRefCurriculum(){
@@ -3006,26 +3209,31 @@ function renderRefCurriculum(){
 
 /* Old renderRevRef - kept for compat */
 function renderRevRef(){renderRefFees();}
-function openRefItemModal(id){
+function openRefItemModal(type,id){
   const item=id?refItems.find(x=>x.id===id):null;
+  const isTuition=(type==='tuition')||(!type&&item&&item.refType==='tuition');
+  const isTextbook=(type==='textbook')||(!type&&item&&item.refType==='textbook');
+  const title=isTuition?(id?'교육비 기준 수정':'교육비 기준 추가'):(id?'교재비 기준 수정':'교재비 기준 추가');
   const overlay=document.createElement('div');
   overlay.className='mo';overlay.style.display='flex';
   overlay.innerHTML=`<div class="ms"><div class="mh"></div>
-    <div class="mt">${id?'교육비 기준 수정':'교육비 기준 추가'}</div>
+    <div class="mt">${title}</div>
     <div class="r2">
       <div class="field"><div class="fl">학년</div><input class="fi" id="ritem-grade" value="${item?.grade||''}" placeholder="초1~고3"></div>
       <div class="field"><div class="fl">단계</div><input class="fi" id="ritem-level" value="${item?.level||''}" placeholder="Basic 등"></div>
     </div>
+    ${isTuition?`
+    <div class="r2">
+      <div class="field"><div class="fl">기본 교육비(원)</div><input type="number" class="fi" id="ritem-base" value="${item?.baseFee||''}" placeholder="180000"></div>
+      <div class="field"><div class="fl">할인 교육비(원)</div><input type="number" class="fi" id="ritem-discount" value="${item?.discountFee||''}" placeholder="148950"></div>
+    </div>`:`
     <div class="r2">
       <div class="field"><div class="fl">교재비(원)</div><input type="number" class="fi" id="ritem-textbook" value="${item?.textbookFee||''}" placeholder="31050"></div>
-      <div class="field"><div class="fl">기본 교육비(원)</div><input type="number" class="fi" id="ritem-base" value="${item?.baseFee||''}" placeholder="180000"></div>
-    </div>
-    <div class="r2">
-      <div class="field"><div class="fl">부교재</div><input class="fi" id="ritem-sup" value="${item?.supMaterial||''}" placeholder="워크북 등"></div>
       <div class="field"><div class="fl">부교재비(원)</div><input type="number" class="fi" id="ritem-supfee" value="${item?.supFee||''}" placeholder="0"></div>
     </div>
+    <div class="field"><div class="fl">부교재명</div><input class="fi" id="ritem-sup" value="${item?.supMaterial||''}" placeholder="워크북 등"></div>`}
     <div style="height:14px"></div>
-    <button class="btn btn-green btn-block" onclick="saveRefItem('${id||''}',this.closest('.mo'))">저장</button>
+    <button class="btn btn-green btn-block" onclick="saveRefItem('${id||''}','${type||'tuition'}',this.closest('.mo'))">저장</button>
     <div style="height:6px"></div>
     <button class="btn btn-outline btn-block" onclick="this.closest('.mo').remove()">취소</button>
     <div style="height:6px"></div>
@@ -3033,9 +3241,22 @@ function openRefItemModal(id){
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
   document.body.appendChild(overlay);
 }
-async function saveRefItem(id,overlay){
+async function saveRefItem(id,type,overlay){
   loading(true);
-  const data={grade:document.getElementById('ritem-grade').value.trim(),level:document.getElementById('ritem-level').value.trim(),textbookFee:parseInt(document.getElementById('ritem-textbook').value)||0,baseFee:parseInt(document.getElementById('ritem-base').value)||0,supMaterial:document.getElementById('ritem-sup').value.trim(),supFee:parseInt(document.getElementById('ritem-supfee').value)||0,updatedAt:new Date().toISOString()};
+  const isTuition=(type==='tuition');
+  const data={
+    grade:document.getElementById('ritem-grade').value.trim(),
+    level:document.getElementById('ritem-level').value.trim(),
+    refType:type||'tuition',
+    ...(isTuition?{
+      baseFee:parseInt(document.getElementById('ritem-base')?.value)||0,
+      discountFee:parseInt(document.getElementById('ritem-discount')?.value)||0,
+    }:{
+      textbookFee:parseInt(document.getElementById('ritem-textbook')?.value)||0,
+      supFee:parseInt(document.getElementById('ritem-supfee')?.value)||0,
+      supMaterial:document.getElementById('ritem-sup')?.value.trim()||'',
+    }),
+    updatedAt:new Date().toISOString()};
   if(id) await db.collection('refItems').doc(id).update(data);
   else await db.collection('refItems').add({...data,createdAt:new Date().toISOString()});
   await loadRefItems();renderRevRef();overlay.remove();loading(false);toast('✅ 저장됨');
@@ -3085,6 +3306,22 @@ function openRevenueModal(id, presetStudentId){
   $('rev-memo').value=r?.memo||'';
   $('modal-revenue').style.display='flex';
 }
+async function saveRevManual(studentId,field,val,yr,mo){
+  // Find existing rev for this student-month or create a placeholder
+  const existing=revenues.find(r=>r.studentId===studentId&&!r.extraType&&new Date(r.paidDate).getFullYear()===yr&&new Date(r.paidDate).getMonth()===mo-1);
+  const update={[field==='lesson'?'manualLesson':'manualAbsent']:parseInt(val)||0,updatedAt:new Date().toISOString()};
+  if(existing){
+    await db.collection('revenues').doc(existing.id).update(update);
+    const idx=revenues.findIndex(r=>r.id===existing.id);
+    if(idx>=0) revenues[idx]={...revenues[idx],...update};
+  }else{
+    // Store as a meta record
+    const s=students.find(x=>x.id===studentId);
+    const newDoc=await db.collection('revenues').add({studentId,studentName:s?.name||'',paidDate:`${yr}-${String(mo).padStart(2,'0')}-01`,amount:0,method:'메모',isManualMeta:true,...update,createdAt:new Date().toISOString()});
+    revenues.push({id:newDoc.id,studentId,...update});
+  }
+}
+
 async function saveRevenue(){
   const sId=$('rev-student').value;if(!sId){toast('⚠️ 학생 선택 필수');return}
   const s=students.find(x=>x.id===sId);
@@ -3105,7 +3342,7 @@ async function deleteRevenue(id){
 function renderUsers(){
   const tb=$('users-tbody');
   if(!users.length){tb.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ei">👤</div><div class="et">계정 없음</div></div></td></tr>`;return}
-  tb.innerHTML=users.map(u=>`<tr onclick="openUserModal('${u.id}')">
+  tb.innerHTML=users.map(u=>`<tr>
     <td><strong>${u.name}</strong></td><td>${u.loginId}</td>
     <td><span class="badge ${u.role==='admin'?'bg-red':'bg-blue'}">${u.role==='admin'?'관리자':'교사'}</span></td>
     <td style="font-size:12px">${(u.createdAt||'').split('T')[0]}</td>
@@ -3277,6 +3514,41 @@ async function deleteEvalModule(){
 }
 
 /* ════ EXPORT ════ */
+/* ════ MENU PERMISSIONS ════ */
+const MENU_LABELS={schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',makeup:'보강 계획표',classes:'클래스 관리',students:'학생 목록',evalmodules:'평가 모듈',revenue:'매출 관리',reference:'참고',admin:'관리자',settings:'설정'};
+
+function openMenuPermModal(userId,userName){
+  const overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  const menuKeys=Object.keys(MENU_LABELS);
+  overlay.innerHTML=`<div class="ms"><div class="mh"></div>
+    <div class="mt">메뉴 권한 설정 - ${userName}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
+      ${menuKeys.map(m=>`<label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;padding:5px;border-radius:6px;background:var(--surface2)">
+        <input type="checkbox" id="uperm-${m}" value="${m}" checked style="width:15px;height:15px">
+        ${MENU_LABELS[m]}
+      </label>`).join('')}
+    </div>
+    <button class="btn btn-green btn-block" onclick="saveUserMenuPerms('${userId}','${userName}',this.closest('.mo'))">저장</button>
+    <div style="height:6px"></div>
+    <button class="btn btn-outline btn-block" onclick="this.closest('.mo').remove()">취소</button>
+  </div>`;
+  // Load existing perms
+  db.collection('userPerms').doc(userId).get().then(doc=>{
+    if(!doc.exists)return;
+    const p=doc.data().perms||{};
+    menuKeys.forEach(m=>{const el=overlay.querySelector('#uperm-'+m);if(el&&m in p)el.checked=p[m];});
+  }).catch(()=>{});
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+}
+async function saveUserMenuPerms(userId,userName,overlay){
+  const perms={};
+  Object.keys(MENU_LABELS).forEach(m=>{const el=overlay.querySelector('#uperm-'+m);if(el)perms[m]=el.checked;});
+  await db.collection('userPerms').doc(userId).set({userId,userName,perms,updatedAt:new Date().toISOString()});
+  overlay.remove();toast('✅ 권한 저장됨');
+}
+
 /* ════ MENU PERMISSIONS ════ */
 async function saveMenuPerms(){
   const perms={};
