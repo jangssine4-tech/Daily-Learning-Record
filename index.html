@@ -657,7 +657,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
       <div class="toolbar">
         <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="rev-year" onchange="renderRevenue()"></select>
         <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="rev-month" onchange="renderRevenue()"></select>
-<span id="rev-add-btn" style="display:none"></span>
+        <button class="btn btn-green btn-sm" id="rev-add-btn" onclick="openRevenueModal()">+ 수납 등록</button>
         <button class="btn btn-outline btn-sm" id="rev-expense-add-btn" style="display:none" onclick="openExpenseModal()">+ 지출 추가</button>
       </div>
 
@@ -2763,35 +2763,39 @@ function renderRevMonthly(yr,mo){
     const manualLesson=lastRev?.manualLesson;
     const manualAbsent=lastRev?.manualAbsent;
     return `<tr style="${rowStyle}">
-
-      <td style="color:var(--txt3);text-align:center">${rowNum++}</td>
-      <td onclick="openStudentModal('${s.id}')" style="cursor:pointer"><strong>${s.name}</strong></td>
-      <td style="font-size:11px">${s.grade||'-'}</td>
+      <td style="color:var(--txt3);text-align:center;font-size:11px">${rowNum++}</td>
+      <td onclick="openStudentModal('${s.id}')" style="cursor:pointer;text-align:center;font-weight:700">${s.name}</td>
+      <td style="font-size:11px;text-align:center">${s.grade||'-'}</td>
+      <td style="font-size:11px;text-align:center;white-space:nowrap">${getStudentLevel(s)||'-'}</td>
       <td style="text-align:center">
         <input type="number" class="rev-inline-input" value="${manualLesson!==undefined?manualLesson:lessonDays}" min="0" max="40" style="width:38px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 2px" title="수기 수정 가능" onchange="saveRevManual('${s.id}','lesson',this.value,${yr},${mo})" onclick="event.stopPropagation()">
       </td>
       <td style="text-align:center">
         <input type="number" class="rev-inline-input" value="${manualAbsent!==undefined?manualAbsent:absentDays}" min="0" max="40" style="width:38px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 2px" title="수기 수정 가능" onchange="saveRevManual('${s.id}','absent',this.value,${yr},${mo})" onclick="event.stopPropagation()">
       </td>
-      <td style="font-size:11px;white-space:nowrap">${getStudentLevel(s)||'-'}</td>
-      <td style="text-align:right;font-size:11px">${tbFee?tbFee.toLocaleString()+'원':'-'}</td>
-      <td style="text-align:right;font-size:11px">${baseFee?baseFee.toLocaleString()+'원':'-'}</td>
-      <td style="font-size:11px;color:var(--gold)">${s.discount||'-'}</td>
-      <td style="text-align:right;font-weight:600;color:${paid?'var(--mint)':'var(--red)'}">${paid?paidAmt.toLocaleString()+'원':'미납'}</td>
-      <td style="font-size:11px">${lastRev?`<span class="badge bg-gray">${lastRev.method}</span>`:'-'}</td>
-      <td style="font-size:11px">${lastRev?.paidDate||'-'}</td>
-      <td style="font-size:11px;color:var(--txt3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastRev?.memo||'-'}</td>
+      <td style="text-align:center;font-size:11px">${tbFee?tbFee.toLocaleString()+'원':'-'}</td>
+      <td style="text-align:center;font-size:11px">${baseFee?baseFee.toLocaleString()+'원':'-'}</td>
+      <td style="font-size:11px;text-align:center;color:var(--gold)">${s.discount||'-'}</td>
+      <td style="text-align:center;font-weight:600;color:${paid?'var(--mint)':'var(--red)'}">${paid?paidAmt.toLocaleString()+'원':'미납'}</td>
+      <td style="font-size:11px;text-align:center">${lastRev?`<span class="badge bg-gray">${lastRev.method}</span>`:'-'}</td>
+      <td style="font-size:11px;text-align:center">${lastRev?.paidDate||'-'}</td>
+      <td style="font-size:11px;color:var(--txt3);text-align:center;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lastRev?.memo||'-'}</td>
+      <td style="font-size:11px;text-align:center;color:var(--gold)">${lastRev?.extra1Type||'-'}</td>
+      <td style="font-size:11px;text-align:center">${lastRev?.extra1Amount?(parseInt(lastRev.extra1Amount)||0).toLocaleString()+'원':'-'}</td>
+      <td style="font-size:11px;text-align:center;color:var(--gold)">${lastRev?.extra2Type||'-'}</td>
+      <td style="font-size:11px;text-align:center">${lastRev?.extra2Amount?(parseInt(lastRev.extra2Amount)||0).toLocaleString()+'원':'-'}</td>
+      <td style="text-align:center"><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();openRevenueModal('${lastRev?.id||''}','${s.id}')" title="수납 등록/수정">💰</button></td>
     </tr>`;
   }).join('');
 
   // Totals row
-  const totalRow=`<tr style="background:var(--surface2);font-weight:700;position:sticky;bottom:0;z-index:5">
-    <td></td><td colspan="2" style="text-align:right">합계</td>
-    <td colspan="3"></td>
-    <td colspan="2"></td>
+  const totalRow=`<tr style="background:var(--surface2);font-weight:700">
     <td></td>
-    <td style="text-align:right;color:var(--mint)">${totalRev.toLocaleString()}원</td>
-    <td style="font-size:11px" colspan="3">카드: ${cardTotal.toLocaleString()} / 현금: ${cashTotal.toLocaleString()} / 이체: ${transferTotal.toLocaleString()}</td>
+    <td colspan="2" style="text-align:center">합계 ${activeStudents.length}명</td>
+    <td></td><td></td><td></td><td></td><td></td><td></td>
+    <td style="text-align:center;color:var(--mint)">${totalRev.toLocaleString()}원</td>
+    <td colspan="2" style="font-size:11px;text-align:center">카드: ${cardTotal.toLocaleString()} / 현금: ${cashTotal.toLocaleString()} / 이체: ${transferTotal.toLocaleString()}</td>
+    <td colspan="6"></td>
   </tr>`;
   tb.innerHTML=rows+totalRow;
 }
