@@ -408,6 +408,9 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
   <div class="sb-item" onclick="goto('settings')" id="snav-settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>설정
   </div>
+  <div class="sb-item" onclick="goto('reference')" id="snav-reference">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>참고
+  </div>
 
   <div class="sb-footer" id="sb-user-info">v3.0 • Firebase</div>
 </nav>
@@ -642,7 +645,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
         <button class="rev-tab" id="rtab-memo" onclick="switchRevTab('memo')">📝 월별 메모</button>
         <button class="rev-tab" id="rtab-monthly" onclick="switchRevTab('monthly')">💰 월별 매출현황</button>
         <button class="rev-tab" id="rtab-expense" onclick="switchRevTab('expense')">📋 수입/지출 내역</button>
-        <button class="rev-tab" id="rtab-ref" onclick="switchRevTab('ref')">📌 참고</button>
+        
       </div>
       <!-- Year/Month selector -->
       <div class="toolbar">
@@ -655,9 +658,12 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
       <!-- Monthly revenue tab -->
       <div id="rev-panel-monthly">
         <div class="cp" style="padding-top:10px">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+            <button class="btn btn-green btn-sm" onclick="openRevenueModal()">+ 수납 등록</button>
+          </div>
           <div class="rev-summary" id="rev-summary"></div>
           <!-- Tuition detail table with sticky header -->
-          <div style="overflow:auto;max-height:calc(100vh - 280px);position:relative;margin-bottom:14px">
+          <div style="overflow:auto;max-height:calc(100vh - 280px);-webkit-overflow-scrolling:touch;margin-bottom:14px;scrollbar-width:thin">
             <table class="tbl" style="min-width:1400px;font-size:11px;border-collapse:separate;border-spacing:0">
               <thead style="position:sticky;top:0;z-index:10">
                 <tr style="background:var(--navy);color:#fff">
@@ -709,26 +715,42 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
         </div>
       </div>
 
-      <!-- Ref tab -->
-      <div id="rev-panel-ref" style="display:none">
-        <div class="cp" style="padding-top:10px">
-          <div class="expense-section">
-            <h4>📌 교육비 기준 설정
-              <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal()">+ 추가</button>
-            </h4>
-            <div style="overflow-x:auto">
-              <table class="rev-tbl" style="min-width:700px">
-                <thead><tr><th>학년</th><th>단계</th><th>교재비</th><th>기본 교육비</th><th>부교재</th><th>부교재비</th><th></th></tr></thead>
-                <tbody id="ref-items-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+
       <!-- Memo tab -->
       <div id="rev-panel-memo" style="display:none">
         <div class="cp" style="padding-top:10px">
           <div id="rev-memo-area"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── REFERENCE ─── -->
+    <div class="view" id="view-reference">
+      <div class="page-top"><h2>참고</h2><p>단계별 교재 및 진도, 교육비 기준을 관리합니다</p></div>
+      <!-- Reference sub-tabs -->
+      <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex">
+        <button class="rev-tab active" id="reftab-fees" onclick="switchRefTab('fees')">💰 교육비 기준</button>
+        <button class="rev-tab" id="reftab-curriculum" onclick="switchRefTab('curriculum')">📚 레벨별 진도</button>
+      </div>
+      <!-- Fees panel -->
+      <div id="ref-panel-fees">
+        <div class="toolbar">
+          <button class="btn btn-green btn-sm" onclick="openRefItemModal()">+ 추가</button>
+        </div>
+        <div class="cp" style="padding-top:10px;overflow-x:auto">
+          <table class="rev-tbl" style="min-width:700px">
+            <thead><tr><th>학년</th><th>단계</th><th>교재비</th><th>기본 교육비</th><th>부교재</th><th>부교재비</th><th></th></tr></thead>
+            <tbody id="ref-fees-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Curriculum panel -->
+      <div id="ref-panel-curriculum" style="display:none">
+        <div class="toolbar">
+          <input type="text" class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="flex:1;max-width:250px;font-size:12px;padding:6px 10px">
+        </div>
+        <div class="cp" style="padding-top:10px">
+          <div id="ref-curriculum-area"></div>
         </div>
       </div>
     </div>
@@ -1239,9 +1261,9 @@ const CURRICULUM={
   'Reader\'s Bank 8':['Lesson 1','Lesson 2','Lesson 3','Lesson 4','Lesson 5','Lesson 6','Lesson 7','Lesson 8','Lesson 9','Lesson 10','Lesson 11','Lesson 12','Lesson 13','Lesson 14','Lesson 15','Lesson 16','Lesson 17','Lesson 18','Lesson 19','Lesson 20','Lesson 21','Lesson 22','Lesson 23','Lesson 24','Lesson 25','Lesson 26','Lesson 27','Lesson 28','Lesson 29','Lesson 30','Lesson 31','Lesson 32','Lesson 33','Lesson 34','Lesson 35','Lesson 36','Lesson 37','Lesson 38','Lesson 39','Lesson 40','Lesson 41','Lesson 42','Lesson 43','Lesson 44','Lesson 45','Lesson 46','Lesson 47','Lesson 48','Lesson 49','Lesson 50'],
   'Reader\'s Bank 9':['Lesson 1','Lesson 2','Lesson 3','Lesson 4','Lesson 5','Lesson 6','Lesson 7','Lesson 8','Lesson 9','Lesson 10','Lesson 11','Lesson 12','Lesson 13','Lesson 14','Lesson 15','Lesson 16','Lesson 17','Lesson 18','Lesson 19','Lesson 20','Lesson 21','Lesson 22','Lesson 23','Lesson 24','Lesson 25','Lesson 26','Lesson 27','Lesson 28','Lesson 29','Lesson 30','Lesson 31','Lesson 32','Lesson 33','Lesson 34','Lesson 35','Lesson 36','Lesson 37','Lesson 38','Lesson 39','Lesson 40','Lesson 41','Lesson 42','Lesson 43','Lesson 44','Lesson 45','Lesson 46','Lesson 47','Lesson 48','Lesson 49','Lesson 50'],
   'Reader\'s Bank 10':['Lesson 1','Lesson 2','Lesson 3','Lesson 4','Lesson 5','Lesson 6','Lesson 7','Lesson 8','Lesson 9','Lesson 10','Lesson 11','Lesson 12','Lesson 13','Lesson 14','Lesson 15','Lesson 16','Lesson 17','Lesson 18','Lesson 19','Lesson 20','Lesson 21','Lesson 22','Lesson 23','Lesson 24','Lesson 25','Lesson 26','Lesson 27','Lesson 28','Lesson 29','Lesson 30','Lesson 31','Lesson 32','Lesson 33','Lesson 34','Lesson 35','Lesson 36','Lesson 37','Lesson 38','Lesson 39','Lesson 40','Lesson 41','Lesson 42','Lesson 43','Lesson 44','Lesson 45','Lesson 46','Lesson 47','Lesson 48','Lesson 49','Lesson 50'],
-  '천일문 입문':['Chapter 1 Unit 1','Chapter 1 Unit 2','Chapter 1 Unit 3','Chapter 1 Unit 4','Chapter 1 Unit 5','Chapter 2 Unit 6','Chapter 2 Unit 7','Chapter 2 Unit 8','Chapter 2 Unit 9','Chapter 2 Unit 10','Chapter 3 Unit 11','Chapter 3 Unit 12','Chapter 3 Unit 13','Chapter 3 Unit 14','Chapter 4 Unit 15','Chapter 4 Unit 16','Chapter 4 Unit 17','Chapter 4 Unit 18','Chapter 4 Unit 19','Chapter 5 Unit 20','Chapter 5 Unit 21','Chapter 5 Unit 22','Chapter 5 Unit 23','Chapter 5 Unit 24','Chapter 6 Unit 25','Chapter 6 Unit 26','Chapter 6 Unit 27','Chapter 6 Unit 28','Chapter 7 Unit 29','Chapter 6 Unit 30','Chapter 7 Unit 31','Chapter 7 Unit 32','Chapter 8 Unit 33','Chapter 8 Unit 34','Chapter 8 Unit 35','Chapter 8 Unit 36','Chapter 9 Unit 37','Chapter 9 Unit 38','Chapter 9 Unit 39','Chapter 9 Unit 40','Chapter 9 Unit 41','Chapter 10 Unit 42','Chapter 10 Unit 43','Chapter 10 Unit 44','Chapter 10 Unit 45','Chapter 10 Unit 46','Chapter 10 Unit 47','Chapter 11 Unit 48','Chapter 11 Unit 49','Chapter 11 Unit 50','Chapter 11 Unit 51','Chapter 12 Unit 52','Chapter 12 Unit 53','Chapter 12 Unit 54','Chapter 12 Unit 55','Chapter 12 Unit 56'],
-  '천일문 기본':['Chapter 1 Unit 1','Chapter 1 Unit 2','Chapter 1 Unit 3','Chapter 1 Unit 4','Chapter 1 Unit 5','Chapter 2 Unit 6','Chapter 2 Unit 7','Chapter 2 Unit 8','Chapter 2 Unit 9','Chapter 2 Unit 10','Chapter 3 Unit 11','Chapter 3 Unit 12','Chapter 3 Unit 13','Chapter 3 Unit 14','Chapter 4 Unit 15','Chapter 4 Unit 16','Chapter 4 Unit 17','Chapter 4 Unit 18','Chapter 4 Unit 19','Chapter 5 Unit 20','Chapter 5 Unit 21','Chapter 5 Unit 22','Chapter 5 Unit 23','Chapter 5 Unit 24','Chapter 6 Unit 25','Chapter 6 Unit 26','Chapter 6 Unit 27','Chapter 6 Unit 28','Chapter 7 Unit 29','Chapter 6 Unit 30','Chapter 7 Unit 31','Chapter 7 Unit 32','Chapter 8 Unit 33','Chapter 8 Unit 34','Chapter 8 Unit 35','Chapter 8 Unit 36','Chapter 9 Unit 37','Chapter 9 Unit 38','Chapter 9 Unit 39','Chapter 9 Unit 40','Chapter 9 Unit 41','Chapter 10 Unit 42','Chapter 10 Unit 43','Chapter 10 Unit 44','Chapter 10 Unit 45','Chapter 10 Unit 46','Chapter 10 Unit 47','Chapter 11 Unit 48','Chapter 11 Unit 49','Chapter 11 Unit 50','Chapter 11 Unit 51','Chapter 12 Unit 52','Chapter 12 Unit 53','Chapter 12 Unit 54','Chapter 12 Unit 55','Chapter 12 Unit 56'],
-  '천일문 실력':['Chapter 1 Unit 1','Chapter 1 Unit 2','Chapter 1 Unit 3','Chapter 1 Unit 4','Chapter 1 Unit 5','Chapter 2 Unit 6','Chapter 2 Unit 7','Chapter 2 Unit 8','Chapter 2 Unit 9','Chapter 2 Unit 10','Chapter 3 Unit 11','Chapter 3 Unit 12','Chapter 3 Unit 13','Chapter 3 Unit 14','Chapter 4 Unit 15','Chapter 4 Unit 16','Chapter 4 Unit 17','Chapter 4 Unit 18','Chapter 4 Unit 19','Chapter 5 Unit 20','Chapter 5 Unit 21','Chapter 5 Unit 22','Chapter 5 Unit 23','Chapter 5 Unit 24','Chapter 6 Unit 25','Chapter 6 Unit 26','Chapter 6 Unit 27','Chapter 6 Unit 28','Chapter 7 Unit 29','Chapter 6 Unit 30','Chapter 7 Unit 31','Chapter 7 Unit 32','Chapter 8 Unit 33','Chapter 8 Unit 34','Chapter 8 Unit 35','Chapter 8 Unit 36','Chapter 9 Unit 37','Chapter 9 Unit 38','Chapter 9 Unit 39','Chapter 9 Unit 40','Chapter 9 Unit 41','Chapter 10 Unit 42','Chapter 10 Unit 43','Chapter 10 Unit 44','Chapter 10 Unit 45','Chapter 10 Unit 46','Chapter 10 Unit 47','Chapter 11 Unit 48','Chapter 11 Unit 49','Chapter 11 Unit 50','Chapter 11 Unit 51','Chapter 12 Unit 52','Chapter 12 Unit 53','Chapter 12 Unit 54','Chapter 12 Unit 55','Chapter 12 Unit 56'],
+  '천일문 입문':['Chapter 1 Unit 1','Chapter 1 Unit 2','Chapter 1 Unit 3','Chapter 1 Unit 4','Chapter 1 Unit 5','Chapter 2 Unit 6','Chapter 2 Unit 7','Chapter 2 Unit 8','Chapter 2 Unit 9','Chapter 2 Unit 10','Chapter 3 Unit 11','Chapter 3 Unit 12','Chapter 3 Unit 13','Chapter 3 Unit 14','Chapter 4 Unit 15','Chapter 4 Unit 16','Chapter 4 Unit 17','Chapter 4 Unit 18','Chapter 4 Unit 19','Chapter 5 Unit 20','Chapter 5 Unit 21','Chapter 5 Unit 22','Chapter 5 Unit 23','Chapter 5 Unit 24','Chapter 6 Unit 25','Chapter 6 Unit 26','Chapter 6 Unit 27','Chapter 6 Unit 28','Chapter 7 Unit 29','Chapter 6 Unit 30','Chapter 7 Unit 31','Chapter 7 Unit 32','Chapter 8 Unit 33','Chapter 8 Unit 34','Chapter 8 Unit 35','Chapter 8 Unit 36','Chapter 9 Unit 37','Chapter 9 Unit 38','Chapter 9 Unit 39','Chapter 9 Unit 40','Chapter 9 Unit 41','Chapter 10 Unit 42','Chapter 10 Unit 43','Chapter 10 Unit 44','Chapter 10 Unit 45','Chapter 10 Unit 46','Chapter 10 Unit 47','Chapter 11 Unit 48','Chapter 11 Unit 49','Chapter 11 Unit 50','Chapter 11 Unit 51','Chapter 12 Unit 52','Chapter 12 Unit 53','Chapter 12 Unit 54','Chapter 12 Unit 55','Chapter 12 Unit 56','0.0'],
+  '천일문 기본':['Chapter 1 Unit 1','Chapter 1 Unit 2','Chapter 1 Unit 3','Chapter 1 Unit 4','Chapter 1 Unit 5','Chapter 2 Unit 6','Chapter 2 Unit 7','Chapter 2 Unit 8','Chapter 2 Unit 9','Chapter 2 Unit 10','Chapter 3 Unit 11','Chapter 3 Unit 12','Chapter 3 Unit 13','Chapter 3 Unit 14','Chapter 4 Unit 15','Chapter 4 Unit 16','Chapter 4 Unit 17','Chapter 4 Unit 18','Chapter 4 Unit 19','Chapter 5 Unit 20','Chapter 5 Unit 21','Chapter 5 Unit 22','Chapter 5 Unit 23','Chapter 5 Unit 24','Chapter 6 Unit 25','Chapter 6 Unit 26','Chapter 6 Unit 27','Chapter 6 Unit 28','Chapter 7 Unit 29','Chapter 6 Unit 30','Chapter 7 Unit 31','Chapter 7 Unit 32','Chapter 8 Unit 33','Chapter 8 Unit 34','Chapter 8 Unit 35','Chapter 8 Unit 36','Chapter 9 Unit 37','Chapter 9 Unit 38','Chapter 9 Unit 39','Chapter 9 Unit 40','Chapter 9 Unit 41','Chapter 10 Unit 42','Chapter 10 Unit 43','Chapter 10 Unit 44','Chapter 10 Unit 45','Chapter 10 Unit 46','Chapter 10 Unit 47','Chapter 11 Unit 48','Chapter 11 Unit 49','Chapter 11 Unit 50','Chapter 11 Unit 51','Chapter 12 Unit 52','Chapter 12 Unit 53','Chapter 12 Unit 54','Chapter 12 Unit 55','Chapter 12 Unit 56','0.0'],
+  '천일문 실력':['Chapter 1 Unit 1','Chapter 1 Unit 2','Chapter 1 Unit 3','Chapter 1 Unit 4','Chapter 1 Unit 5','Chapter 2 Unit 6','Chapter 2 Unit 7','Chapter 2 Unit 8','Chapter 2 Unit 9','Chapter 2 Unit 10','Chapter 3 Unit 11','Chapter 3 Unit 12','Chapter 3 Unit 13','Chapter 3 Unit 14','Chapter 4 Unit 15','Chapter 4 Unit 16','Chapter 4 Unit 17','Chapter 4 Unit 18','Chapter 4 Unit 19','Chapter 5 Unit 20','Chapter 5 Unit 21','Chapter 5 Unit 22','Chapter 5 Unit 23','Chapter 5 Unit 24','Chapter 6 Unit 25','Chapter 6 Unit 26','Chapter 6 Unit 27','Chapter 6 Unit 28','Chapter 7 Unit 29','Chapter 6 Unit 30','Chapter 7 Unit 31','Chapter 7 Unit 32','Chapter 8 Unit 33','Chapter 8 Unit 34','Chapter 8 Unit 35','Chapter 8 Unit 36','Chapter 9 Unit 37','Chapter 9 Unit 38','Chapter 9 Unit 39','Chapter 9 Unit 40','Chapter 9 Unit 41','Chapter 10 Unit 42','Chapter 10 Unit 43','Chapter 10 Unit 44','Chapter 10 Unit 45','Chapter 10 Unit 46','Chapter 10 Unit 47','Chapter 11 Unit 48','Chapter 11 Unit 49','Chapter 11 Unit 50','Chapter 11 Unit 51','Chapter 12 Unit 52','Chapter 12 Unit 53','Chapter 12 Unit 54','Chapter 12 Unit 55','Chapter 12 Unit 56','0.0'],
   '빠바 구문':['Chapter 1','Chapter 2','Chapter 3','Chapter 4','Chapter 5','Chapter 6','Chapter 7','Chapter 8','Chapter 9','Chapter 10','Chapter 11','Chapter 12','Mini Test 1','Mini Test 2','Mini Test 3','Mini Test 4','Mini Test 5'],
   '빠바 유형':['Part 1 Chapter 1','Part 1 Chapter 2','Part 1 Chapter 3','Part 2 Chapter 1','Part 2 Chapter 2','Part 2 Chapter 3','Part 3 Chapter 1','Part 3 Chapter 2','Part 3 Chapter 3','Part 3 Chapter 4','Part 3 Chapter 5','Part 4 Chapter 1','Part 4 Chapter 2','Part 4 Chapter 3','Part 4 Chapter 4','Part 5 Chapter 1','Part 5 Chapter 2','Mini Test 1','Mini Test 2','Mini Test 3','Mini Test 4','Mini Test 5']
 };
@@ -2525,7 +2547,7 @@ function renderRevYearMonth(){
 }
 function switchRevTab(tab){
   currentRevTab=tab;
-  ['monthly','expense','summary','goals','memo','ref'].forEach(t=>{
+  ['monthly','expense','summary','goals','memo'].forEach(t=>{
     const btn=document.getElementById('rtab-'+t);
     const panel=document.getElementById('rev-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -2546,7 +2568,7 @@ function renderRevenue(){
   else if(tab==='summary') renderRevSummary(yr);
   else if(tab==='goals') renderRevGoals(yr);
   else if(tab==='memo') renderRevMemo(yr);
-  else if(tab==='ref') renderRevRef();
+
 }
 
 function renderRevMonthly(yr,mo){
@@ -2636,9 +2658,13 @@ function renderRevExpense(yr,mo){
     return d.getFullYear()===yr&&d.getMonth()===mo-1;
   });
 
-  const cats=['임대료','인건비','교재/물품','공과금','마케팅','세금','기타'];
+  const catGroups={
+    '사무실':['사무실 운영비','교사 급여','교재비','카드 수수료','홍보비','차량 유지비','통신비','세금','공과금'],
+    '개인':['카드비','보험료','아파트']
+  };
+  const allCats=[...catGroups['사무실'],...catGroups['개인']];
   const catTotals={};
-  cats.forEach(cat=>catTotals[cat]=list.filter(e=>e.category===cat).reduce((s,e)=>s+(parseInt(e.amount)||0),0));
+  allCats.forEach(cat=>catTotals[cat]=list.filter(e=>e.category===cat).reduce((s,e)=>s+(parseInt(e.amount)||0),0));
   const totalExp=Object.values(catTotals).reduce((s,v)=>s+v,0);
 
   const revList=revenues.filter(r=>{const d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
@@ -2653,11 +2679,17 @@ function renderRevExpense(yr,mo){
   </div>
   <div class="expense-section">
     <h4>📊 카테고리별 지출</h4>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px">
-      ${cats.map(cat=>`<div style="background:var(--surface2);border-radius:var(--r);padding:10px 12px;border-left:3px solid var(--border2)">
-        <div style="font-size:11px;color:var(--txt3)">${cat}</div>
-        <div style="font-size:14px;font-weight:700;color:var(--red)">${catTotals[cat].toLocaleString()}원</div>
-      </div>`).join('')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      ${Object.entries({'사무실':catGroups['사무실'],'개인':catGroups['개인']}).map(([grpName,cats])=>`
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:6px;padding:4px 8px;background:var(--surface2);border-radius:6px">${grpName}</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            ${cats.map(cat=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--surface2);border-radius:5px;border-left:3px solid ${catTotals[cat]>0?'var(--red)':'var(--border)'}">
+              <span style="font-size:12px;color:var(--txt2)">${cat}</span>
+              <span style="font-size:12px;font-weight:700;color:${catTotals[cat]>0?'var(--red)':'var(--txt3)'}"><strong>${catTotals[cat].toLocaleString()}원</strong></span>
+            </div>`).join('')}
+          </div>
+        </div>`).join('')}
     </div>
   </div>
   <div class="expense-section">
@@ -2748,9 +2780,9 @@ function renderRevSummary(yr){
     <h4>👥 원생 현황 (${yr}년)</h4>
     <div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">
       <thead><tr><th>항목</th>${monthTH}</tr></thead>
-      <tbody>${htmlRows_student.map(([label,val,style])=>`<tr>
+      <tbody>${htmlRows_student.map(([label,valFn,style])=>`<tr>
         <td style="${style||''}">${label}</td>
-        ${months.map((_,i)=>pastCell(i,val,style||'')).join('')}
+        ${months.map((_,i)=>pastCell(i,typeof valFn==='function'?valFn(i):valFn,style||'')).join('')}
       </tr>`).join('')}</tbody>
     </table></div>
   </div>
@@ -2925,25 +2957,55 @@ async function saveRevMemo(yr,mo){
   await db.collection('revMemos').doc(String(yr)).set({[`m${mo}`]:{issue,note,plan,done,updatedAt:new Date().toISOString()}},{merge:true});
 }
 
-/* ════ REFERENCE ITEMS ════ */
+/* ════ REFERENCE (참고) ════ */
 let refItems=[];
 async function loadRefItems(){
   const s=await db.collection('refItems').orderBy('createdAt','asc').get().catch(()=>({docs:[]}));
   refItems=s.docs.map(d=>({id:d.id,...d.data()}));
 }
-function renderRevRef(){
-  const tb=document.getElementById('ref-items-tbody');if(!tb)return;
-  if(!refItems.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--txt3)">기준 데이터를 추가하세요</td></tr>`;return}
-  tb.innerHTML=refItems.map(item=>`<tr onclick="openRefItemModal('${item.id}')">
+
+function switchRefTab(tab){
+  ['fees','curriculum'].forEach(t=>{
+    const btn=document.getElementById('reftab-'+t);
+    const panel=document.getElementById('ref-panel-'+t);
+    if(btn) btn.classList.toggle('active',t===tab);
+    if(panel) panel.style.display=t===tab?'':'none';
+  });
+}
+
+function renderRefFees(){
+  const tb=document.getElementById('ref-fees-tbody');if(!tb)return;
+  if(!refItems.length){tb.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--txt3)">+ 추가 버튼을 눌러 기준 데이터를 입력하세요</td></tr>`;return}
+  tb.innerHTML=refItems.map(item=>`<tr onclick="openRefItemModal('${item.id}')" style="cursor:pointer">
     <td>${item.grade||'-'}</td>
-    <td>${item.level||'-'}</td>
+    <td style="font-weight:600">${item.level||'-'}</td>
     <td style="text-align:right">${(parseInt(item.textbookFee)||0).toLocaleString()}원</td>
-    <td style="text-align:right;font-weight:600">${(parseInt(item.baseFee)||0).toLocaleString()}원</td>
+    <td style="text-align:right;font-weight:600;color:var(--mint)">${(parseInt(item.baseFee)||0).toLocaleString()}원</td>
     <td>${item.supMaterial||'-'}</td>
     <td style="text-align:right">${(parseInt(item.supFee)||0).toLocaleString()}원</td>
     <td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem('${item.id}')">삭제</button></td>
   </tr>`).join('');
 }
+
+function renderRefCurriculum(){
+  const el=document.getElementById('ref-curriculum-area');if(!el)return;
+  const q=(document.getElementById('ref-cur-search')?.value||'').toLowerCase();
+  const entries=Object.entries(CURRICULUM).filter(([k])=>!q||k.toLowerCase().includes(q));
+  if(!entries.length){el.innerHTML=`<div style="text-align:center;padding:24px;color:var(--txt3)">검색 결과 없음</div>`;return}
+  el.innerHTML=entries.map(([level,lessons])=>`
+    <div class="card" style="padding:12px 16px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">${level}</div>
+        <span class="badge bg-navy">${lessons.length}개 진도</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${lessons.map((l,i)=>`<span style="font-size:11px;background:${l.includes('Level Test')||l.includes('Portfolio')?'var(--gold)':'var(--surface2)'};border-radius:4px;padding:2px 7px;color:${l.includes('Level Test')||l.includes('Portfolio')?'#fff':'var(--txt2)'}">${l}</span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+/* Old renderRevRef - kept for compat */
+function renderRevRef(){renderRefFees();}
 function openRefItemModal(id){
   const item=id?refItems.find(x=>x.id===id):null;
   const overlay=document.createElement('div');
@@ -3244,7 +3306,7 @@ function exportCSV(){
 }
 
 /* ════ NAVIGATION ════ */
-const viewTitles={schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',makeup:'보강 계획표',classes:'클래스 관리',students:'학생 목록',evalmodules:'평가 모듈 관리',revenue:'매출 관리',admin:'관리자',settings:'설정'};
+const viewTitles={schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',makeup:'보강 계획표',classes:'클래스 관리',students:'학생 목록',evalmodules:'평가 모듈 관리',revenue:'매출 관리',admin:'관리자',settings:'설정',reference:'참고'};
 
 function goto(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -3263,6 +3325,7 @@ function goto(v){
   if(v==='revenue'){renderRevYearMonth();currentRevTab='summary';switchRevTab('summary');}
   if(v==='admin')renderUsers();
   if(v==='evalmodules')renderEvalModules();
+  if(v==='reference'){renderRefFees();renderRefCurriculum();}
 }
 function toggleSb(){$('sidebar').classList.toggle('open');$('sb-overlay').classList.toggle('show');}
 function closeSb(){$('sidebar').classList.remove('open');$('sb-overlay').classList.remove('show');}
