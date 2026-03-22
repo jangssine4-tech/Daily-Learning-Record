@@ -371,9 +371,12 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
     <div style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.5px">english<span style="color:var(--mint)">eye</span></div>
   </div>
 
-  <div class="sb-sec">매출</div>
-  <div class="sb-item" onclick="goto('revenue')" id="snav-revenue">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/></svg>매출 관리
+  <div class="sb-sec">연간 계획 및 현황</div>
+  <div class="sb-item" onclick="goto('revenue');setTimeout(()=>switchRevTab('goals'),50)" id="snav-revenue-goals" style="padding-left:28px;font-size:12px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>목표 관리
+  </div>
+  <div class="sb-item" onclick="goto('revenue');setTimeout(()=>switchRevTab('summary'),50)" id="snav-revenue-summary" style="padding-left:28px;font-size:12px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>월별 현황
   </div>
 
   <div class="sb-sec">학생 관리</div>
@@ -643,14 +646,17 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
 
     <!-- ─── REVENUE ─── -->
     <div class="view" id="view-revenue">
-      <div class="page-top"><h2>매출 관리</h2></div>
+      <div class="page-top"><h2>연간 계획 및 현황</h2></div>
       <!-- Revenue sub-tabs -->
       <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto">
-        <button class="rev-tab active" id="rtab-summary" onclick="switchRevTab('summary')">📈 월별 현황 요약</button>
+        <div style="padding:0 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,.45);background:var(--navy);display:flex;align-items:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1)">목표 관리</div>
         <button class="rev-tab" id="rtab-goals" onclick="switchRevTab('goals')">🎯 연간 목표</button>
+        <button class="rev-tab" id="rtab-monthly-goals" onclick="switchRevTab('monthly-goals')">📅 월별 목표</button>
         <button class="rev-tab" id="rtab-memo" onclick="switchRevTab('memo')">📝 월별 메모</button>
+        <div style="padding:0 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,.45);background:var(--navy);display:flex;align-items:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1)">월별 현황</div>
+        <button class="rev-tab active" id="rtab-summary" onclick="switchRevTab('summary')">📈 월별 현황 요약</button>
         <button class="rev-tab" id="rtab-monthly" onclick="switchRevTab('monthly')">💰 월별 매출현황</button>
-        <button class="rev-tab" id="rtab-expense" onclick="switchRevTab('expense')">📋 수입/지출 내역</button>
+        <button class="rev-tab" id="rtab-expense" onclick="switchRevTab('expense')">📋 월별 수입/지출 내역</button>
         
       </div>
       <!-- Year/Month selector -->
@@ -719,6 +725,10 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
       </div>
 
 
+      <!-- Monthly Goals tab -->
+      <div id="rev-panel-monthly-goals" style="display:none">
+        <div class="cp" style="padding-top:10px"><div id="rev-monthly-goals-area"></div></div>
+      </div>
       <!-- Memo tab -->
       <div id="rev-panel-memo" style="display:none">
         <div class="cp" style="padding-top:10px">
@@ -891,11 +901,22 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
   <div class="r2">
     <div class="field"><div class="fl">이름 *</div><input class="fi" id="s-name" placeholder="홍길동"></div>
     <div class="field"><div class="fl">재원 상태</div>
-      <select class="fi" id="s-status">
+      <select class="fi" id="s-status" onchange="onStudentStatusChange()">
         <option value="재원">재원</option><option value="신규">신규</option>
         <option value="휴원">휴원</option><option value="퇴원">퇴원</option>
       </select>
     </div>
+  </div>
+  <div id="s-quit-reason-row" style="display:none" class="r2">
+    <div class="field"><div class="fl">휴/퇴원 사유</div>
+      <select class="fi" id="s-quit-reason">
+        <option value="">사유 선택</option>
+        <option value="이사">이사</option><option value="타학원 이동">타학원 이동</option>
+        <option value="학습량 부담">학습량 부담</option><option value="비용 문제">비용 문제</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+    <div class="field"><div class="fl">휴/퇴원일</div><input type="date" class="fi" id="s-quit-date"></div>
   </div>
   <div class="r2">
     <div class="field"><div class="fl">클래스</div><select class="fi" id="s-class" onchange="onSClassChange()"><option value="">미배정</option></select></div>
@@ -2419,6 +2440,11 @@ function renderPeriodInputs(){
     updateWeeklyHours();
   },10);
 }
+function onStudentStatusChange(){
+  var status=document.getElementById('s-status');
+  var row=document.getElementById('s-quit-reason-row');
+  if(row&&status) row.style.display=['휴원','퇴원'].includes(status.value)?'':'none';
+}
 function updateWeeklyHours(){
   const days=[...document.querySelectorAll('#s-days .day-pill.on')].length;
   const el=document.getElementById('s-weekly-hours-display');
@@ -2446,6 +2472,9 @@ function openStudentModal(id){
   $('s-memo').value=s?.memo||'';
   const statusEl=$('s-status');if(statusEl) statusEl.value=s?.status||'재원';
   const discEl=$('s-discount');if(discEl) discEl.value=s?.discount||'';
+  const qrEl=document.getElementById('s-quit-reason');if(qrEl) qrEl.value=s?.quitReason||'';
+  const qdEl=document.getElementById('s-quit-date');if(qdEl) qdEl.value=s?.quitDate||'';
+  onStudentStatusChange();
   $('s-level').value=s?.level||'';
   $('s-custom-level').value=s?.customLevel||'';
   $('s-custom-level').style.display=s?.level==='직접입력'?'block':'none';
@@ -2521,7 +2550,7 @@ async function saveStudent(){
     const enrolled=document.getElementById('sib-enrolled-'+i)?.checked!==false;
     if(n) siblings.push({name:n,grade:g,enrolled});
   });
-  const data={name,level,customLevel:$('s-custom-level').value.trim(),grade:$('s-grade').value,enrollYear:parseInt($('s-enroll-year').value)||new Date().getFullYear(),classId:$('s-class').value,days,periods:periods2,phoneMom:$('s-phone-mom').value.trim(),school:$('s-school').value.trim(),enrollDate:$('s-enroll-date').value,siblings,memo:$('s-memo').value.trim(),status:$('s-status')?.value||'재원',discount:$('s-discount')?.value||'',updatedAt:new Date().toISOString()};
+  const data={name,level,customLevel:$('s-custom-level').value.trim(),grade:$('s-grade').value,enrollYear:parseInt($('s-enroll-year').value)||new Date().getFullYear(),classId:$('s-class').value,days,periods:periods2,phoneMom:$('s-phone-mom').value.trim(),school:$('s-school').value.trim(),enrollDate:$('s-enroll-date').value,siblings,memo:$('s-memo').value.trim(),status:$('s-status')?.value||'재원',discount:$('s-discount')?.value||'',quitReason:document.getElementById('s-quit-reason')?.value||'',quitDate:document.getElementById('s-quit-date')?.value||'',updatedAt:new Date().toISOString()};
   const id=$('s-id').value;
   if(id) await db.collection('students').doc(id).update(data);
   else await db.collection('students').add({...data,createdAt:new Date().toISOString()});
@@ -2828,7 +2857,7 @@ function renderRevYearMonth(){
 }
 function switchRevTab(tab){
   currentRevTab=tab;
-  ['monthly','expense','summary','goals','memo'].forEach(t=>{
+  ['monthly','expense','summary','goals','memo','monthly-goals'].forEach(t=>{
     const btn=document.getElementById('rtab-'+t);
     const panel=document.getElementById('rev-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -2836,8 +2865,10 @@ function switchRevTab(tab){
   });
   const addBtn=document.getElementById('rev-add-btn');
   const expBtn=document.getElementById('rev-expense-add-btn');
+  const moSel=document.getElementById('rev-month');
   if(addBtn) addBtn.style.display=tab==='monthly'?'':'none';
   if(expBtn) expBtn.style.display=tab==='expense'?'':'none';
+  if(moSel) moSel.style.display=['monthly','expense'].includes(tab)?'':'none';
   renderRevenue();
 }
 
@@ -2848,6 +2879,7 @@ function renderRevenue(){
   else if(tab==='expense') renderRevExpense(yr,mo);
   else if(tab==='summary') renderRevSummary(yr);
   else if(tab==='goals') renderRevGoals(yr);
+  else if(tab==='monthly-goals') renderMonthlyGoals(yr,mo);
   else if(tab==='memo') renderRevMemo(yr);
 
 }
@@ -3073,83 +3105,78 @@ function renderRevSummary(yr){
   const quitN=students.filter(s=>s.status==='퇴원').length;
   const restN=students.filter(s=>s.status==='휴원').length;
 
+  const revRows=[
+    {label:'실제 수강료', fn:(d)=>d.totalRev?d.totalRev.toLocaleString()+'원':'₩0', style:'color:var(--mint);font-weight:600'},
+    {label:'미납', fn:(d,i)=>{const mo=i+1;const n=activeStudents2.filter(s=>!revenues.some(r=>r.studentId===s.id&&!r.isManualMeta&&new Date(r.paidDate).getMonth()+1===mo&&new Date(r.paidDate).getFullYear()===yr)).length;return n+'명';}, style:'color:var(--red)'},
+    {label:'지출 합계', fn:(d)=>d.totalExp?d.totalExp.toLocaleString()+'원':'₩0', style:'color:var(--red)'},
+    {label:'순수익', fn:(d)=>d.net.toLocaleString()+'원', style:(d)=>d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700', rowStyle:'background:var(--surface2)'},
+  ];
+
   const studentRows=[
-    ['재원생',activeStudents2.length,'font-weight:700'],
-    ['신규 등록',newN,'color:var(--mint)'],
-    ['퇴원생',quitN,'color:var(--red)'],
-    ['휴원생',restN,'color:var(--gold)'],
-    ['순증감',newN-quitN,(newN-quitN)>=0?'color:var(--mint)':'color:var(--red)'],
+    {label:'재원생', val:activeStudents2.length, style:'font-weight:700'},
+    {label:'신규 등록', val:newN, style:'color:var(--mint)'},
+    {label:'퇴원생', val:quitN, style:'color:var(--red)'},
+    {label:'휴원생', val:restN, style:'color:var(--gold)'},
+    {label:'순증감', val:newN-quitN, style:(newN-quitN)>=0?'color:var(--mint)':'color:var(--red)'},
   ];
 
   const levelRows=[
-    ['Phonics',phonicsN,''],['Basic',basicN,''],['Grammar',grammarN,''],
-    ['Prime/Advanced',primeN,''],['Elite',eliteN,''],['중등',midN,''],['고등',highN,''],
-    ['합계',activeStudents2.length,'font-weight:700'],
+    {label:'Phonics', val:phonicsN},{label:'Basic', val:basicN},{label:'Grammar', val:grammarN},
+    {label:'Prime/Advanced', val:primeN},{label:'Elite', val:eliteN},{label:'중등', val:midN},{label:'고등', val:highN},
+    {label:'합계', val:activeStudents2.length, style:'font-weight:700'},
   ];
 
-  const monthTH=months.map(m=>`<th style="text-align:center;min-width:52px">${m}</th>`).join('');
-  const monthTHR=months.map(m=>`<th style="text-align:right;min-width:52px">${m}</th>`).join('');
+  // Quit reason auto from student list
+  const quitReasons=['이사','타학원 이동','학습량 부담','비용 문제','기타'];
+  const quitRowsHTML=quitReasons.map(function(r){
+    const qN=students.filter(function(s){return s.status==='퇴원'&&(s.quitReason||'기타')===r;}).length;
+    const rN=students.filter(function(s){return s.status==='휴원'&&(s.quitReason||'기타')===r;}).length;
+    return '<tr><td>'+r+'</td><td style="text-align:center">'+(rN||'-')+'</td><td style="text-align:center">'+(qN||'-')+'</td><td style="text-align:center;font-weight:600">'+((rN+qN)||'-')+'</td></tr>';
+  }).join('');
 
-  el.innerHTML=`
-  <div class="expense-section">
-    <h4>👥 원생 현황 (${yr}년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납 데이터가 있는 달만 표시</span></h4>
-    <div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">
-      <thead><tr><th>항목</th>${monthTH}</tr></thead>
-      <tbody>${studentRows.map(([label,val,style])=>`<tr>
-        <td style="${style}">${label}</td>
-        ${months.map((_,i)=>cell(i,val,style)).join('')}
-      </tr>`).join('')}</tbody>
-    </table></div>
-  </div>
-  <div class="expense-section">
-    <h4>📊 레벨별 원생 현황 (${yr}년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납 데이터가 있는 달만 표시</span></h4>
-    <div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">
-      <thead><tr><th>레벨</th>${monthTH}</tr></thead>
-      <tbody>${levelRows.map(([label,val,style])=>`<tr>
-        <td style="${style}">${label}</td>
-        ${months.map((_,i)=>cell(i,val,style)).join('')}
-      </tr>`).join('')}</tbody>
-    </table></div>
-  </div>
-  <div class="expense-section">
-    <h4>💰 매출 현황 (${yr}년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납/지출 데이터가 있는 달만 표시</span></h4>
-    <div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">
-      <thead><tr><th>항목</th>${monthTHR}</tr></thead>
-      <tbody>
-        <tr><td>실제 수강료</td>${monthData.map((d,i)=>cellR(i,d.totalRev?d.totalRev.toLocaleString()+'원':'₩0','color:var(--mint);font-weight:600')).join('')}</tr>
-        <tr><td>미납 금액</td>${monthData.map((d,i)=>{
-          const mo=i+1;
-          const unpaidN=activeStudents2.filter(s=>!revenues.some(r=>r.studentId===s.id&&!r.isManualMeta&&new Date(r.paidDate).getMonth()+1===mo&&new Date(r.paidDate).getFullYear()===yr)).length;
-          return cellR(i,unpaidN+'명','color:var(--red)');
-        }).join('')}</tr>
-        <tr><td>지출 합계</td>${monthData.map((d,i)=>cellR(i,d.totalExp?d.totalExp.toLocaleString()+'원':'₩0','color:var(--red)')).join('')}</tr>
-        <tr style="background:var(--surface2)"><td style="font-weight:700">순수익</td>${monthData.map((d,i)=>cellR(i,d.net.toLocaleString()+'원',d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700')).join('')}</tr>
-      </tbody>
-    </table></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
-    <div class="expense-section">
-      <h4>🚪 퇴원 사유 분석</h4>
-      <table class="rev-tbl">
-        <thead><tr><th>사유</th><th style="text-align:center">건수</th></tr></thead>
-        <tbody>${['이사','타학원 이동','학습량 부담','비용 문제','기타'].map(r=>`<tr>
-          <td>${r}</td>
-          <td style="text-align:center"><input type="number" style="width:50px;border:1px solid var(--border);border-radius:4px;text-align:center;padding:2px;font-size:12px" min="0" value="0" onchange="saveAnalysis('quit','${r}',this.value)"></td>
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>
-    <div class="expense-section">
-      <h4>🌟 신규 유입 경로</h4>
-      <table class="rev-tbl">
-        <thead><tr><th>경로</th><th style="text-align:center">건수</th></tr></thead>
-        <tbody>${['지인 소개','현수막/전단지','블로그','당근','기타'].map(r=>`<tr>
-          <td>${r}</td>
-          <td style="text-align:center"><input type="number" style="width:50px;border:1px solid var(--border);border-radius:4px;text-align:center;padding:2px;font-size:12px" min="0" value="0" onchange="saveAnalysis('inflow','${r}',this.value)"></td>
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>
-  </div>`;
-  // Load saved analysis data
+  el.innerHTML=
+  '<div class="expense-section">'
+  +'<h4>💰 매출 현황 ('+yr+'년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납/지출 데이터가 있는 달만 표시</span></h4>'
+  +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">'
+  +'<thead><tr><th>항목</th>'+monthTHR+'</tr></thead><tbody>'
+  +revRows.map(function(row){
+    return '<tr style="'+(row.rowStyle||'')+'"><td>'+(row.label)+'</td>'
+    +monthData.map(function(d,i){
+      var val=typeof row.fn==='function'?row.fn(d,i):'-';
+      var style=typeof row.style==='function'?row.style(d):(row.style||'');
+      return cellR(i,val,style);
+    }).join('')+'</tr>';
+  }).join('')
+  +'</tbody></table></div></div>'
+  +'<div class="expense-section">'
+  +'<h4>👥 원생 현황 ('+yr+'년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납 데이터가 있는 달만 표시</span></h4>'
+  +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">'
+  +'<thead><tr><th>항목</th>'+monthTH+'</tr></thead><tbody>'
+  +studentRows.map(function(row){
+    return '<tr><td style="'+(row.style||'')+'">'+row.label+'</td>'
+    +months.map(function(_,i){return cell(i,row.val,row.style||'');}).join('')+'</tr>';
+  }).join('')
+  +'</tbody></table></div></div>'
+  +'<div class="expense-section">'
+  +'<h4>📊 레벨별 원생 현황 ('+yr+'년) <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 수납 데이터가 있는 달만 표시</span></h4>'
+  +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px">'
+  +'<thead><tr><th>레벨</th>'+monthTH+'</tr></thead><tbody>'
+  +levelRows.map(function(row){
+    return '<tr><td style="'+(row.style||'')+'">'+row.label+'</td>'
+    +months.map(function(_,i){return cell(i,row.val,row.style||'');}).join('')+'</tr>';
+  }).join('')
+  +'</tbody></table></div></div>'
+  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">'
+  +'<div class="expense-section"><h4>🚪 휴/퇴원 사유 분석 <span style="font-size:11px;font-weight:400;color:var(--txt3)">· 학생 목록 기준</span></h4>'
+  +'<table class="rev-tbl"><thead><tr><th>사유</th><th style="text-align:center">휴원</th><th style="text-align:center">퇴원</th><th style="text-align:center">합계</th></tr></thead>'
+  +'<tbody>'+quitRowsHTML+'</tbody></table></div>'
+  +'<div class="expense-section"><h4>🌟 신규 유입 경로</h4>'
+  +'<table class="rev-tbl"><thead><tr><th>경로</th><th style="text-align:center">건수</th></tr></thead>'
+  +'<tbody>'+['지인 소개','현수막/전단지','블로그','당근','기타'].map(function(r){
+    var encR=r.replace(/'/g,"&#39;");
+    return '<tr><td>'+r+'</td><td style="text-align:center"><input type="number" style="width:50px;border:1px solid var(--border);border-radius:4px;text-align:center;padding:2px;font-size:12px" min="0" value="0" onchange="saveAnalysis(&quot;inflow&quot;,&quot;'+encR+'&quot;,this.value)"></td></tr>';
+  }).join('')+'</tbody></table></div>'
+  +'</div>';
   loadAnalysisData(yr);
 }
 
@@ -3185,6 +3212,8 @@ function renderRevGoals(yr){
   const phonicsC=students.filter(s=>getStudentLevel(s).match(/Phonics|Hello P|Master P/i)).length;
   const basicC=students.filter(s=>getStudentLevel(s).match(/Joy|Wise|Pride/i)).length;
   const grammarC=students.filter(s=>getStudentLevel(s).match(/Grammar|Prime/i)).length;
+  const primeC=students.filter(s=>getStudentLevel(s).match(/Prime|Advanced/i)).length;
+  const eliteC=students.filter(s=>getStudentLevel(s).match(/Elite/i)).length;
   const midC=students.filter(s=>(s.grade||'').startsWith('중')).length;
   const highC=students.filter(s=>(s.grade||'').startsWith('고')).length;
   const newC=students.filter(s=>s.status==='신규').length;
@@ -3197,17 +3226,31 @@ function renderRevGoals(yr){
   }).catch(()=>{});
 
   const T=(label,def)=>savedTargets[label]!==undefined?savedTargets[label]:def;
+  // Auto-calc 목표 매출 from refItems
+  function calcTargetRev(){
+    var lvMap={'Phonics':T('Phonics 레벨 인원',8),'Basic':T('Basic 레벨 인원',10),'Grammar':T('Grammar 레벨 인원',10),'Prime':T('Prime/Advanced 레벨 인원',5),'Elite':T('Elite 레벨 인원',0)};
+    var total=0;
+    Object.entries(lvMap).forEach(function(e){
+      var lv=e[0],cnt=e[1];
+      var tu=refItems.find(function(ri){return (ri.refType==='tuition'||ri.baseFee)&&ri.level&&ri.level.includes(lv);});
+      var tb=refItems.find(function(ri){return (ri.refType==='textbook'||ri.textbookFee)&&ri.level&&ri.level.includes(lv);});
+      total+=((tu?parseInt(tu.baseFee)||0:0)+(tb?parseInt(tb.textbookFee)||0:0))*cnt;
+    });
+    return total;
+  }
+  const targetRevAuto=calcTargetRev();
   const goals=[
+    {label:'목표 매출 (연간)',target:targetRevAuto,current:totalRevYr,isRev:true},
     {label:'총 재원생 수 (명)',target:T('총 재원생 수 (명)',50),current:students.length},
     {label:'신규 등록생 수 (명)',target:T('신규 등록생 수 (명)',20),current:newC},
     {label:'Phonics 레벨 인원',target:T('Phonics 레벨 인원',8),current:phonicsC},
     {label:'Basic 레벨 인원',target:T('Basic 레벨 인원',10),current:basicC},
     {label:'Grammar 레벨 인원',target:T('Grammar 레벨 인원',10),current:grammarC},
+    {label:'Prime/Advanced 레벨 인원',target:T('Prime/Advanced 레벨 인원',5),current:primeC},
+    {label:'Elite 레벨 인원',target:T('Elite 레벨 인원',0),current:eliteC},
     {label:'중등부 인원',target:T('중등부 인원',12),current:midC},
     {label:'고등부 인원',target:T('고등부 인원',5),current:highC},
     {label:'퇴원율 (%)',target:T('퇴원율 (%)',5),current:dropRate,lower:true},
-    {label:'월 평균 수강료 수입 (만원)',target:T('월 평균 수강료 수입 (만원)',1000),current:Math.round(avgMoRev/10000)},
-    {label:'연간 수강료 수입 (만원)',target:T('연간 수강료 수입 (만원)',12000),current:Math.round(totalRevYr/10000)},
   ];
 
   el.innerHTML=`
@@ -3495,9 +3538,14 @@ async function saveRevenue(){
   const selMo=parseInt($('rev-month')?.value)||new Date().getMonth()+1;
   loading(true);
 
+  const selYr2=parseInt($('rev-year')?.value)||new Date().getFullYear();
+  const selMo2=parseInt($('rev-month')?.value)||new Date().getMonth()+1;
+  const rawPaidDate=$('rev-paid-date').value||'';
+  const rawDay=rawPaidDate.split('-')[2]||'01';
+  const canonPaidDate=selYr2+'-'+String(selMo2).padStart(2,'0')+'-'+rawDay;
   const data={
     studentId:sId,studentName:s?.name||'',
-    paidDate:$('rev-paid-date').value,
+    paidDate:canonPaidDate,
     amount:parseInt($('rev-amount').value)||0,
     method:$('rev-method').value,
     memo:$('rev-memo').value.trim(),
@@ -3728,7 +3776,7 @@ async function deleteEvalModule(){
 
 /* ════ EXPORT ════ */
 /* ════ MENU PERMISSIONS ════ */
-const MENU_LABELS={schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',makeup:'보강 계획표',classes:'클래스 관리',students:'학생 목록',evalmodules:'평가 모듈',revenue:'매출 관리',reference:'참고',admin:'관리자',settings:'설정'};
+const MENU_LABELS={schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',makeup:'보강 계획표',classes:'클래스 관리',students:'학생 목록',evalmodules:'평가 모듈',revenue:'연간 계획 및 현황',reference:'참고',admin:'관리자',settings:'설정'};
 
 function openMenuPermModal(userId,userName){
   const overlay=document.createElement('div');
@@ -3791,7 +3839,7 @@ function exportCSV(){
 }
 
 /* ════ NAVIGATION ════ */
-const viewTitles={schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',makeup:'보강 계획표',classes:'클래스 관리',students:'학생 목록',evalmodules:'평가 모듈 관리',revenue:'매출 관리',admin:'관리자',settings:'설정',reference:'참고'};
+const viewTitles={schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',makeup:'보강 계획표',classes:'클래스 관리',students:'학생 목록',evalmodules:'평가 모듈 관리',revenue:'연간 계획 및 현황',admin:'관리자',settings:'설정',reference:'참고'};
 
 function goto(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -3837,4 +3885,13 @@ window.addEventListener('load',()=>{
 });
 </script>
 </body>
-</html>
+</html>function renderMonthlyGoals(yr,mo){
+  const el=document.getElementById('rev-monthly-goals-area');if(!el)return;
+  var moLabel=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'][mo-1];
+  el.innerHTML='<div class="expense-section">'
+    +'<h4>📅 '+yr+'년 '+moLabel+' 월별 목표</h4>'
+    +'<p style="font-size:13px;color:var(--txt3);margin:8px 0 16px">아래 연간 목표 달성 현황을 참고하세요.</p>'
+    +'<button class="btn btn-outline btn-sm" onclick="switchRevTab(\"goals\")">🎯 연간 목표 보기</button>'
+    +'</div>';
+  renderRevGoals(yr);
+}
