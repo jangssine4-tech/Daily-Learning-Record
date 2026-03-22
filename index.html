@@ -410,7 +410,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
           <tr style="background:var(--navy);color:#fff">
             <th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">학년</th>
             <th style="text-align:center">단계</th><th style="text-align:center">수업일수</th><th style="text-align:center">결석</th>
-            <th style="text-align:center;background:rgba(0,184,148,.3)">납부 예정액</th>
+            <th style="text-align:center">납부 예정액</th>
             <th style="text-align:center">할인</th><th style="text-align:center">실납부액</th>
             <th style="text-align:center">결제수단</th><th style="text-align:center">결제일</th>
             <th style="text-align:center">기타비1</th><th style="text-align:center">금액1</th>
@@ -1954,8 +1954,7 @@ function renderRevMonthly(yr,mo){
     const textbookItem=refItems.find(function(ri){return (ri.refType==='textbook'||(!ri.refType&&ri.textbookFee))&&ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0]));});
     const baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
     const tbFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
-    const discountMap={형제할인:Math.round((tbFee+baseFee)*0.1),수학할인:Math.round((tbFee+baseFee)*0.05)};
-    const discountAmt=discountMap[s.discount]||0;
+    const discountAmt=s.discount?10000:0;
     const extra1Amt=lastRev?parseInt(lastRev.extra1Amount)||0:0;
     const extra2Amt=lastRev?parseInt(lastRev.extra2Amount)||0:0;
     const expectedAmt=(tbFee+baseFee)-discountAmt+extra1Amt+extra2Amt;
@@ -1973,7 +1972,7 @@ function renderRevMonthly(yr,mo){
       +'<td style="text-align:center;font-size:11px;white-space:nowrap">'+getStudentLevel(s)+'</td>'
       +'<td style="text-align:center"><input type="number" value="'+dispLesson+'" min="0" max="40" style="width:38px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 2px" onclick="event.stopPropagation()" onchange="saveRevManual(\''+s.id+'\',\'lesson\',this.value,'+yr+','+mo+')"></td>'
       +'<td style="text-align:center"><input type="number" value="'+dispAbsent+'" min="0" max="40" style="width:38px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 2px" onclick="event.stopPropagation()" onchange="saveRevManual(\''+s.id+'\',\'absent\',this.value,'+yr+','+mo+')"></td>'
-      +'<td style="text-align:center;font-size:11px;font-weight:600;background:rgba(0,184,148,.06);color:var(--mint)" title="교재비:'+tbFee.toLocaleString()+' + 교육비:'+baseFee.toLocaleString()+' - 할인:'+discountAmt.toLocaleString()+' + 기타:'+(extra1Amt+extra2Amt).toLocaleString()+'">'+( expectedAmt>0?expectedAmt.toLocaleString()+'원':'-')+'</td>'
+      +'<td style="text-align:center;font-size:11px;font-weight:600" title="교재비:'+tbFee.toLocaleString()+' + 교육비:'+baseFee.toLocaleString()+' - 할인:'+discountAmt.toLocaleString()+' + 기타:'+(extra1Amt+extra2Amt).toLocaleString()+'">'+( expectedAmt>0?expectedAmt.toLocaleString()+'원':'-')+'</td>'
       +'<td style="text-align:center;font-size:11px;color:var(--gold)">'+(s.discount?s.discount+(discountAmt?'(-'+discountAmt.toLocaleString()+')':''):'-')+'</td>'
       +'<td style="text-align:center;font-weight:600;color:'+(paid?'var(--mint)':'var(--red)')+'">'+( paid?paidAmt.toLocaleString()+'원':'미납')+'</td>'
       +'<td style="text-align:center;font-size:11px">'+(lastRev?'<span class="badge bg-gray">'+lastRev.method+'</span>':'-')+'</td>'
@@ -1995,7 +1994,7 @@ function renderRevMonthly(yr,mo){
   const totalRow='<tr style="background:var(--surface2);font-weight:700">'
     +'<td></td><td colspan="2" style="text-align:center">합계 '+active.length+'명</td>'
     +'<td></td><td></td><td></td>'
-    +'<td style="text-align:center;color:var(--mint);background:rgba(0,184,148,.06)">'+totalExpected.toLocaleString()+'원</td>'
+    +'<td style="text-align:center;color:var(--mint)">'+totalExpected.toLocaleString()+'원</td>'
     +'<td></td>'
     +'<td style="text-align:center;color:var(--mint)">'+totalRev.toLocaleString()+'원</td>'
     +'<td colspan="2" style="font-size:11px;text-align:center">카드:'+cardTotal.toLocaleString()+'/현금:'+cashTotal.toLocaleString()+'/이체:'+xferTotal.toLocaleString()+'</td>'
@@ -2244,14 +2243,10 @@ function renderGoalsView(){
 function renderRevGoals(yr){
   var el=$('goals-annual-area');if(!el)return;
   var active=students.filter(function(s){return ['재원','신규'].includes(s.status||'재원');});
-  var phonicsN=active.filter(function(s){return getStudentLevel(s).match(/Phonics|Hello P|Master P/i);}).length;
-  var basicN=active.filter(function(s){return getStudentLevel(s).match(/Joy|Wise|Pride/i);}).length;
-  var grammarN=active.filter(function(s){return getStudentLevel(s).match(/Grammar Plus|First Grammar/i);}).length;
-  var primeN=active.filter(function(s){return getStudentLevel(s).match(/Prime|Advanced/i);}).length;
-  var eliteN=active.filter(function(s){return getStudentLevel(s).match(/Elite/i);}).length;
+  var elemN=active.filter(function(s){return (s.grade||'').startsWith('초');}).length;
   var midN=active.filter(function(s){return (s.grade||'').startsWith('중');}).length;
   var highN=active.filter(function(s){return (s.grade||'').startsWith('고');}).length;
-  var newN=students.filter(function(s){return s.status==='신규';}).length;
+  var autoNewN=elemN+midN+highN;
   var quitN=students.filter(function(s){return s.status==='퇴원';}).length;
   var quitRate=active.length>0?Math.round(quitN/active.length*100):0;
   var yearlyRev=revenues.filter(function(r){
@@ -2259,31 +2254,27 @@ function renderRevGoals(yr){
     if(r.revYear)return r.revYear===yr;
     return new Date(r.paidDate).getFullYear()===yr;
   }).reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
-  var autoTargetRev=0;
-  [['Phonics',phonicsN],['Joy',basicN],['Grammar Plus',grammarN],['Prime',primeN],['Elite',eliteN]].forEach(function(lm){
-    var tu=refItems.find(function(ri){return (ri.refType==='tuition'||ri.baseFee)&&ri.level&&ri.level.includes(lm[0]);});
-    var tb=refItems.find(function(ri){return (ri.refType==='textbook'||ri.textbookFee)&&ri.level&&ri.level.includes(lm[0]);});
-    autoTargetRev+=lm[1]*((tu?parseInt(tu.baseFee)||0:0)+(tb?parseInt(tb.textbookFee)||0:0));
-  });
   var gt=(_goalTargets&&_goalTargets[yr])||{};
   var goals=[
-    {label:'목표 매출',target:gt.targetRev||autoTargetRev,current:yearlyRev,isRev:true,lower:false},
+    {label:'목표 매출',target:gt.targetRev||0,current:yearlyRev,isRev:true,lower:false},
     {label:'목표 재원생(명)',target:gt.targetTotal||50,current:active.length,lower:false},
-    {label:'목표 신규 등록생(명)',target:gt.targetNew||5,current:newN,lower:false},
-    {label:'중등부(명)',target:gt.targetMid||5,current:midN,lower:false},
-    {label:'고등부(명)',target:gt.targetHigh||2,current:highN,lower:false},
+    {label:'목표 신규 등록생(명)',target:(gt.targetElem||0)+(gt.targetMid||0)+(gt.targetHigh||0),current:autoNewN,lower:false,auto:true},
+    {label:'초등부(명)',target:gt.targetElem||0,current:elemN,lower:false},
+    {label:'중등부(명)',target:gt.targetMid||0,current:midN,lower:false},
+    {label:'고등부(명)',target:gt.targetHigh||0,current:highN,lower:false},
     {label:'퇴원율(%)',target:gt.targetQuitRate||10,current:quitRate,lower:true}
   ];
   var tbodyHTML=goals.map(function(g){
     var pct=g.target>0?Math.round(g.current/g.target*100):0;
     var color=g.lower?(pct<=100?'var(--mint)':pct<=150?'var(--gold)':'var(--red)'):(pct>=100?'var(--mint)':pct>=70?'var(--gold)':'var(--red)');
-    var tgt=g.isRev?g.target.toLocaleString()+'원':g.target;
+    var tgt=g.isRev?g.target.toLocaleString()+'원':(g.auto?'자동합산':g.target);
     var cur=g.isRev?g.current.toLocaleString()+'원':g.current;
-    return '<tr><td>'+g.label+'</td>'
+    var rowStyle=g.auto?'background:var(--surface2);font-weight:700':'';
+    return '<tr style="'+rowStyle+'"><td>'+g.label+(g.auto?' <span style="font-size:10px;color:var(--txt3)">(초+중+고)</span>':'')+'</td>'
       +'<td style="text-align:center;font-weight:600">'+tgt+'</td>'
       +'<td style="text-align:center;font-weight:700;color:'+color+'">'+cur+'</td>'
-      +'<td style="text-align:center"><div style="background:var(--border);border-radius:4px;height:6px;width:100%"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%"></div></div><div style="font-size:11px;color:'+color+';margin-top:2px">'+pct+'%</div></td>'
-      +'<td><span class="badge" style="background:'+color+';color:#fff">'+(pct>=100?'달성':'진행중')+'</span></td></tr>';
+      +'<td style="text-align:center"><div style="background:var(--border);border-radius:4px;height:6px;width:100%"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%"></div></div><div style="font-size:11px;color:'+color+';margin-top:2px">'+(g.auto?'':pct+'%')+'</div></td>'
+      +'<td>'+(g.auto?'':('<span class="badge" style="background:'+color+';color:#fff">'+(pct>=100?'달성':'진행중')+'</span>'))+'</td></tr>';
   }).join('');
   el.innerHTML='<div class="expense-section">'
     +'<h4>🎯 '+yr+'년 연간 목표 &amp; 달성 현황 <button class="btn btn-outline btn-xs" style="float:right" onclick="openGoalEditModal('+yr+')">✏️ 목표 편집</button></h4>'
@@ -2303,30 +2294,48 @@ function renderMonthlyGoals(yr,mo){
   var gt=(_goalTargets&&_goalTargets[yr])||{};
   var annualTarget=gt.targetRev||0;
   var monthTarget=annualTarget>0?Math.round(annualTarget/12):0;
-  var newN=students.filter(function(s){return s.status==='신규';}).length;
+  var elemN=active.filter(function(s){return (s.grade||'').startsWith('초');}).length;
   var midN=active.filter(function(s){return (s.grade||'').startsWith('중');}).length;
   var highN=active.filter(function(s){return (s.grade||'').startsWith('고');}).length;
+  var autoNewN=elemN+midN+highN;
+  var targetElem=gt.targetElem||0;
+  var targetMid=gt.targetMid||0;
+  var targetHigh=gt.targetHigh||0;
+  var targetNewTotal=targetElem+targetMid+targetHigh;
+  // Summary cards
+  var revColor=moRev>=monthTarget?'var(--mint)':'var(--red)';
+  var cardsHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'
+    +'<div class="rev-sum-card" style="min-width:120px"><div class="rev-sum-val" style="color:'+revColor+'">'+moRev.toLocaleString()+'원</div><div class="rev-sum-lbl">월 실제 매출</div><div style="font-size:10px;color:var(--txt3);margin-top:2px">목표: '+(monthTarget?monthTarget.toLocaleString()+'원':'-')+'</div></div>'
+    +'<div class="rev-sum-card" style="min-width:100px"><div class="rev-sum-val" style="color:var(--blue)">'+autoNewN+'명</div><div class="rev-sum-lbl">신규 등록생 합계</div><div style="font-size:10px;color:var(--txt3);margin-top:2px">목표: '+(targetNewTotal||'-')+'명</div></div>'
+    +'<div class="rev-sum-card" style="min-width:90px"><div class="rev-sum-val" style="color:var(--gold)">'+elemN+'명</div><div class="rev-sum-lbl">초등부</div><div style="font-size:10px;color:var(--txt3);margin-top:2px">목표: '+(targetElem||'-')+'명</div></div>'
+    +'<div class="rev-sum-card" style="min-width:90px"><div class="rev-sum-val" style="color:var(--purple)">'+midN+'명</div><div class="rev-sum-lbl">중등부</div><div style="font-size:10px;color:var(--txt3);margin-top:2px">목표: '+(targetMid||'-')+'명</div></div>'
+    +'<div class="rev-sum-card" style="min-width:90px"><div class="rev-sum-val" style="color:var(--navy)">'+highN+'명</div><div class="rev-sum-lbl">고등부</div><div style="font-size:10px;color:var(--txt3);margin-top:2px">목표: '+(targetHigh||'-')+'명</div></div>'
+    +'</div>';
   var goals=[
     {label:'월 목표 매출',target:monthTarget,current:moRev,isRev:true,lower:false},
     {label:'목표 재원생(명)',target:gt.targetTotal||50,current:active.length,lower:false},
-    {label:'목표 신규 등록생(명)',target:gt.targetNew||5,current:newN,lower:false},
-    {label:'중등부(명)',target:gt.targetMid||5,current:midN,lower:false},
-    {label:'고등부(명)',target:gt.targetHigh||2,current:highN,lower:false}
+    {label:'목표 신규 등록생(명)',target:targetNewTotal,current:autoNewN,lower:false,auto:true},
+    {label:'초등부(명)',target:targetElem,current:elemN,lower:false},
+    {label:'중등부(명)',target:targetMid,current:midN,lower:false},
+    {label:'고등부(명)',target:targetHigh,current:highN,lower:false}
   ];
   var tbodyHTML=goals.map(function(g){
     var pct=g.target>0?Math.round(g.current/g.target*100):0;
     var color=g.lower?(pct===0?'var(--mint)':'var(--red)'):(pct>=100?'var(--mint)':pct>=70?'var(--gold)':'var(--red)');
-    var tgt=g.isRev?g.target.toLocaleString()+'원':g.target;
+    var tgt=g.isRev?g.target.toLocaleString()+'원':(g.auto?'자동합산':g.target);
     var cur=g.isRev?g.current.toLocaleString()+'원':g.current;
-    var barHTML='<div style="background:var(--border);border-radius:4px;height:6px;width:100%"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%"></div></div><div style="font-size:11px;color:'+color+';margin-top:2px">'+pct+'%</div>';
-    return '<tr><td>'+g.label+'</td>'
+    var rowStyle=g.auto?'background:var(--surface2);font-weight:700':'';
+    var barHTML=g.auto?''
+      :'<div style="background:var(--border);border-radius:4px;height:6px;width:100%"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%"></div></div><div style="font-size:11px;color:'+color+';margin-top:2px">'+pct+'%</div>';
+    return '<tr style="'+rowStyle+'"><td>'+g.label+(g.auto?' <span style="font-size:10px;color:var(--txt3)">(초+중+고)</span>':'')+'</td>'
       +'<td style="text-align:center;font-weight:600">'+tgt+'</td>'
       +'<td style="text-align:center;font-weight:700;color:'+color+'">'+cur+'</td>'
       +'<td style="text-align:center">'+barHTML+'</td>'
-      +'<td><span class="badge" style="background:'+color+';color:#fff">'+(pct>=100?'달성':'진행중')+'</span></td></tr>';
+      +'<td>'+(g.auto?'':('<span class="badge" style="background:'+color+';color:#fff">'+(pct>=100?'달성':'진행중')+'</span>'))+'</td></tr>';
   }).join('');
-  el.innerHTML='<div class="expense-section">'
-    +'<h4>📅 '+yr+'년 '+mo+'월 목표 &amp; 현황</h4>'
+  el.innerHTML=cardsHTML
+    +'<div class="expense-section">'
+    +'<h4>📅 '+yr+'년 '+mo+'월 목표 &amp; 현황 <button class="btn btn-outline btn-xs" style="float:right" onclick="openGoalEditModal('+yr+')">✏️ 목표 편집</button></h4>'
     +'<table class="rev-tbl"><thead><tr><th>항목</th><th style="text-align:center">목표</th><th style="text-align:center">현황</th><th style="text-align:center">달성률</th><th>상태</th></tr></thead>'
     +'<tbody>'+tbodyHTML+'</tbody></table></div>';
 }
@@ -2395,14 +2404,15 @@ function openGoalEditModal(yr){
     var fields=[
       {key:'targetRev',label:'목표 매출 (원)',val:gt.targetRev||0},
       {key:'targetTotal',label:'목표 재원생(명)',val:gt.targetTotal||50},
-      {key:'targetNew',label:'목표 신규 등록생(명)',val:gt.targetNew||5},
-      {key:'targetMid',label:'중등부(명) 목표',val:gt.targetMid||5},
-      {key:'targetHigh',label:'고등부(명) 목표',val:gt.targetHigh||2},
+      {key:'targetElem',label:'초등부(명) 목표',val:gt.targetElem||0},
+      {key:'targetMid',label:'중등부(명) 목표',val:gt.targetMid||0},
+      {key:'targetHigh',label:'고등부(명) 목표',val:gt.targetHigh||0},
       {key:'targetQuitRate',label:'퇴원율 목표(%)',val:gt.targetQuitRate||10}
     ];
-    $('ge-fields').innerHTML=fields.map(function(f){
-      return '<div class="field"><div class="fl">'+f.label+'</div><input type="number" class="fi" id="ge-'+f.key+'" value="'+f.val+'"></div>';
-    }).join('');
+    $('ge-fields').innerHTML='<div style="background:var(--surface2);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--txt3)">※ 목표 신규 등록생은 초등부+중등부+고등부 합계로 자동 계산됩니다</div>'
+      +fields.map(function(f){
+        return '<div class="field"><div class="fl">'+f.label+'</div><input type="number" class="fi" id="ge-'+f.key+'" value="'+f.val+'"></div>';
+      }).join('');
     $('modal-goals-edit').style.display='flex';
   });
 }
@@ -2410,7 +2420,7 @@ function openGoalEditModal(yr){
 async function saveGoalTargets(){
   var yr=parseInt($('goals-year')?.value)||new Date().getFullYear();
   loading(true);
-  var keys=['targetRev','targetTotal','targetNew','targetMid','targetHigh','targetQuitRate'];
+  var keys=['targetRev','targetTotal','targetElem','targetMid','targetHigh','targetQuitRate'];
   var data={updatedAt:new Date().toISOString()};
   keys.forEach(function(k){var el=$('ge-'+k);if(el)data[k]=parseInt(el.value)||0;});
   await db.collection('goalTargets').doc(String(yr)).set(data);
