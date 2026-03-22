@@ -669,38 +669,37 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
       </div>
 
       <!-- Monthly revenue tab -->
-      <div id="rev-panel-monthly">
-        <div class="cp" style="padding-top:10px">
-
+      <div id="rev-panel-monthly" style="display:flex;flex-direction:column;height:calc(100vh - 160px)">
+        <div style="padding:10px 16px 0">
           <div class="rev-summary" id="rev-summary"></div>
-          <!-- Tuition detail table with sticky header -->
-          <div id="rev-monthly-scroll" style="overflow:auto;max-height:calc(100vh - 240px);scrollbar-width:thin;scrollbar-color:var(--border2) var(--surface2)">
-            <table class="tbl" style="min-width:1400px;font-size:11px;border-collapse:separate;border-spacing:0">
-              <thead style="position:sticky;top:0;z-index:10">
-                <tr style="background:var(--navy);color:#fff">
-                  <th style="white-space:nowrap;text-align:center">번호</th>
-                  <th style="white-space:nowrap;text-align:center">이름</th>
-                  <th style="white-space:nowrap;text-align:center">학년</th>
-                  <th style="white-space:nowrap;text-align:center">단계</th>
-                  <th style="white-space:nowrap;text-align:center">수업일수</th>
-                  <th style="white-space:nowrap;text-align:center">결석</th>
-                  <th style="white-space:nowrap;text-align:center">교재비</th>
-                  <th style="white-space:nowrap;text-align:center">교육비</th>
-                  <th style="white-space:nowrap;text-align:center">할인</th>
-                  <th style="white-space:nowrap;text-align:center">실납부액</th>
-                  <th style="white-space:nowrap;text-align:center">결제수단</th>
-                  <th style="white-space:nowrap;text-align:center">결제일</th>
-                  <th style="white-space:nowrap;text-align:center">기타비1</th>
-                  <th style="white-space:nowrap;text-align:center">금액1</th>
-                  <th style="white-space:nowrap;text-align:center">기타비2</th>
-                  <th style="white-space:nowrap;text-align:center">금액2</th>
-                  <th style="white-space:nowrap;text-align:center">메모</th>
-                  <th style="white-space:nowrap;text-align:center">수납</th>
-                </tr>
-              </thead>
-              <tbody id="rev-monthly-tbody"></tbody>
-            </table>
-          </div>
+        </div>
+        <!-- Tuition detail table: fills remaining height so scrollbar stays visible -->
+        <div id="rev-monthly-scroll" style="flex:1;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--border2) var(--surface2)">
+          <table class="tbl" style="min-width:1400px;font-size:11px;border-collapse:separate;border-spacing:0">
+            <thead style="position:sticky;top:0;z-index:10">
+              <tr style="background:var(--navy);color:#fff">
+                <th style="white-space:nowrap;text-align:center">번호</th>
+                <th style="white-space:nowrap;text-align:center">이름</th>
+                <th style="white-space:nowrap;text-align:center">학년</th>
+                <th style="white-space:nowrap;text-align:center">단계</th>
+                <th style="white-space:nowrap;text-align:center">수업일수</th>
+                <th style="white-space:nowrap;text-align:center">결석</th>
+                <th style="white-space:nowrap;text-align:center">교재비</th>
+                <th style="white-space:nowrap;text-align:center">교육비</th>
+                <th style="white-space:nowrap;text-align:center">할인</th>
+                <th style="white-space:nowrap;text-align:center">실납부액</th>
+                <th style="white-space:nowrap;text-align:center">결제수단</th>
+                <th style="white-space:nowrap;text-align:center">결제일</th>
+                <th style="white-space:nowrap;text-align:center">기타비1</th>
+                <th style="white-space:nowrap;text-align:center">금액1</th>
+                <th style="white-space:nowrap;text-align:center">기타비2</th>
+                <th style="white-space:nowrap;text-align:center">금액2</th>
+                <th style="white-space:nowrap;text-align:center">메모</th>
+                <th style="white-space:nowrap;text-align:center">수납</th>
+              </tr>
+            </thead>
+            <tbody id="rev-monthly-tbody"></tbody>
+          </table>
         </div>
       </div>
 
@@ -2898,7 +2897,12 @@ function renderRevenue(){
 }
 
 function renderRevMonthly(yr,mo){
-  const list=revenues.filter(r=>{const d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
+  const list=revenues.filter(r=>{
+    // Use revYear/revMonth if set (canonical month), else fall back to paidDate
+    if(r.revYear&&r.revMonth) return r.revYear===yr&&r.revMonth===mo&&!r.isManualMeta;
+    const d=new Date(r.paidDate);
+    return d.getFullYear()===yr&&d.getMonth()===mo-1&&!r.isManualMeta;
+  });
   const totalRev=list.reduce((s,r)=>s+(parseInt(r.amount)||0),0);
   const cardTotal=list.filter(r=>r.method==='카드').reduce((s,r)=>s+(parseInt(r.amount)||0),0);
   const cashTotal=list.filter(r=>r.method==='현금').reduce((s,r)=>s+(parseInt(r.amount)||0),0);
@@ -3557,11 +3561,13 @@ async function saveRevenue(){
   const selYr2=parseInt($('rev-year')?.value)||new Date().getFullYear();
   const selMo2=parseInt($('rev-month')?.value)||new Date().getMonth()+1;
   const rawPaidDate=$('rev-paid-date').value||'';
-  const rawDay=rawPaidDate.split('-')[2]||'01';
-  const canonPaidDate=selYr2+'-'+String(selMo2).padStart(2,'0')+'-'+rawDay;
+  // Keep the actual entered date as paidDate (for display), 
+  // but store revYear/revMonth to control which month this record belongs to
   const data={
     studentId:sId,studentName:s?.name||'',
-    paidDate:canonPaidDate,
+    paidDate:rawPaidDate,        // actual entered date — shows correctly in table
+    revYear:selYr2,              // which year this record belongs to for filtering
+    revMonth:selMo2,             // which month this record belongs to for filtering
     amount:parseInt($('rev-amount').value)||0,
     method:$('rev-method').value,
     memo:$('rev-memo').value.trim(),
