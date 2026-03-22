@@ -673,7 +673,12 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
         <div style="padding:10px 16px 0">
           <div class="rev-summary" id="rev-summary"></div>
         </div>
-        <div id="rev-monthly-scroll" style="overflow:auto;max-height:calc(100vh - 230px);-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) var(--surface2)">
+        <!-- Sticky horizontal scrollbar (always visible at bottom of viewport) -->
+        <div id="rev-hscroll-sticky" style="position:sticky;bottom:0;z-index:20;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:var(--border2) var(--surface2);background:var(--surface2);border-top:1px solid var(--border)">
+          <div id="rev-hscroll-inner" style="height:1px"></div>
+        </div>
+        <!-- Actual table - vertical scroll only, horizontal scroll hidden (synced with sticky bar above) -->
+        <div id="rev-monthly-scroll" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 260px);-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border2) var(--surface2)">
           <table class="tbl" style="min-width:1400px;font-size:11px;border-collapse:separate;border-spacing:0">
             <thead style="position:sticky;top:0;z-index:10">
               <tr style="background:var(--navy);color:#fff">
@@ -2987,6 +2992,21 @@ function renderRevMonthly(yr,mo){
     <td colspan="6"></td>
   </tr>`;
   tb.innerHTML=rows+totalRow;
+
+  // Sync sticky horizontal scrollbar width with actual table width
+  requestAnimationFrame(()=>{
+    const scrollEl=document.getElementById('rev-monthly-scroll');
+    const stickyInner=document.getElementById('rev-hscroll-inner');
+    const stickyBar=document.getElementById('rev-hscroll-sticky');
+    if(!scrollEl||!stickyInner||!stickyBar) return;
+    // Set inner div width to match actual scrollable width
+    const tableEl=scrollEl.querySelector('table');
+    if(tableEl) stickyInner.style.width=tableEl.scrollWidth+'px';
+    // Sync scroll positions bidirectionally
+    let syncing=false;
+    stickyBar.onscroll=()=>{ if(syncing)return; syncing=true; scrollEl.scrollLeft=stickyBar.scrollLeft; syncing=false; };
+    scrollEl.onscroll=()=>{ if(syncing)return; syncing=true; stickyBar.scrollLeft=scrollEl.scrollLeft; syncing=false; };
+  });
 }
 
 function makeExtraCell(extraRev,idx,studentId,yr,mo,types){
