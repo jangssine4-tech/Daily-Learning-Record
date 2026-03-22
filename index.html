@@ -1903,10 +1903,10 @@ function switchSummaryTab(tab){
   currentSummaryTab=tab;
   ['summary','monthly','expense'].forEach(function(t){
     $('stab-'+t).classList.toggle('active',t===tab);
-    $('summary-panel').style.display=t==='summary'?'':'none';
-    $('monthly-panel').style.display=t==='monthly'?'flex':'none';
-    $('expense-panel').style.display=t==='expense'?'':'none';
   });
+  $('summary-panel').style.display=tab==='summary'?'':'none';
+  $('monthly-panel').style.display=tab==='monthly'?'flex':'none';
+  $('expense-panel').style.display=tab==='expense'?'':'none';
   const addBtn=$('rev-add-btn');const expBtn=$('rev-expense-add-btn');const moSel=$('rev-month');
   if(addBtn) addBtn.style.display=tab==='monthly'?'':'none';
   if(expBtn) expBtn.style.display=tab==='expense'?'':'none';
@@ -2268,15 +2268,10 @@ function renderRevGoals(yr){
   var gt=(_goalTargets&&_goalTargets[yr])||{};
   var goals=[
     {label:'목표 매출',target:gt.targetRev||autoTargetRev,current:yearlyRev,isRev:true,lower:false},
-    {label:'총 재원생',target:gt.targetTotal||50,current:active.length,lower:false},
-    {label:'신규 등록',target:gt.targetNew||5,current:newN,lower:false},
-    {label:'Phonics',target:gt.targetPhonics||10,current:phonicsN,lower:false},
-    {label:'Basic',target:gt.targetBasic||15,current:basicN,lower:false},
-    {label:'Grammar',target:gt.targetGrammar||8,current:grammarN,lower:false},
-    {label:'Prime/Advanced',target:gt.targetPrime||5,current:primeN,lower:false},
-    {label:'Elite',target:gt.targetElite||3,current:eliteN,lower:false},
-    {label:'중등부',target:gt.targetMid||5,current:midN,lower:false},
-    {label:'고등부',target:gt.targetHigh||2,current:highN,lower:false},
+    {label:'목표 재원생(명)',target:gt.targetTotal||50,current:active.length,lower:false},
+    {label:'목표 신규 등록생(명)',target:gt.targetNew||5,current:newN,lower:false},
+    {label:'중등부(명)',target:gt.targetMid||5,current:midN,lower:false},
+    {label:'고등부(명)',target:gt.targetHigh||2,current:highN,lower:false},
     {label:'퇴원율(%)',target:gt.targetQuitRate||10,current:quitRate,lower:true}
   ];
   var tbodyHTML=goals.map(function(g){
@@ -2308,25 +2303,27 @@ function renderMonthlyGoals(yr,mo){
   var gt=(_goalTargets&&_goalTargets[yr])||{};
   var annualTarget=gt.targetRev||0;
   var monthTarget=annualTarget>0?Math.round(annualTarget/12):0;
-  var paidN=new Set(moRevs.map(function(r){return r.studentId;})).size;
-  var unpaidN=active.length-paidN;
+  var newN=students.filter(function(s){return s.status==='신규';}).length;
+  var midN=active.filter(function(s){return (s.grade||'').startsWith('중');}).length;
+  var highN=active.filter(function(s){return (s.grade||'').startsWith('고');}).length;
   var goals=[
     {label:'월 목표 매출',target:monthTarget,current:moRev,isRev:true,lower:false},
-    {label:'납부 완료',target:active.length,current:paidN,lower:false},
-    {label:'미납',target:0,current:unpaidN,lower:true,noBar:true}
+    {label:'목표 재원생(명)',target:gt.targetTotal||50,current:active.length,lower:false},
+    {label:'목표 신규 등록생(명)',target:gt.targetNew||5,current:newN,lower:false},
+    {label:'중등부(명)',target:gt.targetMid||5,current:midN,lower:false},
+    {label:'고등부(명)',target:gt.targetHigh||2,current:highN,lower:false}
   ];
   var tbodyHTML=goals.map(function(g){
     var pct=g.target>0?Math.round(g.current/g.target*100):0;
     var color=g.lower?(pct===0?'var(--mint)':'var(--red)'):(pct>=100?'var(--mint)':pct>=70?'var(--gold)':'var(--red)');
     var tgt=g.isRev?g.target.toLocaleString()+'원':g.target;
     var cur=g.isRev?g.current.toLocaleString()+'원':g.current;
-    var barHTML=g.noBar?''
-      :'<div style="background:var(--border);border-radius:4px;height:6px;width:100%"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%"></div></div><div style="font-size:11px;color:'+color+';margin-top:2px">'+pct+'%</div>';
+    var barHTML='<div style="background:var(--border);border-radius:4px;height:6px;width:100%"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%"></div></div><div style="font-size:11px;color:'+color+';margin-top:2px">'+pct+'%</div>';
     return '<tr><td>'+g.label+'</td>'
       +'<td style="text-align:center;font-weight:600">'+tgt+'</td>'
       +'<td style="text-align:center;font-weight:700;color:'+color+'">'+cur+'</td>'
       +'<td style="text-align:center">'+barHTML+'</td>'
-      +'<td><span class="badge" style="background:'+color+';color:#fff">'+(g.noBar?'-':pct>=100?'달성':'진행중')+'</span></td></tr>';
+      +'<td><span class="badge" style="background:'+color+';color:#fff">'+(pct>=100?'달성':'진행중')+'</span></td></tr>';
   }).join('');
   el.innerHTML='<div class="expense-section">'
     +'<h4>📅 '+yr+'년 '+mo+'월 목표 &amp; 현황</h4>'
@@ -2397,15 +2394,10 @@ function openGoalEditModal(yr){
     $('ge-modal-title').textContent=yr+'년 목표 편집';
     var fields=[
       {key:'targetRev',label:'목표 매출 (원)',val:gt.targetRev||0},
-      {key:'targetTotal',label:'총 재원생 목표',val:gt.targetTotal||50},
-      {key:'targetNew',label:'신규 등록 목표',val:gt.targetNew||5},
-      {key:'targetPhonics',label:'Phonics 목표',val:gt.targetPhonics||10},
-      {key:'targetBasic',label:'Basic 목표',val:gt.targetBasic||15},
-      {key:'targetGrammar',label:'Grammar 목표',val:gt.targetGrammar||8},
-      {key:'targetPrime',label:'Prime/Advanced 목표',val:gt.targetPrime||5},
-      {key:'targetElite',label:'Elite 목표',val:gt.targetElite||3},
-      {key:'targetMid',label:'중등부 목표',val:gt.targetMid||5},
-      {key:'targetHigh',label:'고등부 목표',val:gt.targetHigh||2},
+      {key:'targetTotal',label:'목표 재원생(명)',val:gt.targetTotal||50},
+      {key:'targetNew',label:'목표 신규 등록생(명)',val:gt.targetNew||5},
+      {key:'targetMid',label:'중등부(명) 목표',val:gt.targetMid||5},
+      {key:'targetHigh',label:'고등부(명) 목표',val:gt.targetHigh||2},
       {key:'targetQuitRate',label:'퇴원율 목표(%)',val:gt.targetQuitRate||10}
     ];
     $('ge-fields').innerHTML=fields.map(function(f){
@@ -2418,7 +2410,7 @@ function openGoalEditModal(yr){
 async function saveGoalTargets(){
   var yr=parseInt($('goals-year')?.value)||new Date().getFullYear();
   loading(true);
-  var keys=['targetRev','targetTotal','targetNew','targetPhonics','targetBasic','targetGrammar','targetPrime','targetElite','targetMid','targetHigh','targetQuitRate'];
+  var keys=['targetRev','targetTotal','targetNew','targetMid','targetHigh','targetQuitRate'];
   var data={updatedAt:new Date().toISOString()};
   keys.forEach(function(k){var el=$('ge-'+k);if(el)data[k]=parseInt(el.value)||0;});
   await db.collection('goalTargets').doc(String(yr)).set(data);
