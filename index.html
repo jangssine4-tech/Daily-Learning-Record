@@ -688,8 +688,7 @@ textarea.fi{resize:vertical;min-height:64px;line-height:1.5}
                 <th style="white-space:nowrap;text-align:center">단계</th>
                 <th style="white-space:nowrap;text-align:center">수업일수</th>
                 <th style="white-space:nowrap;text-align:center">결석</th>
-                <th style="white-space:nowrap;text-align:center">교재비</th>
-                <th style="white-space:nowrap;text-align:center">교육비</th>
+                <th style="white-space:nowrap;text-align:center;background:rgba(0,184,148,.15);color:#8fffdf">납부 예정액</th>
                 <th style="white-space:nowrap;text-align:center">할인</th>
                 <th style="white-space:nowrap;text-align:center">실납부액</th>
                 <th style="white-space:nowrap;text-align:center">결제수단</th>
@@ -2943,8 +2942,18 @@ function renderRevMonthly(yr,mo){
     const rawLevel=getStudentLevel(s);
     const lookupLevel=rawLevel.match(/Joy|Wise|Pride/)?'Basic':rawLevel;
     const refItem=refItems.find(ri=>ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0])));
-    const tbFee=refItem?parseInt(refItem.textbookFee)||0:0;
-    const baseFee=refItem?parseInt(refItem.baseFee)||0:0;
+    // Look up textbook and tuition fees separately
+    const tuitionItem=refItems.find(ri=>(ri.refType==='tuition'||(!ri.refType&&ri.baseFee))&&ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0])));
+    const textbookItem=refItems.find(ri=>(ri.refType==='textbook'||(!ri.refType&&ri.textbookFee))&&ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0])));
+    const tbFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
+    const baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
+    // Discount amount
+    const discountMap={'형제할인':Math.round((tbFee+baseFee)*0.1),'수학할인':Math.round((tbFee+baseFee)*0.05)};
+    const discountAmt=discountMap[s.discount]||0;
+    // 납부 예정액 = 교재비 + 교육비 - 할인 + 기타비1 + 기타비2
+    const extra1Amt=lastRev?parseInt(lastRev.extra1Amount)||0:0;
+    const extra2Amt=lastRev?parseInt(lastRev.extra2Amount)||0:0;
+    const expectedAmt=(tbFee+baseFee)-discountAmt+extra1Amt+extra2Amt;
     // Auto-calc from reports: count lesson days and absences this month
     const monthReps=reports.filter(r=>r.studentId===s.id&&r.date&&new Date(r.date).getFullYear()===yr&&new Date(r.date).getMonth()===mo-1);
     const lessonDays=monthReps.filter(r=>!r.absent).length;
@@ -2963,9 +2972,8 @@ function renderRevMonthly(yr,mo){
       <td style="text-align:center">
         <input type="number" class="rev-inline-input" value="${manualAbsent!==undefined?manualAbsent:absentDays}" min="0" max="40" style="width:38px;text-align:center;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 2px" title="수기 수정 가능" onchange="saveRevManual('${s.id}','absent',this.value,${yr},${mo})" onclick="event.stopPropagation()">
       </td>
-      <td style="text-align:center;font-size:11px">${tbFee?tbFee.toLocaleString()+'원':'-'}</td>
-      <td style="text-align:center;font-size:11px">${baseFee?baseFee.toLocaleString()+'원':'-'}</td>
-      <td style="font-size:11px;text-align:center;color:var(--gold)">${s.discount||'-'}</td>
+      <td style="text-align:center;font-size:11px;font-weight:600;background:rgba(0,184,148,.06);color:var(--mint)" title="교재비:${tbFee.toLocaleString()} + 교육비:${baseFee.toLocaleString()} - 할인:${discountAmt.toLocaleString()} + 기타:${(extra1Amt+extra2Amt).toLocaleString()}">${expectedAmt>0?expectedAmt.toLocaleString()+'원':'-'}</td>
+      <td style="font-size:11px;text-align:center;color:var(--gold)">${s.discount?s.discount+(discountAmt?'(-'+discountAmt.toLocaleString()+')':''):'-'}</td>
       <td style="text-align:center;font-weight:600;color:${paid?'var(--mint)':'var(--red)'}">${paid?paidAmt.toLocaleString()+'원':'미납'}</td>
       <td style="font-size:11px;text-align:center">${lastRev?`<span class="badge bg-gray">${lastRev.method}</span>`:'-'}</td>
       <td style="font-size:11px;text-align:center">${lastRev?.paidDate||'-'}</td>
@@ -2983,14 +2991,23 @@ function renderRevMonthly(yr,mo){
   }).join('');
 
   // Totals row
+  const totalExpected=activeStudents.reduce((sum,s)=>{
+    const raw=getStudentLevel(s);
+    const lv=raw.match(/Joy|Wise|Pride/)?'Basic':raw;
+    const ti=refItems.find(ri=>(ri.refType==='tuition'||ri.baseFee)&&ri.level&&(lv.includes(ri.level.trim())||ri.level.trim().includes(lv.split(' ')[0])));
+    const bk=refItems.find(ri=>(ri.refType==='textbook'||ri.textbookFee)&&ri.level&&(lv.includes(ri.level.trim())||ri.level.trim().includes(lv.split(' ')[0])));
+    return sum+(ti?parseInt(ti.baseFee)||0:0)+(bk?parseInt(bk.textbookFee)||0:0);
+  },0);
   const totalRow=`<tr style="background:var(--surface2);font-weight:700">
     <td></td>
     <td colspan="2" style="text-align:center">합계 ${activeStudents.length}명</td>
-    <td></td><td></td><td></td><td></td><td></td><td></td>
+    <td></td><td></td>
+    <td style="text-align:center;color:var(--mint);background:rgba(0,184,148,.06)">${totalExpected.toLocaleString()}원</td>
+    <td></td>
     <td style="text-align:center;color:var(--mint)">${totalRev.toLocaleString()}원</td>
     <td colspan="2" style="font-size:11px;text-align:center">카드: ${cardTotal.toLocaleString()} / 현금: ${cashTotal.toLocaleString()} / 이체: ${transferTotal.toLocaleString()}</td>
-    <td colspan="6"></td>
-  </tr>`;
+    <td colspan="5"></td>
+  </tr>\`;
   tb.innerHTML=rows+totalRow;
 
   // Sync sticky horizontal scrollbar width with actual table width
