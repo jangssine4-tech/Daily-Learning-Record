@@ -650,6 +650,16 @@ function renderSchedule(){
   todayStudents.forEach(function(s){
     var pData=(s.periods||{})[dayName];var pNum=0,pTime='';
     if(pData&&typeof pData==='object'){pNum=pData.period||0;pTime=pData.time||'';}else if(pData)pNum=parseInt(pData)||0;
+    // Fix: 시간이 있으면 customPeriods 시간 범위로 올바른 교시 결정
+    if(pTime&&customPeriods.length>0){
+      var tMin=timeToMin(pTime);
+      var bestP=null;
+      customPeriods.forEach(function(cp){
+        var cpStart=timeToMin(cp.time);var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
+        if(tMin>=cpStart&&tMin<cpEnd)bestP=cp.period;
+      });
+      if(bestP)pNum=bestP;
+    }
     var pKey=pNum?String(pNum):'미설정';
     if(!byPeriod[pKey])byPeriod[pKey]={pNum:pNum,students:[],firstTime:'99:99'};
     byPeriod[pKey].students.push(s);
@@ -713,14 +723,49 @@ async function markAttendance(studentId,absent){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
   var todayStr=todayISO();var existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr;});
   if(existing){
-    if((existing.absent&&absent)||(!existing.absent&&!absent)){await db.collection('reports').doc(existing.id).delete();reports=reports.filter(function(r){return r.id!==existing.id;});}
-    else{await db.collection('reports').doc(existing.id).update({absent:absent,updatedAt:new Date().toISOString()});var idx=reports.findIndex(function(r){return r.id===existing.id;});if(idx>=0)reports[idx]={...reports[idx],absent:absent};}
+    if((existing.absent&&absent)||(!existing.absent&&!absent)){
+      // Toggle off - remove report
+      await db.collection('reports').doc(existing.id).delete();
+      reports=reports.filter(function(r){return r.id!==existing.id;});
+      // If was absent, also remove auto-created makeup
+      if(existing.absent){
+        var existingMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated;});
+        if(existingMk){await db.collection('makeups').doc(existingMk.id).delete();makeups=makeups.filter(function(m){return m.id!==existingMk.id;});}
+      }
+    }
+    else{
+      await db.collection('reports').doc(existing.id).update({absent:absent,updatedAt:new Date().toISOString()});
+      var idx=reports.findIndex(function(r){return r.id===existing.id;});if(idx>=0)reports[idx]={...reports[idx],absent:absent};
+      // Switching to absent → create makeup
+      if(absent){
+        var hasMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr;});
+        if(!hasMk){
+          var mkData={studentId:studentId,studentName:s.name,absentDate:todayStr,absentReason:'',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',autoCreated:true,createdAt:new Date().toISOString()};
+          var mkRef=await db.collection('makeups').add(mkData);
+          makeups.push({id:mkRef.id,...mkData});
+        }
+      }
+      // Switching to present → remove auto makeup
+      if(!absent){
+        var autoMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated;});
+        if(autoMk){await db.collection('makeups').doc(autoMk.id).delete();makeups=makeups.filter(function(m){return m.id!==autoMk.id;});}
+      }
+    }
   }else{
     var cls2=classes.find(function(c){return c.id===s.classId;});
     var newR=await db.collection('reports').add({studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',level:getStudentLevel(s),progress:'',absent:absent,absentReason:'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:cls2?.evalModule||'',evalItems:{},praise:[],createdAt:new Date().toISOString()});
     reports.push({id:newR.id,studentId:studentId,studentName:s.name,date:todayStr,absent:absent,level:getStudentLevel(s)});
+    // New absent → auto-create makeup entry
+    if(absent){
+      var hasMk2=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr;});
+      if(!hasMk2){
+        var mkData2={studentId:studentId,studentName:s.name,absentDate:todayStr,absentReason:'',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',autoCreated:true,createdAt:new Date().toISOString()};
+        var mkRef2=await db.collection('makeups').add(mkData2);
+        makeups.push({id:mkRef2.id,...mkData2});
+      }
+    }
   }
-  toast(absent?'❌ '+s.name+' 결석':'✅ '+s.name+' 출석');
+  toast(absent?'❌ '+s.name+' 결석 (보강 계획표에 등록됨)':'✅ '+s.name+' 출석');
   renderSchedule();saveCacheDebounced();
 }
 
