@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="dns-prefetch" href="https://www.gstatic.com">
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
 <title>잉글리시아이 학원관리 v4</title>
 <style>
 :root{
@@ -173,6 +177,12 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 
 /* ── Responsive ── */
 @media(max-width:600px){#sidebar{position:fixed;top:0;left:0;height:100dvh;transform:translateX(-100%)} #sidebar.open{transform:translateX(0)} #content{margin-left:0} }
+
+/* Pure CSS initial loading state */
+body::before{content:'';position:fixed;inset:0;background:linear-gradient(145deg,#0b2c5c,#0f1a35);z-index:99999;transition:opacity .4s .2s;pointer-events:none}
+body.app-ready::before{opacity:0;pointer-events:none}
+body::after{content:'영어eye';position:fixed;top:50%;left:50%;transform:translate(-50%,-60%);color:rgba(255,255,255,.9);font-size:28px;font-weight:800;letter-spacing:-1px;z-index:100000;transition:opacity .3s}
+body.app-ready::after{opacity:0}
 </style>
 <!-- Firebase SDK: defer = HTML 파싱과 병렬 다운로드, 실행은 파싱 완료 후 -->
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -190,7 +200,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <button class="btn btn-green btn-block" onclick="saveFbConfig()" style="margin-top:8px">연결하기</button>
 </div></div>
 
-<div id="login-screen" style="display:none">
+<div id="login-screen" style="display:flex">
 <div class="setup-card">
   <h1 style="text-align:center;margin-bottom:20px">english<em style="color:var(--mint);font-style:normal">eye</em></h1>
   <input class="setup-fi" id="l-id" placeholder="아이디" onkeydown="if(event.key==='Enter')login()">
@@ -818,6 +828,15 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 
 
 <script>
+// 즉시 실행: 화면 표시를 위한 최소 초기화
+(function(){
+  var s=document.getElementById('login-screen');
+  if(s)s.style.display='flex';
+  document.body.classList.add('app-ready');
+})();
+</script>
+<script>
+
 const DAYS = ['월','화','수','목','금'];
 const DAY_MAP = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
 const GRADE_ORDER = ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'];
@@ -1006,6 +1025,7 @@ function initFb(cfg){
   db=firebase.firestore();
   $('setup-screen').style.display='none';
   $('login-screen').style.display='flex';
+  document.body.classList.add('app-ready');
 }
 
 // ── Login / Logout ──
@@ -2813,6 +2833,7 @@ function _initApp(){
 
   if(!cfg){
     $('setup-screen').style.display='flex';
+  document.body.classList.add('app-ready');
     return;
   }
   try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
