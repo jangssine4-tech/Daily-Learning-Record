@@ -102,6 +102,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .s-card:hover{border-color:var(--mint);box-shadow:0 2px 8px rgba(0,184,148,.15)}
 .s-card.done{border-color:var(--mint);background:#f0fdf4}
 .s-card.absent{border-color:var(--red);background:#fff8f8}
+.s-card.early{border-color:var(--gold);background:#fffbeb}
 .s-card-name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px}
 .s-card-sub{font-size:11px;color:var(--txt3);margin-bottom:8px}
 .s-card-btns{display:flex;gap:5px}
@@ -109,6 +110,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .att-btn:hover{transform:scale(1.15);background:var(--surface2)}
 .att-btn.done-btn.active{background:#dcfce7}
 .att-btn.abs-btn.active{background:#fee2e2}
+.att-btn.early-btn.active{background:#fef3c7}
 .hist-table{width:100%;border-collapse:collapse;font-size:12px}
 .hist-table th{background:var(--navy);color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0;z-index:2;white-space:nowrap}
 .hist-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
@@ -674,7 +676,12 @@ function renderSchedule(){
   });
   var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;if(a.startsWith('보강_'))return 1;if(b.startsWith('보강_'))return 1;return parseInt(a)-parseInt(b);});
   if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';return;}
-  var html='';
+  var html='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0 12px;font-size:11px;color:var(--txt2);align-items:center">'
+    +'<span>✅ 등원</span>'
+    +'<span>❌ 결석</span>'
+    +'<span>⚠️ 조퇴/학습 마무리 못함</span>'
+    +'<span>📝 일지 작성</span>'
+    +'</div>';
   sorted.forEach(function(pKey){
     var p=byPeriod[pKey];var isMakeupGrp=pKey.startsWith('보강_');
     var headerTitle='';
@@ -698,18 +705,21 @@ function renderSchedule(){
       html+='<div class="student-cards">';
       blocks[blk].students.forEach(function(s){
         var rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr;});
-        var done=rep&&!rep.absent,absent=rep&&rep.absent;
+        var done=rep&&!rep.absent&&!rep.earlyLeave;
+        var absent=rep&&rep.absent;
+        var early=rep&&rep.earlyLeave;
         var badge=s._isMakeup?'<span class="badge bg-blue" style="font-size:9px;margin-left:4px">보강</span>':'';
         var pData2=(s.periods||{})[dayName];var pTime3='';
         if(s._isMakeup)pTime3=s._makeupTime||'';
         else if(pData2&&typeof pData2==='object')pTime3=pData2.time||'';
-        html+='<div class="s-card'+(done?' done':absent?' absent':'')+'">';
+        html+='<div class="s-card'+(done?' done':absent?' absent':early?' early':'')+'">';
         html+='<div class="s-card-name">'+s.name+badge+(pTime3?'<span style="font-size:10px;color:var(--mint);font-weight:600;margin-left:5px">'+pTime3+'</span>':'')+'</div>';
         html+='<div class="s-card-sub">'+getStudentLevel(s)+'</div>';
         html+='<div class="s-card-btns">';
-        html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="markAttendance(\''+s.id+'\',false)">✅</button>';
-        html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="markAttendance(\''+s.id+'\',true)">❌</button>';
-        if(done||absent)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\')" title="일지 작성">📝</button>';
+        html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'present\')">✅</button>';
+        html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'absent\')">❌</button>';
+        html+='<button class="att-btn early-btn'+(early?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'early\')" title="조퇴/학습 마무리 못함">⚠️</button>';
+        if(done||absent||early)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\')" title="일지 작성">📝</button>';
         html+='</div></div>';
       });
       html+='</div>';
@@ -719,53 +729,56 @@ function renderSchedule(){
   $('schedule-list').innerHTML=html;
 }
 
-async function markAttendance(studentId,absent){
+async function markAttendance(studentId, action){
+  // action: 'present', 'absent', 'early'
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
-  var todayStr=todayISO();var existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr;});
-  if(existing){
-    if((existing.absent&&absent)||(!existing.absent&&!absent)){
-      // Toggle off - remove report
-      await db.collection('reports').doc(existing.id).delete();
-      reports=reports.filter(function(r){return r.id!==existing.id;});
-      // If was absent, also remove auto-created makeup
-      if(existing.absent){
-        var existingMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated;});
-        if(existingMk){await db.collection('makeups').doc(existingMk.id).delete();makeups=makeups.filter(function(m){return m.id!==existingMk.id;});}
-      }
-    }
-    else{
-      await db.collection('reports').doc(existing.id).update({absent:absent,updatedAt:new Date().toISOString()});
-      var idx=reports.findIndex(function(r){return r.id===existing.id;});if(idx>=0)reports[idx]={...reports[idx],absent:absent};
-      // Switching to absent → create makeup
-      if(absent){
-        var hasMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr;});
-        if(!hasMk){
-          var mkData={studentId:studentId,studentName:s.name,absentDate:todayStr,absentReason:'',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',autoCreated:true,createdAt:new Date().toISOString()};
-          var mkRef=await db.collection('makeups').add(mkData);
-          makeups.push({id:mkRef.id,...mkData});
-        }
-      }
-      // Switching to present → remove auto makeup
-      if(!absent){
-        var autoMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated;});
-        if(autoMk){await db.collection('makeups').doc(autoMk.id).delete();makeups=makeups.filter(function(m){return m.id!==autoMk.id;});}
-      }
-    }
-  }else{
-    var cls2=classes.find(function(c){return c.id===s.classId;});
-    var newR=await db.collection('reports').add({studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',level:getStudentLevel(s),progress:'',absent:absent,absentReason:'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:cls2?.evalModule||'',evalItems:{},praise:[],createdAt:new Date().toISOString()});
-    reports.push({id:newR.id,studentId:studentId,studentName:s.name,date:todayStr,absent:absent,level:getStudentLevel(s)});
-    // New absent → auto-create makeup entry
-    if(absent){
-      var hasMk2=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr;});
-      if(!hasMk2){
-        var mkData2={studentId:studentId,studentName:s.name,absentDate:todayStr,absentReason:'',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',autoCreated:true,createdAt:new Date().toISOString()};
-        var mkRef2=await db.collection('makeups').add(mkData2);
-        makeups.push({id:mkRef2.id,...mkData2});
-      }
+  var todayStr=todayISO();
+  var existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr;});
+  var isAbsent=action==='absent';
+  var isEarly=action==='early';
+  var isPresent=action==='present';
+
+  function removeAutoMakeup(){
+    var mk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated;});
+    if(mk){db.collection('makeups').doc(mk.id).delete();makeups=makeups.filter(function(m){return m.id!==mk.id;});}
+  }
+  function createAutoMakeup(){
+    var hasMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr;});
+    if(!hasMk){
+      var mkData={studentId:studentId,studentName:s.name,absentDate:todayStr,absentReason:isEarly?'조퇴':'',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',autoCreated:true,createdAt:new Date().toISOString()};
+      db.collection('makeups').add(mkData).then(function(ref){makeups.push({id:ref.id,...mkData});});
     }
   }
-  toast(absent?'❌ '+s.name+' 결석 (보강 계획표에 등록됨)':'✅ '+s.name+' 출석');
+
+  if(existing){
+    var sameState=(isPresent&&!existing.absent&&!existing.earlyLeave)||(isAbsent&&existing.absent)||(isEarly&&existing.earlyLeave);
+    if(sameState){
+      await db.collection('reports').doc(existing.id).delete();
+      reports=reports.filter(function(r){return r.id!==existing.id;});
+      if(existing.absent||existing.earlyLeave) removeAutoMakeup();
+      toast('↩ '+s.name+' 상태 취소');
+    } else {
+      var wasAbsentOrEarly=existing.absent||existing.earlyLeave;
+      var update={absent:isAbsent,earlyLeave:isEarly||false,updatedAt:new Date().toISOString()};
+      await db.collection('reports').doc(existing.id).update(update);
+      var idx=reports.findIndex(function(r){return r.id===existing.id;});
+      if(idx>=0) reports[idx]={...reports[idx],...update};
+      if(isAbsent||isEarly){ createAutoMakeup(); }
+      else if(isPresent&&wasAbsentOrEarly){ removeAutoMakeup(); }
+      if(isAbsent) toast('❌ '+s.name+' 결석 (보강 계획표 등록)');
+      else if(isEarly) toast('⚠️ '+s.name+' 조퇴 (보강 계획표 등록)');
+      else toast('✅ '+s.name+' 출석');
+    }
+  } else {
+    var cls2=classes.find(function(c){return c.id===s.classId;});
+    var data={studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',level:getStudentLevel(s),progress:'',absent:isAbsent,earlyLeave:isEarly||false,absentReason:isEarly?'조퇴':'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:cls2?.evalModule||'',evalItems:{},praise:[],createdAt:new Date().toISOString()};
+    var newR=await db.collection('reports').add(data);
+    reports.push({id:newR.id,...data});
+    if(isAbsent||isEarly) createAutoMakeup();
+    if(isAbsent) toast('❌ '+s.name+' 결석 (보강 계획표 등록)');
+    else if(isEarly) toast('⚠️ '+s.name+' 조퇴 (보강 계획표 등록)');
+    else toast('✅ '+s.name+' 출석');
+  }
   renderSchedule();saveCacheDebounced();
 }
 
@@ -878,11 +891,12 @@ function saveReportAsImage(reportId){
 function _doSaveReportAsImage(r){
   var mod=r.evalModule?EVAL_MODULES[r.evalModule]:null;
   function stars(val){
-    if(!val||val===0) return '<span style="color:#ccc">☆☆☆</span>';
-    var f='';for(var i=0;i<val;i++)f+='<span style="color:#f5a623">★</span>';
-    var e='';for(var j=val;j<3;j++)e+='<span style="color:#ddd">☆</span>';
-    var lbl=val===3?' 매우잘함':val===2?' 잘함':' 노력필요';
-    return f+e+'<span style="font-size:11px;color:#888;margin-left:3px">'+lbl+'</span>';
+    if(!val||val===0) return '';
+    var filled='<span style="font-size:18px;text-shadow:0 2px 4px rgba(245,166,35,0.4);filter:drop-shadow(0 1px 2px rgba(0,0,0,0.15))">⭐</span>';
+    var empty='<span style="font-size:18px;opacity:0.25;filter:grayscale(1)">⭐</span>';
+    var out='';
+    for(var i=0;i<3;i++) out+=i<val?filled:empty;
+    return out;
   }
   function infoRow(label,val){
     if(!val) return '';
@@ -892,19 +906,27 @@ function _doSaveReportAsImage(r){
   }
   var evalHTML='';
   if(mod&&r.evalItems){
+    var hasAnyEval=false;
+    Object.keys(r.evalItems).forEach(function(k){if(r.evalItems[k]>0)hasAnyEval=true;});
+    if(hasAnyEval){
     evalHTML='<div style="margin-top:14px">'
       +'<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #e8f0fe">📊 '+mod.label+' 평가</div>';
     mod.sections.forEach(function(sec){
-      evalHTML+='<div style="margin-bottom:10px">'
-        +'<div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:5px;background:#eff6ff;padding:4px 8px;border-radius:5px">'+sec.title+'</div>';
+      var secItems='';
       sec.items.forEach(function(item){
         var v=r.evalItems[item.key]||0;
-        evalHTML+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 4px;border-bottom:1px solid #f0f0f0;font-size:12px">'
+        if(v===0) return; // Skip items with no stars
+        secItems+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 4px;border-bottom:1px solid #f0f0f0;font-size:12px">'
           +'<span style="color:#374151">'+item.label+'</span><span>'+stars(v)+'</span></div>';
       });
-      evalHTML+='</div>';
+      if(secItems){
+        evalHTML+='<div style="margin-bottom:10px">'
+          +'<div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:5px;background:#eff6ff;padding:4px 8px;border-radius:5px">'+sec.title+'</div>'
+          +secItems+'</div>';
+      }
     });
     evalHTML+='</div>';
+    } // hasAnyEval
   }
   var hwIcon=r.homework==='완료'?'✅ 완료':r.homework==='미제출'?'❌ 미제출':r.homework==='일부 제출'?'📋 일부 제출':(r.homework||'-');
   var praiseHTML='';
@@ -945,7 +967,7 @@ function _doSaveReportAsImage(r){
     +'</div>'
     +evalHTML+praiseHTML+commentHTML+memoHTML
     +'</div>'
-    +'<div style="background:#f8fafc;padding:12px 18px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af">잉글리시아이 학원 · 학습 일지</div>'
+    +'<div style="background:#f8fafc;padding:12px 18px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af">잉글리시아이 영어 전문 학원</div>'
     +'</div>';
   var container=document.createElement('div');
   container.style.cssText='position:fixed;top:-9999px;left:-9999px;z-index:-1;';
