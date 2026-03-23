@@ -814,7 +814,6 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
 const DAYS = ['월','화','수','목','금'];
 const DAY_MAP = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
@@ -964,16 +963,16 @@ function goto(view){
   const bEl=$('snav-'+view);
   if(bEl) bEl.classList.add('active');
   if(view==='schedule') renderSchedule();
-  else if(view==='history') renderHistory();
+  else if(view==='history'){if(!reports.length&&currentUser)loadReports().then(renderHistory);else renderHistory();}
   else if(view==='students') renderStudents();
   else if(view==='classes') renderClasses();
-  else if(view==='makeup') renderMakeupCalendar();
-  else if(view==='consult') renderConsults();
-  else if(view==='reference') renderRefFees();
+  else if(view==='makeup'){if(!makeups.length&&currentUser)loadMakeups().then(renderMakeupCalendar);else renderMakeupCalendar();}
+  else if(view==='consult'){if(!consultations.length&&currentUser)loadConsultations().then(renderConsults);else renderConsults();}
+  else if(view==='reference'){if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}
   else if(view==='admin') renderUsers();
   else if(view==='settings') renderPeriodSettings();
-  else if(view==='goals'){initYearSelects('goals');renderGoalsView();}
-  else if(view==='summary'){initYearSelects('summary');renderSummaryView();}
+  else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){const yr=new Date().getFullYear();loadGoalTargets(yr).then(()=>renderGoalsView());}else renderGoalsView();}
+  else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
 
 function getStudentLevel(s){
@@ -1027,23 +1026,67 @@ async function bootApp(){
   loading(true);
   $('sb-username').textContent=currentUser.name;
   $('sb-date').textContent=todayISO();
-  await Promise.all([loadStudents(),loadClasses(),loadReports(),loadMakeups(),loadConsultations(),loadRevenues(),loadExpenses(),loadTeachers(),loadUsers(),loadRefItems(),loadPeriods()]);
-  try{const s=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
+  // Load essential data first (needed for schedule)
+  await Promise.all([loadStudents(),loadClasses(),loadTeachers(),loadUsers(),loadPeriods()]);
   populateAll();
   setFormDates();
   goto('schedule');
   loading(false);
   toast('👋 환영합니다, '+currentUser.name+'님!');
+  // Load remaining data in background
+  setTimeout(async function(){
+    await Promise.all([loadReports(),loadMakeups(),loadRefItems()]);
+    renderSchedule();
+    // Load heavy data last
+    setTimeout(async function(){
+      await Promise.all([loadRevenues(),loadExpenses(),loadConsultations()]);
+      try{const s=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
+    },500);
+  },100);
 }
 
 // ── Data Loaders ──
 async function loadStudents(){const s=await db.collection('students').orderBy('name').get();students=s.docs.map(d=>({id:d.id,...d.data()}));}
 async function loadClasses(){const s=await db.collection('classes').orderBy('sortOrder').get();classes=s.docs.map(d=>({id:d.id,...d.data()}));}
-async function loadReports(){const s=await db.collection('reports').orderBy('date','desc').get();reports=s.docs.map(d=>({id:d.id,...d.data()}));}
 async function loadMakeups(){const s=await db.collection('makeups').get();makeups=s.docs.map(d=>({id:d.id,...d.data()}));}
 async function loadConsultations(){const s=await db.collection('consultations').orderBy('date','desc').get();consultations=s.docs.map(d=>({id:d.id,...d.data()}));}
-async function loadRevenues(){const s=await db.collection('revenues').orderBy('paidDate','desc').get();revenues=s.docs.map(d=>({id:d.id,...d.data()}));}
-async function loadExpenses(){const s=await db.collection('expenses').orderBy('date','desc').get();expenses=s.docs.map(d=>({id:d.id,...d.data()}));}
+async function loadReports(){
+  // Load only current year's reports to reduce data transfer
+  const yearStart=new Date().getFullYear()+'-01-01';
+  try{
+    const s=await db.collection('reports').where('date','>=',yearStart).orderBy('date','desc').get();
+    reports=s.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    // Fallback without filter if index not ready
+    const s=await db.collection('reports').orderBy('date','desc').limit(500).get();
+    reports=s.docs.map(d=>({id:d.id,...d.data()}));
+  }
+}
+async function loadRevenues(){
+  const yearStart=new Date().getFullYear()+'-01-01';
+  try{
+    const s=await db.collection('revenues').where('paidDate','>=',yearStart).orderBy('paidDate','desc').get();
+    revenues=s.docs.map(d=>({id:d.id,...d.data()}));
+    // Also load records by revYear (for current year)
+    const yr=new Date().getFullYear();
+    const s2=await db.collection('revenues').where('revYear','==',yr).get();
+    const existing=new Set(revenues.map(r=>r.id));
+    s2.docs.forEach(d=>{if(!existing.has(d.id))revenues.push({id:d.id,...d.data()});});
+  }catch(e){
+    const s=await db.collection('revenues').orderBy('paidDate','desc').limit(500).get();
+    revenues=s.docs.map(d=>({id:d.id,...d.data()}));
+  }
+}
+async function loadExpenses(){
+  try{
+    const yr=new Date().getFullYear();
+    const s=await db.collection('expenses').where('revYear','==',yr).get();
+    if(s.docs.length>0){expenses=s.docs.map(d=>({id:d.id,...d.data()}));return;}
+  }catch(e){}
+  // Fallback
+  const s=await db.collection('expenses').orderBy('date','desc').limit(200).get();
+  expenses=s.docs.map(d=>({id:d.id,...d.data()}));
+}
 async function loadTeachers(){try{const d=await db.collection('config').doc('teachers').get();teachers=d.exists?(d.data().list||[]):[];}catch(e){teachers=[];}}
 async function loadUsers(){const s=await db.collection('users').get();users=s.docs.map(d=>({id:d.id,...d.data()}));}
 async function loadRefItems(){const s=await db.collection('refItems').get();refItems=s.docs.map(d=>({id:d.id,...d.data()}));}
@@ -1479,6 +1522,19 @@ function sendKakao(reportId){
 
 function saveReportAsImage(reportId){
   const r=reports.find(x=>x.id===reportId);if(!r)return;
+  toast('📷 이미지 생성 중...');
+  // Lazy load html2canvas
+  if(typeof html2canvas==='undefined'){
+    const sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+    sc.onload=function(){_doSaveReportAsImage(r);};
+    sc.onerror=function(){toast('❌ 이미지 라이브러리 로드 실패');};
+    document.head.appendChild(sc);
+  } else {
+    _doSaveReportAsImage(r);
+  }
+}
+function _doSaveReportAsImage(r){
   const mod=r.evalModule?EVAL_MODULES[r.evalModule]:null;
   function stars(val){
     if(!val||val===0) return '<span style="color:#ccc">☆☆☆</span>';
@@ -1533,7 +1589,6 @@ function saveReportAsImage(reportId){
   document.body.appendChild(container);
   var card=container.querySelector('#ric');
   setTimeout(function(){
-    if(typeof html2canvas==='undefined'){toast('❌ 잠시 후 다시 시도하세요.');document.body.removeChild(container);return;}
     toast('📷 이미지 생성 중...');
     html2canvas(card,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}).then(function(canvas){
       document.body.removeChild(container);
