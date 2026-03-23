@@ -174,6 +174,9 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 /* ── Responsive ── */
 @media(max-width:600px){#sidebar{position:fixed;top:0;left:0;height:100dvh;transform:translateX(-100%)} #sidebar.open{transform:translateX(0)} #content{margin-left:0} }
 </style>
+<!-- Firebase SDK: defer = HTML 파싱과 병렬 다운로드, 실행은 파싱 완료 후 -->
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <!-- Setup / Login screens -->
@@ -813,8 +816,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <button class="btn btn-outline btn-block" onclick="closeM('goals-edit')">취소</button><div style="height:6px"></div>
 </div></div>
 
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.min.js"></script>
+
 <script>
 const DAYS = ['월','화','수','목','금'];
 const DAY_MAP = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
@@ -2792,15 +2794,11 @@ async function savePeriodSettings(){
 }
 
 // ══ BOOT ══
-(function(){
+// ── 앱 시작 ──
+// defer 스크립트(Firebase SDK)가 로드된 후에 실행되도록 보장
+function _initApp(){
   var cfg=getCfg();
-  if(!cfg){$('setup-screen').style.display='flex';}
-  else{
-    try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
-    db=firebase.firestore();
-    $('login-screen').style.display='flex';
-  }
-  // Year/month init for rev/goals
+  // Year/month selects 초기화
   var yr=new Date().getFullYear(),mo=new Date().getMonth()+1;
   ['rev-year','goals-year'].forEach(function(id){
     var el=$(id);if(!el)return;
@@ -2810,10 +2808,27 @@ async function savePeriodSettings(){
     var el=$(id);if(!el)return;
     for(var m=1;m<=12;m++) el.innerHTML+='<option value="'+m+'"'+(m===mo?' selected':'')+'>'+m+'월</option>';
   });
-  // Monthly tab default hides month selector
   var moSel=$('rev-month');if(moSel)moSel.style.display='none';
   var goMoSel=$('goals-month');if(goMoSel)goMoSel.style.display='none';
-})();
+
+  if(!cfg){
+    $('setup-screen').style.display='flex';
+    return;
+  }
+  try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
+  db=firebase.firestore();
+  // Firestore 오프라인 캐시 활성화 (반복 접속 시 즉시 데이터 반환)
+  db.settings({cacheSizeBytes:50*1024*1024});
+  db.enablePersistence({synchronizeTabs:true}).catch(function(){});
+  $('login-screen').style.display='flex';
+}
+
+// defer 스크립트는 DOMContentLoaded 이후 실행되므로 항상 DOM이 준비된 상태
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',_initApp);
+} else {
+  _initApp();
+}
 </script>
 </body>
 </html>
