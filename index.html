@@ -69,7 +69,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .tbl tbody tr:hover{background:var(--surface2)}
 .rev-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .rev-tbl th{background:var(--navy);color:#fff;padding:8px 10px;white-space:nowrap;text-align:center}
-.rev-tbl td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.rev-tbl td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:center}
 .rev-tbl tbody tr:hover{background:var(--surface2)}
 .tw{overflow-x:auto}
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
@@ -112,8 +112,8 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .att-btn.abs-btn{color:#fca5a5}.att-btn.abs-btn.active{background:#fee2e2;color:#dc2626}
 .att-btn.early-btn{color:#fcd34d}.att-btn.early-btn.active{background:#fef3c7;color:#d97706}
 .hist-table{width:100%;border-collapse:collapse;font-size:12px}
-.hist-table th{background:var(--navy);color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0;z-index:2;white-space:nowrap}
-.hist-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.hist-table th{background:var(--navy);color:#fff;padding:8px 10px;text-align:center;position:sticky;top:0;z-index:2;white-space:nowrap}
+.hist-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center}
 .hist-table tbody tr:hover{background:var(--surface2);cursor:pointer}
 .absent-row td{background:#fff8f8 !important}
 .star-cell{font-size:14px;text-align:center}
@@ -230,7 +230,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </div>
 <div class="view" id="view-students"><div class="page-top"><h2>학생 목록</h2></div>
   <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-status" onchange="renderStudents()"><option value="">전체</option><option value="재원">재원</option><option value="신규">신규</option><option value="휴원">휴원</option><option value="퇴원">퇴원</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-cls" onchange="renderStudents()"><option value="">전체 클래스</option></select><input class="fi" style="flex:1;max-width:200px;font-size:12px;padding:6px 10px" id="s-search" placeholder="🔍 이름 검색" oninput="renderStudents()"><button class="btn btn-green btn-sm" onclick="openStudentModal()">+ 학생 등록</button></div>
-  <div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th style="text-align:center">상태</th><th style="text-align:center">이름</th><th style="text-align:center">학년</th><th style="text-align:center">클래스</th><th style="text-align:center">단계</th><th style="text-align:center">월 수업 시수</th><th style="text-align:center">수업 요일 및 시수</th><th style="text-align:center">연락처</th><th style="text-align:center">관리</th></tr></thead><tbody id="students-tbody"></tbody></table></div></div></div>
+  <div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th style="text-align:center">상태</th><th style="text-align:center">이름</th><th style="text-align:center">할인</th><th style="text-align:center">학년</th><th style="text-align:center">클래스</th><th style="text-align:center">단계</th><th style="text-align:center">월 수업 시수</th><th style="text-align:center">수업 요일 및 시수</th><th style="text-align:center">연락처</th><th style="text-align:center">관리</th></tr></thead><tbody id="students-tbody"></tbody></table></div></div></div>
 </div>
 <div class="view" id="view-classes"><div class="page-top"><h2>클래스 관리</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openClassModal()">+ 클래스 추가</button></div><div class="cp"><div id="class-list"></div></div></div>
 <div class="view" id="view-makeup"><div class="page-top"><h2>보강 계획표</h2></div><div class="toolbar"><button class="btn btn-outline btn-sm" onclick="prevMakeupMonth()">◀</button><span id="makeup-month-nav" style="font-size:13px;font-weight:700;min-width:80px;text-align:center"></span><button class="btn btn-outline btn-sm" onclick="nextMakeupMonth()">▶</button><span style="font-size:11px;color:var(--txt3)" id="makeup-month-label"></span></div><div class="cp" style="overflow-x:auto"><div id="makeup-calendar"></div></div></div>
@@ -648,7 +648,7 @@ function renderSchedule(){
   function pad(n){return String(n).padStart(2,'0');}
   var byPeriod={};
   // Pre-filter students for today
-  var todayStudents=students.filter(function(s){return(s.days||[]).includes(dayName);});
+  var todayStudents=students.filter(function(s){var st=s.status||'재원';return(st==='재원'||st==='신규')&&(s.days||[]).includes(dayName);});
   todayStudents.forEach(function(s){
     var pData=(s.periods||{})[dayName];var pNum=0,pTime='';
     if(pData&&typeof pData==='object'){pNum=pData.period||0;pTime=pData.time||'';}else if(pData)pNum=parseInt(pData)||0;
@@ -992,22 +992,23 @@ function _doSaveReportAsImage(r){
 function exportHistoryCSV(){var rows=reports.map(function(r){return[r.date,r.teacher,r.studentName,r.level,r.progress,r.absent?'O':'',r.reviewTest,r.attitude,r.dailyQuiz,r.homework,r.comment,r.memo].map(function(v){return'"'+(v||'').replace(/"/g,'""')+'"';}).join(',');});var csv='\uFEFF날짜,교사,학생,단계,진도,결석,복습테스트,태도,퀴즈,숙제,코멘트,전달사항\n'+rows.join('\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='학습일지_'+todayISO()+'.csv';a.click();}
 
 // ══ STUDENTS ══
-function getStudentWeeklyHours(s){if(s.weeklyHours)return s.weeklyHours;if(!s.days||!s.days.length)return 0;var total=0;s.days.forEach(function(d){var p=(s.periods||{})[d];total+=(p&&typeof p==='object'&&p.hours)?p.hours:1;});return total;}
+function getStudentWeeklyHours(s){if(s.weeklyHours)return s.weeklyHours;if(!s.days||!s.days.length)return 0;var total=0;s.days.forEach(function(d){var p=(s.periods||{})[d];total+=(p&&typeof p==='object'&&p.hours)?parseFloat(p.hours):1;});return total;}
 function getStudentMonthlyHours(s){return getStudentWeeklyHours(s)*4;}
 function renderStudents(){
   var filter=$('s-filter-status').value;var cls2=$('s-filter-cls').value;var search=($('s-search').value||'').trim().toLowerCase();
   var list=students;if(filter)list=list.filter(function(s){return(s.status||'재원')===filter;});if(cls2)list=list.filter(function(s){return s.classId===cls2;});if(search)list=list.filter(function(s){return s.name.toLowerCase().includes(search);});
   var statusColor={신규:'bg-mint',재원:'bg-green',휴원:'bg-gold',퇴원:'bg-red'};
   var tb=$('students-tbody');
-  if(!list.length){tb.innerHTML='<tr><td colspan="9"><div class="empty"><div class="ei">👥</div><div class="et">학생 없음</div></div></td></tr>';return;}
+  if(!list.length){tb.innerHTML='<tr><td colspan="10"><div class="empty"><div class="ei">👥</div><div class="et">학생 없음</div></div></td></tr>';return;}
   tb.innerHTML=list.map(function(s){
     var clsName=(classes.find(function(c){return c.id===s.classId;})||{}).name||'-';
     var status=s.status||'재원';
-    var wh=getStudentWeeklyHours(s);var mh=wh*4;
+    var mh=getStudentMonthlyHours(s);
     var dayInfo=s.days&&s.days.length?s.days.map(function(d){var p=(s.periods||{})[d];var h=(p&&typeof p==='object'&&p.hours)?p.hours:1;return d+'('+h+')';}).join(' '):'';
     return'<tr onclick="openStudentModal(\''+s.id+'\')" style="cursor:pointer">'
       +'<td style="text-align:center"><span class="badge '+(statusColor[status]||'bg-gray')+'">'+status+'</span></td>'
-      +'<td style="text-align:center"><strong>'+s.name+'</strong>'+(s.discount?'<span class="badge bg-gold" style="margin-left:4px;font-size:9px">'+s.discount+'</span>':'')+'</td>'
+      +'<td style="text-align:center"><strong>'+s.name+'</strong></td>'
+      +'<td style="text-align:center">'+(s.discount?'<span class="badge bg-gold" style="font-size:9px">'+s.discount+'</span>':'-')+'</td>'
       +'<td style="text-align:center">'+(s.grade||'-')+'</td>'
       +'<td style="text-align:center">'+clsName+'</td>'
       +'<td style="text-align:center">'+getStudentLevel(s)+'</td>'
@@ -1024,12 +1025,12 @@ function updateWeeklyHours(){
   document.querySelectorAll('#s-days .day-pill.on').forEach(function(el){
     var day=el.dataset.day;
     var hEl=document.getElementById('per-hours-'+day);
-    total+=hEl?parseInt(hEl.value)||1:1;
+    total+=hEl?parseFloat(hEl.value)||1:1;
   });
   var el=$('s-weekly-hours-display');
   if(el)el.textContent=total>0?'📅 주 '+total+'시수 · 월 '+(total*4)+'시수':'';
 }
-function renderPeriodInputs(){var selectedDays=[...document.querySelectorAll('#s-days .day-pill.on')].map(function(el){return el.dataset.day;});var area=$('s-periods-area');if(!area)return;area.innerHTML=selectedDays.map(function(day){return'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--txt2);min-width:20px">'+day+'</span><select class="fi" id="per-num-'+day+'" style="flex:1;font-size:11px;padding:5px 8px">'+[1,2,3,4,5,6,7,8,9].map(function(n){return'<option value="'+n+'">'+n+'교시</option>';}).join('')+'</select><input class="fi" id="per-time-'+day+'" placeholder="14:00" style="flex:1;font-size:11px;padding:5px 8px"><select class="fi" id="per-hours-'+day+'" style="width:65px;font-size:11px;padding:5px 8px" onchange="updateWeeklyHours()"><option value="1">1시수</option><option value="2">2시수</option><option value="3">3시수</option></select></div>';}).join('');updateWeeklyHours();}
+function renderPeriodInputs(){var selectedDays=[...document.querySelectorAll('#s-days .day-pill.on')].map(function(el){return el.dataset.day;});var area=$('s-periods-area');if(!area)return;area.innerHTML=selectedDays.map(function(day){return'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--txt2);min-width:20px">'+day+'</span><select class="fi" id="per-num-'+day+'" style="flex:1;font-size:11px;padding:5px 8px">'+[1,2,3,4,5,6,7,8,9].map(function(n){return'<option value="'+n+'">'+n+'교시</option>';}).join('')+'</select><input class="fi" id="per-time-'+day+'" placeholder="14:00" style="flex:1;font-size:11px;padding:5px 8px"><select class="fi" id="per-hours-'+day+'" style="width:70px;font-size:11px;padding:5px 8px" onchange="updateWeeklyHours()"><option value="1">1시수</option><option value="1.5">1.5시수</option><option value="2">2시수</option><option value="2.5">2.5시수</option><option value="3">3시수</option></select></div>';}).join('');updateWeeklyHours();}
 function onSClassChange(){var cls2=classes.find(function(c){return c.id===$('s-class').value;});if(cls2&&cls2.days){document.querySelectorAll('#s-days .day-pill').forEach(function(el){el.classList.toggle('on',(cls2.days||[]).includes(el.dataset.day));});updateWeeklyHours();renderPeriodInputs();}}
 function addSibling(){var area=$('siblings-area');if(!area)return;var i=siblingCount++;var d=document.createElement('div');d.id='sib-'+i;d.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px';d.innerHTML='<input class="fi" placeholder="형제 이름" id="sib-name-'+i+'" style="flex:2;font-size:11px;padding:5px 8px"><select class="fi" id="sib-grade-'+i+'" style="flex:1;font-size:11px;padding:5px 8px"><option value="">학년</option>'+GRADE_ORDER.map(function(g){return'<option value="'+g+'">'+g+'</option>';}).join('')+'</select><label style="font-size:11px;white-space:nowrap"><input type="checkbox" id="sib-enrolled-'+i+'" checked> 재원중</label><button class="btn btn-red btn-xs" onclick="document.getElementById(\'sib-'+i+'\').remove()">✕</button>';area.appendChild(d);}
 
@@ -1053,7 +1054,7 @@ function openStudentModal(id){
 async function saveStudent(){
   var name=$('s-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}loading(true);
   var selectedDays=[...document.querySelectorAll('#s-days .day-pill.on')].map(function(el){return el.dataset.day;});
-  var periods={};var weeklyHours=0;selectedDays.forEach(function(day){var pNum=$('per-num-'+day);var pTime=$('per-time-'+day);var pHours=$('per-hours-'+day);var h=parseInt(pHours?.value)||1;periods[day]={period:parseInt(pNum?.value)||1,time:pTime?.value||'',hours:h};weeklyHours+=h;});
+  var periods={};var weeklyHours=0;selectedDays.forEach(function(day){var pNum=$('per-num-'+day);var pTime=$('per-time-'+day);var pHours=$('per-hours-'+day);var h=parseFloat(pHours?.value)||1;periods[day]={period:parseInt(pNum?.value)||1,time:pTime?.value||'',hours:h};weeklyHours+=h;});
   var siblings=[];document.querySelectorAll('[id^="sib-name-"]').forEach(function(el){var i2=el.id.replace('sib-name-','');var sibName=el.value.trim();if(!sibName)return;siblings.push({name:sibName,grade:$('sib-grade-'+i2)?.value||'',enrolled:$('sib-enrolled-'+i2)?.checked!==false});});
   var data={name:name,level:$('s-level').value,customLevel:$('s-custom-level').value.trim(),grade:$('s-grade').value,enrollYear:parseInt($('s-enroll-year').value)||new Date().getFullYear(),classId:$('s-class').value,days:selectedDays,periods:periods,weeklyHours:weeklyHours,phoneMom:$('s-phone-mom').value.trim(),school:$('s-school').value.trim(),enrollDate:$('s-enroll-date').value,siblings:siblings,memo:$('s-memo').value.trim(),status:$('s-status').value||'재원',discount:$('s-discount').value||'',quitReason:$('s-quit-reason').value||'',quitDate:$('s-quit-date').value||'',updatedAt:new Date().toISOString()};
   var id=$('s-id').value;
@@ -1158,7 +1159,9 @@ function renderRevMonthly(yr,mo){
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
     var rawLevel=getStudentLevel(s);var lookupLevel=rawLevel.match(/Joy|Wise|Pride/)?'Basic':rawLevel;
     var tuitionItem=refItems.find(function(ri){return(ri.refType==='tuition'||ri.baseFee)&&ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0]));});
+    var textbookItem=refItems.find(function(ri){return(ri.refType==='textbook'||ri.textbookFee)&&ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0]));});
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
+    var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
     var mh=getStudentMonthlyHours(s);
     var tuitionFee=getTuitionByMonthlyHours(baseFee,mh);
     var discountAmt=s.discount?10000:0;
@@ -1174,10 +1177,10 @@ function renderRevMonthly(yr,mo){
     var subMatFee=getSubMaterialFee(subMat);
     var extra1Amt=lastRev?parseInt(lastRev.extra1Amount)||0:0;
     var extra2Amt=lastRev?parseInt(lastRev.extra2Amount)||0:0;
-    // 납부 예정액 = 월수업시수 교육비 + 부교재비 - 결석일수*(교육비/월시수) - 할인
+    // 납부 예정액 = 교육비(월시수기준) + 교재비 + 부교재비 - 결석공제 - 할인 + 기타비
     var perHourFee=mh>0?tuitionFee/mh:0;
     var absentDeduction=Math.round(pendingMakeups*perHourFee);
-    var expectedAmt=tuitionFee+subMatFee-absentDeduction-discountAmt+extra1Amt+extra2Amt;
+    var expectedAmt=tuitionFee+textbookFee+subMatFee-absentDeduction-discountAmt+extra1Amt+extra2Amt;
     if(expectedAmt<0)expectedAmt=0;
     totalExpected+=expectedAmt;
     var c='text-align:center;font-size:11px';
