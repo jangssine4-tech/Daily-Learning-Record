@@ -122,14 +122,27 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .rev-sum-val{font-size:18px;font-weight:800;margin-bottom:2px}
 .rev-sum-lbl{font-size:10px;color:var(--txt3);font-weight:600}
 /* Sticky first 4 columns in monthly revenue */
-#rev-monthly-tbody td:nth-child(1),#rev-monthly-tbody td:nth-child(2),#rev-monthly-tbody td:nth-child(3),#rev-monthly-tbody td:nth-child(4),
-#rev-monthly-scroll thead th:nth-child(1),#rev-monthly-scroll thead th:nth-child(2),#rev-monthly-scroll thead th:nth-child(3),#rev-monthly-scroll thead th:nth-child(4){position:sticky;z-index:3}
-#rev-monthly-tbody td:nth-child(1),#rev-monthly-scroll thead th:nth-child(1){left:0}
-#rev-monthly-tbody td:nth-child(2),#rev-monthly-scroll thead th:nth-child(2){left:45px}
-#rev-monthly-tbody td:nth-child(3),#rev-monthly-scroll thead th:nth-child(3){left:110px}
-#rev-monthly-tbody td:nth-child(4),#rev-monthly-scroll thead th:nth-child(4){left:155px;border-right:2px solid var(--border2)}
-#rev-monthly-tbody td:nth-child(1),#rev-monthly-tbody td:nth-child(2),#rev-monthly-tbody td:nth-child(3),#rev-monthly-tbody td:nth-child(4){background:#fff}
-#rev-monthly-scroll thead th:nth-child(1),#rev-monthly-scroll thead th:nth-child(2),#rev-monthly-scroll thead th:nth-child(3),#rev-monthly-scroll thead th:nth-child(4){z-index:11}
+#rev-monthly-scroll{position:relative}
+#rev-monthly-scroll table{border-collapse:separate;border-spacing:0}
+#rev-monthly-tbody td:nth-child(-n+4),
+#rev-monthly-scroll thead th:nth-child(-n+4){position:sticky;z-index:3}
+#rev-monthly-tbody td:nth-child(1),#rev-monthly-scroll thead th:nth-child(1){left:0;min-width:36px}
+#rev-monthly-tbody td:nth-child(2),#rev-monthly-scroll thead th:nth-child(2){left:36px;min-width:60px}
+#rev-monthly-tbody td:nth-child(3),#rev-monthly-scroll thead th:nth-child(3){left:96px;min-width:40px}
+#rev-monthly-tbody td:nth-child(4),#rev-monthly-scroll thead th:nth-child(4){left:136px;min-width:80px;border-right:2px solid var(--border2)}
+#rev-monthly-tbody td:nth-child(-n+4){background:#fff}
+#rev-monthly-tbody tr:hover td:nth-child(-n+4){background:var(--surface2)}
+#rev-monthly-scroll thead th:nth-child(-n+4){z-index:12;background:var(--navy)}
+/* Print styles */
+@media print{
+  body>*{display:none !important}
+  #print-area{display:block !important;position:fixed;inset:0;z-index:99999;background:#fff;overflow:visible}
+  #print-area table{width:100%;border-collapse:collapse;font-size:11px}
+  #print-area th,#print-area td{border:1px solid #333;padding:6px 8px;text-align:center}
+  #print-area th{background:#eee;font-weight:700}
+  #print-area h2{font-size:16px;margin-bottom:10px;text-align:center}
+  @page{size:A4 landscape;margin:10mm}
+}
 .rev-tab{padding:10px 14px;font-size:12px;font-weight:600;color:var(--txt2);background:transparent;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s}
 .rev-tab:hover{color:var(--navy)}
 .rev-tab.active{color:var(--mint);border-bottom-color:var(--mint)}
@@ -1160,13 +1173,104 @@ function getSubMaterialFee(subName){
   });
   return item?(parseInt(item.supFee)||parseInt(item.textbookFee)||0):0;
 }
+// Improved ref item lookup: maps student level to the correct ref category
+function getLevelCategory(rawLevel){
+  if(!rawLevel) return '';
+  if(rawLevel.match(/Hello Phonics|Phonics|Master Pho/i)) return 'Phonics';
+  if(rawLevel.match(/Joy|Wise|Pride/i)) return 'Basic';
+  if(rawLevel.match(/Grammar Plus/i)) return 'Grammar Plus';
+  if(rawLevel.match(/First Grammar/i)) return 'First Grammar';
+  if(rawLevel.match(/Prime/i)) return 'Prime';
+  if(rawLevel.match(/Advanced/i)) return 'Advanced';
+  if(rawLevel.match(/Elite/i)) return 'Elite';
+  if(rawLevel.match(/내신|Reader|천일문|빠바/)) return '중고등';
+  return rawLevel;
+}
+function findRefItem(rawLevel, refType){
+  if(!rawLevel) return null;
+  var cat=getLevelCategory(rawLevel);
+  var isT=refType==='tuition';
+  // Try exact level match first
+  var exact=refItems.find(function(ri){
+    var typeOk=isT?(ri.refType==='tuition'||(!ri.refType&&ri.baseFee)):(ri.refType==='textbook'||(!ri.refType&&(ri.textbookFee||ri.supMaterial)));
+    return typeOk&&ri.level&&ri.level.trim()===rawLevel;
+  });
+  if(exact) return exact;
+  // Try category match (e.g. "Grammar Plus 1" → match refItem with level "Grammar Plus")
+  var catMatch=refItems.find(function(ri){
+    var typeOk=isT?(ri.refType==='tuition'||(!ri.refType&&ri.baseFee)):(ri.refType==='textbook'||(!ri.refType&&(ri.textbookFee||ri.supMaterial)));
+    if(!typeOk||!ri.level) return false;
+    var riL=ri.level.trim();
+    // Category-level matching
+    return cat===riL||rawLevel.indexOf(riL)===0||riL.indexOf(cat)===0||
+      (cat==='Basic'&&riL==='Basic')||(cat==='Grammar Plus'&&(riL==='Grammar Plus'||riL==='Grammar'))||
+      (cat==='First Grammar'&&(riL==='First Grammar'||riL==='Grammar'))||
+      (cat==='Prime'&&riL==='Prime')||(cat==='Advanced'&&riL==='Advanced')||
+      (cat==='Elite'&&riL==='Elite')||(cat==='중고등'&&riL==='중고등');
+  });
+  return catMatch||null;
+}
+function openPrintRevModal(yr,mo){
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var sorted=[...activeStudents].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+  var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
+  var checkboxes=sorted.map(function(s,i){
+    var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
+    var paid=sRevs.length>0;var paidAmt=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
+    var lastRev=sRevs[0];
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer">'
+      +'<input type="checkbox" class="print-stu-check" value="'+s.id+'" checked>'
+      +'<span style="flex:1;font-weight:600">'+s.name+'</span>'
+      +'<span style="font-size:11px;color:var(--txt3)">'+(s.grade||'')+'</span>'
+      +'<span style="font-size:11px;color:'+(paid?'var(--mint)':'var(--red)')+'">'+( paid?paidAmt.toLocaleString()+'원':'미납')+'</span>'
+      +'</label>';
+  }).join('');
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms"><div class="mh"></div>'
+    +'<div class="mt">🖨 인쇄할 학생 선택</div>'
+    +'<div style="margin-bottom:10px"><label style="font-size:12px;cursor:pointer"><input type="checkbox" checked onchange="document.querySelectorAll(\'.print-stu-check\').forEach(function(c){c.checked=this.checked;}.bind(this))"> 전체 선택/해제</label></div>'
+    +'<div style="max-height:50vh;overflow-y:auto">'+checkboxes+'</div>'
+    +'<div style="height:14px"></div>'
+    +'<button class="btn btn-navy btn-block" onclick="doPrintRev('+yr+','+mo+',this.closest(\'.mo\'))">🖨 인쇄하기</button>'
+    +'<div style="height:6px"></div>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button></div>';
+  document.body.appendChild(overlay);
+}
+function doPrintRev(yr,mo,overlay){
+  var checkedIds=[...document.querySelectorAll('.print-stu-check:checked')].map(function(c){return c.value;});
+  if(!checkedIds.length){toast('⚠️ 학생을 선택하세요');return;}
+  var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
+  var selected=students.filter(function(s){return checkedIds.includes(s.id);}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+  var rowNum=1;
+  var rows=selected.map(function(s){
+    var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
+    var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
+    var paidAmt=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
+    return '<tr><td>'+(rowNum++)+'</td><td>'+s.name+'</td><td>'+(s.grade||'-')+'</td><td>'+getStudentLevel(s)+'</td><td>'+(paidAmt>0?paidAmt.toLocaleString()+'원':'미납')+'</td><td>'+(lastRev?.paidDate||'-')+'</td></tr>';
+  }).join('');
+  var existing=document.getElementById('print-area');
+  if(existing)existing.remove();
+  var printDiv=document.createElement('div');
+  printDiv.id='print-area';
+  printDiv.style.display='none';
+  printDiv.innerHTML='<h2>잉글리시아이 '+yr+'년 '+mo+'월 매출현황</h2>'
+    +'<table><thead><tr><th>번호</th><th>이름</th><th>학년</th><th>단계</th><th>실납부액</th><th>결제일</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>';
+  document.body.appendChild(printDiv);
+  if(overlay)overlay.remove();
+  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
+}
 function renderRevMonthly(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
   var totalRev=list.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
   var paidIds=new Set(list.map(function(r){return r.studentId;}));
-  $('rev-summary').innerHTML='<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--mint)">'+totalRev.toLocaleString()+'원</div><div class="rev-sum-lbl">총 수납액</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue)">'+paidIds.size+'명</div><div class="rev-sum-lbl">납부 완료</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--red)">'+(students.length-paidIds.size)+'명</div><div class="rev-sum-lbl">미납</div></div>';
+  // Only show 재원/신규 students for this month
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  $('rev-summary').innerHTML='<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--mint)">'+totalRev.toLocaleString()+'원</div><div class="rev-sum-lbl">총 수납액</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue)">'+paidIds.size+'명</div><div class="rev-sum-lbl">납부 완료</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--red)">'+(activeStudents.length-paidIds.size)+'명</div><div class="rev-sum-lbl">미납</div></div><div style="margin-left:auto;display:flex;gap:6px;align-items:center"><button class="btn btn-outline btn-sm" onclick="openPrintRevModal('+yr+','+mo+')">🖨 인쇄</button></div>';
   var tb=$('rev-monthly-tbody');if(!tb)return;
-  var active=[...students].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+  var active=[...activeStudents].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
   if(!active.length){tb.innerHTML='<tr><td colspan="19" style="text-align:center;padding:20px;color:var(--txt3)">학생 없음</td></tr>';return;}
   var subMatOpts=getSubMaterialOptions();
   var rowNum=1;
@@ -1175,9 +1279,9 @@ function renderRevMonthly(yr,mo){
     var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
     var paid=sRevs.length>0;var paidAmt=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
-    var rawLevel=getStudentLevel(s);var lookupLevel=rawLevel.match(/Joy|Wise|Pride/)?'Basic':rawLevel;
-    var tuitionItem=refItems.find(function(ri){return(ri.refType==='tuition'||ri.baseFee)&&ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0]));});
-    var textbookItem=refItems.find(function(ri){return(ri.refType==='textbook'||ri.textbookFee)&&ri.level&&(lookupLevel.includes(ri.level.trim())||ri.level.trim().includes(lookupLevel.split(' ')[0]));});
+    var rawLevel=getStudentLevel(s);
+    var tuitionItem=findRefItem(rawLevel,'tuition');
+    var textbookItem=findRefItem(rawLevel,'textbook');
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
     var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
     var mh=getStudentMonthlyHours(s);
