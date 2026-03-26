@@ -184,6 +184,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </style>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 </head>
 <body>
 <!-- Boot overlay - shows immediately, hides after app is ready -->
@@ -278,13 +279,13 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <div class="view" id="view-summary"><div class="page-top"><h2>월별 현황</h2></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto"><button class="rev-tab active" id="stab-summary" onclick="switchSummaryTab('summary')">📈 월별 현황 요약</button><button class="rev-tab" id="stab-monthly" onclick="switchSummaryTab('monthly')">💰 월별 매출현황</button><button class="rev-tab" id="stab-expense" onclick="switchSummaryTab('expense')">📋 월별 수입/지출</button><button class="rev-tab" id="stab-staff" onclick="switchSummaryTab('staff')">👩‍🏫 강사</button></div><div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="rev-year" onchange="renderSummaryView()"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="rev-month" onchange="renderSummaryView()"></select><button class="btn btn-green btn-sm" id="rev-add-btn" style="display:none" onclick="openRevenueModal()">+ 수납 등록</button><button class="btn btn-outline btn-sm" id="rev-expense-add-btn" style="display:none" onclick="openExpenseModal()">+ 지출 추가</button></div><div id="summary-panel" class="cp" style="overflow:hidden;padding:0"><div id="rev-summary-area" style="padding:14px 16px;overflow-y:auto;max-height:calc(100vh - 200px)"></div></div><div id="monthly-panel" style="display:none;flex-direction:column;height:calc(100vh - 175px)"><div style="padding:10px 16px 0"><div class="rev-summary" id="rev-summary"></div></div><div id="rev-hscroll-sticky" style="position:sticky;bottom:0;z-index:20;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;background:var(--surface2);border-top:1px solid var(--border)"><div id="rev-hscroll-inner" style="height:1px"></div></div><div id="rev-monthly-scroll" style="flex:1;overflow:auto;min-height:0;scrollbar-width:thin"><table class="tbl" style="min-width:1200px;font-size:11px;border-collapse:separate;border-spacing:0"><thead style="position:sticky;top:0;z-index:10"><tr style="background:var(--navy);color:#fff"><th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">학년</th><th style="text-align:center">단계</th><th style="text-align:center">월 수업 시수</th><th style="text-align:center">할인</th><th style="text-align:center">결석</th><th style="text-align:center">부교재</th><th style="text-align:center">부교재비</th><th style="text-align:center">납부 예정액</th><th style="text-align:center">실납부액</th><th style="text-align:center">결제수단</th><th style="text-align:center">결제일</th><th style="text-align:center">기타비1</th><th style="text-align:center">금액1</th><th style="text-align:center">기타비2</th><th style="text-align:center">금액2</th><th style="text-align:center">메모</th><th style="text-align:center">수납</th></tr></thead><tbody id="rev-monthly-tbody"></tbody></table></div></div><div id="expense-panel" style="display:none" class="cp"><div id="rev-expense-area"></div></div><div id="staff-panel" style="display:none" class="cp"><div id="staff-area"></div></div></div>
 <div class="view" id="view-reference"><div class="page-top"><h2>참고</h2><p>교육비 기준 및 레벨별 진도를 관리합니다</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex"><button class="rev-tab active" id="reftab-fees" onclick="switchRefTab('fees')">💰 교육비 기준</button><button class="rev-tab" id="reftab-curriculum" onclick="switchRefTab('curriculum')">📚 레벨별 진도</button><button class="rev-tab" id="reftab-eval" onclick="switchRefTab('eval')">📊 평가 모듈</button></div><div id="ref-panel-fees" class="cp"><div class="expense-section"><h4>💰 교육비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('tuition')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th style="text-align:center">학년</th><th style="text-align:center">단계</th><th style="text-align:center">기본 교육비</th><th style="text-align:center">주 3회</th><th style="text-align:center">주 4회</th><th style="text-align:center">주 5회</th><th></th></tr></thead><tbody id="ref-tuition-tbody"></tbody></table></div></div><div class="expense-section"><h4>📚 교재비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('textbook')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th>학년</th><th>단계</th><th style="text-align:right">교재비</th><th>부교재명</th><th style="text-align:right">부교재비</th><th></th></tr></thead><tbody id="ref-textbook-tbody"></tbody></table></div></div></div><div id="ref-panel-curriculum" style="display:none" class="cp"><input class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="max-width:280px;font-size:12px;padding:6px 10px;margin-bottom:12px"><div id="ref-curriculum-area"></div></div><div id="ref-panel-eval" style="display:none" class="cp"><div id="eval-modules-area"></div></div></div>
 <div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
-<div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><button class="btn btn-outline btn-sm" onclick="if(confirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
+<div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 알림톡 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div id="solapi-settings"></div><button class="btn btn-green btn-sm" onclick="saveSolapiConfig()">💾 저장</button><button class="btn btn-outline btn-sm" style="margin-left:6px" onclick="testSolapi()">📱 테스트 발송</button></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><button class="btn btn-outline btn-sm" onclick="if(confirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
 </div>
 
 <!-- MODALS -->
 <div id="modal-student" style="display:none" class="mo" onclick="if(event.target===this)closeM('student')"><div class="ms"><div class="mh"></div><div class="mt" id="s-modal-title">학생 등록</div><input type="hidden" id="s-id"><div class="r2"><div class="field"><div class="fl">이름 *</div><input class="fi" id="s-name" placeholder="홍길동"></div><div class="field"><div class="fl">재원 상태</div><select class="fi" id="s-status" onchange="onStudentStatusChange()"><option value="재원">재원</option><option value="신규">신규</option><option value="휴원">휴원</option><option value="퇴원">퇴원</option></select></div></div><div id="s-quit-reason-row" style="display:none" class="r2"><div class="field"><div class="fl">휴/퇴원 사유</div><select class="fi" id="s-quit-reason"><option value="">사유 선택</option><option value="이사">이사</option><option value="타학원 이동">타학원 이동</option><option value="학습량 부담">학습량 부담</option><option value="비용 문제">비용 문제</option><option value="기타">기타</option></select></div><div class="field"><div class="fl">휴/퇴원일</div><input type="date" class="fi" id="s-quit-date"></div></div><div class="r2"><div class="field"><div class="fl">클래스</div><select class="fi" id="s-class" onchange="onSClassChange()"><option value="">미배정</option></select></div><div class="field"><div class="fl">할인</div><select class="fi" id="s-discount"><option value="">없음</option><option value="형제할인">형제 할인</option><option value="수학할인">수학 할인</option></select></div></div><div class="field"><div class="fl">단계 *</div><select class="fi" id="s-level" onchange="document.getElementById('s-custom-level').style.display=this.value==='직접입력'?'block':'none'"><option value="">선택</option><optgroup label="Phonics"><option>Hello Phonics 1</option><option>Hello Phonics 2</option><option>Phonics1A</option><option>Phonics1B</option><option>Phonics 2A</option><option>Phonics 2B</option><option>Phonics 3A</option><option>Phonics 3B</option><option>Master Phonics 1</option><option>Master Phonics 2</option></optgroup><optgroup label="Basic"><option>Joy 1A</option><option>Joy 1B</option><option>Joy 1C</option><option>Joy 2A</option><option>Joy 2B</option><option>Joy 2C</option><option>Wise 1A</option><option>Wise 1B</option><option>Wise 1C</option><option>Wise 2A</option><option>Wise 2B</option><option>Wise 2C</option><option>Pride 1A</option><option>Pride 1B</option><option>Pride 1C</option><option>Pride 2A</option><option>Pride 2B</option><option>Pride 2C</option></optgroup><optgroup label="Grammar"><option>Grammar Plus 1</option><option>Grammar Plus 2</option><option>Grammar Plus 3</option><option>Grammar Plus 4</option><option>Grammar Plus 5</option><option>Grammar Plus 6</option><option>First Grammar 1</option><option>First Grammar 2</option><option>First Grammar 3</option></optgroup><optgroup label="Prime"><option>Prime 1A</option><option>Prime 1B</option><option>Prime 2A</option><option>Prime 2B</option><option>Prime 3A</option><option>Prime 3B</option><option>Prime 4A</option><option>Prime 4B</option></optgroup><optgroup label="Advanced"><option>Advanced 1A</option><option>Advanced 1B</option><option>Advanced 2A</option><option>Advanced 2B</option><option>Advanced 3A</option><option>Advanced 3B</option><option>Advanced 4A</option><option>Advanced 4B</option></optgroup><optgroup label="Elite"><option>Elite 1-1</option><option>Elite 1-2</option><option>Elite 1-3</option><option>Elite 2-1</option><option>Elite 2-2</option><option>Elite 2-3</option><option>Elite 3-1</option><option>Elite 3-2</option><option>Elite 3-3</option></optgroup><optgroup label="중고등"><option>내신콘서트</option><option>Reader's Bank 1</option><option>Reader's Bank 2</option><option>Reader's Bank 3</option><option>Reader's Bank 4</option><option>Reader's Bank 5</option><option>천일문 입문</option><option>천일문 기본</option><option>천일문 실력</option><option>빠바 구문</option><option>빠바 유형</option></optgroup><option value="직접입력">직접 입력</option></select><input class="fi" id="s-custom-level" placeholder="직접 입력" style="display:none;margin-top:6px"></div><div class="r2"><div class="field"><div class="fl">학년</div><select class="fi" id="s-grade"><option value="">선택</option><option>초1</option><option>초2</option><option>초3</option><option>초4</option><option>초5</option><option>초6</option><option>중1</option><option>중2</option><option>중3</option><option>고1</option><option>고2</option><option>고3</option></select></div><div class="field"><div class="fl">등록 연도</div><input type="number" class="fi" id="s-enroll-year" placeholder="2024"></div></div><div class="field"><div class="fl">수업 요일 및 시수</div><div id="s-days" style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap"><div class="day-pill" data-day="월" onclick="toggleDay(this)">월</div><div class="day-pill" data-day="화" onclick="toggleDay(this)">화</div><div class="day-pill" data-day="수" onclick="toggleDay(this)">수</div><div class="day-pill" data-day="목" onclick="toggleDay(this)">목</div><div class="day-pill" data-day="금" onclick="toggleDay(this)">금</div></div><div id="s-periods-area" style="margin-top:8px"></div><div id="s-weekly-hours-display" style="font-size:11px;color:var(--mint);margin-top:4px;font-weight:600"></div></div><div class="r2"><div class="field"><div class="fl">학부모 연락처</div><input class="fi" id="s-phone-mom" placeholder="010-0000-0000" type="tel"></div><div class="field"><div class="fl">학교</div><input class="fi" id="s-school" placeholder="군포초등학교"></div></div><div class="r2"><div class="field"><div class="fl">메시지 수신 동의</div><select class="fi" id="s-msg-consent"><option value="동의">동의</option><option value="미동의">미동의</option></select></div><div class="field"><div class="fl">등록일</div><input type="date" class="fi" id="s-enroll-date"></div></div><div class="field"><div class="fl">형제 정보</div><div id="siblings-area"></div><button class="btn btn-outline btn-xs" onclick="addSibling()" style="margin-top:6px">+ 형제 추가</button></div><div class="field"><div class="fl">메모</div><textarea class="fi" id="s-memo" rows="2" placeholder="특이사항 등"></textarea></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveStudent()">저장</button><div style="height:6px"></div><div id="s-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteStudent()">학생 삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('student')">취소</button></div></div>
 <div id="modal-revenue" style="display:none" class="mo" onclick="if(event.target===this)closeM('revenue')"><div class="ms"><div class="mh"></div><div class="mt" id="rev-modal-title">수납 등록</div><input type="hidden" id="rev-id"><div class="r2"><div class="field"><div class="fl">학생</div><select class="fi" id="rev-student"></select></div><div class="field"><div class="fl">납부일</div><input type="date" class="fi" id="rev-paid-date"></div></div><div class="r2"><div class="field"><div class="fl">수강료 (원)</div><input type="number" class="fi" id="rev-amount" placeholder="250000"></div><div class="field"><div class="fl">납부 방법</div><select class="fi" id="rev-method"><option>계좌이체</option><option>카드</option><option>현금</option><option>결제 선생</option></select></div></div><div style="background:var(--surface2);border-radius:var(--r);padding:10px 12px;margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:7px">기타비 1</div><div class="r2"><div class="field"><div class="fl">종류</div><select class="fi" id="rev-extra1-type"><option value="">없음</option><option value="특강">특강</option><option value="PFC">PFC</option><option value="캠프">캠프</option></select></div><div class="field"><div class="fl">금액</div><input type="number" class="fi" id="rev-extra1-amount" placeholder="0"></div></div><div class="r2"><div class="field"><div class="fl">결제일</div><input type="date" class="fi" id="rev-extra1-date"></div><div class="field"><div class="fl">결제수단</div><select class="fi" id="rev-extra1-method"><option>카드</option><option>현금</option><option>계좌이체</option></select></div></div></div><div style="background:var(--surface2);border-radius:var(--r);padding:10px 12px;margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:7px">기타비 2</div><div class="r2"><div class="field"><div class="fl">종류</div><select class="fi" id="rev-extra2-type"><option value="">없음</option><option value="특강">특강</option><option value="PFC">PFC</option><option value="캠프">캠프</option></select></div><div class="field"><div class="fl">금액</div><input type="number" class="fi" id="rev-extra2-amount" placeholder="0"></div></div><div class="r2"><div class="field"><div class="fl">결제일</div><input type="date" class="fi" id="rev-extra2-date"></div><div class="field"><div class="fl">결제수단</div><select class="fi" id="rev-extra2-method"><option>카드</option><option>현금</option><option>계좌이체</option></select></div></div></div><div class="field" style="margin-bottom:18px"><div class="fl">메모</div><input class="fi" id="rev-memo" placeholder="메모"></div><button class="btn btn-green btn-block" onclick="saveRevenue()">저장</button><div style="height:6px"></div><div id="rev-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteCurrentRevenue()">🗑 삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('revenue')">취소</button></div></div>
-<div id="modal-expense" style="display:none" class="mo" onclick="if(event.target===this)closeM('expense')"><div class="ms"><div class="mh"></div><div class="mt">지출 추가</div><input type="hidden" id="exp-id"><div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="exp-date"></div><div class="field"><div class="fl">카테고리</div><select class="fi" id="exp-category"><optgroup label="── 사무실 ──"><option value="사무실 운영비">사무실 운영비</option><option value="교사 급여">교사 급여</option><option value="교재비">교재비</option><option value="카드 수수료">카드 수수료</option><option value="홍보비">홍보비</option><option value="차량 유지비">차량 유지비</option><option value="통신비">통신비</option><option value="세금">세금</option><option value="공과금">공과금</option><option value="대출">대출</option></optgroup><optgroup label="── 개인 ──"><option value="카드비">카드비</option><option value="보험료">보험료</option><option value="아파트">아파트</option></optgroup></select></div></div><div class="r2"><div class="field"><div class="fl">항목명</div><input class="fi" id="exp-name" placeholder="월세 등"></div><div class="field"><div class="fl">금액</div><input type="number" class="fi" id="exp-amount" placeholder="500000"></div></div><div class="r2"><div class="field"><div class="fl">결제 방법</div><select class="fi" id="exp-method"><option>계좌이체</option><option>카드</option><option>현금</option></select></div><div class="field"><div class="fl">메모</div><input class="fi" id="exp-memo" placeholder="메모"></div></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveExpense()">저장</button><div style="height:6px"></div><div id="exp-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteExpenseFromModal()">삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('expense')">취소</button></div></div>
+<div id="modal-expense" style="display:none" class="mo" onclick="if(event.target===this)closeM('expense')"><div class="ms"><div class="mh"></div><div class="mt">지출 추가</div><input type="hidden" id="exp-id"><div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="exp-date"></div><div class="field"><div class="fl">카테고리</div><select class="fi" id="exp-category"><optgroup label="── 사무실 ──"><option value="사무실 운영비">사무실 운영비</option><option value="교사 급여">교사 급여</option><option value="교재비">교재비</option><option value="카드 수수료">카드 수수료</option><option value="홍보비">홍보비</option><option value="차량 유지비">차량 유지비</option><option value="통신비">통신비</option><option value="세금">세금</option><option value="공과금">공과금</option><option value="대출">대출</option><option value="기타(사무실)">기타(사무실)</option></optgroup><optgroup label="── 개인 ──"><option value="카드비">카드비</option><option value="보험료">보험료</option><option value="아파트">아파트</option><option value="기타(개인)">기타(개인)</option></optgroup></select></div></div><div class="r2"><div class="field"><div class="fl">항목명</div><input class="fi" id="exp-name" placeholder="월세 등"></div><div class="field"><div class="fl">금액</div><input type="number" class="fi" id="exp-amount" placeholder="500000"></div></div><div class="r2"><div class="field"><div class="fl">결제 방법</div><select class="fi" id="exp-method"><option>계좌이체</option><option>카드</option><option>현금</option></select></div><div class="field"><div class="fl">메모</div><input class="fi" id="exp-memo" placeholder="메모"></div></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveExpense()">저장</button><div style="height:6px"></div><div id="exp-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteExpenseFromModal()">삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('expense')">취소</button></div></div>
 <div id="modal-class" style="display:none" class="mo" onclick="if(event.target===this)closeM('class')"><div class="ms"><div class="mh"></div><div class="mt" id="cls-modal-title">클래스 등록</div><input type="hidden" id="cls-id"><div class="field"><div class="fl">클래스명</div><input class="fi" id="cls-name" placeholder="Basic 반"></div><div class="r2"><div class="field"><div class="fl">담임 교사</div><select class="fi" id="cls-teacher"></select></div><div class="field"><div class="fl">보조 교사</div><select class="fi" id="cls-asst"><option value="">없음</option></select></div></div><div class="field"><div class="fl">평가 모듈</div><select class="fi" id="cls-eval"><option value="">없음</option><option value="PHONICS">Phonics</option><option value="BASIC">Basic</option><option value="GRAMMAR">Grammar</option></select></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveClass()">저장</button><div style="height:6px"></div><div id="cls-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteClass()">삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('class')">취소</button></div></div>
 <div id="modal-makeup" style="display:none" class="mo" onclick="if(event.target===this)closeM('makeup')"><div class="ms"><div class="mh"></div><div class="mt">보강 처리</div><input type="hidden" id="mk-id"><div id="mk-info" style="font-size:13px;color:var(--txt2);margin-bottom:12px;padding:8px;background:var(--surface2);border-radius:8px"></div><div class="field"><div class="fl">보강 상태</div><select class="fi" id="mk-status"><option value="pending">보강 예정</option><option value="scheduled">보강 일정 확정</option><option value="done">보강 완료</option></select></div><div class="r2"><div class="field"><div class="fl">보강 날짜</div><input type="date" class="fi" id="mk-date"></div><div class="field"><div class="fl">보강 시간</div><input class="fi" id="mk-time" placeholder="14:00"></div></div><div class="field"><div class="fl">메모</div><input class="fi" id="mk-note" placeholder="보강 방식 등"></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveMakeup()">저장</button><div style="height:6px"></div><button class="btn btn-red btn-block" onclick="deleteMakeupEntry()">🗑 삭제</button><div style="height:6px"></div><button class="btn btn-outline btn-block" onclick="closeM('makeup')">취소</button></div></div>
 <div id="modal-report" style="display:none" class="mo" onclick="if(event.target===this)closeM('report')"><div class="ms"><div class="mh"></div><div id="report-detail-inner"></div><button class="btn btn-outline btn-block" onclick="closeM('report')">닫기</button></div></div>
@@ -674,7 +675,7 @@ function goto(view){
   else if(view==='homework'){loadHwData().then(function(){renderHwCheck();});}
   else if(view==='reference'){if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}
   else if(view==='admin')renderUsers();
-  else if(view==='settings')renderPeriodSettings();
+  else if(view==='settings'){renderPeriodSettings();renderSolapiSettings();}
   else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){var yr2=new Date().getFullYear();loadGoalTargets(yr2).then(function(){renderGoalsView();});}else renderGoalsView();}
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
@@ -1763,44 +1764,97 @@ function renderHwPreview(){
 }
 async function sendHwMsg(studentId,date,type,btn){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
-  // Copy message to clipboard
   var hw=_homeworks.find(function(h){return h.date===date;});
   var missCount=_hwChecks.filter(function(c){return c.studentId===studentId&&c.status==='미완료';}).length;
-  var msg='';
-  if(type==='완료'){
-    msg='[잉글리시아이 학원]\n안녕하세요, '+s.name+' 어머님! 😊\n\n오늘 '+s.name+'(이)가 숙제를 잘 완료했어요.\n📚 과목: '+(hw?.subject||'-')+' - '+(hw?.title||'')+'\n✅ 확인 시각: '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+'\n\n내일도 파이팅! 🌟';
-  } else {
-    msg='[잉글리시아이 학원]\n안녕하세요, '+s.name+' 어머님.\n\n오늘 '+s.name+'의 숙제가 아직 제출되지 않았어요.\n📚 과목: '+(hw?.subject||'-')+' - '+(hw?.title||'')+'\n⚠️ 누적 미제출: '+missCount+'회\n\n내일 수업 전까지 제출 부탁드립니다.';
+  var msg=buildHwMsg(s.name,hw,type,missCount);
+  if(btn){btn.textContent='⏳ 발송 중...';btn.disabled=true;}
+  // Try Cloud Function (Solapi) first
+  var solapiOk=await _checkSolapiConfig();
+  if(solapiOk&&s.phoneMom){
+    try{
+      var fn=firebase.functions().httpsCallable('sendHomeworkMsg',{region:'asia-northeast3'});
+      var result=await fn({studentId:studentId,studentName:s.name,phone:s.phoneMom,msgText:msg,date:date,type:type==='완료'?'completed':'missing',homeworkId:hw?.id||'',missCount:missCount,sentBy:currentUser.name||''});
+      if(result.data.success){
+        _msgLogs.unshift({studentId:studentId,studentName:s.name,date:date,type:type==='완료'?'completed':'missing',missCount:missCount,sentAt:new Date().toISOString(),success:true,sentBy:currentUser.name});
+        if(btn)btn.textContent='✅ SMS 발송 완료';
+        toast('📱 '+s.name+' SMS 발송 완료!');return;
+      } else {
+        toast('⚠️ '+s.name+': '+(result.data.error||'발송 실패'));
+        if(btn){btn.textContent='📋 복사로 전환';btn.disabled=false;}
+      }
+    }catch(e){
+      console.error('Cloud Function error:',e);
+      toast('⚠️ SMS 실패 → 클립보드 복사로 전환');
+      if(btn){btn.textContent='📋 복사';btn.disabled=false;}
+    }
   }
-  try{await navigator.clipboard.writeText(msg);toast('📋 '+s.name+' 메시지 복사됨!');}catch(e){prompt('복사:',msg);}
-  // Save log
-  var logData={studentId:studentId,studentName:s.name,homeworkId:hw?.id||'',date:date,type:type==='완료'?'completed':'missing',missCount:missCount,sentAt:new Date().toISOString(),success:true,sentBy:currentUser.name||''};
+  // Fallback: clipboard copy
+  try{await navigator.clipboard.writeText(msg);toast('📋 '+s.name+' 메시지 복사됨! 카톡에 붙여넣기');}catch(e2){prompt('복사:',msg);}
+  var logData={studentId:studentId,studentName:s.name,homeworkId:hw?.id||'',date:date,type:type==='완료'?'completed':'missing',missCount:missCount,sentAt:new Date().toISOString(),success:true,sentBy:currentUser.name||'',method:'clipboard'};
   var logRef=await db.collection('msgLogs').add(logData);
   _msgLogs.unshift({id:logRef.id,...logData});
-  if(btn)btn.textContent='✅ 발송 완료';if(btn)btn.disabled=true;
+  if(btn){btn.textContent='✅ 복사 완료';btn.disabled=true;}
 }
 async function sendAllHwMsg(date){
   var dayHw=_homeworks.filter(function(h){return h.date===date;});
   var allChecks=_hwChecks.filter(function(c){return dayHw.some(function(h){return h.id===c.homeworkId;})&&(c.status==='완료'||c.status==='미완료');});
   var byStudent={};
   allChecks.forEach(function(c){if(!byStudent[c.studentId])byStudent[c.studentId]={name:c.studentName,checks:[]};byStudent[c.studentId].checks.push(c);});
+  loading(true);
+  var solapiOk=await _checkSolapiConfig();
+  if(solapiOk){
+    // Build bulk messages
+    var messages=[];
+    for(var sId of Object.keys(byStudent)){
+      var s2=students.find(function(x){return x.id===sId;});
+      if(!s2||s2.msgConsent===false||!s2.phoneMom)continue;
+      var missing2=byStudent[sId].checks.some(function(c){return c.status==='미완료';});
+      var type2=missing2?'missing':'completed';
+      var missCount2=_hwChecks.filter(function(c){return c.studentId===sId&&c.status==='미완료';}).length;
+      var hw2=dayHw.find(function(h){return h.id===byStudent[sId].checks[0].homeworkId;});
+      messages.push({studentId:sId,studentName:s2.name,phone:s2.phoneMom,msgText:buildHwMsg(s2.name,hw2,missing2?'미완료':'완료',missCount2),type:type2,homeworkId:hw2?.id||'',missCount:missCount2});
+    }
+    try{
+      var fn2=firebase.functions().httpsCallable('sendBulkHomeworkMsg',{region:'asia-northeast3'});
+      var result2=await fn2({messages:messages,date:date,sentBy:currentUser.name||''});
+      loading(false);
+      if(result2.data.success){
+        toast('📱 발송: '+result2.data.sent+'명 / 건너뜀: '+result2.data.skipped+'명'+(result2.data.failed?' / 실패: '+result2.data.failed+'명':''));
+        await loadHwData();renderHwPreview();return;
+      }
+    }catch(e3){console.error(e3);toast('⚠️ 일괄 SMS 실패 → 개별 복사로 전환');}
+  }
+  // Fallback: save logs only (clipboard mode)
   var count=0;
-  for(var sId of Object.keys(byStudent)){
-    var s=students.find(function(x){return x.id===sId;});
-    if(s?.msgConsent===false)continue;
-    var alreadySent=_msgLogs.some(function(log){return log.studentId===sId&&log.date===date&&log.success;});
-    var wasEdited=byStudent[sId].checks.some(function(c){return c.teacherEdited;});
-    if(alreadySent&&!wasEdited)continue;
-    var missing=byStudent[sId].checks.some(function(c){return c.status==='미완료';});
-    var type=missing?'missing':'completed';
-    var missCount=_hwChecks.filter(function(c){return c.studentId===sId&&c.status==='미완료';}).length;
-    var logData={studentId:sId,studentName:byStudent[sId].name,homeworkId:dayHw[0]?.id||'',date:date,type:type,missCount:missCount,sentAt:new Date().toISOString(),success:true,sentBy:currentUser.name||''};
-    var logRef=await db.collection('msgLogs').add(logData);
-    _msgLogs.unshift({id:logRef.id,...logData});
+  for(var sId2 of Object.keys(byStudent)){
+    var s3=students.find(function(x){return x.id===sId2;});
+    if(s3?.msgConsent===false)continue;
+    var alreadySent2=_msgLogs.some(function(log){return log.studentId===sId2&&log.date===date&&log.success;});
+    var wasEdited2=byStudent[sId2].checks.some(function(c){return c.teacherEdited;});
+    if(alreadySent2&&!wasEdited2)continue;
+    var missing3=byStudent[sId2].checks.some(function(c){return c.status==='미완료';});
+    var type3=missing3?'missing':'completed';
+    var missCount3=_hwChecks.filter(function(c){return c.studentId===sId2&&c.status==='미완료';}).length;
+    var logData2={studentId:sId2,studentName:byStudent[sId2].name,homeworkId:dayHw[0]?.id||'',date:date,type:type3,missCount:missCount3,sentAt:new Date().toISOString(),success:true,sentBy:currentUser.name||'',method:'clipboard'};
+    var logRef2=await db.collection('msgLogs').add(logData2);
+    _msgLogs.unshift({id:logRef2.id,...logData2});
     count++;
   }
-  toast('✅ '+count+'명 발송 기록 저장 완료');
+  loading(false);
+  toast('✅ '+count+'명 발송 기록 저장 (클립보드 모드)');
   renderHwPreview();
+}
+function buildHwMsg(name,hw,type,missCount){
+  if(type==='완료'){
+    return '[잉글리시아이 학원]\n안녕하세요, '+name+' 어머님! 😊\n\n오늘 '+name+'(이)가 숙제를 잘 완료했어요.\n📚 과목: '+(hw?.subject||'-')+' - '+(hw?.title||'')+'\n✅ 확인 시각: '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+'\n\n꾸준히 잘하고 있어요!\n내일도 파이팅! 응원해주세요 🌟';
+  } else {
+    return '[잉글리시아이 학원]\n안녕하세요, '+name+' 어머님.\n\n오늘 '+name+'의 숙제가 아직 제출되지 않았어요.\n📚 과목: '+(hw?.subject||'-')+' - '+(hw?.title||'')+'\n⚠️ 이번 달 미제출 횟수: '+missCount+'회\n\n내일 수업 전까지 제출을 도와주시면 감사하겠습니다.\n문의: 잉글리시아이 학원';
+  }
+}
+var _solapiConfigCache=null;
+async function _checkSolapiConfig(){
+  if(_solapiConfigCache!==null)return _solapiConfigCache;
+  try{var doc=await db.collection('config').doc('solapi').get();_solapiConfigCache=doc.exists&&doc.data().apiKey&&doc.data().enabled===true;return _solapiConfigCache;}catch(e){_solapiConfigCache=false;return false;}
 }
 function renderHwLog(){
   var el=$('hw-log-area');if(!el)return;
@@ -2136,7 +2190,7 @@ function _renderPayrollImg(cardHTML,name,yr,mo){
 function renderRevExpense(yr,mo){
   var el=$('rev-expense-area');if(!el)return;
   var list=expenses.filter(function(e){if(e.revYear&&e.revMonth)return e.revYear===yr&&e.revMonth===mo;var d=new Date(e.date||e.createdAt);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
-  var catGroups={'사무실':['사무실 운영비','교사 급여','교재비','카드 수수료','홍보비','차량 유지비','통신비','세금','공과금','대출'],'개인':['카드비','보험료','아파트']};
+  var catGroups={'사무실':['사무실 운영비','교사 급여','교재비','카드 수수료','홍보비','차량 유지비','통신비','세금','공과금','대출','기타(사무실)'],'개인':['카드비','보험료','아파트','기타(개인)']};
   var allCats=[...catGroups['사무실'],...catGroups['개인']];
   var catTotals={};allCats.forEach(function(cat){catTotals[cat]=list.filter(function(e2){return e2.category===cat;}).reduce(function(s,e2){return s+(parseInt(e2.amount)||0);},0);});
   var totalExp=Object.values(catTotals).reduce(function(s,v){return s+v;},0);
@@ -2156,7 +2210,8 @@ function renderRevExpense(yr,mo){
       +'<span style="font-size:12px;font-weight:700;color:'+(amt>0?'var(--red)':'var(--txt3)')+'">'+amt.toLocaleString()+'원</span></div>'
       +'<div id="'+catId+'" style="display:none;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 5px 5px;margin-top:-2px">'+subHTML+'</div></div>';
   }).join('');return'<div><div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:6px;padding:4px 8px;background:var(--surface2);border-radius:6px">'+grpName+'</div><div style="display:flex;flex-direction:column;gap:2px">'+catsHTML+'</div></div>';}).join('');
-  var listHTML=list.length?'<table class="rev-tbl"><thead><tr><th>날짜</th><th>카테고리</th><th>항목명</th><th>금액</th><th>결제수단</th><th></th></tr></thead><tbody>'+list.map(function(e2){return'<tr style="cursor:pointer" onclick="openExpenseModal(\''+e2.id+'\')"><td>'+(e2.date||'-')+'</td><td><span class="badge bg-gray">'+(e2.category||'-')+'</span></td><td>'+(e2.name||'-')+'</td><td style="font-weight:600;color:var(--red)">'+(parseInt(e2.amount)||0).toLocaleString()+'원</td><td>'+(e2.method||'-')+'</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteExpense(\''+e2.id+'\')">삭제</button></td></tr>';}).join('')+'</tbody></table>':'<div style="text-align:center;padding:20px;color:var(--txt3)">지출 없음</div>';
+  var sortedList=[...list].sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
+  var listHTML=sortedList.length?'<table class="rev-tbl"><thead><tr><th>날짜</th><th>카테고리</th><th>항목명</th><th>금액</th><th>결제수단</th><th></th></tr></thead><tbody>'+sortedList.map(function(e2){return'<tr style="cursor:pointer" onclick="openExpenseModal(\''+e2.id+'\')"><td>'+(e2.date||'-')+'</td><td><span class="badge bg-gray">'+(e2.category||'-')+'</span></td><td>'+(e2.name||'-')+'</td><td style="font-weight:600;color:var(--red)">'+(parseInt(e2.amount)||0).toLocaleString()+'원</td><td>'+(e2.method||'-')+'</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteExpense(\''+e2.id+'\')">삭제</button></td></tr>';}).join('')+'</tbody></table>':'<div style="text-align:center;padding:20px;color:var(--txt3)">지출 없음</div>';
   el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px"><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--mint)">'+totalRev.toLocaleString()+'원</div><div class="rev-sum-lbl">수입</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--red)">'+totalExp.toLocaleString()+'원</div><div class="rev-sum-lbl">지출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:'+profitColor+'">'+netProfit.toLocaleString()+'원</div><div class="rev-sum-lbl">순수익</div></div></div><div class="expense-section"><h4>📊 카테고리별 지출</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'+catGroupsHTML+'</div></div><div class="expense-section"><h4>📝 지출 상세 <button class="btn btn-outline btn-xs" style="float:right" onclick="openExpenseModal()">+ 추가</button></h4>'+listHTML+'</div>';
 }
 function openExpenseModal(id){var e=id?expenses.find(function(x){return x.id===id;}):null;$('exp-id').value=id||'';$('exp-del-wrap').style.display=id?'block':'none';var selYr=parseInt($('rev-year')?.value)||new Date().getFullYear();var selMo=parseInt($('rev-month')?.value)||new Date().getMonth()+1;$('exp-date').value=e?.originalDate||e?.date||selYr+'-'+String(selMo).padStart(2,'0')+'-01';$('exp-category').value=e?.category||'사무실 운영비';$('exp-name').value=e?.name||'';$('exp-amount').value=e?.amount||'';$('exp-method').value=e?.method||'계좌이체';$('exp-memo').value=e?.memo||'';$('modal-expense').style.display='flex';}
@@ -2240,6 +2295,150 @@ async function saveGoalTargets(){var yr=parseInt($('goals-year')?.value)||new Da
 function switchRefTab(tab){currentRefTab=tab;['fees','curriculum','eval'].forEach(function(t){var btn=$('reftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('ref-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='fees')renderRefFees();else if(tab==='curriculum')renderRefCurriculum();else if(tab==='eval')renderEvalModulesPage();}
 function renderRefFees(){var tbT=$('ref-tuition-tbody');var tbB=$('ref-textbook-tbody');var tuitionItems=refItems.filter(function(i){return i.refType==='tuition'||(!i.refType&&i.baseFee);});var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});if(tbT)tbT.innerHTML=tuitionItems.length?tuitionItems.map(function(item){var base=parseInt(item.baseFee)||0;var w3=item.feeW3||Math.round(base/20*12);var w4=item.feeW4||Math.round(base/20*16);var w5=item.feeW5||base;return'<tr onclick="openRefItemModal(\'tuition\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--mint)">'+base.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w3.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w4.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w5.toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--txt3)">교육비 기준을 추가하세요</td></tr>';if(tbB)tbB.innerHTML=textbookItems.length?textbookItems.map(function(item){return'<tr onclick="openRefItemModal(\'textbook\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--blue)">'+(parseInt(item.textbookFee)||0).toLocaleString()+'원</td><td style="text-align:center">'+(item.supMaterial||'-')+'</td><td style="text-align:center">'+(parseInt(item.supFee)||0).toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="6" style="text-align:center;padding:14px;color:var(--txt3)">교재비 기준을 추가하세요</td></tr>';}
 function renderRefCurriculum(){var el=$('ref-curriculum-area');if(!el)return;var q=($('ref-cur-search')?$('ref-cur-search').value:'').toLowerCase();var entries=Object.entries(CURRICULUM).filter(function(e2){return!q||e2[0].toLowerCase().includes(q);});if(!entries.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--txt3)">검색 결과 없음</div>';return;}el.innerHTML=entries.map(function(e2){var level=e2[0],lessons=e2[1];var pillsHTML=lessons.map(function(l){var special=l.includes('Level Test')||l.includes('Portfolio');return'<span style="font-size:11px;background:'+(special?'var(--gold)':'var(--surface2)')+';border-radius:4px;padding:2px 7px;color:'+(special?'#fff':'var(--txt2)')+'">'+l+'</span>';}).join('');return'<div class="card" style="padding:12px 16px;margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:14px;font-weight:700;color:var(--navy)">'+level+'</div><span class="badge bg-navy">'+lessons.length+'개</span></div><div style="display:flex;flex-wrap:wrap;gap:4px">'+pillsHTML+'</div></div>';}).join('');}
+
+// ══ MESSAGE BOARD (발송 관리) ══
+var _msgHistory=[];
+async function loadMsgHistory(){
+  try{var snap=await db.collection('msgHistory').orderBy('sentAt','desc').limit(200).get();
+  _msgHistory=snap.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){_msgHistory=[];}
+}
+function initMsgBoard(){
+  // Populate date dropdown with recent 7 days
+  var sel=$('msg-date');if(!sel)return;
+  var opts='';
+  for(var i=0;i<7;i++){
+    var d=new Date();d.setDate(d.getDate()-i);
+    var ds=d.toISOString().split('T')[0];
+    opts+='<option value="'+ds+'">'+(i===0?'오늘':i===1?'어제':ds)+'</option>';
+  }
+  sel.innerHTML=opts;
+  loadMsgHistory().then(function(){renderMsgPreview();});
+}
+function switchMsgTab(tab){
+  ['preview','history'].forEach(function(t){
+    var btn=$('msgtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
+    var pn=$('msg-'+t+'-panel');if(pn)pn.style.display=t===tab?'':'none';
+  });
+  if(tab==='preview')renderMsgPreview();else renderMsgHistory();
+}
+function renderMsgPreview(){
+  var el=$('msg-preview-area');if(!el)return;
+  var date=$('msg-date')?.value||todayISO();
+  var dayReports=reports.filter(function(r){return r.date===date&&!r.absent;});
+  if(!dayReports.length){el.innerHTML='<div class="empty"><div class="ei">📨</div><div class="et">'+date+' 학습 일지가 없습니다</div></div>';return;}
+  var html='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">'+date+' · '+dayReports.length+'명 · 미확인 상태는 발송 대상에서 제외됩니다.</div>';
+  html+='<div style="display:flex;gap:6px;margin-bottom:14px"><button class="btn btn-green btn-sm" onclick="bulkCopyMsg(\''+date+'\')">📋 전체 메시지 일괄 복사</button></div>';
+  // Table
+  html+='<div style="overflow-x:auto"><table class="rev-tbl" style="font-size:12px"><thead><tr><th>검수</th><th>학생</th><th>숙제 상태</th><th>수신 동의</th><th>발송 여부</th><th>미리보기</th><th>발송</th></tr></thead><tbody>';
+  dayReports.forEach(function(r){
+    var s=students.find(function(x){return x.id===r.studentId;});
+    var consent=(s?.msgConsent||'동의')==='동의';
+    var hwSt=r.hwStatus||'미확인';
+    var sentToday=_msgHistory.find(function(h){return h.studentId===r.studentId&&h.date===date;});
+    var canSend=hwSt!=='미확인'&&consent&&!sentToday;
+    var stColor=hwSt==='완료'?'#16a34a':hwSt==='미완료'?'#dc2626':'var(--txt3)';
+    var stBg=hwSt==='완료'?'bg-green':hwSt==='미완료'?'bg-red':'bg-gray';
+    html+='<tr>'
+      +'<td style="text-align:center"><input type="checkbox" class="msg-check" data-rid="'+r.id+'" '+(canSend?'checked':'')+' '+(canSend?'':'disabled')+'></td>'
+      +'<td style="font-weight:600">'+r.studentName+'</td>'
+      +'<td style="text-align:center"><span class="badge '+stBg+'">'+hwSt+'</span></td>'
+      +'<td style="text-align:center">'+(consent?'<span style="color:#16a34a">✔</span>':'<span style="color:#dc2626">✕</span>')+'</td>'
+      +'<td style="text-align:center">'+(sentToday?'<span class="badge bg-gray">발송됨 '+(sentToday.sentAt||'').split('T')[1]?.substring(0,5)+'</span>'+(sentToday.modifiedResend?'<span class="badge bg-blue" style="font-size:9px">수정재발송</span>':''):'<span style="color:var(--txt3)">-</span>')+'</td>'
+      +'<td style="text-align:center"><button class="btn btn-outline btn-xs" onclick="previewMsg(\''+r.id+'\')">👁</button></td>'
+      +'<td style="text-align:center">'+(canSend?'<button class="btn btn-green btn-xs" onclick="sendSingleMsg(\''+r.id+'\',\''+date+'\')">📤</button>':sentToday?'<button class="btn btn-outline btn-xs" onclick="resendMsg(\''+r.id+'\',\''+date+'\')" title="담당교사 수정 후 재발송">🔄</button>':'<span style="color:var(--txt3);font-size:10px">'+(hwSt==='미확인'?'미확인':!consent?'미동의':'')+'</span>')+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+function generateMsg(r){
+  var hwSt=r.hwStatus||'미확인';
+  if(hwSt==='완료'){
+    return '📚 [잉글리시아이 학습 알림]\n\n안녕하세요, '+r.studentName+' 학부모님.\n오늘 '+r.studentName+' 학생이 숙제를 잘 완료했습니다! 👏\n\n📅 '+r.date+'\n📖 '+(r.level||'')+' · '+(r.progress||'')+'\n✅ 숙제: '+(r.homework||'완료')+'\n'+(r.comment?'\n💬 '+r.comment:'')+(r.memo?'\n📢 '+r.memo:'')+'\n\n잉글리시아이 영어 전문 학원';
+  } else if(hwSt==='미완료'){
+    return '📚 [잉글리시아이 학습 알림]\n\n안녕하세요, '+r.studentName+' 학부모님.\n오늘 '+r.studentName+' 학생의 숙제가 완료되지 않았습니다.\n가정에서 확인 부탁드립니다. 🙏\n\n📅 '+r.date+'\n📖 '+(r.level||'')+' · '+(r.progress||'')+'\n❌ 숙제: '+(r.homework||'미완료')+'\n'+(r.comment?'\n💬 '+r.comment:'')+(r.memo?'\n📢 '+r.memo:'')+'\n\n잉글리시아이 영어 전문 학원';
+  }
+  return '';
+}
+function previewMsg(reportId){
+  var r=reports.find(function(x){return x.id===reportId;});if(!r)return;
+  var msg=generateMsg(r);
+  if(!msg){toast('⚠️ 숙제 상태가 미확인입니다');return;}
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms"><div class="mh"></div><div class="mt">📨 메시지 미리보기 · '+r.studentName+'</div>'
+    +'<div style="background:var(--surface2);border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap;line-height:1.6;margin-bottom:12px">'+msg.replace(/\n/g,'<br>')+'</div>'
+    +'<button class="btn btn-green btn-block" onclick="copyMsg(\''+reportId+'\');this.closest(\'.mo\').remove()">📋 메시지 복사</button>'
+    +'<div style="height:6px"></div><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button></div>';
+  document.body.appendChild(overlay);
+}
+function copyMsg(reportId){
+  var r=reports.find(function(x){return x.id===reportId;});if(!r)return;
+  var msg=generateMsg(r);
+  navigator.clipboard.writeText(msg).then(function(){toast('📋 메시지 복사됨! 카톡에 붙여넣기하세요');}).catch(function(){
+    var ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('📋 복사됨!');
+  });
+}
+async function sendSingleMsg(reportId,date){
+  var r=reports.find(function(x){return x.id===reportId;});if(!r)return;
+  var s=students.find(function(x){return x.id===r.studentId;});
+  // Check duplicate
+  var dup=_msgHistory.find(function(h){return h.studentId===r.studentId&&h.date===date;});
+  if(dup){toast('⚠️ 이미 발송됨 (중복 방지)');return;}
+  // Check consent
+  if((s?.msgConsent||'동의')!=='동의'){toast('⚠️ 수신 미동의 학생');return;}
+  var msg=generateMsg(r);
+  if(!msg){toast('⚠️ 숙제 상태 미확인');return;}
+  // Copy to clipboard
+  try{await navigator.clipboard.writeText(msg);}catch(e){
+    var ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+  }
+  // Save send history
+  var histData={studentId:r.studentId,studentName:r.studentName,date:date,hwStatus:r.hwStatus,teacher:r.teacher,sentAt:new Date().toISOString(),sentBy:currentUser.name||''};
+  var ref=await db.collection('msgHistory').add(histData);
+  _msgHistory.unshift({id:ref.id,...histData});
+  renderMsgPreview();toast('📤 '+r.studentName+' 메시지 복사 + 발송 기록됨');
+}
+async function resendMsg(reportId,date){
+  var r=reports.find(function(x){return x.id===reportId;});if(!r)return;
+  if(!confirm(r.studentName+' 학생에게 재발송할까요?\n(담당교사가 내용 수정 후에만 재발송 가능)'))return;
+  // Remove old history for this student+date
+  var old=_msgHistory.find(function(h){return h.studentId===r.studentId&&h.date===date;});
+  if(old)await db.collection('msgHistory').doc(old.id).delete();
+  _msgHistory=_msgHistory.filter(function(h){return!(h.studentId===r.studentId&&h.date===date);});
+  // Re-send
+  var msg=generateMsg(r);
+  try{await navigator.clipboard.writeText(msg);}catch(e){}
+  var histData={studentId:r.studentId,studentName:r.studentName,date:date,hwStatus:r.hwStatus,teacher:r.teacher,sentAt:new Date().toISOString(),sentBy:currentUser.name||'',modifiedResend:true};
+  var ref=await db.collection('msgHistory').add(histData);
+  _msgHistory.unshift({id:ref.id,...histData});
+  renderMsgPreview();toast('🔄 재발송 처리됨');
+}
+function bulkCopyMsg(date){
+  var checks=[...document.querySelectorAll('.msg-check:checked')];
+  if(!checks.length){toast('발송할 학생이 없습니다');return;}
+  var allMsgs=checks.map(function(cb){
+    var r=reports.find(function(x){return x.id===cb.dataset.rid;});
+    return r?generateMsg(r):'';
+  }).filter(Boolean).join('\n\n─────────────────\n\n');
+  navigator.clipboard.writeText(allMsgs).then(function(){toast('📋 '+checks.length+'명 메시지 일괄 복사됨!');}).catch(function(){toast('❌ 복사 실패');});
+}
+function renderMsgHistory(){
+  var el=$('msg-history-area');if(!el)return;
+  if(!_msgHistory.length){el.innerHTML='<div class="empty"><div class="ei">📊</div><div class="et">발송 이력 없음</div></div>';return;}
+  var html='<table class="rev-tbl" style="font-size:12px"><thead><tr><th>날짜</th><th>학생</th><th>숙제 상태</th><th>발송 시각</th><th>담당</th><th>비고</th></tr></thead><tbody>';
+  _msgHistory.slice(0,100).forEach(function(h){
+    var stBg=h.hwStatus==='완료'?'bg-green':h.hwStatus==='미완료'?'bg-red':'bg-gray';
+    html+='<tr><td>'+h.date+'</td><td style="font-weight:600">'+h.studentName+'</td>'
+      +'<td style="text-align:center"><span class="badge '+stBg+'">'+(h.hwStatus||'-')+'</span></td>'
+      +'<td style="text-align:center;font-size:11px">'+(h.sentAt||'').replace('T',' ').substring(0,16)+'</td>'
+      +'<td>'+(h.sentBy||h.teacher||'-')+'</td>'
+      +'<td>'+(h.modifiedResend?'<span class="badge bg-blue" style="font-size:9px">수정재발송</span>':'')+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
 
 // ══ EVAL MODULE MANAGEMENT ══
 var _customEvalModules=[];
@@ -2416,6 +2615,46 @@ async function saveMenuPerms(userId,overlay){loading(true);var menuList=['schedu
 // ══ SETTINGS ══
 function renderPeriodSettings(){var el=$('period-settings');if(!el)return;var html='<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px">교시별 시간 설정</div>';for(var p=1;p<=9;p++){var cp=customPeriods.find(function(x){return x.period===p;});html+='<div class="period-row"><label>'+p+'교시</label><input class="fi" id="period-start-'+p+'" placeholder="14:00" value="'+(cp?cp.time||'':'')+'" style="font-size:12px;padding:5px 8px"><input class="fi" id="period-end-'+p+'" placeholder="15:00" value="'+(cp?cp.endTime||'':'')+'" style="font-size:12px;padding:5px 8px"></div>';}html+='<button class="btn btn-green btn-sm" onclick="savePeriodSettings()" style="margin-top:8px">💾 저장</button>';el.innerHTML=html;}
 async function savePeriodSettings(){loading(true);var periods=[];for(var p=1;p<=9;p++){var t=$('period-start-'+p);var e=$('period-end-'+p);if(t&&t.value)periods.push({period:p,time:t.value,endTime:e?e.value:''});}await db.collection('config').doc('periods').set({periods:periods,updatedAt:new Date().toISOString()});customPeriods=periods;loading(false);toast('✅ 교시 설정 저장됨');}
+async function renderSolapiSettings(){
+  var el=$('solapi-settings');if(!el)return;
+  var cfg={};
+  try{var doc=await db.collection('config').doc('solapi').get();if(doc.exists)cfg=doc.data();}catch(e){}
+  el.innerHTML='<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">카카오 알림톡 연동 시 숙제 알림이 학부모에게 카카오톡으로 자동 발송됩니다.<br>미설정 시 클립보드 복사 모드로 동작합니다.</div>'
+    +'<div class="field"><label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer"><input type="checkbox" id="sol-enabled" '+(cfg.enabled?'checked':'')+' style="width:18px;height:18px"> 카카오 알림톡 자동발송 활성화</label></div>'
+    +'<div class="r2"><div class="field"><div class="fl">NHN Cloud AppKey</div><input class="fi" id="sol-apikey" value="'+(cfg.apiKey||'')+'" placeholder="Notification > 알림톡 > AppKey"></div><div class="field"><div class="fl">NHN Cloud SecretKey</div><input class="fi" id="sol-secret" type="password" value="'+(cfg.apiSecret||'')+'" placeholder="SecretKey"></div></div>'
+    +'<div class="r2"><div class="field"><div class="fl">발신프로필 키 (senderKey)</div><input class="fi" id="sol-sender" value="'+(cfg.senderKey||'')+'" placeholder="카카오톡 채널 발신프로필 키"></div><div class="field"><div class="fl">템플릿 코드 (완료)</div><input class="fi" id="sol-tpl-done" value="'+(cfg.tplDone||'')+'" placeholder="예: HW_DONE_001"></div></div>'
+    +'<div class="r2"><div class="field"><div class="fl">템플릿 코드 (미완료)</div><input class="fi" id="sol-tpl-miss" value="'+(cfg.tplMiss||'')+'" placeholder="예: HW_MISS_001"></div><div class="field"><div class="fl">SMS 폴백 발신번호</div><input class="fi" id="sol-phone" value="'+(cfg.senderPhone||'')+'" placeholder="031-000-0000" type="tel"></div></div>'
+    +'<div style="font-size:12px;font-weight:600;color:var(--navy);margin-top:12px;margin-bottom:6px">📌 설정 방법 (순서대로)</div>'
+    +'<div style="font-size:11px;color:var(--txt2);line-height:1.9">'
+    +'1. <a href="https://business.kakao.com/dashboard/" target="_blank" style="color:var(--blue)">카카오 비즈니스</a>에서 카카오톡 채널 개설<br>'
+    +'2. <a href="https://www.nhncloud.com" target="_blank" style="color:var(--blue)">NHN Cloud</a> 가입 → Notification > 카카오톡 알림톡 활성화<br>'
+    +'3. 카카오톡 채널 연동 + 발신프로필 등록<br>'
+    +'4. 메시지 템플릿 2개 등록 (완료용/미완료용) → 카카오 심사 (1~2일)<br>'
+    +'5. Firebase Blaze 요금제 전환 + Cloud Functions 배포<br>'
+    +'6. 위 설정 입력 후 저장 → 테스트 발송</div>'
+    +'<div style="margin-top:10px;padding:10px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--txt2)">'
+    +'<strong>💡 알림톡 실패 시 자동으로 SMS로 대체 발송됩니다.</strong><br>'
+    +'알림톡: 건당 ~8원 / SMS 폴백: 건당 ~20원</div>';
+}
+async function saveSolapiConfig(){
+  loading(true);
+  var data={apiKey:$('sol-apikey').value.trim(),apiSecret:$('sol-secret').value.trim(),senderKey:$('sol-sender').value.trim(),tplDone:$('sol-tpl-done').value.trim(),tplMiss:$('sol-tpl-miss').value.trim(),senderPhone:$('sol-phone').value.trim(),enabled:$('sol-enabled').checked,provider:'kakao',updatedAt:new Date().toISOString()};
+  await db.collection('config').doc('solapi').set(data);
+  _solapiConfigCache=data.enabled&&data.apiKey?true:false;
+  loading(false);toast('✅ 카카오 알림톡 설정 저장됨');
+}
+async function testSolapi(){
+  var phone=prompt('테스트 수신 번호 (본인 번호 입력):');
+  if(!phone)return;
+  loading(true);
+  try{
+    var fn=firebase.functions().httpsCallable('sendHomeworkMsg',{region:'asia-northeast3'});
+    var result=await fn({studentId:'test',studentName:'테스트',phone:phone,msgText:'[잉글리시아이] 카카오 알림톡 테스트입니다. 정상 수신되면 설정 완료!',date:todayISO(),type:'test',sentBy:currentUser.name||'',parentName:'테스트'});
+    loading(false);
+    if(result.data.success)toast('✅ 테스트 발송 성공! 카카오톡 확인하세요');
+    else toast('❌ 실패: '+(result.data.error||''));
+  }catch(e){loading(false);toast('❌ Cloud Functions 연결 실패. 배포 상태를 확인하세요.');}
+}
 
 // ══ APP INIT ══
 function _initApp(){
