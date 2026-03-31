@@ -1466,23 +1466,35 @@ function renderRevMonthly(yr,mo){
     var paid=sRevs.length>0;var paidAmt=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
     var rawLevel=getStudentLevel(s);
-    // Auto-advance: check if student completed level in previous month
-    var prevMo2=mo-1,prevYr2=yr;if(prevMo2<1){prevMo2=12;prevYr2--;}
-    var prevReports=reports.filter(function(r2){
-      if(r2.studentId!==s.id)return false;
-      var d2=new Date(r2.date);return d2.getFullYear()===prevYr2&&d2.getMonth()===prevMo2-1;
-    }).sort(function(a,b){return b.date>a.date?1:-1;});
-    if(prevReports.length>0){
-      var lastProgress=prevReports[0].progress||'';
-      var lastLevel=prevReports[0].level||rawLevel;
-      var curLessons=CURRICULUM[lastLevel]||[];
-      if(curLessons.length>0&&lastProgress){
-        var lastLesson=curLessons[curLessons.length-1];
-        if(lastProgress===lastLesson){
-          var nextLv=getNextLevel(lastLevel);
-          if(nextLv){rawLevel=nextLv;}
+    // Auto-advance: determine level for the selected month by tracking all past reports
+    var stuReports=reports.filter(function(r2){return r2.studentId===s.id&&r2.level;}).sort(function(a,b){return a.date<b.date?-1:1;});
+    if(stuReports.length>0){
+      // Find earliest level from reports or student record
+      var trackLevel=stuReports[0].level||rawLevel;
+      var selectedMonthStart=yr+'-'+String(mo).padStart(2,'0')+'-01';
+      // Walk through all reports before selected month
+      stuReports.forEach(function(rp){
+        if(rp.date>=selectedMonthStart)return; // stop at selected month
+        var rpLevel=rp.level||trackLevel;
+        if(rpLevel!==trackLevel)trackLevel=rpLevel; // level changed in report
+        // Check if this report completed the level
+        var lessons2=CURRICULUM[trackLevel]||[];
+        if(lessons2.length>0&&rp.progress){
+          var lastL=lessons2[lessons2.length-1];
+          if(rp.progress===lastL){
+            var nxt=getNextLevel(trackLevel);
+            if(nxt)trackLevel=nxt;
+          }
         }
+      });
+      // Also check reports IN the selected month for level info
+      var thisMonthReports=stuReports.filter(function(rp){
+        var d3=new Date(rp.date);return d3.getFullYear()===yr&&d3.getMonth()===mo-1;
+      });
+      if(thisMonthReports.length>0){
+        trackLevel=thisMonthReports[thisMonthReports.length-1].level||trackLevel;
       }
+      rawLevel=trackLevel;
     }
     var tuitionItem=findRefItem(rawLevel,'tuition');
     var textbookItem=findRefItem(rawLevel,'textbook');
