@@ -1466,36 +1466,6 @@ function renderRevMonthly(yr,mo){
     var paid=sRevs.length>0;var paidAmt=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
     var rawLevel=getStudentLevel(s);
-    // Auto-advance: determine level for the selected month by tracking all past reports
-    var stuReports=reports.filter(function(r2){return r2.studentId===s.id&&r2.level;}).sort(function(a,b){return a.date<b.date?-1:1;});
-    if(stuReports.length>0){
-      // Find earliest level from reports or student record
-      var trackLevel=stuReports[0].level||rawLevel;
-      var selectedMonthStart=yr+'-'+String(mo).padStart(2,'0')+'-01';
-      // Walk through all reports before selected month
-      stuReports.forEach(function(rp){
-        if(rp.date>=selectedMonthStart)return; // stop at selected month
-        var rpLevel=rp.level||trackLevel;
-        if(rpLevel!==trackLevel)trackLevel=rpLevel; // level changed in report
-        // Check if this report completed the level
-        var lessons2=CURRICULUM[trackLevel]||[];
-        if(lessons2.length>0&&rp.progress){
-          var lastL=lessons2[lessons2.length-1];
-          if(rp.progress===lastL){
-            var nxt=getNextLevel(trackLevel);
-            if(nxt)trackLevel=nxt;
-          }
-        }
-      });
-      // Also check reports IN the selected month for level info
-      var thisMonthReports=stuReports.filter(function(rp){
-        var d3=new Date(rp.date);return d3.getFullYear()===yr&&d3.getMonth()===mo-1;
-      });
-      if(thisMonthReports.length>0){
-        trackLevel=thisMonthReports[thisMonthReports.length-1].level||trackLevel;
-      }
-      rawLevel=trackLevel;
-    }
     var tuitionItem=findRefItem(rawLevel,'tuition');
     var textbookItem=findRefItem(rawLevel,'textbook');
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
@@ -1503,6 +1473,13 @@ function renderRevMonthly(yr,mo){
     var mh=getStudentMonthlyHours(s);
     var tuitionFee=getTuitionByMonthlyHours(baseFee,mh,tuitionItem);
     var discountAmt=s.discount?10000:0;
+    // Payment method: use current rev or fallback to previous month
+    var curMethod=lastRev?lastRev.method:'';
+    if(!curMethod){
+      var pm=mo-1,py=yr;if(pm<1){pm=12;py--;}
+      var prevRev=revenues.find(function(r2){return r2.studentId===s.id&&!r2.isManualMeta&&!r2.extraType&&r2.revYear===py&&r2.revMonth===pm;});
+      curMethod=prevRev?prevRev.method||'':'';
+    }
     // Absent count: from makeups where not done for this student/month
     var pendingMakeups=makeups.filter(function(m){
       if(m.studentId!==s.id)return false;
@@ -1526,7 +1503,7 @@ function renderRevMonthly(yr,mo){
       +'<td style="'+c+'">'+(rowNum++)+'</td>'
       +'<td style="'+c+';font-weight:700">'+s.name+'</td>'
       +'<td style="'+c+'">'+(s.grade||'-')+'</td>'
-      +'<td style="'+c+'">'+rawLevel+'</td>'
+      +'<td style="'+c+'" onclick="event.stopPropagation()"><select style="font-size:10px;border:1px solid var(--border);border-radius:4px;padding:1px;max-width:90px" onchange="changeStudentLevel(\''+s.id+'\',this.value)">'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===rawLevel?' selected':'')+'>'+lv+'</option>';}).join('')+'</select></td>'
       +'<td style="'+c+';color:var(--blue)">'+(tuitionFee>0?tuitionFee.toLocaleString():'0')+'</td>'
       +'<td style="'+c+';color:var(--blue)">'+(textbookFee>0?textbookFee.toLocaleString():'0')+'</td>'
       +'<td style="'+c+';font-weight:600;color:var(--mint)">'+mh+'</td>'
@@ -1536,7 +1513,7 @@ function renderRevMonthly(yr,mo){
       +'<td style="'+c+'">'+(subMatFee>0?subMatFee.toLocaleString()+'원':'-')+'</td>'
       +'<td style="'+c+';font-weight:600">'+(expectedAmt>0?expectedAmt.toLocaleString()+'원':'-')+'</td>'
       +'<td style="'+c+';font-weight:600;color:'+(paid&&paidAmt!==expectedAmt&&expectedAmt>0?'#dc2626':paid?'var(--mint)':'var(--red)')+'">'+( paid?paidAmt.toLocaleString()+'원':'미납')+'</td>'
-      +'<td style="'+c+'">'+(lastRev?lastRev.method:'-')+'</td>'
+      +'<td style="'+c+'" onclick="event.stopPropagation()"><select style="font-size:10px;border:1px solid var(--border);border-radius:4px;padding:1px" onchange="saveRevMethod(\''+s.id+'\',this.value,'+yr+','+mo+')"><option value=""'+(curMethod===''?' selected':'')+'>-</option><option value="계좌이체"'+(curMethod==='계좌이체'?' selected':'')+'>계좌이체</option><option value="카드"'+(curMethod==='카드'?' selected':'')+'>카드</option><option value="현금"'+(curMethod==='현금'?' selected':'')+'>현금</option><option value="결제 선생"'+(curMethod==='결제 선생'?' selected':'')+'>결제 선생</option></select></td>'
       +'<td style="'+c+'">'+(lastRev?.paidDate||'-')+'</td>'
       +'<td style="'+c+'">'+(lastRev?.extra1Type||'-')+'</td>'
       +'<td style="'+c+'">'+(lastRev?.extra1Amount?(parseInt(lastRev.extra1Amount)||0).toLocaleString()+'원':'-')+'</td>'
@@ -1548,6 +1525,30 @@ function renderRevMonthly(yr,mo){
   }).join('');
   tb.innerHTML=rows+'<tr style="background:var(--surface2);font-weight:700"><td></td><td colspan="2" style="text-align:center">합계 '+active.length+'명</td><td></td><td style="text-align:center;color:var(--blue)">'+totalTuitionFee.toLocaleString()+'</td><td style="text-align:center;color:var(--blue)">'+totalTextbookFee.toLocaleString()+'</td><td colspan="5"></td><td style="text-align:center;font-weight:700;color:var(--navy)">'+totalExpected.toLocaleString()+'원</td><td style="text-align:center;color:var(--mint)">'+totalRev.toLocaleString()+'원</td><td colspan="8"></td></tr>';
   requestAnimationFrame(function(){var scrollEl=$('rev-monthly-scroll');var stickyInner=$('rev-hscroll-inner');var stickyBar=$('rev-hscroll-sticky');if(!scrollEl||!stickyInner||!stickyBar)return;var tableEl=scrollEl.querySelector('table');if(tableEl)stickyInner.style.width=tableEl.scrollWidth+'px';var syncing=false;stickyBar.onscroll=function(){if(syncing)return;syncing=true;scrollEl.scrollLeft=stickyBar.scrollLeft;syncing=false;};scrollEl.onscroll=function(){if(syncing)return;syncing=true;stickyBar.scrollLeft=scrollEl.scrollLeft;syncing=false;};});
+}
+async function changeStudentLevel(studentId,newLevel){
+  if(!newLevel)return;
+  var s=students.find(function(x){return x.id===studentId;});if(!s)return;
+  var update={level:newLevel,customLevel:'',updatedAt:new Date().toISOString()};
+  await db.collection('students').doc(studentId).update(update);
+  var idx=students.findIndex(function(x){return x.id===studentId;});
+  if(idx>=0){students[idx].level=newLevel;students[idx].customLevel='';}
+  saveCacheDebounced();toast('✅ '+s.name+' 단계 → '+newLevel);
+  // Re-render to update tuition/textbook fees
+  renderSummaryView();
+}
+async function saveRevMethod(studentId,method,yr,mo){
+  var existing=revenues.find(function(r){return r.studentId===studentId&&!r.isManualMeta&&!r.extraType&&r.revYear===yr&&r.revMonth===mo;});
+  if(existing){
+    await db.collection('revenues').doc(existing.id).update({method:method,updatedAt:new Date().toISOString()});
+    var idx=revenues.findIndex(function(r){return r.id===existing.id;});
+    if(idx>=0)revenues[idx].method=method;
+  } else {
+    var s=students.find(function(x){return x.id===studentId;});
+    var nd=await db.collection('revenues').add({studentId:studentId,studentName:s?.name||'',paidDate:yr+'-'+String(mo).padStart(2,'0')+'-01',amount:0,method:method,revYear:yr,revMonth:mo,createdAt:new Date().toISOString()});
+    revenues.push({id:nd.id,studentId:studentId,method:method,revYear:yr,revMonth:mo});
+  }
+  saveCacheDebounced();
 }
 async function saveRevSubMat(studentId,subMat,yr,mo){
   var existing=revenues.find(function(r){return r.studentId===studentId&&!r.isManualMeta&&r.revYear===yr&&r.revMonth===mo;});
