@@ -241,7 +241,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </nav>
 
 <div id="content">
-<div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘 시간표</h2></div><div class="cp" id="schedule-list"></div></div>
+<div class="view active" id="view-schedule"><div class="page-top" style="display:flex;align-items:center;justify-content:space-between"><h2 id="schedule-day-title">오늘 시간표</h2><div style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button></div></div><div class="cp" id="schedule-list"></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
   <div class="cp" style="max-width:560px"><div class="card" style="padding:16px">
     <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
@@ -680,12 +680,20 @@ function goto(view){
 }
 
 // ══ SCHEDULE ══
+var _scheduleDate=null; // null = today
+function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
+function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
 function renderSchedule(){
-  var today=new Date();var dow=today.getDay();var dayName=DAY_MAP[dow];
-  $('schedule-day-title').textContent='오늘 시간표 · '+['월','화','수','목','금','토','일'][dow===0?6:dow-1]+'요일';
-  var todayStr=todayISO();
+  var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
+  var dow=targetDate.getDay();var dayName=DAY_MAP[dow];
+  var dayNames=['월','화','수','목','금','토','일'];
+  var isToday=!_scheduleDate||_scheduleDate===todayISO();
+  var dateLabel=isToday?'오늘 시간표':(_scheduleDate.split('-').slice(1).join('/'))+' 시간표';
+  $('schedule-day-title').textContent=dateLabel+' · '+dayNames[dow===0?6:dow-1]+'요일';
+  var dp=$('schedule-date-pick');if(dp&&!dp.value)dp.value=todayISO();
+  var todayStr=_scheduleDate||todayISO();
   var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&m.makeupStatus==='scheduled';});
-  if(!DAYS.includes(dayName)&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">오늘은 수업이 없어요</div></div>';return;}
+  if(!DAYS.includes(dayName)&&dayName!=='토'&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';return;}
   function timeToMin(t){if(!t)return 9999;var m2=t.match(/(\d{1,2}):(\d{2})/);return m2?parseInt(m2[1])*60+parseInt(m2[2]):9999;}
   function pad(n){return String(n).padStart(2,'0');}
   var byPeriod={};
