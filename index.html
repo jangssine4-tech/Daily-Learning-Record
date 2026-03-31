@@ -511,7 +511,7 @@ async function bootApp(){
     hideBootOverlay();
     toast('👋 환영합니다, '+currentUser.name+'님!');
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -1466,6 +1466,24 @@ function renderRevMonthly(yr,mo){
     var paid=sRevs.length>0;var paidAmt=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
     var rawLevel=getStudentLevel(s);
+    // Auto-advance: check if student completed level in previous month
+    var prevMo2=mo-1,prevYr2=yr;if(prevMo2<1){prevMo2=12;prevYr2--;}
+    var prevReports=reports.filter(function(r2){
+      if(r2.studentId!==s.id)return false;
+      var d2=new Date(r2.date);return d2.getFullYear()===prevYr2&&d2.getMonth()===prevMo2-1;
+    }).sort(function(a,b){return b.date>a.date?1:-1;});
+    if(prevReports.length>0){
+      var lastProgress=prevReports[0].progress||'';
+      var lastLevel=prevReports[0].level||rawLevel;
+      var curLessons=CURRICULUM[lastLevel]||[];
+      if(curLessons.length>0&&lastProgress){
+        var lastLesson=curLessons[curLessons.length-1];
+        if(lastProgress===lastLesson){
+          var nextLv=getNextLevel(lastLevel);
+          if(nextLv){rawLevel=nextLv;}
+        }
+      }
+    }
     var tuitionItem=findRefItem(rawLevel,'tuition');
     var textbookItem=findRefItem(rawLevel,'textbook');
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
@@ -2385,7 +2403,35 @@ async function saveGoalTargets(){var yr=parseInt($('goals-year')?.value)||new Da
 // ══ REFERENCE ══
 function switchRefTab(tab){currentRefTab=tab;['fees','curriculum','eval'].forEach(function(t){var btn=$('reftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('ref-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='fees')renderRefFees();else if(tab==='curriculum')renderRefCurriculum();else if(tab==='eval')renderEvalModulesPage();}
 function renderRefFees(){var tbT=$('ref-tuition-tbody');var tbB=$('ref-textbook-tbody');var tuitionItems=refItems.filter(function(i){return i.refType==='tuition'||(!i.refType&&i.baseFee);});var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});if(tbT)tbT.innerHTML=tuitionItems.length?tuitionItems.map(function(item){var base=parseInt(item.baseFee)||0;var w3=item.feeW3||Math.round(base/20*12);var w4=item.feeW4||Math.round(base/20*16);var w5=item.feeW5||base;return'<tr onclick="openRefItemModal(\'tuition\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--mint)">'+base.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w3.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w4.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w5.toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--txt3)">교육비 기준을 추가하세요</td></tr>';if(tbB)tbB.innerHTML=textbookItems.length?textbookItems.map(function(item){return'<tr onclick="openRefItemModal(\'textbook\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--blue)">'+(parseInt(item.textbookFee)||0).toLocaleString()+'원</td><td style="text-align:center">'+(item.supMaterial||'-')+'</td><td style="text-align:center">'+(parseInt(item.supFee)||0).toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="6" style="text-align:center;padding:14px;color:var(--txt3)">교재비 기준을 추가하세요</td></tr>';}
-function renderRefCurriculum(){var el=$('ref-curriculum-area');if(!el)return;var q=($('ref-cur-search')?$('ref-cur-search').value:'').toLowerCase();var entries=Object.entries(CURRICULUM).filter(function(e2){return!q||e2[0].toLowerCase().includes(q);});if(!entries.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--txt3)">검색 결과 없음</div>';return;}el.innerHTML=entries.map(function(e2){var level=e2[0],lessons=e2[1];var pillsHTML=lessons.map(function(l){var special=l.includes('Level Test')||l.includes('Portfolio');return'<span style="font-size:11px;background:'+(special?'var(--gold)':'var(--surface2)')+';border-radius:4px;padding:2px 7px;color:'+(special?'#fff':'var(--txt2)')+'">'+l+'</span>';}).join('');return'<div class="card" style="padding:12px 16px;margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:14px;font-weight:700;color:var(--navy)">'+level+'</div><span class="badge bg-navy">'+lessons.length+'개</span></div><div style="display:flex;flex-wrap:wrap;gap:4px">'+pillsHTML+'</div></div>';}).join('');}
+var _levelOrder=null;
+function getLevelOrder(){
+  if(_levelOrder&&_levelOrder.length)return _levelOrder;
+  _levelOrder=Object.keys(CURRICULUM);
+  return _levelOrder;
+}
+function getNextLevel(currentLevel){
+  var order=getLevelOrder();
+  var idx=order.indexOf(currentLevel);
+  if(idx<0||idx>=order.length-1)return null;
+  return order[idx+1];
+}
+async function loadLevelOrder(){
+  try{var doc=await db.collection('config').doc('levelOrder').get();if(doc.exists&&doc.data().order){_levelOrder=doc.data().order;}}catch(e){}
+}
+async function saveLevelOrder(){
+  await db.collection('config').doc('levelOrder').set({order:_levelOrder,updatedAt:new Date().toISOString()});
+  toast('✅ 단계 순서 저장됨');
+}
+function moveLevelOrder(level,dir){
+  var order=getLevelOrder();
+  var idx=order.indexOf(level);if(idx<0)return;
+  var newIdx=idx+dir;
+  if(newIdx<0||newIdx>=order.length)return;
+  order.splice(idx,1);order.splice(newIdx,0,level);
+  _levelOrder=order;
+  saveLevelOrder();renderRefCurriculum();
+}
+function renderRefCurriculum(){var el=$('ref-curriculum-area');if(!el)return;var q=($('ref-cur-search')?$('ref-cur-search').value:'').toLowerCase();var order=getLevelOrder();var entries=order.map(function(lv){return[lv,CURRICULUM[lv]||[]];}).filter(function(e2){return e2[1].length>0&&(!q||e2[0].toLowerCase().includes(q));});if(!entries.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--txt3)">검색 결과 없음</div>';return;}el.innerHTML=entries.map(function(e2,idx){var level=e2[0],lessons=e2[1];var pillsHTML=lessons.map(function(l){var special=l.includes('Level Test')||l.includes('Portfolio');return'<span style="font-size:11px;background:'+(special?'var(--gold)':'var(--surface2)')+';border-radius:4px;padding:2px 7px;color:'+(special?'#fff':'var(--txt2)')+'">'+l+'</span>';}).join('');return'<div class="card" style="padding:12px 16px;margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--txt3);min-width:24px">'+(idx+1)+'.</span><div style="font-size:14px;font-weight:700;color:var(--navy)">'+level+'</div></div><div style="display:flex;align-items:center;gap:4px"><button class="btn btn-outline btn-xs" onclick="moveLevelOrder(\''+level+'\',-1)" title="위로" style="padding:2px 6px"'+(idx===0?' disabled style="opacity:0.3;padding:2px 6px"':'')+'>▲</button><button class="btn btn-outline btn-xs" onclick="moveLevelOrder(\''+level+'\',1)" title="아래로" style="padding:2px 6px"'+(idx===entries.length-1?' disabled style="opacity:0.3;padding:2px 6px"':'')+'>▼</button><span class="badge bg-navy">'+lessons.length+'개</span></div></div><div style="display:flex;flex-wrap:wrap;gap:4px">'+pillsHTML+'</div></div>';}).join('');}
 
 // ══ MESSAGE BOARD (발송 관리) ══
 var _msgHistory=[];
