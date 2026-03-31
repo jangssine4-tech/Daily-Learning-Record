@@ -1573,50 +1573,70 @@ async function saveRevManual(studentId,field,val,yr,mo){var existing=revenues.fi
 function saveInvoiceImage(studentId, expectedAmt, yr, mo){
   var s=students.find(function(x){return x.id===studentId;});
   if(!s){toast('학생 정보 없음');return;}
+  var moStr=mo+'월';
+  var dueStr=mo+'월 5일까지';
+  var defaultGreeting='안녕하세요, 잉글리시아이위드멘토링입니다 😊\n'+moStr+' 교육비 안내드립니다.\n\n항상 아이의 영어 실력이 한 단계씩\n성장할 수 있도록 꼼꼼하게 지도하겠습니다.\n\n편하신 방법으로 기간 내 납부 부탁드립니다.\n궁금하신 점은 언제든 편하게 문의 주세요.\n\n감사합니다 🙂';
+  var savedGreeting=localStorage.getItem('invoiceGreeting_'+yr+'_'+mo);
+  var greeting=savedGreeting||defaultGreeting;
+  // Show edit modal
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms"><div class="mh"></div><div class="mt">📄 청구서 미리보기</div>'
+    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px">'
+    +'<div><strong>학생:</strong> '+s.name+'</div>'
+    +'<div><strong>단계:</strong> '+getStudentLevel(s)+'</div>'
+    +'<div><strong>교육비:</strong> '+expectedAmt.toLocaleString()+'원</div>'
+    +'<div><strong>납부 기한:</strong> '+dueStr+'</div></div>'
+    +'<div class="field"><div class="fl">인사말 (매월 수정 가능)</div><textarea class="fi" id="inv-greeting" rows="8" style="font-size:12px;line-height:1.6">'+greeting+'</textarea></div>'
+    +'<div style="height:8px"></div>'
+    +'<button class="btn btn-green btn-block" onclick="_generateInvoice(\''+studentId+'\','+expectedAmt+','+yr+','+mo+',this.closest(\'.mo\'))">📄 청구서 이미지 저장</button>'
+    +'<div style="height:6px"></div><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button></div>';
+  document.body.appendChild(overlay);
+}
+function _generateInvoice(studentId,expectedAmt,yr,mo,overlay){
+  var s=students.find(function(x){return x.id===studentId;});if(!s)return;
+  var greeting=$('inv-greeting').value;
+  localStorage.setItem('invoiceGreeting_'+yr+'_'+mo,greeting);
+  if(overlay)overlay.remove();
   toast('📄 청구서 생성 중...');
   if(typeof html2canvas==='undefined'){
     var sc=document.createElement('script');
     sc.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-    sc.onload=function(){_doSaveInvoice(s,expectedAmt,yr,mo);};
+    sc.onload=function(){_doSaveInvoice(s,expectedAmt,yr,mo,greeting);};
     sc.onerror=function(){toast('❌ 이미지 라이브러리 로드 실패');};
     document.head.appendChild(sc);
   } else {
-    _doSaveInvoice(s,expectedAmt,yr,mo);
+    _doSaveInvoice(s,expectedAmt,yr,mo,greeting);
   }
 }
-function _doSaveInvoice(s,expectedAmt,yr,mo){
+function _doSaveInvoice(s,expectedAmt,yr,mo,greeting){
   var moStr=mo+'월';
-  var nextMo=mo+1;var nextYr=yr;if(nextMo>12){nextMo=1;nextYr++;}
-  var dueDateStr=nextYr+'년 '+String(nextMo).padStart(2,'0')+'월 17일';
+  var dueStr=mo+'월 5일';
   var startDate=yr+'년 '+String(mo).padStart(2,'0')+'월 01일';
   var endDate=yr+'년 '+String(mo).padStart(2,'0')+'월 '+new Date(yr,mo,0).getDate()+'일';
   var rawLevel=getStudentLevel(s);
   var amt=expectedAmt||0;
-  // Simple clean design matching 결제선생 style
+  var greetingHTML=(greeting||'').split('\n').map(function(line){return line||'<br>';}).join('<br>');
   var cardHTML='<div id="invoice-card" style="width:380px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden">'
-    // Title block - light gray bg
     +'<div style="background:#f5f5f5;padding:28px 24px 24px">'
-    +'<div style="font-size:22px;font-weight:800;color:#222;line-height:1.4">교육비 안내가<br>도착했습니다</div>'
+    +'<div style="font-size:22px;font-weight:800;color:#222;line-height:1.4">'+moStr+' 교육비<br>안내 드립니다</div>'
     +'<div style="text-align:right;margin-top:12px"><span style="font-size:40px">💌</span></div>'
     +'</div>'
-    // Academy name + amount
     +'<div style="padding:20px 24px;border-bottom:1px solid #e5e5e5">'
-    +'<div style="font-size:15px;font-weight:600;color:#333;margin-bottom:16px">잉글리시아이 영어 전문 학원</div>'
+    +'<div style="font-size:15px;font-weight:600;color:#333;margin-bottom:16px">잉글리시아이위드멘토링 영수학원</div>'
     +'<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-top:1px solid #e5e5e5;padding-top:10px"><span style="color:#666">교육비</span><span style="color:#333">'+amt.toLocaleString()+'원</span></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px"><span style="color:#666">납부 기한</span><span style="color:#c00;font-weight:700">'+dueStr+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:10px 0 0;margin-top:8px;border-top:2px solid #222"><span style="font-size:15px;font-weight:800;color:#222">금액</span><span style="font-size:22px;font-weight:800;color:#222">'+amt.toLocaleString()+'원</span></div>'
     +'</div>'
-    // Greeting + details
     +'<div style="padding:20px 24px;line-height:1.8;font-size:14px;color:#333">'
-    +'<div>안녕하세요, 잉글리시아이입니다 😊<br>다가오는 '+moStr+' 교육비 안내드립니다.</div>'
+    +'<div>'+greetingHTML+'</div>'
     +'<div style="margin-top:16px;font-weight:700">[교육비 안내]</div>'
     +'<div style="margin-top:4px">- 학생명 : '+s.name+'</div>'
     +'<div>- 수업 과정 : '+rawLevel+' 과정</div>'
     +'<div>- 교육 기간 : '+startDate+' ~ '+endDate+'</div>'
     +'<div>- 교육비 : '+amt.toLocaleString()+'원</div>'
-    +'<div style="margin-top:16px">항상 아이의 영어 실력이 한 단계씩<br>성장할 수 있도록 꼼꼼하게 지도하겠습니다.</div>'
-    +'<div style="margin-top:12px">편하신 방법으로 기간 내 납부 부탁드립니다.<br>궁금하신 점은 언제든 편하게 문의 주세요.</div>'
-    +'<div style="margin-top:12px">감사합니다 🙂</div>'
-    +'<div style="margin-top:16px;font-size:13px;color:#888">- 만료일 : '+dueDateStr+' 까지</div>'
+    +'<div>- 납부 기한 : <strong style="color:#c00">'+dueStr+'</strong></div>'
     +'</div>'
     +'</div>';
 
