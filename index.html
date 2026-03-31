@@ -983,8 +983,26 @@ function renderCommentView(){
       +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📢 '+r.memo+'</div>':'')
       +'</div>';
   }).join('');
-  html+='<div style="text-align:center;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="renderHistory()">← 전체 기록으로 돌아가기</button></div>';
+  html+='<div style="text-align:center;margin-top:12px;display:flex;gap:8px;justify-content:center"><button class="btn btn-outline btn-sm" onclick="renderHistory()">← 전체 기록으로 돌아가기</button><button class="btn btn-navy btn-sm" onclick="printCommentView()">🖨 인쇄</button></div>';
   $('history-scroll-wrap').innerHTML=html;
+}
+function printCommentView(){
+  var sId=$('h-student').value;
+  var s=students.find(function(x){return x.id===sId;});
+  var list=reports.filter(function(r){return r.studentId===sId&&r.comment;}).sort(function(a,b){return b.date>a.date?1:-1;});
+  var rows=list.map(function(r){
+    return '<tr><td style="text-align:center;white-space:nowrap">'+r.date+'</td><td style="text-align:center">'+(r.teacher||'-')+'</td><td style="text-align:center">'+(r.level||'-')+'</td><td style="text-align:center">'+(r.progress||'-')+'</td><td>'+r.comment+'</td><td>'+(r.memo||'-')+'</td></tr>';
+  }).join('');
+  var existing=document.getElementById('print-area');
+  if(existing)existing.remove();
+  var printDiv=document.createElement('div');
+  printDiv.id='print-area';
+  printDiv.style.display='none';
+  printDiv.innerHTML='<h2>💬 '+(s?.name||'')+' 코멘트 모아보기 ('+list.length+'건)</h2>'
+    +'<div class="print-date">출력일: '+todayISO()+'</div>'
+    +'<table><thead><tr><th>날짜</th><th>교사</th><th>단계</th><th>진도</th><th>코멘트</th><th>전달사항</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  document.body.appendChild(printDiv);
+  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
 function updateBulkDeleteBtn(){var n=document.querySelectorAll('.h-row-check:checked').length;var btn=$('h-bulk-delete-btn');if(btn)btn.textContent='🗑 선택 삭제'+(n?' ('+n+'건)':'');}
 function toggleSelectAllReports(){var checks=document.querySelectorAll('.h-row-check');var allC=[...checks].every(function(c){return c.checked;});checks.forEach(function(c2){c2.checked=!allC;});var allCb=$('h-check-all');if(allCb)allCb.checked=!allC;updateBulkDeleteBtn();}
@@ -1539,7 +1557,7 @@ function renderRevMonthly(yr,mo){
       +'<td style="'+c+'">'+(lastRev?.extra2Type||'-')+'</td>'
       +'<td style="'+c+'">'+(lastRev?.extra2Amount?(parseInt(lastRev.extra2Amount)||0).toLocaleString()+'원':'-')+'</td>'
       +'<td style="'+c+';max-width:70px;overflow:hidden;text-overflow:ellipsis">'+(lastRev?.memo||'-')+'</td>'
-      +'<td style="'+c+'" onclick="event.stopPropagation()"><button class="btn btn-outline btn-xs" onclick="openRevenueModal(\''+(lastRev?.id||'')+'\',\''+s.id+'\','+yr+','+mo+')">'+(paid?'✏️':'💰')+'</button>'+((!lastRev||lastRev.method!=='결제 선생')?'<button class="btn btn-outline btn-xs" style="margin-left:3px;color:var(--gold)" onclick="saveInvoiceImage(\''+s.id+'\','+expectedAmt+','+yr+','+mo+')" title="청구서 이미지 저장">📄</button>':'')+'</td>'
+      +'<td style="'+c+'" onclick="event.stopPropagation()"><button class="btn btn-outline btn-xs" onclick="openRevenueModal(\''+(lastRev?.id||'')+'\',\''+s.id+'\','+yr+','+mo+')">'+(paid?'✏️':'💰')+'</button>'+(curMethod!=='결제 선생'?'<button class="btn btn-outline btn-xs" style="margin-left:3px;color:var(--gold)" onclick="saveInvoiceImage(\''+s.id+'\','+expectedAmt+','+yr+','+mo+')" title="청구서 이미지 저장">📄</button>':'')+'</td>'
       +'</tr>';
   }).join('');
   tb.innerHTML=rows+'<tr style="background:var(--surface2);font-weight:700"><td></td><td colspan="2" style="text-align:center">합계 '+active.length+'명</td><td></td><td style="text-align:center;color:var(--blue)">'+totalTuitionFee.toLocaleString()+'</td><td style="text-align:center;color:var(--blue)">'+totalTextbookFee.toLocaleString()+'</td><td colspan="5"></td><td style="text-align:center;font-weight:700;color:var(--navy)">'+totalExpected.toLocaleString()+'원</td><td style="text-align:center;color:var(--mint)">'+totalRev.toLocaleString()+'원</td><td colspan="8"></td></tr>';
@@ -1568,6 +1586,8 @@ async function saveRevMethod(studentId,method,yr,mo){
     revenues.push({id:nd.id,studentId:studentId,method:method,revYear:yr,revMonth:mo});
   }
   saveCacheDebounced();
+  // Re-render to update invoice button visibility
+  renderRevMonthly(yr,mo);
 }
 async function saveRevSubMat(studentId,subMat,yr,mo){
   var existing=revenues.find(function(r){return r.studentId===studentId&&!r.isManualMeta&&r.revYear===yr&&r.revMonth===mo;});
