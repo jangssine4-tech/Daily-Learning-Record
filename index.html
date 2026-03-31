@@ -2214,8 +2214,9 @@ function openPayrollModal(userId,yr,mo){
   var daysInMo=new Date(yr,mo,0).getDate();
   var dayNames=['일','월','화','수','목','금','토'];
   var dayMap={'일':0,'월':1,'화':2,'수':3,'목':4,'금':5,'토':6};
-  // Auto-fill from staffDays if workDays is empty
-  if(!workDays.length&&staffDays.length){
+  // Auto-fill from staffDays only if never manually saved
+  var wasSaved=u[key+'_saved']||false;
+  if(!workDays.length&&staffDays.length&&!wasSaved){
     for(var d=1;d<=daysInMo;d++){
       var dt=new Date(yr,mo-1,d);var dow=dt.getDay();
       var dowName=dayNames[dow];
@@ -2260,12 +2261,12 @@ function openPayrollModal(userId,yr,mo){
 }
 async function savePayroll(userId,yr,mo,overlay){
   var inputs=[...document.querySelectorAll('.payroll-hrs')];
-  var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0};}).filter(function(d){return d.hours>0;});
+  var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0};});
   var key='workDays_'+yr+'_'+mo;
-  var update={};update[key]=workDays;update.updatedAt=new Date().toISOString();
+  var update={};update[key]=workDays;update[key+'_saved']=true;update.updatedAt=new Date().toISOString();
   await db.collection('users').doc(userId).update(update);
   var idx=users.findIndex(function(x){return x.id===userId;});
-  if(idx>=0)users[idx][key]=workDays;
+  if(idx>=0){users[idx][key]=workDays;users[idx][key+'_saved']=true;}
   if(overlay)overlay.remove();
   renderStaffArea();saveCacheDebounced();toast('✅ 근무시간 저장됨');
 }
