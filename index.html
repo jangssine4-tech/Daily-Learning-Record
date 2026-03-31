@@ -2422,16 +2422,104 @@ async function saveLevelOrder(){
   await db.collection('config').doc('levelOrder').set({order:_levelOrder,updatedAt:new Date().toISOString()});
   toast('✅ 단계 순서 저장됨');
 }
-function moveLevelOrder(level,dir){
-  var order=getLevelOrder();
-  var idx=order.indexOf(level);if(idx<0)return;
-  var newIdx=idx+dir;
-  if(newIdx<0||newIdx>=order.length)return;
-  order.splice(idx,1);order.splice(newIdx,0,level);
-  _levelOrder=order;
-  saveLevelOrder();renderRefCurriculum();
+function moveLevelOrder(level,dir){/* legacy - replaced by drag */}
+var _dragLevelSrc=null;
+function renderRefCurriculum(){var el=$('ref-curriculum-area');if(!el)return;var q=($('ref-cur-search')?$('ref-cur-search').value:'').toLowerCase();var order=getLevelOrder();var entries=order.map(function(lv){return[lv,CURRICULUM[lv]||[]];}).filter(function(e2){return e2[1].length>0&&(!q||e2[0].toLowerCase().includes(q));});if(!entries.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--txt3)">검색 결과 없음</div>';return;}
+  el.innerHTML=entries.map(function(e2,idx){var level=e2[0],lessons=e2[1];var pillsHTML=lessons.map(function(l){var special=l.includes('Level Test')||l.includes('Portfolio');return'<span style="font-size:11px;background:'+(special?'var(--gold)':'var(--surface2)')+';border-radius:4px;padding:2px 7px;color:'+(special?'#fff':'var(--txt2)')+'">'+l+'</span>';}).join('');
+    return'<div class="card cur-drag-item" draggable="true" data-level="'+level+'" style="padding:12px 16px;margin-bottom:8px;cursor:grab;transition:opacity .15s,transform .15s">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:14px;color:var(--txt3);cursor:grab" title="드래그하여 순서 변경">☰</span>'
+      +'<span style="font-size:11px;color:var(--txt3);min-width:24px;font-weight:600">'+(idx+1)+'</span>'
+      +'<div style="font-size:14px;font-weight:700;color:var(--navy)">'+level+'</div></div>'
+      +'<span class="badge bg-navy">'+lessons.length+'개</span></div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:4px">'+pillsHTML+'</div></div>';
+  }).join('');
+  // Attach drag events
+  var items=el.querySelectorAll('.cur-drag-item');
+  items.forEach(function(item){
+    item.addEventListener('dragstart',function(e){
+      _dragLevelSrc=item.dataset.level;
+      item.style.opacity='0.4';
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain',item.dataset.level);
+    });
+    item.addEventListener('dragend',function(){item.style.opacity='1';_dragLevelSrc=null;el.querySelectorAll('.cur-drag-item').forEach(function(it){it.style.borderTop='';it.style.borderBottom='';});});
+    item.addEventListener('dragover',function(e){
+      e.preventDefault();e.dataTransfer.dropEffect='move';
+      var rect=item.getBoundingClientRect();
+      var midY=rect.top+rect.height/2;
+      el.querySelectorAll('.cur-drag-item').forEach(function(it){it.style.borderTop='';it.style.borderBottom='';});
+      if(e.clientY<midY){item.style.borderTop='3px solid var(--mint)';item.style.borderBottom='';}
+      else{item.style.borderBottom='3px solid var(--mint)';item.style.borderTop='';}
+    });
+    item.addEventListener('dragleave',function(){item.style.borderTop='';item.style.borderBottom='';});
+    item.addEventListener('drop',function(e){
+      e.preventDefault();
+      item.style.borderTop='';item.style.borderBottom='';
+      if(!_dragLevelSrc||_dragLevelSrc===item.dataset.level)return;
+      var order2=getLevelOrder();
+      var fromIdx=order2.indexOf(_dragLevelSrc);
+      var toIdx=order2.indexOf(item.dataset.level);
+      if(fromIdx<0||toIdx<0)return;
+      var rect2=item.getBoundingClientRect();
+      var insertAfter=e.clientY>rect2.top+rect2.height/2;
+      order2.splice(fromIdx,1);
+      var newToIdx=order2.indexOf(item.dataset.level);
+      if(insertAfter)newToIdx++;
+      order2.splice(newToIdx,0,_dragLevelSrc);
+      _levelOrder=order2;
+      saveLevelOrder();renderRefCurriculum();
+    });
+  });
+  // Touch drag support for mobile
+  var touchSrc=null,touchClone=null,touchTarget=null;
+  items.forEach(function(item){
+    item.addEventListener('touchstart',function(e){
+      if(e.touches.length!==1)return;
+      touchSrc=item;
+      touchClone=item.cloneNode(true);
+      touchClone.style.cssText='position:fixed;z-index:9999;opacity:0.8;pointer-events:none;width:'+item.offsetWidth+'px;transform:rotate(2deg);box-shadow:0 8px 24px rgba(0,0,0,0.2)';
+      document.body.appendChild(touchClone);
+      item.style.opacity='0.3';
+    },{passive:true});
+    item.addEventListener('touchmove',function(e){
+      if(!touchSrc)return;
+      e.preventDefault();
+      var t=e.touches[0];
+      touchClone.style.left=t.clientX-touchClone.offsetWidth/2+'px';
+      touchClone.style.top=t.clientY-40+'px';
+      el.querySelectorAll('.cur-drag-item').forEach(function(it){it.style.borderTop='';it.style.borderBottom='';});
+      var target=document.elementFromPoint(t.clientX,t.clientY);
+      var card=target?target.closest('.cur-drag-item'):null;
+      if(card&&card!==touchSrc){
+        touchTarget=card;
+        var rect3=card.getBoundingClientRect();
+        if(t.clientY<rect3.top+rect3.height/2)card.style.borderTop='3px solid var(--mint)';
+        else card.style.borderBottom='3px solid var(--mint)';
+      } else {touchTarget=null;}
+    },{passive:false});
+    item.addEventListener('touchend',function(e){
+      if(!touchSrc)return;
+      touchSrc.style.opacity='1';
+      if(touchClone)touchClone.remove();
+      el.querySelectorAll('.cur-drag-item').forEach(function(it){it.style.borderTop='';it.style.borderBottom='';});
+      if(touchTarget&&touchSrc!==touchTarget){
+        var order3=getLevelOrder();
+        var fi=order3.indexOf(touchSrc.dataset.level);
+        var ti=order3.indexOf(touchTarget.dataset.level);
+        if(fi>=0&&ti>=0){
+          order3.splice(fi,1);
+          var nti=order3.indexOf(touchTarget.dataset.level);
+          if(fi>ti)order3.splice(nti,0,touchSrc.dataset.level);
+          else order3.splice(nti+1,0,touchSrc.dataset.level);
+          _levelOrder=order3;saveLevelOrder();renderRefCurriculum();
+        }
+      }
+      touchSrc=null;touchClone=null;touchTarget=null;
+    });
+  });
 }
-function renderRefCurriculum(){var el=$('ref-curriculum-area');if(!el)return;var q=($('ref-cur-search')?$('ref-cur-search').value:'').toLowerCase();var order=getLevelOrder();var entries=order.map(function(lv){return[lv,CURRICULUM[lv]||[]];}).filter(function(e2){return e2[1].length>0&&(!q||e2[0].toLowerCase().includes(q));});if(!entries.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--txt3)">검색 결과 없음</div>';return;}el.innerHTML=entries.map(function(e2,idx){var level=e2[0],lessons=e2[1];var pillsHTML=lessons.map(function(l){var special=l.includes('Level Test')||l.includes('Portfolio');return'<span style="font-size:11px;background:'+(special?'var(--gold)':'var(--surface2)')+';border-radius:4px;padding:2px 7px;color:'+(special?'#fff':'var(--txt2)')+'">'+l+'</span>';}).join('');return'<div class="card" style="padding:12px 16px;margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--txt3);min-width:24px">'+(idx+1)+'.</span><div style="font-size:14px;font-weight:700;color:var(--navy)">'+level+'</div></div><div style="display:flex;align-items:center;gap:4px"><button class="btn btn-outline btn-xs" onclick="moveLevelOrder(\''+level+'\',-1)" title="위로" style="padding:2px 6px"'+(idx===0?' disabled style="opacity:0.3;padding:2px 6px"':'')+'>▲</button><button class="btn btn-outline btn-xs" onclick="moveLevelOrder(\''+level+'\',1)" title="아래로" style="padding:2px 6px"'+(idx===entries.length-1?' disabled style="opacity:0.3;padding:2px 6px"':'')+'>▼</button><span class="badge bg-navy">'+lessons.length+'개</span></div></div><div style="display:flex;flex-wrap:wrap;gap:4px">'+pillsHTML+'</div></div>';}).join('');}
 
 // ══ MESSAGE BOARD (발송 관리) ══
 var _msgHistory=[];
