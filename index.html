@@ -255,7 +255,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div id="eval-area"></div>
     <div class="field"><div class="fl">칭찬 스티커</div><div id="praise-area" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
     <div class="field"><div class="fl">선생님 코멘트</div><textarea class="fi" id="r-comment" rows="2" placeholder="오늘 수업 코멘트"></textarea></div>
-    <div class="field"><div class="fl">전달 사항</div><textarea class="fi" id="r-memo" rows="2" placeholder="학부모 전달사항"></textarea></div>
+    <div class="field"><div class="fl">전달 사항</div><textarea class="fi" id="r-memo" rows="2"></textarea></div>
     <div class="field" style="background:var(--surface2);border-radius:var(--r);padding:10px 12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-makeup-check" onchange="$('r-makeup-content-wrap').style.display=this.checked?'block':'none'"> 보강 필요</label></div><div id="r-makeup-content-wrap" style="display:none"><textarea class="fi" id="r-makeup-content" rows="2" placeholder="보강 사유 및 내용 (보강 계획표 메모에 연동됩니다)"></textarea></div></div>
     <div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap"><button class="btn btn-outline" style="flex:1;min-width:80px" onclick="tempSaveReport()">📋 임시 저장</button><button class="btn btn-green" style="flex:1;min-width:80px" onclick="saveReport()">💾 저장</button><button class="btn btn-navy" style="flex:1;min-width:80px" onclick="saveReportAndImage()">📷 저장 + 이미지</button><button class="btn btn-outline" style="min-width:50px;color:var(--txt3)" onclick="goto('schedule')">취소</button></div>
     <div id="temp-save-indicator" style="display:none;text-align:center;margin-top:6px;font-size:11px;color:var(--blue)">📋 임시 저장된 데이터가 있습니다</div>
@@ -933,7 +933,6 @@ function onReportDateChange(){
   // Check if there's already a saved report for this date
   var existingRep=reports.find(function(r){return r.studentId===sId&&r.date===newDate;});
   if(existingRep){
-    // Load existing report data
     populateProgressDropdown($('r-level').value,existingRep.progress||'',newDate);
     $('r-review').value=existingRep.reviewTest||'';$('r-review-items').value=existingRep.reviewTestItems||'';
     $('r-attitude').value=existingRep.attitude||'';$('r-quiz').value=existingRep.dailyQuiz||'';
@@ -942,10 +941,22 @@ function onReportDateChange(){
     return;
   }
   if(isClassDay){
-    // Auto-advance progress to the next lesson
     var level=$('r-level').value;
-    populateProgressDropdown(level,'',newDate);
-    toast('📅 '+dayOfWeek+'요일 수업일 — 다음 진도로 자동 설정');
+    var lessons=CURRICULUM[level]||[];
+    var curProgress=$('r-progress').value;
+    if(curProgress&&lessons.length>0){
+      var idx=lessons.indexOf(curProgress);
+      if(idx>=0&&idx+1<lessons.length){
+        $('r-progress').value=lessons[idx+1];
+        toast('📅 '+dayOfWeek+'요일 수업일 — 진도: '+lessons[idx+1]);
+      } else if(idx>=0){
+        toast('📅 '+dayOfWeek+'요일 수업일 — 마지막 진도입니다');
+      }
+    } else if(!curProgress&&lessons.length>0){
+      // No current progress — try to find from DB
+      var lastRep=reports.filter(function(r){return r.studentId===sId&&r.level===level&&r.progress&&r.date<newDate;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+      if(lastRep){var idx2=lessons.indexOf(lastRep.progress);if(idx2>=0&&idx2+1<lessons.length){$('r-progress').value=lessons[idx2+1];toast('📅 '+dayOfWeek+'요일 수업일 — 진도: '+lessons[idx2+1]);}}
+    }
   }
 }
 function onReportLevelChange(){
