@@ -246,7 +246,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="cp" style="max-width:560px"><div class="card" style="padding:16px">
     <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
     <input type="hidden" id="r-student-id">
-    <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date"></div><div class="field"><div class="fl">담당 선생님</div><select class="fi" id="r-teacher"></select></div></div>
+    <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">담당 선생님</div><select class="fi" id="r-teacher"></select></div></div>
     <div class="field"><div class="fl">단계</div><select class="fi" id="r-level" onchange="onReportLevelChange()"><option value="">선택</option></select></div>
     <div class="field"><div class="fl">진도</div><select class="fi" id="r-progress"><option value="">선택</option></select></div>
     <div class="r2"><div class="field"><div class="fl">복습 테스트</div><select class="fi" id="r-review"><option value="">-</option><option>매우잘함</option><option>잘함</option><option>보통</option><option>부진</option></select></div><div class="field"><div class="fl">테스트 항목</div><input class="fi" id="r-review-items" placeholder="예: Unit 3 단어 20개"></div></div>
@@ -910,11 +910,43 @@ function tempSaveReport(){
   var ind=$('temp-save-indicator');if(ind)ind.style.display='block';
   toast('📋 임시 저장 완료 (DB에는 저장되지 않음)');
 }
-function populateProgressDropdown(level,current){
+function populateProgressDropdown(level,current,refDate){
   var sel=$('r-progress');if(!sel)return;
   var lessons=CURRICULUM[level]||[];
   sel.innerHTML='<option value="">선택</option>'+lessons.map(function(l){return'<option value="'+l+'"'+(l===current?' selected':'')+'>'+l+'</option>';}).join('');
-  if(!current&&lessons.length>0){var lastRep=reports.find(function(r){return r.studentId===$('r-student-id').value&&r.level===level&&r.progress;});if(lastRep){var idx2=lessons.indexOf(lastRep.progress);if(idx2>=0&&idx2+1<lessons.length)sel.value=lessons[idx2+1];else if(idx2>=0)sel.value=lessons[idx2];}}
+  if(!current&&lessons.length>0){
+    var sId=$('r-student-id').value;var dt=refDate||$('r-date').value||todayISO();
+    // Find the most recent report for this student+level BEFORE the given date
+    var lastRep=reports.filter(function(r){return r.studentId===sId&&r.level===level&&r.progress&&r.date<dt;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+    // If no prior report, also check same-date report
+    if(!lastRep)lastRep=reports.find(function(r){return r.studentId===sId&&r.level===level&&r.progress;});
+    if(lastRep){var idx2=lessons.indexOf(lastRep.progress);if(idx2>=0&&idx2+1<lessons.length)sel.value=lessons[idx2+1];else if(idx2>=0)sel.value=lessons[idx2];}
+  }
+}
+function onReportDateChange(){
+  var sId=$('r-student-id').value;if(!sId)return;
+  var s=students.find(function(x){return x.id===sId;});if(!s)return;
+  var newDate=$('r-date').value;if(!newDate)return;
+  var dayNames=['일','월','화','수','목','금','토'];
+  var dayOfWeek=dayNames[new Date(newDate+'T00:00:00').getDay()];
+  var isClassDay=(s.days||[]).includes(dayOfWeek);
+  // Check if there's already a saved report for this date
+  var existingRep=reports.find(function(r){return r.studentId===sId&&r.date===newDate;});
+  if(existingRep){
+    // Load existing report data
+    populateProgressDropdown($('r-level').value,existingRep.progress||'',newDate);
+    $('r-review').value=existingRep.reviewTest||'';$('r-review-items').value=existingRep.reviewTestItems||'';
+    $('r-attitude').value=existingRep.attitude||'';$('r-quiz').value=existingRep.dailyQuiz||'';
+    $('r-hw').value=existingRep.homework||'';$('r-hw-status').value=existingRep.hwStatus||'미확인';
+    $('r-comment').value=existingRep.comment||'';$('r-memo').value=existingRep.memo||'';
+    return;
+  }
+  if(isClassDay){
+    // Auto-advance progress to the next lesson
+    var level=$('r-level').value;
+    populateProgressDropdown(level,'',newDate);
+    toast('📅 '+dayOfWeek+'요일 수업일 — 다음 진도로 자동 설정');
+  }
 }
 function onReportLevelChange(){
   var newLevel=$('r-level').value;
