@@ -1602,6 +1602,28 @@ function doPrintRev(yr,mo,overlay){
   if(overlay)overlay.remove();
   setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
+function calcExpectedRevenue(yr,mo){
+  var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var totalExpected=0;var totalRev=list.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
+  activeStudents.forEach(function(s){
+    var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
+    var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
+    var rawLevel=getStudentLevel(s);
+    var tuitionItem=findRefItem(rawLevel,'tuition');var textbookItem=findRefItem(rawLevel,'textbook');
+    var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
+    var mh=getStudentMonthlyHours(s);var tuitionFee=getTuitionByMonthlyHours(baseFee,mh,tuitionItem);
+    var discountAmt=s.discount?10000:0;
+    var pendingMakeups=makeups.filter(function(m){if(m.studentId!==s.id)return false;var ad=m.absentDate||'';if(!ad)return false;var md=new Date(ad);return md.getFullYear()===yr&&md.getMonth()===mo-1&&m.makeupStatus!=='done';}).length;
+    var subMat=lastRev?.subMaterial||'';var subMatFee=getSubMaterialFee(subMat);
+    var extra1Amt=lastRev?parseInt(lastRev.extra1Amount)||0:0;var extra2Amt=lastRev?parseInt(lastRev.extra2Amount)||0:0;
+    var perHourFee=mh>0?tuitionFee/mh:0;var absentDeduction=Math.round(pendingMakeups*perHourFee);
+    var expectedAmt=tuitionFee+textbookFee+subMatFee-absentDeduction-discountAmt+extra1Amt+extra2Amt;
+    if(expectedAmt<0)expectedAmt=0;
+    totalExpected+=expectedAmt;
+  });
+  return{totalExpected:totalExpected,totalRev:totalRev};
+}
 function renderRevMonthly(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
   var totalRev=list.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
@@ -2622,22 +2644,8 @@ function renderRevExpense(yr,mo){
   var sortedList=[...list].filter(function(e2){return!e2.autoFromLedger;}).sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
   var listHTML=sortedList.length?'<table class="rev-tbl"><thead><tr><th>날짜</th><th>카테고리</th><th>항목명</th><th>금액</th><th>결제수단</th><th></th></tr></thead><tbody>'+sortedList.map(function(e2){return'<tr style="cursor:pointer" onclick="openExpenseModal(\''+e2.id+'\')"><td>'+(e2.date||'-')+'</td><td><span class="badge bg-gray">'+(e2.category||'-')+'</span></td><td>'+(e2.name||'-')+'</td><td style="font-weight:600;color:var(--red)">'+(parseInt(e2.amount)||0).toLocaleString()+'원</td><td>'+(e2.method||'-')+'</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteExpense(\''+e2.id+'\')">삭제</button></td></tr>';}).join('')+'</tbody></table>':'<div style="text-align:center;padding:20px;color:var(--txt3)">지출 없음</div>';
   // ── 당월 예상 수입 (납부 예정액 합계) ──
-  var estRevMonth=0;
-  var activeForExp=students.filter(function(s3){return s3.status==='재원'||s3.status==='신규';});
-  activeForExp.forEach(function(s3){
-    var rawLv=getStudentLevel(s3);var ti=findRefItem(rawLv,'tuition');var tbi=findRefItem(rawLv,'textbook');
-    var bf=ti?parseInt(ti.baseFee)||0:0;var tbf=tbi?parseInt(tbi.textbookFee)||0:0;
-    var mh=getStudentMonthlyHours(s3);var tf=getTuitionByMonthlyHours(bf,mh,ti);
-    var da=s3.discount?10000:0;
-    var pendMk=makeups.filter(function(m2){if(m2.studentId!==s3.id)return false;var ad2=m2.absentDate||'';if(!ad2)return false;var md2=new Date(ad2);return md2.getFullYear()===yr&&md2.getMonth()===mo-1&&m2.makeupStatus!=='done';}).length;
-    var phf=mh>0?tf/mh:0;var abd=Math.round(pendMk*phf);
-    var sRevs=revenues.filter(function(r3){if(r3.isManualMeta||r3.extraType)return false;if(r3.studentId!==s3.id)return false;if(r3.revYear&&r3.revMonth)return r3.revYear===yr&&r3.revMonth===mo;var d3=new Date(r3.paidDate);return d3.getFullYear()===yr&&d3.getMonth()===mo-1;});
-    var lastR=sRevs.sort(function(a2,b2){return(b2.paidDate||'')>(a2.paidDate||'')?1:-1;})[0];
-    var smf=0;if(lastR?.subMaterial)smf=getSubMaterialFee(lastR.subMaterial);
-    var e1a=lastR?parseInt(lastR.extra1Amount)||0:0;var e2a=lastR?parseInt(lastR.extra2Amount)||0:0;
-    var ea=tf+tbf+smf-abd-da+e1a+e2a;if(ea<0)ea=0;
-    estRevMonth+=ea;
-  });
+  var revCalc=calcExpectedRevenue(yr,mo);
+  var estRevMonth=revCalc.totalExpected;
   // ── 학원 운영비 소계 ──
   var bizExpTotal=0;
   Object.values(catGroups['학원 운영비']).forEach(function(cats2){cats2.forEach(function(cat2){bizExpTotal+=catTotals[cat2]||0;});});
