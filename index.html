@@ -628,7 +628,10 @@ async function loadExpenses(){
   var s2=await db.collection('expenses').orderBy('date','desc').limit(200).get();expenses=s2.docs.map(function(d){return{id:d.id,...d.data()};});
 }
 async function loadTeachers(){try{var d=await db.collection('config').doc('teachers').get();teachers=d.exists?(d.data().list||[]):[];}catch(e){teachers=[];}}
-async function loadUsers(){var s=await db.collection('users').get();users=s.docs.map(function(d){return{id:d.id,...d.data()};});}
+async function loadUsers(){var s=await db.collection('users').get();users=s.docs.map(function(d){return{id:d.id,...d.data()};});
+  // Load menu permissions and merge
+  try{var ps=await db.collection('userPerms').get();ps.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
+}
 async function loadRefItems(){var s=await db.collection('refItems').get();refItems=s.docs.map(function(d){return{id:d.id,...d.data()};});}
 async function loadPeriods(){try{var d=await db.collection('config').doc('periods').get();customPeriods=d.exists?(d.data().periods||[]):[];}catch(e){customPeriods=[];}}
 
@@ -875,6 +878,7 @@ async function markAttendance(studentId, action){
   renderSchedule();saveCacheDebounced();
 }
 
+function _cleanComment(c){return (c||'').replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'');}
 function _combineComment(){var t=$('r-comment-tablet').value.trim();var b=$('r-comment-book').value.trim();var parts=[];if(t)parts.push('[태블릿] '+t);if(b)parts.push('[교재] '+b);return parts.join('\n');}
 function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m1=c.match(/\[태블릿\]\s*(.*)/);var m2=c.match(/\[교재\]\s*(.*)/);if(m1)t=m1[1];if(m2)b=m2[1];if(!m1&&!m2)t=c;return{t:t,b:b};}
 function startReport(studentId){
@@ -1144,7 +1148,7 @@ async function updateReportComment(id){
 function sendKakao(reportId){
   var r=reports.find(function(x){return x.id===reportId;});if(!r)return;
   var lines=['📚 [잉글리시아이 학습 일지]','','📅 '+r.date,'👤 '+r.studentName,'📖 '+(r.level||'-')+' · '+(r.progress||'-'),'👩‍🏫 '+(r.teacher||'-'),'','[평가]','• 복습: '+(r.reviewTest||'-'),'• 태도: '+(r.attitude||'-'),'• 숙제: '+(r.homework||'-')];
-  if(r.comment)lines.push('','💬 '+r.comment);
+  if(r.comment)lines.push('','💬 '+_cleanComment(r.comment));
   if(r.memo)lines.push('','📢 '+r.memo);
   lines.push('','⭐ 잉글리시아이');
   navigator.clipboard.writeText(lines.join('\n')).then(function(){toast('📋 복사됨! 카카오톡에 붙여넣기');}).catch(function(){prompt('복사:',lines.join('\n'));});
@@ -1213,7 +1217,7 @@ function _doSaveReportAsImage(r){
   if(r.comment){
     commentHTML='<div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bbf7d0">'
       +'<span style="font-size:12px;font-weight:700;color:#166534">💬 선생님 코멘트</span>'
-      +'<div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6">'+r.comment+'</div></div>';
+      +'<div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6">'+r.comment.replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'')+'</div></div>';
   }
   var memoHTML='';
   if(r.memo){
@@ -1638,13 +1642,14 @@ function doPrintRev(yr,mo,overlay){
 function calcExpectedRevenue(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
   var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
-  var totalExpected=0;var totalRev=list.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
+  var totalExpected=0;var totalTextbook=0;var totalRev=list.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
   activeStudents.forEach(function(s){
     var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
     var rawLevel=getStudentLevel(s);
     var tuitionItem=findRefItem(rawLevel,'tuition');var textbookItem=findRefItem(rawLevel,'textbook');
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
+    totalTextbook+=textbookFee;
     var mh=getStudentMonthlyHours(s);var tuitionFee=getTuitionByMonthlyHours(baseFee,mh,tuitionItem);
     var discountAmt=s.discount?10000:0;
     var pendingMakeups=makeups.filter(function(m){if(m.studentId!==s.id)return false;var ad=m.absentDate||'';if(!ad)return false;var md=new Date(ad);return md.getFullYear()===yr&&md.getMonth()===mo-1&&m.makeupStatus!=='done';}).length;
@@ -1655,7 +1660,7 @@ function calcExpectedRevenue(yr,mo){
     if(expectedAmt<0)expectedAmt=0;
     totalExpected+=expectedAmt;
   });
-  return{totalExpected:totalExpected,totalRev:totalRev};
+  return{totalExpected:totalExpected,totalRev:totalRev,totalTextbook:totalTextbook};
 }
 function renderRevMonthly(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
@@ -2530,6 +2535,7 @@ function renderRevExpense(yr,mo){
   };
   var parentDisplayNames={'세금':'세금 & 공과금','대출':'대출','보험료':'보험료','카드':'카드','아파트':'아파트'};
   var allCats=[];Object.values(catGroups).forEach(function(grp){Object.values(grp).forEach(function(cats){allCats=allCats.concat(cats);});});
+  var revCalc=calcExpectedRevenue(yr,mo);
   // ── Auto-populate 인건비 from freelancer ledger ──
   var teacherList=users.filter(function(u){return u.role==='teacher';});
   var hasAutoSalary=list.some(function(e2){return e2.category==='인건비'&&e2.autoFromLedger;});
@@ -2558,16 +2564,10 @@ function renderRevExpense(yr,mo){
       if(resTax>0) list.push({id:'auto_restax_'+u.id,category:'세금-원천 지방 소득세',name:u.name+' 주민세',amount:resTax,date:'',autoFromLedger:true,method:'-'});
     });
   }
-  // ── Auto: 교재비 from 월별 매출현황 ──
+  // ── Auto: 교재비 from calcExpectedRevenue (same as 월별 매출현황) ──
   var hasAutoTextbook=list.some(function(e2){return e2.category==='교재비'&&e2.autoFromLedger;});
   if(!hasAutoTextbook){
-    var activeForMonth=students.filter(function(s2){return s2.status==='재원'||s2.status==='신규';});
-    var autoTbTotal=0;
-    activeForMonth.forEach(function(s2){
-      var rawLv=getStudentLevel(s2);
-      var tbItem=findRefItem(rawLv,'textbook');
-      autoTbTotal+=tbItem?parseInt(tbItem.textbookFee)||0:0;
-    });
+    var autoTbTotal=revCalc.totalTextbook;
     if(autoTbTotal>0) list.push({id:'auto_textbook',category:'교재비',name:'교재비 (매출현황 합계)',amount:autoTbTotal,date:'',autoFromLedger:true,method:'-'});
   }
   // ── Auto: 카드 수수료 = (카드+결제선생 실납부액 합) * 4% ──
@@ -2575,8 +2575,8 @@ function renderRevExpense(yr,mo){
   if(!hasAutoCardFee){
     var cardRevs=revenues.filter(function(r2){if(r2.isManualMeta||r2.extraType)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===yr&&r2.revMonth===mo;return false;}).filter(function(r2){return r2.method==='카드'||r2.method==='결제 선생';});
     var cardSum=cardRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0);
-    var autoCardFee=Math.round(cardSum*0.004);
-    if(autoCardFee>0) list.push({id:'auto_cardfee',category:'카드 수수료',name:'카드 수수료 0.4% (자동 계산)',amount:autoCardFee,date:'',autoFromLedger:true,method:'-'});
+    var autoCardFee=Math.round(cardSum*0.008);
+    if(autoCardFee>0) list.push({id:'auto_cardfee',category:'카드 수수료',name:'카드 수수료 0.8% (자동 계산)',amount:autoCardFee,date:'',autoFromLedger:true,method:'-'});
   }
   // ── Auto: 고정비 전월 복사 ──
   var fixedCats=catGroups['학원 운영비']['고정비'].concat(catGroups['개인 지출']['고정비']);
@@ -2603,7 +2603,7 @@ function renderRevExpense(yr,mo){
   var prevRevList=revenues.filter(function(r2){if(r2.isManualMeta)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===prevYr&&r2.revMonth===prevMo;var d=new Date(r2.paidDate);return d.getFullYear()===prevYr&&d.getMonth()===prevMo-1;});
   var prevExpList=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===prevYr&&e2.revMonth===prevMo;var d=new Date(e2.date||e2.createdAt);return d.getFullYear()===prevYr&&d.getMonth()===prevMo-1;});
   var estRev=prevRevList.reduce(function(s,r2){return s+(parseInt(r2.amount)||0);},0);
-  // Calculate prev month auto items (인건비, 세금, 교재비, 카드수수료)
+  // Calculate prev month auto items (인건비, 세금, 카드수수료, 교재비) 
   var prevAutoTotal=0;
   teacherList.forEach(function(u2){
     var wd2=u2['workDays_'+prevYr+'_'+prevMo]||[];var th2=wd2.reduce(function(s2,d2){return s2+(parseFloat(d2.hours)||0);},0);
@@ -2611,9 +2611,9 @@ function renderRevExpense(yr,mo){
     prevAutoTotal+=net2+bt2+rt2;
   });
   var prevCardRevs=revenues.filter(function(r2){if(r2.isManualMeta||r2.extraType)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===prevYr&&r2.revMonth===prevMo;return false;}).filter(function(r2){return r2.method==='카드'||r2.method==='결제 선생';});
-  prevAutoTotal+=Math.round(prevCardRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0)*0.004);
-  var prevAutoTb=0;students.filter(function(s2){return s2.status==='재원'||s2.status==='신규';}).forEach(function(s2){var tbi2=findRefItem(getStudentLevel(s2),'textbook');prevAutoTb+=tbi2?parseInt(tbi2.textbookFee)||0:0;});
-  prevAutoTotal+=prevAutoTb;
+  prevAutoTotal+=Math.round(prevCardRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0)*0.008);
+  var prevCalc=calcExpectedRevenue(prevYr,prevMo);
+  prevAutoTotal+=prevCalc.totalTextbook;
   var estExp=prevExpList.reduce(function(s,e2){return s+(parseInt(e2.amount)||0);},0)+prevAutoTotal;
   var estNet=estRev-estExp;var estColor=estNet>=0?'var(--blue)':'var(--red)';
   // ── Render functions ──
@@ -2691,7 +2691,6 @@ function renderRevExpense(yr,mo){
   var sortedList=[...list].filter(function(e2){return!e2.autoFromLedger;}).sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
   var listHTML=sortedList.length?'<table class="rev-tbl"><thead><tr><th>날짜</th><th>카테고리</th><th>항목명</th><th>금액</th><th>결제수단</th><th></th></tr></thead><tbody>'+sortedList.map(function(e2){return'<tr style="cursor:pointer" onclick="openExpenseModal(\''+e2.id+'\')"><td>'+(e2.date||'-')+'</td><td><span class="badge bg-gray">'+(e2.category||'-')+'</span></td><td>'+(e2.name||'-')+'</td><td style="font-weight:600;color:var(--red)">'+(parseInt(e2.amount)||0).toLocaleString()+'원</td><td>'+(e2.method||'-')+'</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteExpense(\''+e2.id+'\')">삭제</button></td></tr>';}).join('')+'</tbody></table>':'<div style="text-align:center;padding:20px;color:var(--txt3)">지출 없음</div>';
   // ── 당월 예상 수입 (납부 예정액 합계) ──
-  var revCalc=calcExpectedRevenue(yr,mo);
   var estRevMonth=revCalc.totalExpected;
   // ── 학원 운영비 소계 ──
   var bizExpTotal=0;
@@ -2973,9 +2972,9 @@ function renderMsgPreview(){
 function generateMsg(r){
   var hwSt=r.hwStatus||'미확인';
   if(hwSt==='완료'){
-    return '📚 [잉글리시아이 학습 알림]\n\n안녕하세요, '+r.studentName+' 학부모님.\n오늘 '+r.studentName+' 학생이 숙제를 잘 완료했습니다! 👏\n\n📅 '+r.date+'\n📖 '+(r.level||'')+' · '+(r.progress||'')+'\n✅ 숙제: '+(r.homework||'완료')+'\n'+(r.comment?'\n💬 '+r.comment:'')+(r.memo?'\n📢 '+r.memo:'')+'\n\n잉글리시아이위드멘토링 영수학원';
+    return '📚 [잉글리시아이 학습 알림]\n\n안녕하세요, '+r.studentName+' 학부모님.\n오늘 '+r.studentName+' 학생이 숙제를 잘 완료했습니다! 👏\n\n📅 '+r.date+'\n📖 '+(r.level||'')+' · '+(r.progress||'')+'\n✅ 숙제: '+(r.homework||'완료')+'\n'+(r.comment?'\n💬 '+_cleanComment(r.comment):'')+(r.memo?'\n📢 '+r.memo:'')+'\n\n잉글리시아이위드멘토링 영수학원';
   } else if(hwSt==='미완료'){
-    return '📚 [잉글리시아이 학습 알림]\n\n안녕하세요, '+r.studentName+' 학부모님.\n오늘 '+r.studentName+' 학생의 숙제가 완료되지 않았습니다.\n가정에서 확인 부탁드립니다. 🙏\n\n📅 '+r.date+'\n📖 '+(r.level||'')+' · '+(r.progress||'')+'\n❌ 숙제: '+(r.homework||'미완료')+'\n'+(r.comment?'\n💬 '+r.comment:'')+(r.memo?'\n📢 '+r.memo:'')+'\n\n잉글리시아이위드멘토링 영수학원';
+    return '📚 [잉글리시아이 학습 알림]\n\n안녕하세요, '+r.studentName+' 학부모님.\n오늘 '+r.studentName+' 학생의 숙제가 완료되지 않았습니다.\n가정에서 확인 부탁드립니다. 🙏\n\n📅 '+r.date+'\n📖 '+(r.level||'')+' · '+(r.progress||'')+'\n❌ 숙제: '+(r.homework||'미완료')+'\n'+(r.comment?'\n💬 '+_cleanComment(r.comment):'')+(r.memo?'\n📢 '+r.memo:'')+'\n\n잉글리시아이위드멘토링 영수학원';
   }
   return '';
 }
