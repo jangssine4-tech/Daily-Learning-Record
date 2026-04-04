@@ -406,8 +406,7 @@ var EVAL_MODULES = {
   PHONICS:{label:'Phonics',color:'#2196f3',badgeCls:'bg-blue',sections:[
     {id:'voca',title:'📖 단어장 (Vocabulary)',items:[{key:'v1',label:'영단어 보고 읽기'},{key:'v2',label:'뜻 말하기'}]},
     {id:'main',title:'📕 메인북 (Student Book)',items:[{key:'m1',label:'줄 맞춰 바르게 쓰기'},{key:'m2',label:'문장 정확하게 읽기'},{key:'m3',label:'사이트 워드 외우기'}]},
-    {id:'wb',title:'✏️ 워크북 (Workbook)',items:[{key:'w1',label:'줄 맞춰 바르게 쓰기'}]},
-    {id:'dict',title:'📝 받아쓰기 (Dictation)',items:[{key:'d1',label:'1번 단어'},{key:'d2',label:'2번 단어'},{key:'d3',label:'3번 단어'},{key:'d4',label:'4번 단어'}]}]},
+    {id:'wb',title:'✏️ 워크북 (Workbook)',items:[{key:'w1',label:'줄 맞춰 바르게 쓰기'}]}]},
   BASIC:{label:'Basic',color:'#00b894',badgeCls:'bg-green',sections:[
     {id:'voca',title:'📖 단어장 (Vocabulary)',items:[{key:'v1',label:'영단어 보고 읽기 & 뜻 말하기'},{key:'v3',label:'그림 보고 영단어 말하기'}]},
     {id:'sb',title:'📗 스토리북 (Storybook)',items:[{key:'s1',label:'정확하게 읽기'},{key:'s2',label:'유창하게 읽기'},{key:'s3',label:'내용 이해&질문에 답하기'},{key:'s4',label:'그림 보고 영어로 말하기'}]},
@@ -1641,19 +1640,39 @@ function doPrintRev(yr,mo,overlay){
 }
 function calcMonthExpTotal(yr,mo){
   var expList=expenses.filter(function(e){if(e.revYear&&e.revMonth)return e.revYear===yr&&e.revMonth===mo;var d=new Date(e.date||e.createdAt);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
-  var total=expList.reduce(function(s,e2){return s+(parseInt(e2.amount)||0);},0);
-  // Add auto: 인건비 + 세금
+  var items=expList.map(function(e2){return{category:e2.category,amount:parseInt(e2.amount)||0};});
   var tl=users.filter(function(u){return u.role==='teacher';});
-  tl.forEach(function(u2){
-    var wd=u2['workDays_'+yr+'_'+mo]||[];var th=wd.reduce(function(s2,d2){return s2+(parseFloat(d2.hours)||0);},0);
-    var fee=Math.round(th*(u2.hourlyRate||15000));total+=fee;
+  // 인건비: 전월 데이터 (당월 인건비는 다음달 10일 지급)
+  var pmo=mo-1,pyr=yr;if(pmo<1){pmo=12;pyr--;}
+  if(!items.some(function(e2){return e2.category==='인건비';})){
+    tl.forEach(function(u2){
+      var wd=u2['workDays_'+pyr+'_'+pmo]||[];var th=wd.reduce(function(s2,d2){return s2+(parseFloat(d2.hours)||0);},0);
+      var fee=Math.round(th*(u2.hourlyRate||15000));var bt=Math.round(fee*0.03);var rt=Math.round(bt*0.1);var nt=fee-bt-rt;
+      if(nt>0)items.push({category:'인건비',amount:nt});
+      if(bt>0)items.push({category:'세금-원천 소득세',amount:bt});
+      if(rt>0)items.push({category:'세금-원천 지방 소득세',amount:rt});
+    });
+  }
+  // 교재비
+  if(!items.some(function(e2){return e2.category==='교재비';})){
+    var rc=calcExpectedRevenue(yr,mo);if(rc.totalTextbook>0)items.push({category:'교재비',amount:rc.totalTextbook});
+  }
+  // 카드수수료
+  if(!items.some(function(e2){return e2.category==='카드 수수료';})){
+    var cRevs=revenues.filter(function(r2){if(r2.isManualMeta||r2.extraType)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===yr&&r2.revMonth===mo;return false;}).filter(function(r2){return r2.method==='카드'||r2.method==='결제 선생';});
+    var cf=Math.round(cRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0)*0.008);
+    if(cf>0)items.push({category:'카드 수수료',amount:cf});
+  }
+  // 고정비 전월복사
+  var fixedC=['학원 임대료','복사기 임대료','정수기 임대료','세무 기장료','카드 단말기','보험료-국민연금','보험료-건강보험','보험료-노란우산 공제','보험료-롯데 손해보험','보험료-KB 손해보험','보험료-메리츠'];
+  var pfmo=mo-1,pfyr=yr;if(pfmo<1){pfmo=12;pfyr--;}
+  fixedC.forEach(function(fc){
+    if(!items.some(function(e2){return e2.category===fc;})){
+      var prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pfyr&&e2.revMonth===pfmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pfyr&&d2.getMonth()===pfmo-1;}).filter(function(e2){return e2.category===fc;});
+      prev.forEach(function(pe){items.push({category:fc,amount:parseInt(pe.amount)||0});});
+    }
   });
-  // Add auto: 교재비
-  var rc=calcExpectedRevenue(yr,mo);total+=rc.totalTextbook;
-  // Add auto: 카드수수료
-  var cRevs=revenues.filter(function(r2){if(r2.isManualMeta||r2.extraType)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===yr&&r2.revMonth===mo;return false;}).filter(function(r2){return r2.method==='카드'||r2.method==='결제 선생';});
-  total+=Math.round(cRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0)*0.008);
-  return total;
+  return items.reduce(function(s,i){return s+i.amount;},0);
 }
 function calcExpectedRevenue(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
@@ -2552,32 +2571,33 @@ function renderRevExpense(yr,mo){
   var parentDisplayNames={'세금':'세금 & 공과금','대출':'대출','보험료':'보험료','카드':'카드','아파트':'아파트'};
   var allCats=[];Object.values(catGroups).forEach(function(grp){Object.values(grp).forEach(function(cats){allCats=allCats.concat(cats);});});
   var revCalc=calcExpectedRevenue(yr,mo);
-  // ── Auto-populate 인건비 from freelancer ledger ──
+  // ── Auto-populate 인건비 from freelancer ledger (전월 - 당월 인건비는 다음달 10일 지급) ──
   var teacherList=users.filter(function(u){return u.role==='teacher';});
+  var prevMoS=mo-1,prevYrS=yr;if(prevMoS<1){prevMoS=12;prevYrS--;}
   var hasAutoSalary=list.some(function(e2){return e2.category==='인건비'&&e2.autoFromLedger;});
   if(!hasAutoSalary&&teacherList.length){
     teacherList.forEach(function(u){
-      var workDays=u['workDays_'+yr+'_'+mo]||[];
+      var workDays=u['workDays_'+prevYrS+'_'+prevMoS]||[];
       var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
       var fee=Math.round(totalHours*(u.hourlyRate||15000));
       var bizTax=Math.round(fee*0.03);var resTax=Math.round(bizTax*0.1);
       var net=fee-bizTax-resTax;
       if(net>0){
         var existing=list.find(function(e2){return e2.category==='인건비'&&e2.name===u.name+' 급여'&&e2.autoFromLedger;});
-        if(!existing) list.push({id:'auto_'+u.id,category:'인건비',name:u.name+' 급여 (차감수령액)',amount:net,date:'',autoFromLedger:true,method:'-'});
+        if(!existing) list.push({id:'auto_'+u.id,category:'인건비',name:u.name+' 급여 ('+prevMoS+'월분·차감수령액)',amount:net,date:'',autoFromLedger:true,method:'-'});
       }
     });
   }
-  // ── Auto: 원천 소득세 & 원천 지방 소득세 from freelancer ledger ──
+  // ── Auto: 원천 소득세 & 원천 지방 소득세 from freelancer ledger (전월분) ──
   var hasAutoTax=list.some(function(e2){return e2.category==='세금-원천 소득세'&&e2.autoFromLedger;});
   if(!hasAutoTax&&teacherList.length){
     teacherList.forEach(function(u){
-      var workDays=u['workDays_'+yr+'_'+mo]||[];
+      var workDays=u['workDays_'+prevYrS+'_'+prevMoS]||[];
       var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
       var fee=Math.round(totalHours*(u.hourlyRate||15000));
       var bizTax=Math.round(fee*0.03);var resTax=Math.round(bizTax*0.1);
-      if(bizTax>0) list.push({id:'auto_biztax_'+u.id,category:'세금-원천 소득세',name:u.name+' 사업소득세(3%)',amount:bizTax,date:'',autoFromLedger:true,method:'-'});
-      if(resTax>0) list.push({id:'auto_restax_'+u.id,category:'세금-원천 지방 소득세',name:u.name+' 주민세',amount:resTax,date:'',autoFromLedger:true,method:'-'});
+      if(bizTax>0) list.push({id:'auto_biztax_'+u.id,category:'세금-원천 소득세',name:u.name+' 사업소득세(3%) ('+prevMoS+'월분)',amount:bizTax,date:'',autoFromLedger:true,method:'-'});
+      if(resTax>0) list.push({id:'auto_restax_'+u.id,category:'세금-원천 지방 소득세',name:u.name+' 주민세 ('+prevMoS+'월분)',amount:resTax,date:'',autoFromLedger:true,method:'-'});
     });
   }
   // ── Auto: 교재비 from calcExpectedRevenue (same as 월별 매출현황) ──
