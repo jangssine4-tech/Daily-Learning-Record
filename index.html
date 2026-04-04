@@ -1639,40 +1639,42 @@ function doPrintRev(yr,mo,overlay){
   setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
 function calcMonthExpTotal(yr,mo){
-  var expList=expenses.filter(function(e){if(e.revYear&&e.revMonth)return e.revYear===yr&&e.revMonth===mo;var d=new Date(e.date||e.createdAt);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
-  var items=expList.map(function(e2){return{category:e2.category,amount:parseInt(e2.amount)||0};});
-  var tl=users.filter(function(u){return u.role==='teacher';});
-  // 인건비: 전월 데이터 (당월 인건비는 다음달 10일 지급)
+  // Replicate exact same logic as renderRevExpense totalExp
+  var list=expenses.filter(function(e){if(e.revYear&&e.revMonth)return e.revYear===yr&&e.revMonth===mo;var d=new Date(e.date||e.createdAt);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
+  var allCats=['학원 임대료','복사기 임대료','정수기 임대료','세무 기장료','카드 단말기','인건비','학원 관리비','교재비','카드 수수료','홍보비','차량 유지비','통신비','세금-원천 소득세','세금-원천 지방 소득세','세금-종합 소득세','세금-자동차세','세금-지방교육세','세금-등록 면허세','대출','기타','보험료-국민연금','보험료-건강보험','보험료-노란우산 공제','보험료-롯데 손해보험','보험료-KB 손해보험','보험료-메리츠','카드-농협 BC카드','카드-현대카드','카드','아파트-임대료','아파트-관리비','아파트-대출 원리금 상환'];
+  var fixedC=['학원 임대료','복사기 임대료','정수기 임대료','세무 기장료','카드 단말기','보험료-국민연금','보험료-건강보험','보험료-노란우산 공제','보험료-롯데 손해보험','보험료-KB 손해보험','보험료-메리츠'];
   var pmo=mo-1,pyr=yr;if(pmo<1){pmo=12;pyr--;}
-  if(!items.some(function(e2){return e2.category==='인건비';})){
+  var tl=users.filter(function(u){return u.role==='teacher';});
+  // Auto 인건비+세금 (전월분) - same check as renderRevExpense (autoFromLedger)
+  if(!list.some(function(e2){return e2.category==='인건비'&&e2.autoFromLedger;})){
     tl.forEach(function(u2){
       var wd=u2['workDays_'+pyr+'_'+pmo]||[];var th=wd.reduce(function(s2,d2){return s2+(parseFloat(d2.hours)||0);},0);
       var fee=Math.round(th*(u2.hourlyRate||15000));var bt=Math.round(fee*0.03);var rt=Math.round(bt*0.1);var nt=fee-bt-rt;
-      if(nt>0)items.push({category:'인건비',amount:nt});
-      if(bt>0)items.push({category:'세금-원천 소득세',amount:bt});
-      if(rt>0)items.push({category:'세금-원천 지방 소득세',amount:rt});
+      if(nt>0)list.push({category:'인건비',amount:nt,autoFromLedger:true});
+      if(bt>0)list.push({category:'세금-원천 소득세',amount:bt,autoFromLedger:true});
+      if(rt>0)list.push({category:'세금-원천 지방 소득세',amount:rt,autoFromLedger:true});
     });
   }
-  // 교재비
-  if(!items.some(function(e2){return e2.category==='교재비';})){
-    var rc=calcExpectedRevenue(yr,mo);if(rc.totalTextbook>0)items.push({category:'교재비',amount:rc.totalTextbook});
+  // Auto 교재비
+  if(!list.some(function(e2){return e2.category==='교재비'&&e2.autoFromLedger;})){
+    var rc=calcExpectedRevenue(yr,mo);if(rc.totalTextbook>0)list.push({category:'교재비',amount:rc.totalTextbook,autoFromLedger:true});
   }
-  // 카드수수료
-  if(!items.some(function(e2){return e2.category==='카드 수수료';})){
+  // Auto 카드수수료
+  if(!list.some(function(e2){return e2.category==='카드 수수료'&&e2.autoFromLedger;})){
     var cRevs=revenues.filter(function(r2){if(r2.isManualMeta||r2.extraType)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===yr&&r2.revMonth===mo;return false;}).filter(function(r2){return r2.method==='카드'||r2.method==='결제 선생';});
     var cf=Math.round(cRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0)*0.008);
-    if(cf>0)items.push({category:'카드 수수료',amount:cf});
+    if(cf>0)list.push({category:'카드 수수료',amount:cf,autoFromLedger:true});
   }
-  // 고정비 전월복사
-  var fixedC=['학원 임대료','복사기 임대료','정수기 임대료','세무 기장료','카드 단말기','보험료-국민연금','보험료-건강보험','보험료-노란우산 공제','보험료-롯데 손해보험','보험료-KB 손해보험','보험료-메리츠'];
-  var pfmo=mo-1,pfyr=yr;if(pfmo<1){pfmo=12;pfyr--;}
+  // Auto 고정비 전월복사
   fixedC.forEach(function(fc){
-    if(!items.some(function(e2){return e2.category===fc;})){
-      var prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pfyr&&e2.revMonth===pfmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pfyr&&d2.getMonth()===pfmo-1;}).filter(function(e2){return e2.category===fc;});
-      prev.forEach(function(pe){items.push({category:fc,amount:parseInt(pe.amount)||0});});
+    if(!list.some(function(e2){return e2.category===fc&&!e2.autoFromPrevMonth;})){
+      var prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pyr&&e2.revMonth===pmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pyr&&d2.getMonth()===pmo-1;}).filter(function(e2){return e2.category===fc;});
+      prev.forEach(function(pe){list.push({category:fc,amount:parseInt(pe.amount)||0,autoFromPrevMonth:true,autoFromLedger:true});});
     }
   });
-  return items.reduce(function(s,i){return s+i.amount;},0);
+  // Sum ONLY allCats categories
+  var ct={};allCats.forEach(function(cat){ct[cat]=list.filter(function(e2){return e2.category===cat;}).reduce(function(s,e2){return s+(parseInt(e2.amount)||0);},0);});
+  return Object.values(ct).reduce(function(s,v){return s+v;},0);
 }
 function calcExpectedRevenue(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
@@ -2370,7 +2372,9 @@ function renderStaffArea(){
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">차감수령액</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+net.toLocaleString()+'</div></div>'
       +'</div>'
       +'<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openPayrollModal(\''+u.id+'\','+yr+','+mo+')">📝 근무 시간표</button>'
-      +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button></div></div>';
+      +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
+      +'<button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">✏️ 편집</button>'
+      +'<button class="btn btn-red btn-xs" onclick="deleteStaffUser(\''+u.id+'\',\''+u.name+'\')">🗑 삭제</button></div></div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt3)">등록된 교사가 없습니다.</div>';
   // Freelancer ledger
   var freelancerHTML='<table class="rev-tbl" style="font-size:12px"><thead><tr><th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">주민번호</th><th style="text-align:center">주소</th><th style="text-align:center">용역비</th><th style="text-align:center">사업소득세(3%)</th><th style="text-align:center">주민세</th><th style="text-align:center">차감수령액</th><th style="text-align:center">지급날짜</th></tr></thead><tbody>';
@@ -2388,8 +2392,15 @@ function renderStaffArea(){
     freelancerHTML+='<tr><td style="text-align:center">'+(idx+1)+'</td><td style="text-align:center;font-weight:600">'+u.name+'</td><td style="text-align:center;font-size:11px">'+ssn+'</td><td style="text-align:center;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(u.address||'-')+'</td><td style="text-align:center">'+fee.toLocaleString()+'</td><td style="text-align:center">'+bizTax.toLocaleString()+'</td><td style="text-align:center">'+resTax.toLocaleString()+'</td><td style="text-align:center;font-weight:700">'+net2.toLocaleString()+'</td><td style="text-align:center">'+payDateStr+'</td></tr>';
   });
   freelancerHTML+='<tr style="background:var(--surface2);font-weight:700"><td colspan="4" style="text-align:center">합계</td><td style="text-align:center;color:var(--red)">'+totalFee.toLocaleString()+'</td><td style="text-align:center">'+totalBizTax.toLocaleString()+'</td><td style="text-align:center">'+totalResTax.toLocaleString()+'</td><td style="text-align:center;color:var(--navy)">'+totalNet.toLocaleString()+'</td><td></td></tr></tbody></table>';
-  el.innerHTML='<div class="expense-section"><h4>💰 '+moStr+' 급여 명세서</h4>'+payrollHTML+'</div>'
+  el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h4 style="margin:0">💰 '+moStr+' 급여 명세서</h4><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 강사 등록</button></div>'
+    +'<div class="expense-section">'+payrollHTML+'</div>'
     +'<div class="expense-section"><h4>📋 '+moStr+' 프리랜서 용역 대장</h4><div style="overflow-x:auto">'+freelancerHTML+'</div></div>';
+}
+async function deleteStaffUser(userId,name){
+  if(!confirm(name+' 강사를 삭제하시겠습니까?\n(해당 월에 근무 데이터가 있으면 그 월에는 계속 표시됩니다)'))return;
+  loading(true);await db.collection('users').doc(userId).update({deleted:true,deletedAt:new Date().toISOString()});
+  var u=users.find(function(x){return x.id===userId;});if(u)u.deleted=true;
+  renderStaffArea();loading(false);toast('🗑 '+name+' 삭제됨');
 }
 function toggleStaffDay(userId,day,el){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
