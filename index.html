@@ -684,7 +684,7 @@ function goto(view){
   // Only populate selects when navigating away from schedule
   if(view!=='schedule') ensureFullPopulate();
   if(view==='schedule')renderSchedule();
-  else if(view==='history'){if(!reports.length&&currentUser)loadReports().then(renderHistory);else renderHistory();}
+  else if(view==='history'){loadReports().then(renderHistory);}
   else if(view==='students'){
     var syf=$('s-filter-year'),smf2=$('s-filter-month');
     if(syf&&!syf.options.length){var cy=new Date().getFullYear();for(var yy=cy-3;yy<=cy+1;yy++){var o=document.createElement('option');o.value=yy;o.textContent=yy+'년';syf.appendChild(o);}syf.value=cy;}
@@ -1040,7 +1040,9 @@ function setEval(key,val,btn){var btns=btn.parentNode.querySelectorAll('button')
 
 async function saveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 시간표에서 선택하세요');return;}
-  var s=students.find(function(x){return x.id===sId;});if(!s)return;loading(true);
+  var s=students.find(function(x){return x.id===sId;});if(!s){toast('⚠️ 학생 데이터를 찾을 수 없습니다');return;}
+  loading(true);
+  try{
   var evalItems=window._evalState||{};var cls2=classes.find(function(c){return c.id===s.classId;});var usedEvalModule=window._currentEvalModule||cls2?.evalModule||'';
   var data={studentId:sId,studentName:s.name,classId:s.classId||'',date:$('r-date').value,teacher:$('r-teacher').value,level:$('r-level').value,progress:$('r-progress').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,dictation:$('r-dictation').value||'',evalModule:usedEvalModule,evalItems:evalItems,praise:[],absent:false,needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',updatedAt:new Date().toISOString()};
   var savedId='';
@@ -1075,6 +1077,7 @@ async function saveReport(){
   loading(false);toast('✅ 일지 저장됨 (DB 반영 완료)');
   if(window._saveImageAfter){window._saveImageAfter=false;saveCacheDebounced();saveReportAsImage(savedId);return;}
   goto('schedule');saveCacheDebounced();
+  }catch(err){loading(false);toast('❌ 저장 실패: '+err.message);console.error('saveReport error:',err);}
 }
 async function saveReportAndImage(){window._saveImageAfter=true;await saveReport();}
 
