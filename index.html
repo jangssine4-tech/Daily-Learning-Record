@@ -488,6 +488,18 @@ async function login(){
 // ═══════════════════════════════════════════════════
 // OPTIMIZED BOOT - breaks work into yielding steps
 // ═══════════════════════════════════════════════════
+function applyMenuPerms(){
+  if(!currentUser||currentUser.role==='admin')return;
+  // Find this user in the loaded users list and get their menuPerms
+  var matchedUser=users.find(function(u){return u.loginId===currentUser.loginId;});
+  if(matchedUser&&matchedUser.menuPerms)currentUser.menuPerms=matchedUser.menuPerms;
+  var perms=currentUser.menuPerms||{};
+  var menuMap={goals:'snav-goals',summary:'snav-summary',students:'snav-students',classes:'snav-classes',memo:'snav-memo',schedule:'snav-schedule',write:'snav-write',history:'snav-history',consult:'snav-consult',homework:'snav-homework',makeup:'snav-makeup',reference:'snav-reference',admin:'snav-admin',settings:'snav-settings'};
+  Object.keys(menuMap).forEach(function(key){
+    var el=document.getElementById(menuMap[key]);
+    if(el)el.style.display=perms[key]===false?'none':'';
+  });
+}
 async function bootApp(){
   $('sb-username').textContent=currentUser.name;
   $('sb-date').textContent=todayISO();
@@ -513,6 +525,7 @@ async function bootApp(){
     bootProgress(100, '완료!');
     hideBootOverlay();
     toast('👋 환영합니다, '+currentUser.name+'님!');
+    applyMenuPerms();
     // Background sync after 1 second
     setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();}, 1000);
   } else {
@@ -540,6 +553,7 @@ async function bootApp(){
       bootProgress(100, '완료!');
       hideBootOverlay();
       toast('👋 환영합니다, '+currentUser.name+'님!');
+      applyMenuPerms();
       // Stage 2: Non-essential data in background
       setTimeout(async function(){
         try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules()]);}catch(e){}
@@ -2341,7 +2355,7 @@ function renderStaffArea(){
   var moStr=yr+'년 '+mo+'월';
   var nextMo=mo+1;var nextYr=yr;if(nextMo>12){nextMo=1;nextYr++;}
   var payDateStr=nextYr+'.'+String(nextMo).padStart(2,'0')+'.10';
-  var teacherList=users.filter(function(u){if(u.role!=='teacher')return false;if(!u.deleted)return true;var wd=u['workDays_'+yr+'_'+mo]||[];return wd.length>0;});
+  var teacherList=users.filter(function(u){if(u.role!=='teacher')return false;if(!u.staffDeleted)return true;var wd=u['workDays_'+yr+'_'+mo]||[];return wd.length>0;});
   var payrollHTML=teacherList.length?teacherList.map(function(u,idx){
     var hourlyRate=u.hourlyRate||15000;
     var workDays=u['workDays_'+yr+'_'+mo]||[];
@@ -2397,10 +2411,10 @@ function renderStaffArea(){
     +'<div class="expense-section"><h4>📋 '+moStr+' 프리랜서 용역 대장</h4><div style="overflow-x:auto">'+freelancerHTML+'</div></div>';
 }
 async function deleteStaffUser(userId,name){
-  if(!confirm(name+' 강사를 삭제하시겠습니까?\n(해당 월에 근무 데이터가 있으면 그 월에는 계속 표시됩니다)'))return;
-  loading(true);await db.collection('users').doc(userId).update({deleted:true,deletedAt:new Date().toISOString()});
-  var u=users.find(function(x){return x.id===userId;});if(u)u.deleted=true;
-  renderStaffArea();loading(false);toast('🗑 '+name+' 삭제됨');
+  if(!confirm(name+' 강사를 강사 페이지에서 삭제합니다.\n관리자 페이지에는 영향이 없습니다.\n(해당 월에 근무 데이터가 있으면 그 월에는 계속 표시됩니다)\n삭제하시겠습니까?'))return;
+  loading(true);await db.collection('users').doc(userId).update({staffDeleted:true,staffDeletedAt:new Date().toISOString()});
+  var u=users.find(function(x){return x.id===userId;});if(u)u.staffDeleted=true;
+  renderStaffArea();loading(false);toast('🗑 '+name+' 강사 페이지에서 삭제됨');
 }
 function toggleStaffDay(userId,day,el){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
@@ -3259,10 +3273,10 @@ async function saveRefItem(){loading(true);var type=$('ref-type').value;var data
 async function deleteRefItem(id){var did=id||$('ref-id').value;if(!did||!confirm('삭제?'))return;loading(true);await db.collection('refItems').doc(did).delete();await loadRefItems();renderRefFees();closeM('refitem');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
 
 // ══ ADMIN ══
-function renderUsers(){var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.deleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong></td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>')+'</td><td><button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button></td></tr>';}).join('');}
+function renderUsers(){var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.adminDeleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong></td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>')+'</td><td><button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button></td></tr>';}).join('');}
 function openUserModal(id){var u=id?users.find(function(x){return x.id===id;}):null;$('u-id-key').value=id||'';$('u-name').value=u?u.name||'':'';$('u-role').value=u?u.role||'teacher':'teacher';$('u-id').value=u?u.loginId||'':'';$('u-pw').value='';$('u-phone').value=u?u.phone||'':'';if(u&&u.ssn){try{$('u-ssn').value=atob(u.ssn);}catch(e){$('u-ssn').value='';}}else{$('u-ssn').value='';}$('u-ssn').type='password';$('u-address').value=u?u.address||'':'';$('u-del-wrap').style.display=id?'block':'none';$('modal-user').style.display='flex';}
 async function saveUser(){var name=$('u-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}var loginId=$('u-id').value.trim();if(!loginId){toast('⚠️ 아이디 필수');return;}loading(true);var data={name:name,role:$('u-role').value,loginId:loginId,phone:$('u-phone').value.trim(),address:$('u-address').value.trim(),updatedAt:new Date().toISOString()};var ssnVal=$('u-ssn').value;if(ssnVal&&ssnVal!=='******'){data.ssn=btoa(ssnVal);}var pw=$('u-pw').value;if(pw)data.password=pw;var id=$('u-id-key').value;if(id)await db.collection('users').doc(id).update(data);else{data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}await loadUsers();renderUsers();_fullyPopulated=false;closeM('user');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
-async function deleteUser(){var id=$('u-id-key').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('users').doc(id).update({deleted:true,deletedAt:new Date().toISOString()});await loadUsers();renderUsers();closeM('user');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
+async function deleteUser(){var id=$('u-id-key').value;if(!id||!confirm('관리자 페이지에서 삭제합니다. 강사 페이지에는 영향이 없습니다.\n삭제하시겠습니까?'))return;loading(true);await db.collection('users').doc(id).update({adminDeleted:true,adminDeletedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===id;});if(u)u.adminDeleted=true;await loadUsers();renderUsers();closeM('user');loading(false);saveCacheDebounced();toast('🗑 관리자 페이지에서 삭제됨');}
 function openMenuPermModal(userId){var u=users.find(function(x){return x.id===userId;});if(!u)return;var menuList=['goals','summary','students','classes','memo','schedule','write','history','consult','homework','makeup','reference','admin','settings'];var menuLabels={goals:'목표 관리',summary:'월별 현황',students:'학생 목록',classes:'클래스 관리',memo:'메모',schedule:'오늘 시간표',write:'학습 일지 작성',history:'기록 조회',consult:'상담 일지',homework:'숙제 관리',makeup:'보강 계획표',reference:'참고',admin:'관리자',settings:'설정'};var perms=u.menuPerms||{};var fieldsHTML=menuList.map(function(m){return'<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px">'+menuLabels[m]+'</span><input type="checkbox" id="perm-'+m+'"'+(perms[m]!==false?' checked':'')+'></div>';}).join('');var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};overlay.innerHTML='<div class="ms"><div class="mh"></div><div class="mt">'+u.name+' 메뉴 권한</div><div>'+fieldsHTML+'</div><div style="height:14px"></div><button class="btn btn-green btn-block" onclick="saveMenuPerms(\''+userId+'\',this.closest(\'.mo\'))">저장</button><div style="height:6px"></div><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button></div>';document.body.appendChild(overlay);}
 async function saveMenuPerms(userId,overlay){loading(true);var menuList=['goals','summary','students','classes','memo','schedule','write','history','consult','homework','makeup','reference','admin','settings'];var perms={};menuList.forEach(function(m){var el=document.getElementById('perm-'+m);perms[m]=el?el.checked:true;});await db.collection('userPerms').doc(userId).set({menuPerms:perms,updatedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===userId;});if(u)u.menuPerms=perms;if(overlay)overlay.remove();loading(false);toast('✅ 권한 저장됨');}
 
