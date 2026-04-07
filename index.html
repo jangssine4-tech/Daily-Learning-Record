@@ -261,6 +261,21 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">전달 사항</div><textarea class="fi" id="r-memo" rows="2"></textarea></div>
     <div class="field" style="background:var(--surface2);border-radius:var(--r);padding:10px 12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-makeup-check" onchange="$('r-makeup-content-wrap').style.display=this.checked?'block':'none'"> 보강 필요</label></div><div id="r-makeup-content-wrap" style="display:none"><textarea class="fi" id="r-makeup-content" rows="2" placeholder="보강 사유 및 내용 (보강 계획표 메모에 연동됩니다)"></textarea></div></div>
+    <div class="field" style="background:linear-gradient(135deg,#eff6ff,#f0fdf4);border-radius:var(--r);padding:12px;border:1px solid #bfdbfe">
+      <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">🤖 AI 어시스턴트</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-xs" style="font-size:11px" onclick="runAi('parent')">💬 학부모 코멘트</button>
+        <button class="btn btn-outline btn-xs" style="font-size:11px" onclick="runAi('teacher')">📝 교사 메모</button>
+        <button class="btn btn-outline btn-xs" style="font-size:11px" onclick="runAi('goal')">🎯 다음 수업 목표</button>
+        <button class="btn btn-outline btn-xs" style="font-size:11px" onclick="runAi('all')">⚡ 전체 생성</button>
+      </div>
+      <div id="ai-result-area" style="display:none;margin-top:10px">
+        <div id="ai-loading" style="display:none;text-align:center;padding:12px;font-size:12px;color:var(--blue)">🔄 AI 분석 중... (약 5~10초)</div>
+        <div id="ai-result-parent" style="display:none;background:#fff;border-radius:6px;padding:10px;margin-bottom:6px;border:1px solid #bbf7d0"><div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:4px">💬 학부모 코멘트</div><div id="ai-parent-text" style="font-size:12px;line-height:1.6;color:var(--txt)"></div><button class="btn btn-green btn-xs" style="margin-top:6px" onclick="applyAiResult('parent')">✅ 전달사항에 적용</button></div>
+        <div id="ai-result-teacher" style="display:none;background:#fff;border-radius:6px;padding:10px;margin-bottom:6px;border:1px solid #bfdbfe"><div style="font-size:11px;font-weight:700;color:#1e40af;margin-bottom:4px">📝 교사 메모</div><div id="ai-teacher-text" style="font-size:12px;line-height:1.6;color:var(--txt)"></div><button class="btn btn-navy btn-xs" style="margin-top:6px" onclick="applyAiResult('teacher')">✅ 코멘트에 적용</button></div>
+        <div id="ai-result-goal" style="display:none;background:#fff;border-radius:6px;padding:10px;border:1px solid #fde68a"><div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:4px">🎯 다음 수업 목표</div><div id="ai-goal-text" style="font-size:12px;line-height:1.6;color:var(--txt)"></div></div>
+      </div>
+    </div>
     <div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap"><button class="btn btn-outline" style="flex:1;min-width:80px" onclick="tempSaveReport()">📋 임시 저장</button><button class="btn btn-green" style="flex:1;min-width:80px" onclick="saveReport()">💾 저장</button><button class="btn btn-navy" style="flex:1;min-width:80px" onclick="saveReportAndImage()">📷 저장 + 이미지</button><button class="btn btn-outline" style="min-width:50px;color:var(--txt3)" onclick="goto('schedule')">취소</button></div>
     <div id="temp-save-indicator" style="display:none;text-align:center;margin-top:6px;font-size:11px;color:var(--blue)">📋 임시 저장된 데이터가 있습니다</div>
   </div></div>
@@ -294,7 +309,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </div>
 <div class="view" id="view-reference"><div class="page-top"><h2>참고</h2><p>교육비 기준 및 레벨별 진도를 관리합니다</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex"><button class="rev-tab active" id="reftab-fees" onclick="switchRefTab('fees')">💰 교육비 기준</button><button class="rev-tab" id="reftab-curriculum" onclick="switchRefTab('curriculum')">📚 레벨별 진도</button><button class="rev-tab" id="reftab-eval" onclick="switchRefTab('eval')">📊 평가 모듈</button></div><div id="ref-panel-fees" class="cp"><div class="expense-section"><h4>💰 교육비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('tuition')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th style="text-align:center">학년</th><th style="text-align:center">단계</th><th style="text-align:center">기본 교육비</th><th style="text-align:center">주 3회</th><th style="text-align:center">주 4회</th><th style="text-align:center">주 5회</th><th></th></tr></thead><tbody id="ref-tuition-tbody"></tbody></table></div></div><div class="expense-section"><h4>📚 교재비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('textbook')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th>학년</th><th>단계</th><th style="text-align:right">교재비</th><th>부교재명</th><th style="text-align:right">부교재비</th><th></th></tr></thead><tbody id="ref-textbook-tbody"></tbody></table></div></div></div><div id="ref-panel-curriculum" style="display:none" class="cp"><input class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="max-width:280px;font-size:12px;padding:6px 10px;margin-bottom:12px"><div id="ref-curriculum-area"></div></div><div id="ref-panel-eval" style="display:none" class="cp"><div id="eval-modules-area"></div></div></div>
 <div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
-<div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 알림톡 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div id="solapi-settings"></div><button class="btn btn-green btn-sm" onclick="saveSolapiConfig()">💾 저장</button><button class="btn btn-outline btn-sm" style="margin-left:6px" onclick="testSolapi()">📱 테스트 발송</button></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><button class="btn btn-outline btn-sm" onclick="if(confirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
+<div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 알림톡 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div id="solapi-settings"></div><button class="btn btn-green btn-sm" onclick="saveSolapiConfig()">💾 저장</button><button class="btn btn-outline btn-sm" style="margin-left:6px" onclick="testSolapi()">📱 테스트 발송</button></div><div class="sec">AI 어시스턴트 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div class="r2"><div class="field"><div class="fl">AI 서비스</div><select class="fi" id="ai-provider" onchange="toggleAiFields()"><option value="openai">OpenAI (GPT)</option><option value="anthropic">Anthropic (Claude)</option></select></div><div class="field"><div class="fl">모델</div><select class="fi" id="ai-model"><option value="gpt-4.1-nano">GPT-4.1 Nano (최저가)</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option><option value="gpt-4o-mini">GPT-4o Mini</option><option value="gpt-4o">GPT-4o</option><option value="claude-sonnet-4-20250514">Claude Sonnet 4</option></select></div></div><div class="field"><div class="fl">API Key</div><div style="display:flex;gap:4px"><input class="fi" id="ai-apikey" type="password" placeholder="sk-... 또는 sk-ant-..." style="flex:1"><button class="btn btn-outline btn-xs" type="button" onclick="var el=$('ai-apikey');el.type=el.type==='password'?'text':'password'" style="white-space:nowrap;padding:4px 8px">👁</button></div></div><div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-green btn-sm" onclick="saveAiConfig()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="testAiConfig()">🧪 연결 테스트</button></div><div style="font-size:10px;color:var(--txt3);margin-top:8px">API Key는 브라우저 localStorage에만 저장됩니다. 서버에 전송되지 않습니다.</div></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><button class="btn btn-outline btn-sm" onclick="if(confirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
 </div>
 
 <!-- MODALS -->
@@ -713,7 +728,7 @@ function goto(view){
   else if(view==='reference'){if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}
   else if(view==='marketing'){initMkSelects();renderMarketing();}
   else if(view==='admin')renderUsers();
-  else if(view==='settings'){renderPeriodSettings();renderSolapiSettings();}
+  else if(view==='settings'){renderPeriodSettings();renderSolapiSettings();loadAiConfigUI();}
   else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){var yr2=new Date().getFullYear();loadGoalTargets(yr2).then(function(){renderGoalsView();});}else renderGoalsView();}
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
@@ -1165,7 +1180,7 @@ function showReportDetail(id){
   function rowH(k,v){if(!v)return'';return'<div style="display:flex;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--txt3);min-width:80px">'+k+'</span><span>'+v+'</span></div>';}
   var evalH='';
   if(mod&&r.evalItems){evalH='<div style="font-size:12px;font-weight:700;color:var(--txt3);margin:10px 0 7px">📊 '+mod.label+' 평가</div>';mod.sections.forEach(function(sec){evalH+='<div style="font-size:12px;font-weight:700;margin:8px 0 4px;color:var(--txt2)">'+sec.title+'</div>';sec.items.forEach(function(item){evalH+='<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)"><span>'+item.label+'</span><span>'+starH(r.evalItems[item.key]||0)+'</span></div>';});});}
-  $('report-detail-inner').innerHTML='<div class="mt">'+r.studentName+' 학습 일지</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px"><span class="badge bg-navy">'+r.date+'</span>'+(r.level?'<span class="badge bg-blue">'+r.level+'</span>':'')+'<span class="badge bg-gray">'+(r.teacher||'-')+'</span>'+(r.absent?'<span class="badge bg-red">결석</span>':'')+'</div><div style="background:var(--surface2);border-radius:var(--r);padding:11px;margin-bottom:10px">'+rowH('진도',r.progress)+rowH('복습 테스트',r.reviewTest)+rowH('수업 태도',r.attitude)+rowH('Daily Quiz',r.dailyQuiz)+rowH('숙제',r.homework)+'</div>'+evalH+'<div style="background:var(--surface2);border-radius:8px;padding:9px 11px;margin-top:7px"><strong>💬 코멘트</strong><textarea class="fi" id="rd-comment" rows="2" style="margin-top:4px;font-size:12px">'+(r.comment||'')+'</textarea></div><div style="background:#f0f9ff;border-radius:8px;padding:9px 11px;margin-top:7px"><strong>📢 전달 사항</strong><textarea class="fi" id="rd-memo" rows="2" style="margin-top:4px;font-size:12px">'+(r.memo||'')+'</textarea></div><div style="height:8px"></div><button class="btn btn-navy btn-block btn-sm" onclick="updateReportComment(\''+id+'\')">💾 코멘트 저장</button><div style="height:8px"></div><button class="btn btn-green btn-block" onclick="saveReportAsImage(\''+id+'\')">📷 이미지로 저장 (카톡 전송용)</button>';
+  $('report-detail-inner').innerHTML='<div class="mt">'+r.studentName+' 학습 일지</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px"><span class="badge bg-navy">'+r.date+'</span>'+(r.level?'<span class="badge bg-blue">'+r.level+'</span>':'')+'<span class="badge bg-gray">'+(r.teacher||'-')+'</span>'+(r.absent?'<span class="badge bg-red">결석</span>':'')+'</div><div style="background:var(--surface2);border-radius:var(--r);padding:11px;margin-bottom:10px">'+rowH('진도',r.progress)+rowH('복습 테스트',r.reviewTest)+rowH('수업 태도',r.attitude)+rowH('Daily Quiz',r.dailyQuiz)+rowH('숙제',r.homework)+'</div>'+evalH+'<div style="background:var(--surface2);border-radius:8px;padding:9px 11px;margin-top:7px"><strong>💬 코멘트</strong><textarea class="fi" id="rd-comment" rows="2" style="margin-top:4px;font-size:12px">'+(r.comment||'')+'</textarea></div><div style="background:#f0f9ff;border-radius:8px;padding:9px 11px;margin-top:7px"><strong>📢 전달 사항</strong><textarea class="fi" id="rd-memo" rows="2" style="margin-top:4px;font-size:12px">'+(r.memo||'')+'</textarea></div><div style="height:8px"></div><button class="btn btn-navy btn-block btn-sm" onclick="updateReportComment(\''+id+'\')">💾 코멘트 저장</button><div style="height:8px"></div><button class="btn btn-green btn-block" onclick="saveReportAsImage(\''+id+'\')">📷 이미지로 저장 (카톡 전송용)</button><div style="height:8px"></div><button class="btn btn-outline btn-block" onclick="aiConsultSummary(\''+r.studentId+'\')">🤖 AI 상담용 요약</button><div id="ai-consult-result" style="display:none;margin-top:8px;background:#eff6ff;border-radius:8px;padding:10px;font-size:12px;line-height:1.6"></div>';
   $('modal-report').style.display='flex';
 }
 async function updateReportComment(id){
@@ -2381,6 +2396,132 @@ async function saveMemoEdit(memoId){
   var m=window._studentMemos.find(function(x){return x.id===memoId;});
   if(m)m.content=newContent;
   renderMemoPage();renderSchedule();toast('✅ 메모 수정됨');
+}
+
+// ══ AI ASSISTANT ══
+function getAiConfig(){
+  try{var raw=localStorage.getItem('ai_config');return raw?JSON.parse(raw):null;}catch(e){return null;}
+}
+function saveAiConfig(){
+  var cfg={provider:$('ai-provider').value,model:$('ai-model').value,apiKey:$('ai-apikey').value.trim()};
+  if(!cfg.apiKey){toast('⚠️ API Key를 입력하세요');return;}
+  localStorage.setItem('ai_config',JSON.stringify(cfg));toast('✅ AI 설정 저장됨');
+}
+function toggleAiFields(){
+  var p=$('ai-provider').value;var m=$('ai-model');
+  if(p==='openai')m.innerHTML='<option value="gpt-4.1-nano">GPT-4.1 Nano (최저가)</option><option value="gpt-4.1-mini">GPT-4.1 Mini</option><option value="gpt-4o-mini">GPT-4o Mini</option><option value="gpt-4o">GPT-4o</option>';
+  else m.innerHTML='<option value="claude-sonnet-4-20250514">Claude Sonnet 4</option><option value="claude-haiku-3-5-20241022">Claude Haiku 3.5</option>';
+}
+function loadAiConfigUI(){
+  var cfg=getAiConfig();if(!cfg)return;
+  if($('ai-provider'))$('ai-provider').value=cfg.provider||'openai';
+  toggleAiFields();
+  if($('ai-model'))$('ai-model').value=cfg.model||'';
+  if($('ai-apikey'))$('ai-apikey').value=cfg.apiKey||'';
+}
+async function testAiConfig(){
+  var cfg=getAiConfig();if(!cfg||!cfg.apiKey){toast('⚠️ API Key를 먼저 저장하세요');return;}
+  toast('🔄 연결 테스트 중...');
+  try{
+    var result=await callAiAPI(cfg,'안녕하세요. 테스트입니다. "연결 성공"이라고만 답해주세요.');
+    toast('✅ AI 연결 성공: '+result.substring(0,30));
+  }catch(e){toast('❌ 연결 실패: '+e.message);}
+}
+async function callAiAPI(cfg,prompt){
+  if(cfg.provider==='anthropic'){
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:cfg.model,max_tokens:1024,messages:[{role:'user',content:prompt}]})});
+    if(!resp.ok)throw new Error('API 오류: '+resp.status);
+    var data=await resp.json();return(data.content||[]).map(function(c){return c.text||'';}).join('');
+  } else {
+    var resp2=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify({model:cfg.model,max_tokens:1024,messages:[{role:'system',content:'당신은 한국의 영어학원 교육 전문가 AI 어시스턴트입니다. 학원명은 잉글리시아이위드멘토링 영수학원입니다. 항상 한국어로 답하세요.'},{role:'user',content:prompt}]})});
+    if(!resp2.ok){var errData=await resp2.json().catch(function(){return{};});throw new Error('API 오류: '+resp2.status+' '+(errData.error?.message||''));}
+    var data2=await resp2.json();return data2.choices?.[0]?.message?.content||'결과 없음';
+  }
+}
+function buildAiPrompt(type){
+  var sId=$('r-student-id').value;
+  var s=students.find(function(x){return x.id===sId;});if(!s)return null;
+  var level=$('r-level').value;var progress=$('r-progress').value;
+  var review=$('r-review').value;var attitude=$('r-attitude').value;
+  var quiz=$('r-quiz').value;var hw=$('r-hw').value;
+  var commentT=$('r-comment-tablet').value.trim();
+  var commentB=$('r-comment-book').value.trim();
+  var dictation=$('r-dictation')?.value||'';
+  // Get recent reports for context
+  var recentReps=reports.filter(function(r){return r.studentId===sId;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,3);
+  var historyText=recentReps.map(function(r){return r.date+': '+r.level+' '+r.progress+' 복습='+r.reviewTest+' 태도='+r.attitude+' 숙제='+r.homework+(r.comment?' 코멘트:'+r.comment:'');}).join('\n');
+  var info='[학생 정보]\n이름: '+s.name+'\n학년: '+(s.grade||'-')+'\n단계: '+level+'\n진도: '+progress+'\n\n[오늘 수업 기록]\n복습 테스트: '+(review||'-')+'\n수업 태도: '+(attitude||'-')+'\nDaily Quiz: '+(quiz||'-')+'\n숙제: '+(hw||'-')+(dictation?'\n받아쓰기: '+dictation:'')+(commentT?'\n태블릿 코멘트: '+commentT:'')+(commentB?'\n교재 코멘트: '+commentB:'')+'\n\n[최근 3회 수업 이력]\n'+(historyText||'이력 없음');
+  if(type==='parent'){
+    return info+'\n\n위 정보를 바탕으로, 학부모님께 보내는 따뜻하고 구체적인 오늘 수업 코멘트를 작성해주세요.\n- 2~3문장, 존댓말\n- 학생의 잘한 점을 먼저 언급하고, 개선점이 있으면 부드럽게 제안\n- 이모지 1~2개 자연스럽게 사용\n- 학원명이나 인사말은 제외하고 코멘트만';
+  } else if(type==='teacher'){
+    return info+'\n\n위 정보를 바탕으로, 교사용 내부 메모를 작성해주세요.\n- 다음 수업 때 확인할 사항\n- 학생의 취약점과 보충 필요 영역\n- 1~2문장, 간결하게';
+  } else if(type==='goal'){
+    return info+'\n\n위 정보를 바탕으로, 다음 수업 목표를 제안해주세요.\n- 구체적인 학습 목표 2~3개\n- 오늘 수업 결과 반영\n- 번호 매기기';
+  } else {
+    return info+'\n\n위 정보를 바탕으로 아래 3가지를 JSON 형식으로 작성해주세요. 키는 parent, teacher, goal입니다.\n\n1. parent: 학부모님께 보내는 따뜻한 오늘 수업 코멘트 (2~3문장, 존댓말, 이모지 1~2개)\n2. teacher: 교사용 내부 메모 (다음 수업 확인 사항, 1~2문장)\n3. goal: 다음 수업 목표 (2~3개, 번호)\n\n반드시 JSON만 출력하세요. ```json 마크다운 없이 순수 JSON만.';
+  }
+}
+async function runAi(type){
+  var cfg=getAiConfig();
+  if(!cfg||!cfg.apiKey){toast('⚠️ 설정 > AI 어시스턴트에서 API Key를 먼저 등록하세요');return;}
+  var sId=$('r-student-id').value;
+  if(!sId){toast('⚠️ 학생을 시간표에서 먼저 선택하세요');return;}
+  var prompt=buildAiPrompt(type);if(!prompt)return;
+  $('ai-result-area').style.display='block';
+  $('ai-loading').style.display='block';
+  ['ai-result-parent','ai-result-teacher','ai-result-goal'].forEach(function(id2){$(id2).style.display='none';});
+  try{
+    var result=await callAiAPI(cfg,prompt);
+    $('ai-loading').style.display='none';
+    if(type==='all'){
+      try{
+        var clean=result.replace(/```json|```/g,'').trim();
+        var parsed=JSON.parse(clean);
+        if(parsed.parent){$('ai-parent-text').textContent=parsed.parent;$('ai-result-parent').style.display='block';}
+        if(parsed.teacher){$('ai-teacher-text').textContent=parsed.teacher;$('ai-result-teacher').style.display='block';}
+        if(parsed.goal){$('ai-goal-text').textContent=parsed.goal;$('ai-result-goal').style.display='block';}
+      }catch(e2){
+        $('ai-parent-text').textContent=result;$('ai-result-parent').style.display='block';
+      }
+    } else if(type==='parent'){
+      $('ai-parent-text').textContent=result;$('ai-result-parent').style.display='block';
+    } else if(type==='teacher'){
+      $('ai-teacher-text').textContent=result;$('ai-result-teacher').style.display='block';
+    } else if(type==='goal'){
+      $('ai-goal-text').textContent=result;$('ai-result-goal').style.display='block';
+    }
+    toast('✅ AI 분석 완료');
+  }catch(err){
+    $('ai-loading').style.display='none';
+    toast('❌ AI 오류: '+err.message);
+  }
+}
+function applyAiResult(type){
+  if(type==='parent'){
+    var txt=$('ai-parent-text').textContent;
+    $('r-memo').value=($('r-memo').value?$('r-memo').value+'\n':'')+txt;
+    toast('✅ 전달사항에 적용됨');
+  } else if(type==='teacher'){
+    var txt2=$('ai-teacher-text').textContent;
+    var existing=$('r-comment-tablet').value;
+    $('r-comment-tablet').value=(existing?existing+'\n':'')+txt2;
+    toast('✅ 코멘트에 적용됨');
+  }
+}
+async function aiConsultSummary(studentId){
+  var cfg=getAiConfig();
+  if(!cfg||!cfg.apiKey){toast('⚠️ 설정 > AI 어시스턴트에서 API Key를 먼저 등록하세요');return;}
+  var s=students.find(function(x){return x.id===studentId;});if(!s)return;
+  var reps=reports.filter(function(r){return r.studentId===studentId;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,10);
+  if(!reps.length){toast('⚠️ 수업 기록이 없습니다');return;}
+  var el=$('ai-consult-result');if(el){el.style.display='block';el.innerHTML='🔄 AI 분석 중...';}
+  var historyText=reps.map(function(r){return r.date+' | '+r.level+' | '+r.progress+' | 복습:'+r.reviewTest+' | 태도:'+r.attitude+' | 숙제:'+r.homework+(r.comment?' | '+_cleanComment(r.comment):'');}).join('\n');
+  var prompt='[학생 정보]\n이름: '+s.name+'\n학년: '+(s.grade||'-')+'\n현재 단계: '+getStudentLevel(s)+'\n\n[최근 10회 수업 기록]\n'+historyText+'\n\n위 정보를 바탕으로 학부모 상담용 종합 요약을 작성해주세요.\n- 전체 학습 경향 (향상/유지/부진)\n- 강점과 약점\n- 향후 학습 방향 제안\n- 학부모님께 전달할 긍정적 메시지\n- 존댓말, 3~5문단';
+  try{
+    var result=await callAiAPI(cfg,prompt);
+    if(el)el.innerHTML='<div style="font-weight:700;color:var(--navy);margin-bottom:6px">🤖 AI 상담 요약 - '+s.name+'</div><div style="white-space:pre-wrap">'+result+'</div><button class="btn btn-outline btn-xs" style="margin-top:8px" onclick="navigator.clipboard.writeText(document.getElementById(\'ai-consult-result\').querySelector(\'div:nth-child(2)\').textContent);toast(\'📋 복사됨\')">📋 클립보드 복사</button>';
+    toast('✅ 상담 요약 생성 완료');
+  }catch(err){if(el)el.innerHTML='❌ 오류: '+err.message;toast('❌ AI 오류: '+err.message);}
 }
 
 // ══ MARKETING ══
