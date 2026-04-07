@@ -555,7 +555,7 @@ async function bootApp(){
     toast('👋 환영합니다, '+currentUser.name+'님!');
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -587,6 +587,7 @@ async function bootApp(){
         try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules()]);}catch(e){}
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return {id:d.id,...d.data()};});}catch(e){}
         saveCache();
+        startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();
       }, 500);
     } catch(e) {
       console.error('Boot error:', e);
@@ -629,7 +630,7 @@ function loadCache(){
 async function syncFromFirestore(){
   try{
     await Promise.all([loadStudents(),loadClasses(),loadTeachers(),loadUsers(),loadPeriods(),loadRefItems()]);
-    _fullyPopulated=false; // Force re-populate on next view switch
+    _fullyPopulated=false;
     renderSchedule();
     setTimeout(async function(){
       await Promise.all([loadReports(),loadMakeups()]);
@@ -641,6 +642,67 @@ async function syncFromFirestore(){
       },300);
     },100);
   }catch(e){console.error('sync error:',e);}
+}
+// ── Real-time Listeners ──
+var _rtListeners=[];
+function startRealtimeListeners(){
+  if(!db)return;
+  // Reports listener
+  var yearStart=new Date().getFullYear()+'-01-01';
+  try{
+    var unsub1=db.collection('reports').where('date','>=',yearStart).onSnapshot(function(snap){
+      reports=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      // Re-render current view if relevant
+      var cv=document.querySelector('.view.active');
+      if(cv){var vid=cv.id.replace('view-','');if(vid==='schedule')renderSchedule();else if(vid==='history')renderHistory();}
+    },function(err){console.error('reports listener:',err);});
+    _rtListeners.push(unsub1);
+  }catch(e){}
+  // StudentMemos listener
+  try{
+    var unsub2=db.collection('studentMemos').onSnapshot(function(snap){
+      window._studentMemos=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      var cv2=document.querySelector('.view.active');
+      if(cv2&&cv2.id==='view-memo')renderMemoPage();
+    },function(err){console.error('memos listener:',err);});
+    _rtListeners.push(unsub2);
+  }catch(e){}
+  // Students listener
+  try{
+    var unsub3=db.collection('students').onSnapshot(function(snap){
+      students=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      _fullyPopulated=false;
+    },function(err){});
+    _rtListeners.push(unsub3);
+  }catch(e){}
+}
+// Periodic full sync every 60 seconds
+var _syncTimer=null;
+function startPeriodicSync(){
+  if(_syncTimer)clearInterval(_syncTimer);
+  _syncTimer=setInterval(function(){
+    if(!db||!currentUser)return;
+    syncFromFirestore();
+  },60000);
+}
+// ── Auto: 신규 → 재원 전환 ──
+async function autoConvertNewStudents(){
+  var now=new Date();var curYr=now.getFullYear();var curMo=now.getMonth()+1;
+  var toUpdate=students.filter(function(s){
+    if(s.status!=='신규')return false;
+    var ed=s.enrollDate;if(!ed)return false;
+    var d=new Date(ed);var eMo=d.getMonth()+1;var eYr=d.getFullYear();
+    // If enrolled in a previous month, convert to 재원
+    return eYr<curYr||(eYr===curYr&&eMo<curMo);
+  });
+  if(!toUpdate.length)return;
+  for(var i=0;i<toUpdate.length;i++){
+    var s=toUpdate[i];
+    await db.collection('students').doc(s.id).update({status:'재원',updatedAt:new Date().toISOString()});
+    var idx=students.findIndex(function(x){return x.id===s.id;});
+    if(idx>=0)students[idx].status='재원';
+  }
+  if(toUpdate.length)toast('📋 '+toUpdate.length+'명 신규→재원 자동 전환');
 }
 
 // Data Loaders
