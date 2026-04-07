@@ -1394,13 +1394,26 @@ function renderStudents(){
       return true;
     });
   }
-  if(filter)list=list.filter(function(s){return(s.status||'재원')===filter;});if(cls2)list=list.filter(function(s){return s.classId===cls2;});if(search)list=list.filter(function(s){return s.name.toLowerCase().includes(search);});
+  // Dynamic status: 등록월 = 선택월이면 '신규', 등록월 < 선택월이면 '재원'
+  function getDisplayStatus(s){
+    var base=s.status||'재원';
+    if(base==='휴원'||base==='퇴원')return base;
+    if(sMo>0&&s.enrollDate){
+      var ed=new Date(s.enrollDate);var eYr=ed.getFullYear();var eMo=ed.getMonth()+1;
+      if(eYr===sYr&&eMo===sMo)return '신규';
+      if(eYr<sYr||(eYr===sYr&&eMo<sMo))return '재원';
+    }
+    return base;
+  }
+  if(filter)list=list.filter(function(s){return getDisplayStatus(s)===filter;});
+  if(cls2)list=list.filter(function(s){return s.classId===cls2;});
+  if(search)list=list.filter(function(s){return s.name.toLowerCase().includes(search);});
   var statusColor={신규:'bg-mint',재원:'bg-green',휴원:'bg-gold',퇴원:'bg-red'};
   var tb=$('students-tbody');
   if(!list.length){tb.innerHTML='<tr><td colspan="10"><div class="empty"><div class="ei">👥</div><div class="et">학생 없음</div></div></td></tr>';return;}
   tb.innerHTML=list.map(function(s){
     var clsName=(classes.find(function(c){return c.id===s.classId;})||{}).name||'-';
-    var status=s.status||'재원';
+    var status=getDisplayStatus(s);
     var mh=getStudentMonthlyHours(s);
     var dayInfo=s.days&&s.days.length?s.days.map(function(d){var p=(s.periods||{})[d];var h=(p&&typeof p==='object'&&p.hours)?p.hours:1;return d+'('+h+')';}).join(' '):'';
     return'<tr onclick="openStudentModal(\''+s.id+'\')" style="cursor:pointer">'
