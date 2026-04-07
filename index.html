@@ -972,7 +972,7 @@ async function markAttendance(studentId, action){
     }
   } else {
     var cls2=classes.find(function(c){return c.id===s.classId;});
-    var data={studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',level:getStudentLevel(s),progress:'',absent:isAbsent,earlyLeave:isEarly||false,absentReason:isEarly?'조퇴':'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:cls2?.evalModule||'',evalItems:{},praise:[],createdAt:new Date().toISOString()};
+    var data={studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',level:getStudentLevel(s),progress:'',absent:isAbsent,earlyLeave:isEarly||false,absentReason:isEarly?'조퇴':'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s)),evalItems:{},praise:[],createdAt:new Date().toISOString()};
     var newR=await db.collection('reports').add(data);
     reports.push({id:newR.id,...data});
     if(isAbsent||isEarly) createAutoMakeup();
@@ -1022,8 +1022,8 @@ function startReport(studentId){
     if(ind)ind.style.display='none';
     if(rep){$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';$('r-attitude').value=rep.attitude||'';$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-dictation'))$('r-dictation').value=rep.dictation||'';}
     else{['r-review','r-attitude','r-hw'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';}
-    var cls2=classes.find(function(c){return c.id===s.classId;});
-    if(cls2?.evalModule)renderEvalArea(cls2.evalModule,rep?.evalItems||{});
+    var levelModule=getEvalModuleForLevel(getStudentLevel(s));
+    if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
   }
   // Auto-set teacher from last report or localStorage
@@ -1088,27 +1088,29 @@ function onReportDateChange(){
     }
   }
 }
+function getEvalModuleForLevel(level){
+  if(!level)return '';
+  var cat='';
+  if(/phonics/i.test(level))cat='phonics';
+  else if(/joy|wise|pride/i.test(level))cat='basic';
+  else if(/grammar|first grammar/i.test(level))cat='grammar';
+  else if(/prime/i.test(level))cat='prime';
+  else if(/advanced/i.test(level))cat='advanced';
+  else if(/elite/i.test(level))cat='elite';
+  else if(/내신|reader|천일문|빠바/i.test(level))cat='중고등';
+  if(!cat)return '';
+  var found='';
+  Object.keys(EVAL_MODULES).forEach(function(k){if(k.toLowerCase()===cat||k.toLowerCase().includes(cat)||(EVAL_MODULES[k].label&&EVAL_MODULES[k].label.toLowerCase().includes(cat)))found=k;});
+  return found;
+}
 function onReportLevelChange(){
   var newLevel=$('r-level').value;
   var da=$('dictation-area');if(da)da.style.display=/phonics/i.test(newLevel)?'block':'none';
   populateProgressDropdown(newLevel,'');
-  // Update student info display
   var sId=$('r-student-id').value;
   var s=students.find(function(x){return x.id===sId;});
   if(s){$('write-student-info').textContent=s.name+' · '+newLevel+' · '+(s.grade||'');}
-  // Update eval module based on new level's category
-  var cat='';
-  if(/phonics/i.test(newLevel))cat='phonics';
-  else if(/joy|wise|pride/i.test(newLevel))cat='basic';
-  else if(/grammar|first grammar/i.test(newLevel))cat='grammar';
-  else if(/prime/i.test(newLevel))cat='prime';
-  else if(/advanced/i.test(newLevel))cat='advanced';
-  else if(/elite/i.test(newLevel))cat='elite';
-  else if(/내신|reader|천일문|빠바/i.test(newLevel))cat='중고등';
-  var foundModule='';
-  if(cat){Object.keys(EVAL_MODULES).forEach(function(k){if(k.toLowerCase()===cat||k.toLowerCase().includes(cat)||(EVAL_MODULES[k].label&&EVAL_MODULES[k].label.toLowerCase().includes(cat)))foundModule=k;});}
-  // Also check class-based eval module
-  if(!foundModule&&s){var cls2=classes.find(function(c){return c.id===s.classId;});if(cls2?.evalModule)foundModule=cls2.evalModule;}
+  var foundModule=getEvalModuleForLevel(newLevel);
   if(foundModule)renderEvalArea(foundModule,{});
   else{var area=$('eval-area');if(area)area.innerHTML='';}
 }
@@ -1135,7 +1137,7 @@ async function saveReport(){
   var s=students.find(function(x){return x.id===sId;});if(!s){toast('⚠️ 학생 데이터를 찾을 수 없습니다');return;}
   loading(true);
   try{
-  var evalItems=window._evalState||{};var cls2=classes.find(function(c){return c.id===s.classId;});var usedEvalModule=window._currentEvalModule||cls2?.evalModule||'';
+  var evalItems=window._evalState||{};var usedEvalModule=window._currentEvalModule||getEvalModuleForLevel($('r-level').value);
   var data={studentId:sId,studentName:s.name,classId:s.classId||'',date:$('r-date').value,teacher:$('r-teacher').value,level:$('r-level').value,progress:$('r-progress').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,dictation:$('r-dictation').value||'',evalModule:usedEvalModule,evalItems:evalItems,praise:[],absent:false,needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',updatedAt:new Date().toISOString()};
   var savedId='';
   var existing=reports.find(function(r){return r.studentId===sId&&r.date===data.date;});
@@ -1519,7 +1521,7 @@ function renderMakeupCalendar(){
         monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){var cls3=m.makeupStatus==='done'?'done':m.makeupStatus==='scheduled'?'scheduled':'';chips+='<div class="makeup-chip '+cls3+'" onclick="openMakeupModal(\''+m.id+'\')">'+m.studentName+'</div>';});
         makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr&&m.makeupStatus!=='pending';}).forEach(function(m){var cls3=m.makeupStatus==='done'?'done':'scheduled';chips+='<div class="makeup-chip '+cls3+'" onclick="openMakeupModal(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+(m.makeupTime?' '+m.makeupTime:'')+'</div>';});
       }
-      html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px">'+dateLbl+chips+'</div>';
+      html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px;cursor:pointer" onclick="openMakeupDayView(\''+dateStr+'\')">'+dateLbl+chips+'</div>';
       if(col<6&&date>lastDate){for(var rr=col+1;rr<7;rr++)html+='<div style="background:var(--surface);border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-height:65px"></div>';break;}
     }
     weekNum++;if(date>lastDate)break;
@@ -1529,6 +1531,88 @@ function renderMakeupCalendar(){
 function openMakeupModal(id){var m=makeups.find(function(x){return x.id===id;});if(!m)return;$('mk-id').value=id;$('mk-info').innerHTML='<strong>'+m.studentName+'</strong> · 결석일: '+m.absentDate;$('mk-status').value=m.makeupStatus||'pending';$('mk-date').value=m.makeupDate||'';$('mk-time').value=m.makeupTime||'';$('mk-note').value=m.makeupNote||'';$('modal-makeup').style.display='flex';}
 async function saveMakeup(){var id=$('mk-id').value;if(!id)return;loading(true);await db.collection('makeups').doc(id).update({makeupStatus:$('mk-status').value,makeupDate:$('mk-date').value,makeupTime:$('mk-time').value,makeupNote:$('mk-note').value,updatedAt:new Date().toISOString()});await loadMakeups();renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();toast('✅ 업데이트');}
 async function deleteMakeupEntry(){var id=$('mk-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('makeups').doc(id).delete();makeups=makeups.filter(function(m){return m.id!==id;});renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
+
+function openMakeupDayView(dateStr){
+  if(!dateStr)return;
+  var d=new Date(dateStr);
+  var dayNames=['일','월','화','수','목','금','토'];
+  var dayName=dayNames[d.getDay()];
+  var dateLabel=(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+dayName+')';
+  // Find absent reports for this date
+  var absentReps=reports.filter(function(r){return r.date===dateStr&&r.absent;});
+  // Find existing makeups for this date
+  var dayMakeups=makeups.filter(function(m){return m.absentDate===dateStr;});
+  var scheduledHere=makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;});
+  var existingIds=new Set(dayMakeups.map(function(m){return m.studentId;}));
+  // Students scheduled for this day but not having reports (potential absences)
+  var activeS=students.filter(function(s){var st=s.status||'재원';return(st==='재원'||st==='신규')&&(s.days||[]).includes(dayName);});
+  var statusColors={'pending':'bg-red','scheduled':'bg-gold','done':'bg-green'};
+  var statusLabels={'pending':'미처리','scheduled':'예정','done':'완료'};
+  var html='<div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div class="mt">📅 '+dateLabel+' 보강 현황</div>';
+  // Absent students section
+  html+='<div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px">❌ 결석 학생</div>';
+  if(absentReps.length){
+    html+=absentReps.map(function(r){
+      var hasMk=dayMakeups.find(function(m){return m.studentId===r.studentId;});
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:13px;font-weight:600">'+r.studentName+'</span>'
+        +(hasMk?'<span class="badge '+(statusColors[hasMk.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupModal(\''+hasMk.id+'\')">'+statusLabels[hasMk.makeupStatus||'pending']+'</span>'
+        :'<button class="btn btn-green btn-xs" onclick="addMakeupFromDay(\''+r.studentId+'\',\''+r.studentName+'\',\''+dateStr+'\',this.closest(\'.mo\'))">+ 보강 등록</button>')
+        +'</div>';
+    }).join('');
+  } else {
+    html+='<div style="font-size:12px;color:var(--txt3);padding:6px 0">결석 학생 없음</div>';
+  }
+  // Existing makeups for this date (not from absent reports)
+  var unlinked=dayMakeups.filter(function(m){return!absentReps.find(function(r){return r.studentId===m.studentId;});});
+  if(unlinked.length){
+    html+='<div style="font-size:13px;font-weight:700;color:var(--navy);margin:12px 0 6px">📋 보강 등록 건</div>';
+    html+=unlinked.map(function(m){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:13px">'+m.studentName+'</span>'
+        +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'+statusLabels[m.makeupStatus||'pending']+'</span>'
+        +'</div>';
+    }).join('');
+  }
+  // Scheduled makeups on this date (from other absent dates)
+  if(scheduledHere.length){
+    html+='<div style="font-size:13px;font-weight:700;color:var(--blue);margin:12px 0 6px">🔄 이 날 보강 예정</div>';
+    html+=scheduledHere.map(function(m){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:13px">'+m.studentName+' <span style="font-size:10px;color:var(--txt3)">(결석: '+m.absentDate+')</span></span>'
+        +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'+(m.makeupTime||'')+' '+statusLabels[m.makeupStatus||'pending']+'</span>'
+        +'</div>';
+    }).join('');
+  }
+  // Quick add for any student
+  html+='<div style="margin-top:14px;border-top:2px solid var(--border);padding-top:10px">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:6px">➕ 수동 보강 추가</div>'
+    +'<div style="display:flex;gap:6px"><select class="fi" id="mkday-student" style="flex:1;font-size:12px"><option value="">학생 선택</option>'
+    +students.filter(function(s2){var st=s2.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).map(function(s2){return'<option value="'+s2.id+'">'+s2.name+'</option>';}).join('')
+    +'</select><button class="btn btn-green btn-xs" onclick="addMakeupFromDayManual(\''+dateStr+'\',this.closest(\'.mo\'))">추가</button></div></div>';
+  html+='<div style="height:14px"></div><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button></div>';
+  var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=html;document.body.appendChild(overlay);
+}
+async function addMakeupFromDay(studentId,studentName,dateStr,overlay){
+  loading(true);
+  var data={studentId:studentId,studentName:studentName,absentDate:dateStr,absentReason:'결석',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',createdAt:new Date().toISOString()};
+  var ref=await db.collection('makeups').add(data);
+  makeups.push({id:ref.id,...data});
+  if(overlay)overlay.remove();
+  renderMakeupCalendar();loading(false);toast('✅ 보강 등록됨');
+}
+async function addMakeupFromDayManual(dateStr,overlay){
+  var sId=$('mkday-student')?.value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
+  var s=students.find(function(x){return x.id===sId;});if(!s)return;
+  loading(true);
+  var data={studentId:sId,studentName:s.name,absentDate:dateStr,absentReason:'수동 등록',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',createdAt:new Date().toISOString()};
+  var ref=await db.collection('makeups').add(data);
+  makeups.push({id:ref.id,...data});
+  if(overlay)overlay.remove();
+  renderMakeupCalendar();loading(false);toast('✅ '+s.name+' 보강 등록됨');
+}
 
 // ══ CONSULT ══
 function switchConsultTab(tab){['history','new','schedule'].forEach(function(t){var btn=$('ctab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('consult-panel-'+t);if(pn)pn.style.display=t===tab?'block':'none';});if(tab==='history')renderConsults();else if(tab==='new')renderNewConsults();else if(tab==='schedule')renderWeeklySchedule();}
