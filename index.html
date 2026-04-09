@@ -653,7 +653,12 @@ function startRealtimeListeners(){
     var unsub1=db.collection('reports').where('date','>=',yearStart).onSnapshot(function(snap){
       reports=snap.docs.map(function(d){return{id:d.id,...d.data()};});
       var cv=document.querySelector('.view.active');
-      if(cv){var vid=cv.id.replace('view-','');if(vid==='schedule')renderSchedule();else if(vid==='history')renderHistory();}
+      if(cv){
+        var vid=cv.id.replace('view-','');
+        if(vid==='schedule')renderSchedule();
+        else if(vid==='history')renderHistory();
+        else if(vid==='write')refreshWriteFormIfNeeded();
+      }
     },function(err){console.error('reports listener:',err);});
     _rtListeners.push(unsub1);
   }catch(e){}
@@ -715,7 +720,7 @@ function startPeriodicSync(){
   _syncTimer=setInterval(function(){
     if(!db||!currentUser)return;
     syncFromFirestore();
-  },60000);
+  },30000);
 }
 // ── Auto: 신규 → 재원 전환 ──
 async function autoConvertNewStudents(){
@@ -1019,7 +1024,7 @@ function _cleanComment(c){return (c||'').replace(/\[태블릿\]\s*/g,'').replace
 function _combineComment(){var t=$('r-comment-tablet').value.trim();var b=$('r-comment-book').value.trim();var parts=[];if(t)parts.push('[태블릿] '+t);if(b)parts.push('[교재] '+b);return parts.join('\n');}
 function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m1=c.match(/\[태블릿\]\s*(.*)/);var m2=c.match(/\[교재\]\s*(.*)/);if(m1)t=m1[1];if(m2)b=m2[1];if(!m1&&!m2)t=c;return{t:t,b:b};}
 function startReport(studentId){
-  window._currentEvalModule='';window._evalState={};window._saveImageAfter=false;
+  window._currentEvalModule='';window._evalState={};window._saveImageAfter=false;_lastLoadedReportTs='';
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
   var rep=reports.find(function(r){return r.studentId===studentId&&r.date===todayISO();});
   $('r-student-id').value=studentId;
@@ -1052,8 +1057,8 @@ function startReport(studentId){
   }
   if(!tempData||!useTempData) {
     if(ind)ind.style.display='none';
-    if(rep){$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';$('r-attitude').value=rep.attitude||'';$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-dictation'))$('r-dictation').value=rep.dictation||'';}
-    else{['r-review','r-attitude','r-hw'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';}
+    if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';$('r-attitude').value=rep.attitude||'';$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-dictation'))$('r-dictation').value=rep.dictation||'';}
+    else{_lastLoadedReportTs='';['r-review','r-attitude','r-hw'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';}
     var levelModule=getEvalModuleForLevel(getStudentLevel(s));
     if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
@@ -1084,6 +1089,37 @@ function populateProgressDropdown(level,current,refDate){
     if(lastRep){var idx2=lessons.indexOf(lastRep.progress);if(idx2>=0&&idx2+1<lessons.length)sel.value=lessons[idx2+1];else if(idx2>=0)sel.value=lessons[idx2];}
   }
 }
+var _lastLoadedReportTs='';
+function refreshWriteFormIfNeeded(){
+  var sId=$('r-student-id')?.value;var dt=$('r-date')?.value;
+  if(!sId||!dt)return;
+  var rep=reports.find(function(r){return r.studentId===sId&&r.date===dt;});
+  if(!rep)return;
+  var ts=rep.updatedAt||rep.createdAt||'';
+  if(!ts||ts===_lastLoadedReportTs)return;
+  // Check if this update was by a different teacher
+  var repTeacher=rep.teacher||'';
+  var myName=currentUser?.name||'';
+  if(repTeacher===myName)return; // My own save, skip
+  _lastLoadedReportTs=ts;
+  // Update form fields with new data
+  if($('r-level'))$('r-level').value=rep.level||'';
+  if($('r-progress'))$('r-progress').value=rep.progress||'';
+  if($('r-teacher'))$('r-teacher').value=rep.teacher||'';
+  $('r-review').value=rep.reviewTest||'';
+  $('r-review-items').value=rep.reviewTestItems||'';
+  $('r-attitude').value=rep.attitude||'';
+  $('r-quiz').value=rep.dailyQuiz||'';
+  $('r-hw').value=rep.homework||'';
+  var _sc=_splitComment(rep.comment||'');
+  $('r-comment-tablet').value=_sc.t;
+  $('r-comment-book').value=_sc.b;
+  $('r-memo').value=rep.memo||'';
+  if($('r-dictation'))$('r-dictation').value=rep.dictation||'';
+  if(rep.evalItems)window._evalState=rep.evalItems;
+  if(rep.evalModule){var mod=getEvalModuleForLevel(rep.level);if(mod)renderEvalArea(mod,rep.evalItems||{});}
+  toast('🔄 '+repTeacher+' 선생님이 일지를 업데이트했습니다');
+}
 function onReportDateChange(){
   var sId=$('r-student-id').value;if(!sId)return;
   var s=students.find(function(x){return x.id===sId;});if(!s)return;
@@ -1094,6 +1130,7 @@ function onReportDateChange(){
   // Check if there's already a saved report for this date
   var existingRep=reports.find(function(r){return r.studentId===sId&&r.date===newDate;});
   if(existingRep){
+    _lastLoadedReportTs=existingRep.updatedAt||existingRep.createdAt||'';
     populateProgressDropdown($('r-level').value,existingRep.progress||'',newDate);
     $('r-review').value=existingRep.reviewTest||'';$('r-review-items').value=existingRep.reviewTestItems||'';
     $('r-attitude').value=existingRep.attitude||'';$('r-quiz').value=existingRep.dailyQuiz||'';
@@ -1170,9 +1207,48 @@ async function saveReport(){
   loading(true);
   try{
   var evalItems=window._evalState||{};var usedEvalModule=window._currentEvalModule||getEvalModuleForLevel($('r-level').value);
-  var data={studentId:sId,studentName:s.name,classId:s.classId||'',date:$('r-date').value,teacher:$('r-teacher').value,level:$('r-level').value,progress:$('r-progress').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,dictation:$('r-dictation').value||'',evalModule:usedEvalModule,evalItems:evalItems,praise:[],absent:false,needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',updatedAt:new Date().toISOString()};
+  var formDate=$('r-date').value;
+  // ── Field-level merge: read latest from Firestore (via onSnapshot-updated array) ──
+  var existing=reports.find(function(r){return r.studentId===sId&&r.date===formDate;});
+  var prev=existing||{};
+  // For comment: merge tablet/book independently
+  var formTablet=$('r-comment-tablet').value;
+  var formBook=$('r-comment-book').value;
+  var prevComment=_splitComment(prev.comment||'');
+  var mergedTablet=formTablet||prevComment.t;
+  var mergedBook=formBook||prevComment.b;
+  var mergedComment='';
+  if(mergedTablet&&mergedBook)mergedComment='[태블릿] '+mergedTablet+' [교재] '+mergedBook;
+  else if(mergedTablet)mergedComment=mergedTablet;
+  else if(mergedBook)mergedComment='[교재] '+mergedBook;
+  // For other fields: use form value if non-empty, else keep existing
+  function pick(formVal,prevVal){return(formVal!==undefined&&formVal!==''&&formVal!==null)?formVal:(prevVal||'');}
+  // Merge eval items: combine, don't overwrite
+  var mergedEval=Object.assign({},prev.evalItems||{},evalItems);
+  var data={
+    studentId:sId,studentName:s.name,classId:s.classId||'',
+    date:formDate,
+    teacher:pick($('r-teacher').value,prev.teacher),
+    level:pick($('r-level').value,prev.level),
+    progress:pick($('r-progress').value,prev.progress),
+    reviewTest:pick($('r-review').value,prev.reviewTest),
+    reviewTestItems:pick($('r-review-items').value,prev.reviewTestItems),
+    attitude:pick($('r-attitude').value,prev.attitude),
+    dailyQuiz:pick($('r-quiz').value,prev.dailyQuiz),
+    homework:pick($('r-hw').value,prev.homework),
+    hwStatus:pick($('r-hw-status').value,prev.hwStatus)||'미확인',
+    comment:mergedComment,
+    memo:pick($('r-memo').value,prev.memo),
+    dictation:pick($('r-dictation')?.value,prev.dictation),
+    evalModule:usedEvalModule||prev.evalModule||'',
+    evalItems:mergedEval,
+    praise:prev.praise||[],
+    absent:false,
+    needsMakeup:$('r-makeup-check').checked||false,
+    makeupContent:pick($('r-makeup-content').value,prev.makeupContent),
+    updatedAt:new Date().toISOString()
+  };
   var savedId='';
-  var existing=reports.find(function(r){return r.studentId===sId&&r.date===data.date;});
   if(existing){await db.collection('reports').doc(existing.id).update(data);var i2=reports.findIndex(function(r){return r.id===existing.id;});reports[i2]={...existing,...data};savedId=existing.id;}
   else{var nr=await db.collection('reports').add({...data,createdAt:new Date().toISOString()});reports.unshift({id:nr.id,...data});savedId=nr.id;}
   // Auto-create makeup entry if checked
@@ -1199,7 +1275,7 @@ async function saveReport(){
     var si=students.findIndex(function(x){return x.id===sId;});
     if(si>=0){if(lvUpdate.customLevel!==undefined)students[si].customLevel=lvUpdate.customLevel;if(lvUpdate.level)students[si].level=lvUpdate.level;if(lvUpdate.classId)students[si].classId=lvUpdate.classId;}
   }
-  window._evalState={};localStorage.setItem('lastTeacher',$('r-teacher').value||'');
+  window._evalState={};_lastLoadedReportTs=data.updatedAt;localStorage.setItem('lastTeacher',$('r-teacher').value||'');
   // Clear temp data after successful DB save
   var tempKey='tempReport_'+sId+'_'+data.date;localStorage.removeItem(tempKey);
   var ind=$('temp-save-indicator');if(ind)ind.style.display='none';
