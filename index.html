@@ -253,7 +253,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="field"><div class="fl">진도</div><select class="fi" id="r-progress"><option value="">선택</option></select></div>
     <div class="r2"><div class="field"><div class="fl">복습 테스트</div><select class="fi" id="r-review"><option value="">-</option><option>매우잘함</option><option>잘함</option><option>보통</option><option>부진</option></select></div><div class="field"><div class="fl">테스트 항목</div><input class="fi" id="r-review-items" placeholder="예: Unit 3 단어 20개"></div></div>
     <div class="r2"><div class="field"><div class="fl">수업 태도</div><select class="fi" id="r-attitude"><option value="">-</option><option>매우 적극적</option><option>적극적</option><option>보통</option><option>산만함</option></select></div><div class="field"><div class="fl">Daily Quiz</div><input class="fi" id="r-quiz" placeholder="예: 9/10"></div></div>
-    <div class="r2"><div class="field"><div class="fl">숙제</div><select class="fi" id="r-hw"><option value="">-</option><option>완료</option><option>미제출</option><option>일부 제출</option></select></div><div class="field"><div class="fl">숙제 상태 (발송용)</div><select class="fi" id="r-hw-status"><option value="미확인">미확인</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div></div>
+    <div class="field"><div class="fl">숙제</div><select class="fi" id="r-hw"><option value="">-</option><option>완료</option><option>미제출</option><option>일부 제출</option></select></div><input type="hidden" id="r-hw-status" value="미확인">
     <div id="eval-area"></div>
     <div id="dictation-area" style="display:none"><div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📝 받아쓰기</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px">맞은 개수:</span><select class="fi" id="r-dictation" style="width:80px;font-size:12px"><option value="">-</option><option value="0/4">0/4</option><option value="1/4">1/4</option><option value="2/4">2/4</option><option value="3/4">3/4</option><option value="4/4">4/4</option></select><span style="font-size:11px;color:var(--txt3)">(4개 중)</span></div></div></div>
     <div class="field"><div class="fl">칭찬 스티커</div><div id="praise-area" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
@@ -652,7 +652,6 @@ function startRealtimeListeners(){
   try{
     var unsub1=db.collection('reports').where('date','>=',yearStart).onSnapshot(function(snap){
       reports=snap.docs.map(function(d){return{id:d.id,...d.data()};});
-      // Re-render current view if relevant
       var cv=document.querySelector('.view.active');
       if(cv){var vid=cv.id.replace('view-','');if(vid==='schedule')renderSchedule();else if(vid==='history')renderHistory();}
     },function(err){console.error('reports listener:',err);});
@@ -663,7 +662,7 @@ function startRealtimeListeners(){
     var unsub2=db.collection('studentMemos').onSnapshot(function(snap){
       window._studentMemos=snap.docs.map(function(d){return{id:d.id,...d.data()};});
       var cv2=document.querySelector('.view.active');
-      if(cv2&&cv2.id==='view-memo')renderMemoPage();
+      if(cv2){if(cv2.id==='view-memo')renderMemoPage();if(cv2.id==='view-schedule')renderSchedule();}
     },function(err){console.error('memos listener:',err);});
     _rtListeners.push(unsub2);
   }catch(e){}
@@ -674,6 +673,39 @@ function startRealtimeListeners(){
       _fullyPopulated=false;
     },function(err){});
     _rtListeners.push(unsub3);
+  }catch(e){}
+  // Consultations listener
+  try{
+    var unsub4=db.collection('consultations').orderBy('date','desc').onSnapshot(function(snap){
+      consultations=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      var cv4=document.querySelector('.view.active');
+      if(cv4&&cv4.id==='view-consult')renderConsults();
+    },function(err){});
+    _rtListeners.push(unsub4);
+  }catch(e){}
+  // Makeups listener
+  try{
+    var unsub5=db.collection('makeups').onSnapshot(function(snap){
+      makeups=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      var cv5=document.querySelector('.view.active');
+      if(cv5){if(cv5.id==='view-makeup')renderMakeupCalendar();if(cv5.id==='view-schedule')renderSchedule();}
+    },function(err){});
+    _rtListeners.push(unsub5);
+  }catch(e){}
+  // Classes listener
+  try{
+    var unsub6=db.collection('classes').onSnapshot(function(snap){
+      classes=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      _fullyPopulated=false;
+    },function(err){});
+    _rtListeners.push(unsub6);
+  }catch(e){}
+  // Users listener
+  try{
+    var unsub7=db.collection('users').onSnapshot(function(snap){
+      users=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+    },function(err){});
+    _rtListeners.push(unsub7);
   }catch(e){}
 }
 // Periodic full sync every 60 seconds
@@ -1130,7 +1162,7 @@ function renderEvalArea(moduleId,savedItems){
   });
   html+='</div>';area.innerHTML=html;
 }
-function setEval(key,val,btn){var btns=btn.parentNode.querySelectorAll('button');btns.forEach(function(b,i){b.style.background=i<val?'var(--mint)':'var(--surface)';b.style.color=i<val?'#fff':'var(--txt3)';});if(!window._evalState)window._evalState={};window._evalState[key]=val;}
+function setEval(key,val,btn){if(!window._evalState)window._evalState={};var cur=window._evalState[key]||0;var newVal=(cur===val)?0:val;window._evalState[key]=newVal;var btns=btn.parentNode.querySelectorAll('button');btns.forEach(function(b,i){b.style.background=i<newVal?'var(--mint)':'var(--surface)';b.style.color=i<newVal?'#fff':'var(--txt3)';});}
 
 async function saveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 시간표에서 선택하세요');return;}
