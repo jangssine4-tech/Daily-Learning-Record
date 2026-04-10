@@ -1097,27 +1097,33 @@ function refreshWriteFormIfNeeded(){
   if(!rep)return;
   var ts=rep.updatedAt||rep.createdAt||'';
   if(!ts||ts===_lastLoadedReportTs)return;
-  // Check if this update was by a different teacher
   var repTeacher=rep.teacher||'';
   var myName=currentUser?.name||'';
-  if(repTeacher===myName)return; // My own save, skip
+  if(repTeacher===myName)return;
   _lastLoadedReportTs=ts;
-  // Update form fields with new data
-  if($('r-level'))$('r-level').value=rep.level||'';
-  if($('r-progress'))$('r-progress').value=rep.progress||'';
-  if($('r-teacher'))$('r-teacher').value=rep.teacher||'';
-  $('r-review').value=rep.reviewTest||'';
-  $('r-review-items').value=rep.reviewTestItems||'';
-  $('r-attitude').value=rep.attitude||'';
-  $('r-quiz').value=rep.dailyQuiz||'';
-  $('r-hw').value=rep.homework||'';
+  // Only fill fields that are currently EMPTY — never overwrite user's input
+  function fillIfEmpty(elId,newVal){var el=$(elId);if(el&&!el.value&&newVal)el.value=newVal;}
+  fillIfEmpty('r-level',rep.level);
+  fillIfEmpty('r-progress',rep.progress);
+  fillIfEmpty('r-review',rep.reviewTest);
+  fillIfEmpty('r-review-items',rep.reviewTestItems);
+  fillIfEmpty('r-attitude',rep.attitude);
+  fillIfEmpty('r-quiz',rep.dailyQuiz);
+  fillIfEmpty('r-hw',rep.homework);
+  fillIfEmpty('r-memo',rep.memo);
+  if($('r-dictation'))fillIfEmpty('r-dictation',rep.dictation);
+  // Comment fields: fill only if empty
   var _sc=_splitComment(rep.comment||'');
-  $('r-comment-tablet').value=_sc.t;
-  $('r-comment-book').value=_sc.b;
-  $('r-memo').value=rep.memo||'';
-  if($('r-dictation'))$('r-dictation').value=rep.dictation||'';
-  if(rep.evalItems)window._evalState=rep.evalItems;
-  if(rep.evalModule){var mod=getEvalModuleForLevel(rep.level);if(mod)renderEvalArea(mod,rep.evalItems||{});}
+  fillIfEmpty('r-comment-tablet',_sc.t);
+  fillIfEmpty('r-comment-book',_sc.b);
+  // Eval items: merge (add new keys, don't overwrite existing)
+  if(rep.evalItems){
+    if(!window._evalState)window._evalState={};
+    Object.keys(rep.evalItems).forEach(function(k){
+      if(!window._evalState[k])window._evalState[k]=rep.evalItems[k];
+    });
+    if(rep.evalModule){var mod=getEvalModuleForLevel(rep.level);if(mod)renderEvalArea(mod,window._evalState);}
+  }
   toast('🔄 '+repTeacher+' 선생님이 일지를 업데이트했습니다');
 }
 function onReportDateChange(){
