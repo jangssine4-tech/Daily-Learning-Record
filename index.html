@@ -252,7 +252,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="r2"><div class="field"><div class="fl">단계</div><select class="fi" id="r-level" onchange="onReportLevelChange()"><option value="">선택</option></select></div><div class="field"><div class="fl">진도</div><div style="display:flex;gap:4px"><select class="fi" id="r-progress" style="flex:1"><option value="">선택</option></select><select class="fi" id="r-review-yn" style="width:85px;font-size:11px;padding:6px 4px"><option value="">Review</option><option value="Review">✔ Review</option></select></div></div></div>
     <div class="r2"><div class="field"><div class="fl">테스트 항목</div><input class="fi" id="r-review-items" placeholder="예: Unit 3 단어 20개"></div><div class="field"><div class="fl">복습 테스트</div><select class="fi" id="r-review"><option value="">-</option><option>매우잘함</option><option>잘함</option><option>보통</option><option>부진</option></select></div></div>
     <div class="r2"><div class="field"><div class="fl">수업 태도</div><select class="fi" id="r-attitude"><option value="">-</option><option>매우 적극적</option><option>적극적</option><option>보통</option><option>산만함</option></select></div><div class="field"><div class="fl">Daily Quiz</div><input class="fi" id="r-quiz" placeholder="예: 9/10"></div></div>
-    <div style="max-width:50%"><div class="field"><div class="fl">숙제</div><select class="fi" id="r-hw"><option value="">-</option><option value="영상 숙제 제출">영상 숙제 제출</option><option value="영상 숙제 미제출">영상 숙제 미제출</option><option value="교재 숙제 제출">교재 숙제 제출</option><option value="교재 숙제 미제출">교재 숙제 미제출</option><option value="완료">전체 완료</option><option value="미제출">전체 미제출</option><option value="일부 제출">일부 제출</option></select></div></div><input type="hidden" id="r-hw-status" value="미확인">
+    <div class="r2"><div class="field"><div class="fl">영상 숙제</div><select class="fi" id="r-hw-video" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div><div class="field"><div class="fl">교재 숙제</div><select class="fi" id="r-hw-book" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div></div><input type="hidden" id="r-hw" value=""><input type="hidden" id="r-hw-status" value="미확인">
     <div class="field"><div class="fl">교재 점검 교사</div><select class="fi" id="r-teacher-book"></select></div>
     <div id="eval-area"></div>
     <div id="dictation-area" style="display:none"><div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📝 받아쓰기</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px">맞은 개수:</span><select class="fi" id="r-dictation" style="width:80px;font-size:12px"><option value="">-</option><option value="0/4">0/4</option><option value="1/4">1/4</option><option value="2/4">2/4</option><option value="3/4">3/4</option><option value="4/4">4/4</option></select><span style="font-size:11px;color:var(--txt3)">(4개 중)</span></div></div></div>
@@ -1022,6 +1022,8 @@ async function markAttendance(studentId, action){
 
 function _cleanComment(c){return (c||'').replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'');}
 function _combineComment(){var t=$('r-comment-tablet').value.trim();var b=$('r-comment-book').value.trim();var parts=[];if(t)parts.push('[태블릿] '+t);if(b)parts.push('[교재] '+b);return parts.join('\n');}
+function combineHw(){var v=$('r-hw-video')?.value||'';var b=$('r-hw-book')?.value||'';var parts=[];if(v)parts.push('영상:'+v);if(b)parts.push('교재:'+b);$('r-hw').value=parts.join(', ');}
+function splitHw(val){var r={video:'',book:''};if(!val)return r;if(val.indexOf('영상:')>=0){var m=val.match(/영상:([^,]+)/);if(m)r.video=m[1].trim();}if(val.indexOf('교재:')>=0){var m2=val.match(/교재:([^,]+)/);if(m2)r.book=m2[1].trim();}if(!r.video&&!r.book){if(val==='완료'){r.video='제출';r.book='제출';}else if(val==='미제출'){r.video='미제출';r.book='미제출';}}return r;}
 function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m1=c.match(/\[태블릿\]\s*(.*)/);var m2=c.match(/\[교재\]\s*(.*)/);if(m1)t=m1[1];if(m2)b=m2[1];if(!m1&&!m2)t=c;return{t:t,b:b};}
 function startReport(studentId){
   window._currentEvalModule='';window._evalState={};window._saveImageAfter=false;_lastLoadedReportTs='';
@@ -1049,7 +1051,7 @@ function startReport(studentId){
   if(useTempData){
     // Restore temp data
     if(lvSel&&tempData.level){lvSel.value=tempData.level;populateProgressDropdown(tempData.level,tempData.progress||'');if(tempData.progress){var _ps=$('r-progress');if(_ps)_ps.value=tempData.progress;}}
-    if($('r-review-yn'))$('r-review-yn').value=tempData.reviewYN||'';$('r-review').value=tempData.reviewTest||'';$('r-review-items').value=tempData.reviewTestItems||'';$('r-attitude').value=tempData.attitude||'';$('r-quiz').value=tempData.dailyQuiz||'';$('r-hw').value=tempData.homework||'';$('r-hw-status').value=tempData.hwStatus||'미확인';var _sc0=_splitComment(tempData.comment||'');$('r-comment-tablet').value=_sc0.t;$('r-comment-book').value=_sc0.b;$('r-memo').value=tempData.memo||'';$('r-makeup-check').checked=tempData.needsMakeup||false;$('r-makeup-content').value=tempData.makeupContent||'';$('r-makeup-content-wrap').style.display=tempData.needsMakeup?'block':'none';
+    if($('r-review-yn'))$('r-review-yn').value=tempData.reviewYN||'';$('r-review').value=tempData.reviewTest||'';$('r-review-items').value=tempData.reviewTestItems||'';$('r-attitude').value=tempData.attitude||'';$('r-quiz').value=tempData.dailyQuiz||'';$('r-hw').value=tempData.homework||'';var _hw0=splitHw(tempData.homework);if($('r-hw-video'))$('r-hw-video').value=_hw0.video;if($('r-hw-book'))$('r-hw-book').value=_hw0.book;$('r-hw-status').value=tempData.hwStatus||'미확인';var _sc0=_splitComment(tempData.comment||'');$('r-comment-tablet').value=_sc0.t;$('r-comment-book').value=_sc0.b;$('r-memo').value=tempData.memo||'';$('r-makeup-check').checked=tempData.needsMakeup||false;$('r-makeup-content').value=tempData.makeupContent||'';$('r-makeup-content-wrap').style.display=tempData.needsMakeup?'block':'none';
     if($('r-dictation'))$('r-dictation').value=tempData.dictation||'';if(tempData.evalState)window._evalState=tempData.evalState;
     if(tempData.evalModule){window._currentEvalModule=tempData.evalModule;renderEvalArea(tempData.evalModule,tempData.evalState||{});}
     if(ind)ind.style.display='block';
@@ -1057,8 +1059,8 @@ function startReport(studentId){
   }
   if(!tempData||!useTempData) {
     if(ind)ind.style.display='none';
-    if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';$('r-attitude').value=rep.attitude||'';$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-dictation'))$('r-dictation').value=rep.dictation||'';}
-    else{_lastLoadedReportTs='';['r-review-yn','r-review','r-attitude','r-hw'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';}
+    if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';$('r-attitude').value=rep.attitude||'';$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';var _hw1=splitHw(rep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw1.video;if($('r-hw-book'))$('r-hw-book').value=_hw1.book;$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-dictation'))$('r-dictation').value=rep.dictation||'';}
+    else{_lastLoadedReportTs='';['r-review-yn','r-review','r-attitude','r-hw','r-hw-video','r-hw-book'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';}
     var levelModule=getEvalModuleForLevel(getStudentLevel(s));
     if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
@@ -1079,6 +1081,7 @@ function startReport(studentId){
 function tempSaveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
   var tempKey='tempReport_'+sId+'_'+$('r-date').value;
+  combineHw();
   var data={level:$('r-level').value,progress:$('r-progress').value,teacherTablet:$('r-teacher-tablet').value,teacherBook:$('r-teacher-book').value,reviewYN:$('r-review-yn').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',dictation:$('r-dictation').value||'',evalModule:window._currentEvalModule||'',evalState:window._evalState||{},savedAt:new Date().toISOString()};
   localStorage.setItem(tempKey,JSON.stringify(data));
   var ind=$('temp-save-indicator');if(ind)ind.style.display='block';
@@ -1121,6 +1124,9 @@ function refreshWriteFormIfNeeded(){
   fillIfEmpty('r-attitude',rep.attitude);
   fillIfEmpty('r-quiz',rep.dailyQuiz);
   fillIfEmpty('r-hw',rep.homework);
+  var _hwR=splitHw(rep.homework);
+  fillIfEmpty('r-hw-video',_hwR.video);
+  fillIfEmpty('r-hw-book',_hwR.book);
   fillIfEmpty('r-memo',rep.memo);
   if($('r-dictation'))fillIfEmpty('r-dictation',rep.dictation);
   // Comment fields: fill only if empty
@@ -1151,7 +1157,7 @@ function onReportDateChange(){
     populateProgressDropdown($('r-level').value,existingRep.progress||'',newDate);
     if($('r-review-yn'))$('r-review-yn').value=existingRep.reviewYN||'';$('r-review').value=existingRep.reviewTest||'';$('r-review-items').value=existingRep.reviewTestItems||'';
     $('r-attitude').value=existingRep.attitude||'';$('r-quiz').value=existingRep.dailyQuiz||'';
-    $('r-hw').value=existingRep.homework||'';$('r-hw-status').value=existingRep.hwStatus||'미확인';
+    $('r-hw').value=existingRep.homework||'';var _hw2=splitHw(existingRep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw2.video;if($('r-hw-book'))$('r-hw-book').value=_hw2.book;$('r-hw-status').value=existingRep.hwStatus||'미확인';
     var _sc3=_splitComment(existingRep.comment||'');$('r-comment-tablet').value=_sc3.t;$('r-comment-book').value=_sc3.b;$('r-memo').value=existingRep.memo||'';
     return;
   }
@@ -1225,6 +1231,7 @@ async function saveReport(){
   try{
   var evalItems=window._evalState||{};var usedEvalModule=window._currentEvalModule||getEvalModuleForLevel($('r-level').value);
   var formDate=$('r-date').value;
+  combineHw();
   // ── Field-level merge: read latest from Firestore (via onSnapshot-updated array) ──
   var existing=reports.find(function(r){return r.studentId===sId&&r.date===formDate;});
   var prev=existing||{};
@@ -1318,7 +1325,7 @@ function renderHistory(){
   else if(period&&period!=='all'&&!isNaN(parseInt(period))){var mo2=parseInt(period);if(mo2>curMo){$('history-scroll-wrap').innerHTML='<div class="empty"><div class="ei">⏳</div><div class="et">'+mo2+'월은 아직 진행 전입니다</div></div>';$('h-bulk-delete-btn').style.display='none';$('h-select-all-btn').style.display='none';return;}list=list.filter(function(r){var d=new Date(r.date);return d.getMonth()+1===mo2&&d.getFullYear()===now2.getFullYear();});}
   if(!list.length){$('history-scroll-wrap').innerHTML='<div class="empty"><div class="ei">📊</div><div class="et">기록이 없습니다</div></div>';$('h-bulk-delete-btn').style.display='none';$('h-select-all-btn').style.display='none';return;}
   $('h-bulk-delete-btn').style.display='';$('h-select-all-btn').style.display='';
-  function hwIcon(hw){return hw==='완료'?'✅':hw==='미제출'?'❌':hw==='일부 제출'?'📋':(hw||'-');}
+  function hwIcon(hw){if(!hw)return'-';var s=splitHw(hw);if(s.video||s.book){var p=[];if(s.video)p.push(s.video==='제출'?'🎬✅':'🎬❌');if(s.book)p.push(s.book==='제출'?'📖✅':'📖❌');return p.join(' ');}return hw==='완료'?'✅':hw==='미제출'?'❌':hw;}
   var thead='<tr><th style="width:32px"><input type="checkbox" id="h-check-all" onclick="toggleSelectAllReports()" title="전체선택"></th>';
   ['날짜','이름','단계','진도','숙제','복습테스트','수업태도','코멘트','삭제'].forEach(function(h){thead+='<th>'+h+'</th>';});
   thead+='</tr>';
@@ -1473,15 +1480,16 @@ function _doSaveReportAsImage(r){
   if(r.teacherTablet||r.teacher)teacherLine+='태블릿: '+(r.teacherTablet||r.teacher||'-');
   if(r.teacherBook)teacherLine+=(teacherLine?' · ':'')+'교재: '+r.teacherBook;
   if(!teacherLine)teacherLine='-';
-  var hwIcon='-';
-  if(r.homework==='영상 숙제 제출')hwIcon='🎬✅ 영상 제출';
-  else if(r.homework==='영상 숙제 미제출')hwIcon='🎬❌ 영상 미제출';
-  else if(r.homework==='교재 숙제 제출')hwIcon='📖✅ 교재 제출';
-  else if(r.homework==='교재 숙제 미제출')hwIcon='📖❌ 교재 미제출';
+  var hwIcon='';
+  var _hwS=splitHw(r.homework||'');
+  var hwParts=[];
+  if(_hwS.video)hwParts.push('🎬 영상 '+(_hwS.video==='제출'?'✅':'❌'));
+  if(_hwS.book)hwParts.push('📖 교재 '+(_hwS.book==='제출'?'✅':'❌'));
+  if(hwParts.length)hwIcon=hwParts.join(' · ');
   else if(r.homework==='완료')hwIcon='✅ 완료';
   else if(r.homework==='미제출')hwIcon='❌ 미제출';
-  else if(r.homework==='일부 제출')hwIcon='📋 일부 제출';
   else if(r.homework)hwIcon=r.homework;
+  else hwIcon='-';
   var cardHTML='<div id="ric" style="width:380px;background:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12)">'
     +'<div style="background:linear-gradient(135deg,#0b2c5c 0%,#1e40af 100%);padding:20px 20px 16px;color:white">'
     +'<div style="font-size:11px;font-weight:600;letter-spacing:1px;opacity:0.7;margin-bottom:6px">englisheye</div>'
