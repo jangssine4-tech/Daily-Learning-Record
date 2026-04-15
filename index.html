@@ -255,7 +255,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="r2"><div class="field"><div class="fl">영상 숙제</div><select class="fi" id="r-hw-video" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div><div class="field"><div class="fl">교재 숙제</div><select class="fi" id="r-hw-book" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div></div><input type="hidden" id="r-hw" value=""><input type="hidden" id="r-hw-status" value="미확인">
     <div class="field"><div class="fl">교재 점검 교사</div><select class="fi" id="r-teacher-book"></select></div>
     <div id="eval-area"></div>
-    <div id="dictation-area" style="display:none"><div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📝 받아쓰기</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px">맞은 개수:</span><select class="fi" id="r-dictation" style="width:80px;font-size:12px"><option value="">-</option><option value="0/4">0/4</option><option value="1/4">1/4</option><option value="2/4">2/4</option><option value="3/4">3/4</option><option value="4/4">4/4</option></select><span style="font-size:11px;color:var(--txt3)">(4개 중)</span></div></div></div>
+    <div id="dictation-area"><div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📝 받아쓰기</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px">맞은 개수:</span><select class="fi" id="r-dictation" style="width:80px;font-size:12px"></select><span id="dictation-total" style="font-size:11px;color:var(--txt3)"></span></div></div></div>
     <div class="field"><div class="fl">칭찬 스티커</div><div id="praise-area" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
     <div class="field"><div class="fl">선생님 코멘트 (태블릿)</div><textarea class="fi" id="r-comment-tablet" rows="2" placeholder="태블릿 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
@@ -789,10 +789,13 @@ function populateClassSelects(){
   var sfCls=$('s-filter-cls');if(sfCls)sfCls.innerHTML='<option value="">전체 모듈</option>'+classes.map(function(c){return'<option value="'+c.id+'">'+c.name+'</option>';}).join('');
 }
 function populateTeacherSelects(){
-  var userTeachers=users.filter(function(u){return['teacher','admin'].includes(u.role)&&!u.adminDeleted;}).map(function(u){return u.engName?(u.name+' ('+u.engName+')'):u.name;});
-  var all=[...new Set([...userTeachers])].filter(Boolean);
-  var opts=all.map(function(t){return'<option value="'+t+'">'+t+'</option>';}).join('');
-  ['r-teacher-tablet','r-teacher-book','cls-teacher','cls-asst','con-teacher','nc-teacher'].forEach(function(id){var el=$(id);if(!el)return;var cur=el.value;el.innerHTML=(id==='cls-asst'?'<option value="">없음</option>':'<option value="">선택</option>')+opts;if(cur)el.value=cur;});
+  var activeUsers=users.filter(function(u){return['teacher','admin'].includes(u.role)&&!u.adminDeleted;});
+  // English name only for tablet/book teacher
+  var engOpts=activeUsers.filter(function(u){return u.engName;}).map(function(u){return'<option value="'+u.engName+'">'+u.engName+'</option>';}).join('');
+  ['r-teacher-tablet','r-teacher-book'].forEach(function(id){var el=$(id);if(!el)return;var cur=el.value;el.innerHTML='<option value="">선택</option>'+engOpts;if(cur)el.value=cur;});
+  // Full name for other selects
+  var fullOpts=activeUsers.map(function(u){var display=u.engName?(u.name+' ('+u.engName+')'):u.name;return'<option value="'+display+'">'+display+'</option>';}).join('');
+  ['cls-teacher','cls-asst','con-teacher','nc-teacher'].forEach(function(id){var el=$(id);if(!el)return;var cur=el.value;el.innerHTML=(id==='cls-asst'?'<option value="">없음</option>':'<option value="">선택</option>')+fullOpts;if(cur)el.value=cur;});
 }
 
 function initYearSelects(which){
@@ -1023,8 +1026,23 @@ async function markAttendance(studentId, action){
 function _cleanComment(c){return (c||'').replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'');}
 function _combineComment(){var t=$('r-comment-tablet').value.trim();var b=$('r-comment-book').value.trim();var parts=[];if(t)parts.push('[태블릿] '+t);if(b)parts.push('[교재] '+b);return parts.join('\n');}
 function combineHw(){var v=$('r-hw-video')?.value||'';var b=$('r-hw-book')?.value||'';var parts=[];if(v)parts.push('영상:'+v);if(b)parts.push('교재:'+b);$('r-hw').value=parts.join(', ');}
+function getDictationCount(level){
+  if(!level)return 4;
+  if(/phonics/i.test(level))return 4;
+  if(/elite|내신|reader|천일문|빠바/i.test(level))return 20;
+  return 12;
+}
+function updateDictationDropdown(level,currentVal){
+  var sel=$('r-dictation');var lbl=$('dictation-total');if(!sel)return;
+  var count=getDictationCount(level);
+  var opts='<option value="">-</option>';
+  for(var i=0;i<=count;i++)opts+='<option value="'+i+'/'+count+'">'+i+'/'+count+'</option>';
+  sel.innerHTML=opts;
+  if(lbl)lbl.textContent='('+count+'개 중)';
+  if(currentVal)sel.value=currentVal;
+}
 function splitHw(val){var r={video:'',book:''};if(!val)return r;if(val.indexOf('영상:')>=0){var m=val.match(/영상:([^,]+)/);if(m)r.video=m[1].trim();}if(val.indexOf('교재:')>=0){var m2=val.match(/교재:([^,]+)/);if(m2)r.book=m2[1].trim();}if(!r.video&&!r.book){if(val==='완료'){r.video='제출';r.book='제출';}else if(val==='미제출'){r.video='미제출';r.book='미제출';}}return r;}
-function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m1=c.match(/\[태블릿\]\s*(.*)/);var m2=c.match(/\[교재\]\s*(.*)/);if(m1)t=m1[1];if(m2)b=m2[1];if(!m1&&!m2)t=c;return{t:t,b:b};}
+function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m2=c.match(/\[교재\]\s*([\s\S]*?)$/);if(m2)b=m2[1].trim();var m1=c.match(/\[태블릿\]\s*([\s\S]*?)(?=\s*\[교재\]|$)/);if(m1)t=m1[1].trim();if(!m1&&!m2)t=c;return{t:t,b:b};}
 function startReport(studentId){
   window._currentEvalModule='';window._evalState={};window._saveImageAfter=false;_lastLoadedReportTs='';
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
@@ -1033,7 +1051,7 @@ function startReport(studentId){
   $('write-student-info').textContent=s.name+' · '+getStudentLevel(s)+' · '+(s.grade||'');
   $('r-date').value=todayISO();
   var lvSel=$('r-level');
-  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===getStudentLevel(s)?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(getStudentLevel(s),rep?.progress||'');}var _da=$('dictation-area');if(_da)_da.style.display=/phonics/i.test(getStudentLevel(s))?'block':'none';
+  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===getStudentLevel(s)?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(getStudentLevel(s),rep?.progress||'');}updateDictationDropdown(getStudentLevel(s),rep?.dictation||'');
   // Check for temp saved data
   var tempKey='tempReport_'+studentId+'_'+todayISO();
   var tempData=null;
@@ -1050,7 +1068,7 @@ function startReport(studentId){
   }
   if(useTempData){
     // Restore temp data
-    if(lvSel&&tempData.level){lvSel.value=tempData.level;populateProgressDropdown(tempData.level,tempData.progress||'');if(tempData.progress){var _ps=$('r-progress');if(_ps)_ps.value=tempData.progress;}}
+    if(lvSel&&tempData.level){lvSel.value=tempData.level;populateProgressDropdown(tempData.level,tempData.progress||'');updateDictationDropdown(tempData.level,tempData.dictation||'');if(tempData.progress){var _ps=$('r-progress');if(_ps)_ps.value=tempData.progress;}}
     if($('r-review-yn'))$('r-review-yn').value=tempData.reviewYN||'';$('r-review').value=tempData.reviewTest||'';$('r-review-items').value=tempData.reviewTestItems||'';$('r-attitude').value=tempData.attitude||'';$('r-quiz').value=tempData.dailyQuiz||'';$('r-hw').value=tempData.homework||'';var _hw0=splitHw(tempData.homework);if($('r-hw-video'))$('r-hw-video').value=_hw0.video;if($('r-hw-book'))$('r-hw-book').value=_hw0.book;$('r-hw-status').value=tempData.hwStatus||'미확인';var _sc0=_splitComment(tempData.comment||'');$('r-comment-tablet').value=_sc0.t;$('r-comment-book').value=_sc0.b;$('r-memo').value=tempData.memo||'';$('r-makeup-check').checked=tempData.needsMakeup||false;$('r-makeup-content').value=tempData.makeupContent||'';$('r-makeup-content-wrap').style.display=tempData.needsMakeup?'block':'none';
     if($('r-dictation'))$('r-dictation').value=tempData.dictation||'';if(tempData.evalState)window._evalState=tempData.evalState;
     if(tempData.evalModule){window._currentEvalModule=tempData.evalModule;renderEvalArea(tempData.evalModule,tempData.evalState||{});}
@@ -1197,7 +1215,8 @@ function getEvalModuleForLevel(level){
 }
 function onReportLevelChange(){
   var newLevel=$('r-level').value;
-  var da=$('dictation-area');if(da)da.style.display=/phonics/i.test(newLevel)?'block':'none';
+  var da=$('dictation-area');if(da)da.style.display='block';
+  updateDictationDropdown(newLevel,'');
   populateProgressDropdown(newLevel,'');
   var sId=$('r-student-id').value;
   var s=students.find(function(x){return x.id===sId;});
@@ -1242,7 +1261,7 @@ async function saveReport(){
   var mergedTablet=formTablet||prevComment.t;
   var mergedBook=formBook||prevComment.b;
   var mergedComment='';
-  if(mergedTablet&&mergedBook)mergedComment='[태블릿] '+mergedTablet+' [교재] '+mergedBook;
+  if(mergedTablet&&mergedBook)mergedComment='[태블릿] '+mergedTablet+'\n[교재] '+mergedBook;
   else if(mergedTablet)mergedComment=mergedTablet;
   else if(mergedBook)mergedComment='[교재] '+mergedBook;
   // For other fields: use form value if non-empty, else keep existing
