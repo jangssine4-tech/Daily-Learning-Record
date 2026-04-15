@@ -255,7 +255,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="r2"><div class="field"><div class="fl">영상 숙제</div><select class="fi" id="r-hw-video" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div><div class="field"><div class="fl">교재 숙제</div><select class="fi" id="r-hw-book" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div></div><input type="hidden" id="r-hw" value=""><input type="hidden" id="r-hw-status" value="미확인">
     <div class="field"><div class="fl">교재 점검 교사</div><select class="fi" id="r-teacher-book"></select></div>
     <div id="eval-area"></div>
-    <div id="dictation-area"><div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📝 받아쓰기</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px">맞은 개수:</span><select class="fi" id="r-dictation" style="width:80px;font-size:12px"></select><span id="dictation-total" style="font-size:11px;color:var(--txt3)"></span></div></div></div>
+    <div id="dictation-area"><div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📝 받아쓰기</div><div style="display:flex;align-items:center;gap:6px"><input type="number" class="fi" id="r-dictation-correct" min="0" style="width:50px;font-size:12px;text-align:center" placeholder="0" oninput="updateDictationValue()"><span style="font-size:13px;font-weight:700">/</span><input type="number" class="fi" id="r-dictation-total" min="1" style="width:50px;font-size:12px;text-align:center" placeholder="0" oninput="updateDictationValue()"><span style="font-size:11px;color:var(--txt3)">개</span><input type="hidden" id="r-dictation" value=""></div></div></div>
     <div class="field"><div class="fl">칭찬 스티커</div><div id="praise-area" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
     <div class="field"><div class="fl">선생님 코멘트 (태블릿)</div><textarea class="fi" id="r-comment-tablet" rows="2" placeholder="태블릿 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
@@ -1033,13 +1033,24 @@ function getDictationCount(level){
   return 12;
 }
 function updateDictationDropdown(level,currentVal){
-  var sel=$('r-dictation');var lbl=$('dictation-total');if(!sel)return;
   var count=getDictationCount(level);
-  var opts='<option value="">-</option>';
-  for(var i=0;i<=count;i++)opts+='<option value="'+i+'/'+count+'">'+i+'/'+count+'</option>';
-  sel.innerHTML=opts;
-  if(lbl)lbl.textContent='('+count+'개 중)';
-  if(currentVal)sel.value=currentVal;
+  var totalInp=$('r-dictation-total');
+  var correctInp=$('r-dictation-correct');
+  if(currentVal){
+    var m=currentVal.match(/^(\d+)\/(\d+)/);
+    if(m){if(correctInp)correctInp.value=m[1];if(totalInp)totalInp.value=m[2];}
+  } else {
+    if(correctInp)correctInp.value='';
+    if(totalInp)totalInp.value='';
+  }
+  updateDictationValue();
+}
+function updateDictationValue(){
+  var correct=$('r-dictation-correct')?.value||'';
+  var total=$('r-dictation-total')?.value||'';
+  var hidden=$('r-dictation');
+  if(!hidden)return;
+  hidden.value=(correct&&total)?correct+'/'+total:'';
 }
 function splitHw(val){var r={video:'',book:''};if(!val)return r;if(val.indexOf('영상:')>=0){var m=val.match(/영상:([^,]+)/);if(m)r.video=m[1].trim();}if(val.indexOf('교재:')>=0){var m2=val.match(/교재:([^,]+)/);if(m2)r.book=m2[1].trim();}if(!r.video&&!r.book){if(val==='완료'){r.video='제출';r.book='제출';}else if(val==='미제출'){r.video='미제출';r.book='미제출';}}return r;}
 function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m2=c.match(/\[교재\]\s*([\s\S]*?)$/);if(m2)b=m2[1].trim();var m1=c.match(/\[태블릿\]\s*([\s\S]*?)(?=\s*\[교재\]|$)/);if(m1)t=m1[1].trim();if(!m1&&!m2)t=c;return{t:t,b:b};}
@@ -1070,20 +1081,21 @@ function startReport(studentId){
     // Restore temp data
     if(lvSel&&tempData.level){lvSel.value=tempData.level;populateProgressDropdown(tempData.level,tempData.progress||'');updateDictationDropdown(tempData.level,tempData.dictation||'');if(tempData.progress){var _ps=$('r-progress');if(_ps)_ps.value=tempData.progress;}}
     if($('r-review-yn'))$('r-review-yn').value=tempData.reviewYN||'';$('r-review').value=tempData.reviewTest||'';$('r-review-items').value=tempData.reviewTestItems||'';$('r-attitude').value=tempData.attitude||'';$('r-quiz').value=tempData.dailyQuiz||'';$('r-hw').value=tempData.homework||'';var _hw0=splitHw(tempData.homework);if($('r-hw-video'))$('r-hw-video').value=_hw0.video;if($('r-hw-book'))$('r-hw-book').value=_hw0.book;$('r-hw-status').value=tempData.hwStatus||'미확인';var _sc0=_splitComment(tempData.comment||'');$('r-comment-tablet').value=_sc0.t;$('r-comment-book').value=_sc0.b;$('r-memo').value=tempData.memo||'';$('r-makeup-check').checked=tempData.needsMakeup||false;$('r-makeup-content').value=tempData.makeupContent||'';$('r-makeup-content-wrap').style.display=tempData.needsMakeup?'block':'none';
-    if($('r-dictation'))$('r-dictation').value=tempData.dictation||'';if(tempData.evalState)window._evalState=tempData.evalState;
+    if(tempData.dictation){var _dm=tempData.dictation.match(/^(\d+)\/(\d+)/);if(_dm){if($('r-dictation-correct'))$('r-dictation-correct').value=_dm[1];if($('r-dictation-total'))$('r-dictation-total').value=_dm[2];}$('r-dictation').value=tempData.dictation;}updateDictationValue();if(tempData.evalState)window._evalState=tempData.evalState;
     if(tempData.evalModule){window._currentEvalModule=tempData.evalModule;renderEvalArea(tempData.evalModule,tempData.evalState||{});}
     if(ind)ind.style.display='block';
     toast('📋 임시 저장 데이터를 불러왔습니다');
   }
   if(!tempData||!useTempData) {
     if(ind)ind.style.display='none';
-    if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';$('r-attitude').value=rep.attitude||'';$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';var _hw1=splitHw(rep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw1.video;if($('r-hw-book'))$('r-hw-book').value=_hw1.book;$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-dictation'))$('r-dictation').value=rep.dictation||'';}
-    else{_lastLoadedReportTs='';['r-review-yn','r-review','r-attitude','r-hw','r-hw-video','r-hw-book'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';}
+    if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';$('r-attitude').value=rep.attitude||'';$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';var _hw1=splitHw(rep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw1.video;if($('r-hw-book'))$('r-hw-book').value=_hw1.book;$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if(rep.dictation){var _dm2=rep.dictation.match(/^(\d+)\/(\d+)/);if(_dm2){if($('r-dictation-correct'))$('r-dictation-correct').value=_dm2[1];if($('r-dictation-total'))$('r-dictation-total').value=_dm2[2];}$('r-dictation').value=rep.dictation;}else{if($('r-dictation-correct'))$('r-dictation-correct').value='';if($('r-dictation-total'))$('r-dictation-total').value='';$('r-dictation').value='';}}
+    else{_lastLoadedReportTs='';['r-review-yn','r-review','r-attitude','r-hw','r-hw-video','r-hw-book','r-dictation-correct','r-dictation-total'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';}
     var levelModule=getEvalModuleForLevel(getStudentLevel(s));
     if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
   }
-  // Auto-set teachers
+  goto('write');
+  // Auto-set teachers AFTER goto (which rebuilds dropdowns via populateTeacherSelects)
   if(tempData&&(tempData.teacherTablet||tempData.teacher)){
     if($('r-teacher-tablet'))$('r-teacher-tablet').value=tempData.teacherTablet||tempData.teacher||'';
     if($('r-teacher-book'))$('r-teacher-book').value=tempData.teacherBook||'';
@@ -1091,10 +1103,10 @@ function startReport(studentId){
     if($('r-teacher-tablet'))$('r-teacher-tablet').value=rep.teacherTablet||rep.teacher||'';
     if($('r-teacher-book'))$('r-teacher-book').value=rep.teacherBook||'';
   } else {
-    if($('r-teacher-tablet'))$('r-teacher-tablet').value=currentUser.name||'';
+    var myEng=users.find(function(u){return u.name===currentUser?.name||u.loginId===currentUser?.loginId;});
+    if($('r-teacher-tablet'))$('r-teacher-tablet').value=myEng?.engName||'';
     if($('r-teacher-book'))$('r-teacher-book').value='';
   }
-  goto('write');
 }
 function tempSaveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
@@ -1146,7 +1158,11 @@ function refreshWriteFormIfNeeded(){
   fillIfEmpty('r-hw-video',_hwR.video);
   fillIfEmpty('r-hw-book',_hwR.book);
   fillIfEmpty('r-memo',rep.memo);
-  if($('r-dictation'))fillIfEmpty('r-dictation',rep.dictation);
+  if(rep.dictation&&!$('r-dictation')?.value){
+    $('r-dictation').value=rep.dictation;
+    var _dmR=rep.dictation.match(/^(\d+)\/(\d+)/);
+    if(_dmR){if($('r-dictation-correct'))$('r-dictation-correct').value=_dmR[1];if($('r-dictation-total'))$('r-dictation-total').value=_dmR[2];}
+  }
   // Comment fields: fill only if empty
   var _sc=_splitComment(rep.comment||'');
   fillIfEmpty('r-comment-tablet',_sc.t);
@@ -1402,7 +1418,7 @@ function showReportDetail(id){
   function rowH(k,v){if(!v)return'';return'<div style="display:flex;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--txt3);min-width:80px">'+k+'</span><span>'+v+'</span></div>';}
   var evalH='';
   if(mod&&r.evalItems){evalH='<div style="font-size:12px;font-weight:700;color:var(--txt3);margin:10px 0 7px">📊 '+mod.label+' 평가</div>';mod.sections.forEach(function(sec){evalH+='<div style="font-size:12px;font-weight:700;margin:8px 0 4px;color:var(--txt2)">'+sec.title+'</div>';sec.items.forEach(function(item){evalH+='<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)"><span>'+item.label+'</span><span>'+starH(r.evalItems[item.key]||0)+'</span></div>';});});}
-  $('report-detail-inner').innerHTML='<div class="mt">'+r.studentName+' 학습 일지</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px"><span class="badge bg-navy">'+r.date+'</span>'+(r.level?'<span class="badge bg-blue">'+r.level+'</span>':'')+'<span class="badge bg-gray">T:'+(r.teacherTablet||r.teacher||'-')+'</span>'+(r.teacherBook?'<span class="badge bg-blue">B:'+r.teacherBook+'</span>':'')+(r.absent?'<span class="badge bg-red">결석</span>':'')+'</div><div style="background:var(--surface2);border-radius:var(--r);padding:11px;margin-bottom:10px">'+rowH('진도',r.progress)+rowH('복습 테스트',r.reviewTest)+rowH('수업 태도',r.attitude)+rowH('Daily Quiz',r.dailyQuiz)+rowH('숙제',r.homework)+'</div>'+evalH+'<div style="background:var(--surface2);border-radius:8px;padding:9px 11px;margin-top:7px"><strong>💬 코멘트</strong><textarea class="fi" id="rd-comment" rows="2" style="margin-top:4px;font-size:12px">'+(r.comment||'')+'</textarea></div><div style="background:#f0f9ff;border-radius:8px;padding:9px 11px;margin-top:7px"><strong>📢 전달 사항</strong><textarea class="fi" id="rd-memo" rows="2" style="margin-top:4px;font-size:12px">'+(r.memo||'')+'</textarea></div><div style="height:8px"></div><button class="btn btn-navy btn-block btn-sm" onclick="updateReportComment(\''+id+'\')">💾 코멘트 저장</button><div style="height:8px"></div><button class="btn btn-green btn-block" onclick="saveReportAsImage(\''+id+'\')">📷 이미지로 저장 (카톡 전송용)</button><div style="height:8px"></div><button class="btn btn-outline btn-block" onclick="aiConsultSummary(\''+r.studentId+'\')">🤖 AI 상담 보고서</button><div id="ai-consult-result" style="display:none;margin-top:8px;background:#eff6ff;border-radius:8px;padding:10px;font-size:12px;line-height:1.6"></div>';
+  $('report-detail-inner').innerHTML='<div class="mt">'+r.studentName+' 학습 일지</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px"><span class="badge bg-navy">'+r.date+'</span>'+(r.level?'<span class="badge bg-blue">'+r.level+'</span>':'')+'<span class="badge bg-gray">T:'+(r.teacherTablet||r.teacher||'-')+'</span>'+(r.teacherBook?'<span class="badge bg-blue">B:'+r.teacherBook+'</span>':'')+(r.absent?'<span class="badge bg-red">결석</span>':'')+'</div><div style="background:var(--surface2);border-radius:var(--r);padding:11px;margin-bottom:10px">'+rowH('진도',r.progress)+rowH('복습 테스트',r.reviewTest)+rowH('수업 태도',r.attitude)+rowH('Daily Quiz',r.dailyQuiz)+rowH('숙제',r.homework)+(r.dictation?rowH('받아쓰기',(function(){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(!dm)return r.dictation;var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;return dm[1]+'/'+dm[2]+' ('+pct+'점)';})()):'')+'</div>'+evalH+'<div style="background:var(--surface2);border-radius:8px;padding:9px 11px;margin-top:7px"><strong>💬 코멘트</strong><textarea class="fi" id="rd-comment" rows="2" style="margin-top:4px;font-size:12px">'+(r.comment||'')+'</textarea></div><div style="background:#f0f9ff;border-radius:8px;padding:9px 11px;margin-top:7px"><strong>📢 전달 사항</strong><textarea class="fi" id="rd-memo" rows="2" style="margin-top:4px;font-size:12px">'+(r.memo||'')+'</textarea></div><div style="height:8px"></div><button class="btn btn-navy btn-block btn-sm" onclick="updateReportComment(\''+id+'\')">💾 코멘트 저장</button><div style="height:8px"></div><button class="btn btn-green btn-block" onclick="saveReportAsImage(\''+id+'\')">📷 이미지로 저장 (카톡 전송용)</button><div style="height:8px"></div><button class="btn btn-outline btn-block" onclick="aiConsultSummary(\''+r.studentId+'\')">🤖 AI 상담 보고서</button><div id="ai-consult-result" style="display:none;margin-top:8px;background:#eff6ff;border-radius:8px;padding:10px;font-size:12px;line-height:1.6"></div>';
   $('modal-report').style.display='flex';
 }
 async function updateReportComment(id){
@@ -1414,7 +1430,9 @@ async function updateReportComment(id){
 }
 function sendKakao(reportId){
   var r=reports.find(function(x){return x.id===reportId;});if(!r)return;
-  var lines=['📚 [잉글리시아이 학습 일지]','','📅 '+r.date,'👤 '+r.studentName,'📖 '+(r.level||'-')+' · '+(r.progress||'-')+(r.reviewYN==='Review'?' · Review':''),'👩‍🏫 태블릿: '+(r.teacherTablet||r.teacher||'-')+(r.teacherBook?' · 교재: '+r.teacherBook:''),'','[평가]','• 복습: '+(r.reviewTest||'-'),'• 태도: '+(r.attitude||'-'),'• 숙제: '+(r.homework||'-')];
+  var _tNames=[];if(r.teacherTablet||r.teacher)_tNames.push(r.teacherTablet||r.teacher);if(r.teacherBook&&r.teacherBook!==(r.teacherTablet||r.teacher))_tNames.push(r.teacherBook);
+  var lines=['📚 [잉글리시아이 학습 일지]','','📅 '+r.date+' · 담임 : '+(_tNames.length?_tNames.join(' / '):'-'),'👤 '+r.studentName,'📖 '+(r.level||'-')+' · '+(r.progress||'-')+(r.reviewYN==='Review'?' · Review':''),'','[평가]','• 복습: '+(r.reviewTest||'-'),'• 태도: '+(r.attitude||'-'),'• 숙제: '+(r.homework||'-')];
+  if(r.dictation){var _dm3=r.dictation.match(/^(\d+)\/(\d+)/);if(_dm3){var _pct=parseInt(_dm3[2])>0?Math.round(parseInt(_dm3[1])/parseInt(_dm3[2])*100):0;lines.push('• 받아쓰기: '+_dm3[1]+'/'+_dm3[2]+' ('+_pct+'점)');}}
   if(r.comment)lines.push('','💬 '+_cleanComment(r.comment));
   if(r.memo)lines.push('','📢 '+r.memo);
   lines.push('','⭐ 잉글리시아이');
@@ -1524,6 +1542,7 @@ function _doSaveReportAsImage(r){
     +infoRow('수업 태도',r.attitude)
     +infoRow('Daily Quiz',r.dailyQuiz)
     +infoRow('숙제',hwIcon)
+    +(function(){if(!r.dictation)return'';var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(!dm)return infoRow('받아쓰기',r.dictation);var correct=parseInt(dm[1]),total=parseInt(dm[2]);var pct=total>0?Math.round(correct/total*100):0;return infoRow('받아쓰기',correct+'/'+total+' ('+pct+'점)');})()
     +'</div>'
     +evalHTML+praiseHTML+commentHTML+memoHTML
     +'</div>'
