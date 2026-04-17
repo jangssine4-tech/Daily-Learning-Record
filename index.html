@@ -1729,8 +1729,9 @@ function renderMakeupCalendar(){
         var dateStr=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(cellDate).padStart(2,'0');
         var isToday=dateStr===todayStr;var holiday=isHoliday(yr,mo,cellDate);var isRed=isSun2||holiday!=null;
         dateLbl='<div style="font-size:10px;font-weight:700;color:'+(isRed?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+';margin-bottom:3px'+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" title="'+(holiday||'')+'">'+cellDate+(holiday?'🔴':'')+'</div>';
-        monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){var cls3=m.makeupStatus==='done'?'done':m.makeupStatus==='scheduled'?'scheduled':'';chips+='<div class="makeup-chip '+cls3+'" onclick="openMakeupModal(\''+m.id+'\')">'+m.studentName+'</div>';});
-        makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr&&m.makeupStatus!=='pending';}).forEach(function(m){var cls3=m.makeupStatus==='done'?'done':'scheduled';chips+='<div class="makeup-chip '+cls3+'" onclick="openMakeupStatusModal(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+(m.makeupTime?' '+m.makeupTime:'')+'</div>';});
+        var _chipSeen={};
+        monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':m.makeupStatus==='scheduled'?'scheduled':'';chips+='<div class="makeup-chip '+cls3+'" onclick="openMakeupModal(\''+m.id+'\')">'+m.studentName+'</div>';});
+        makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr&&m.makeupStatus!=='pending';}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':'scheduled';chips+='<div class="makeup-chip '+cls3+'" onclick="openMakeupStatusModal(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+(m.makeupTime?' '+m.makeupTime:'')+'</div>';});
       }
       html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px;cursor:pointer" onclick="openMakeupDayView(\''+dateStr+'\')">'+dateLbl+chips+'</div>';
       if(col<6&&date>lastDate){for(var rr=col+1;rr<7;rr++)html+='<div style="background:var(--surface);border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-height:65px"></div>';break;}
@@ -1787,51 +1788,41 @@ function openMakeupDayView(dateStr){
   var dayNames=['일','월','화','수','목','금','토'];
   var dayName=dayNames[d.getDay()];
   var dateLabel=(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+dayName+')';
-  // Find absent reports for this date
-  var absentReps=reports.filter(function(r){return r.date===dateStr&&r.absent;});
-  // Find existing makeups for this date
+  // Find all makeups related to this date (absent on this date OR scheduled for this date)
   var dayMakeups=makeups.filter(function(m){return m.absentDate===dateStr;});
   var scheduledHere=makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;});
-  var existingIds=new Set(dayMakeups.map(function(m){return m.studentId;}));
-  // Students scheduled for this day but not having reports (potential absences)
-  var activeS=students.filter(function(s){var st=s.status||'재원';return(st==='재원'||st==='신규')&&(s.days||[]).includes(dayName);});
+  // Deduplicate by student ID
+  var seenIds=new Set();
+  var allMakeups=[];
+  dayMakeups.forEach(function(m){if(!seenIds.has(m.studentId)){seenIds.add(m.studentId);allMakeups.push(m);}});
+  scheduledHere.forEach(function(m){if(!seenIds.has(m.studentId)){seenIds.add(m.studentId);allMakeups.push(m);}});
   var statusColors={'pending':'bg-red','scheduled':'bg-gold','done':'bg-green'};
   var statusLabels={'pending':'미처리','scheduled':'예정','done':'완료'};
-  var html='<div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div class="mt">📅 '+dateLabel+' 보강 현황</div>';
-  // Absent students section
-  html+='<div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px">❌ 결석 학생</div>';
-  if(absentReps.length){
-    html+=absentReps.map(function(r){
-      var hasMk=dayMakeups.find(function(m){return m.studentId===r.studentId;});
+  var html='<div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div class="mt">📅 '+dateLabel+' 보강</div>';
+  // Makeups for this date (결석일 기준)
+  var absentHere=allMakeups.filter(function(m){return m.absentDate===dateStr;});
+  if(absentHere.length){
+    html+='<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">📋 보강 등록 건</div>';
+    html+=absentHere.map(function(m){
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
-        +'<span style="font-size:13px;font-weight:600">'+r.studentName+'</span>'
-        +(hasMk?'<span class="badge '+(statusColors[hasMk.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupModal(\''+hasMk.id+'\')">'+statusLabels[hasMk.makeupStatus||'pending']+'</span>'
-        :'<button class="btn btn-green btn-xs" onclick="addMakeupFromDay(\''+r.studentId+'\',\''+r.studentName+'\',\''+dateStr+'\',this.closest(\'.mo\'))">+ 보강 등록</button>')
-        +'</div>';
-    }).join('');
-  } else {
-    html+='<div style="font-size:12px;color:var(--txt3);padding:6px 0">결석 학생 없음</div>';
-  }
-  // Existing makeups for this date (not from absent reports)
-  var unlinked=dayMakeups.filter(function(m){return!absentReps.find(function(r){return r.studentId===m.studentId;});});
-  if(unlinked.length){
-    html+='<div style="font-size:13px;font-weight:700;color:var(--navy);margin:12px 0 6px">📋 보강 등록 건</div>';
-    html+=unlinked.map(function(m){
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
-        +'<span style="font-size:13px">'+m.studentName+'</span>'
+        +'<span style="font-size:13px;font-weight:600">'+m.studentName+'</span>'
         +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'+statusLabels[m.makeupStatus||'pending']+'</span>'
         +'</div>';
     }).join('');
   }
   // Scheduled makeups on this date (from other absent dates)
-  if(scheduledHere.length){
+  var schedHere=allMakeups.filter(function(m){return m.absentDate!==dateStr;});
+  if(schedHere.length){
     html+='<div style="font-size:13px;font-weight:700;color:var(--blue);margin:12px 0 6px">🔄 이 날 보강 예정</div>';
-    html+=scheduledHere.map(function(m){
+    html+=schedHere.map(function(m){
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
         +'<span style="font-size:13px">'+m.studentName+' <span style="font-size:10px;color:var(--txt3)">(결석: '+m.absentDate+')</span></span>'
         +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupStatusModal(\''+m.id+'\')">'+(m.makeupTime||'')+' '+statusLabels[m.makeupStatus||'pending']+'</span>'
         +'</div>';
     }).join('');
+  }
+  if(!absentHere.length&&!schedHere.length){
+    html+='<div style="font-size:12px;color:var(--txt3);padding:10px 0;text-align:center">이 날 보강 기록 없음</div>';
   }
   // Quick add for any student
   html+='<div style="margin-top:14px;border-top:2px solid var(--border);padding-top:10px">'
