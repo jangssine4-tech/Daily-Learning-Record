@@ -987,7 +987,7 @@ async function markAttendance(studentId, action){
     var hasMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr;});
     if(!hasMk){
       var mkData={studentId:studentId,studentName:s.name,absentDate:todayStr,absentReason:isEarly?'조퇴':'',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',autoCreated:true,createdAt:new Date().toISOString()};
-      db.collection('makeups').add(mkData).then(function(ref){makeups.push({id:ref.id,...mkData});});
+      db.collection('makeups').add(mkData).then(function(ref){makeups.push({id:ref.id,...mkData});renderMakeupCalendar();});
     }
   }
 
@@ -1731,7 +1731,7 @@ function renderMakeupCalendar(){
         dateLbl='<div style="font-size:10px;font-weight:700;color:'+(isRed?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+';margin-bottom:3px'+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" title="'+(holiday||'')+'">'+cellDate+(holiday?'🔴':'')+'</div>';
         var _chipSeen={};
         monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':m.makeupStatus==='scheduled'?'scheduled':'';chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'+m.studentName+'</div>';});
-        makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr&&m.makeupStatus!=='pending';}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':'scheduled';chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupStatusModal(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+(m.makeupTime?' '+m.makeupTime:'')+'</div>';});
+        makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':'scheduled';chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupStatusModal(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+(m.makeupTime?' '+m.makeupTime:'')+'</div>';});
       }
       html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px;cursor:pointer" onclick="openMakeupDayView(\''+dateStr+'\')">'+dateLbl+chips+'</div>';
       if(col<6&&date>lastDate){for(var rr=col+1;rr<7;rr++)html+='<div style="background:var(--surface);border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-height:65px"></div>';break;}
@@ -1742,19 +1742,22 @@ function renderMakeupCalendar(){
 }
 function openMakeupModal(id){var m=makeups.find(function(x){return x.id===id;});if(!m)return;
   // Close any open day view modal first
-  document.querySelectorAll('.mo').forEach(function(el){if(el.id!=='modal-makeup'&&!el.closest('#modal-makeup')&&el.querySelector('.mt')&&el.querySelector('.mt').textContent.indexOf('보강 현황')>=0)el.remove();});
+  document.querySelectorAll('.mo').forEach(function(el){if(el.id!=='modal-makeup'&&!el.closest('#modal-makeup')&&el.querySelector('.mt')&&(el.querySelector('.mt').textContent.indexOf('보강 현황')>=0||el.querySelector('.mt').textContent.indexOf('보강 등록')>=0))el.remove();});
   $('mk-id').value=id;$('mk-info').innerHTML='<strong>'+m.studentName+'</strong> · 결석일: '+m.absentDate;$('mk-status').value=m.makeupStatus||'pending';$('mk-date').value=m.makeupDate||'';$('mk-time').value=m.makeupTime||'';$('mk-note').value=m.makeupNote||'';$('mk-content').value=m.makeupContent||'';$('modal-makeup').style.display='flex';}
-async function saveMakeup(){var id=$('mk-id').value;if(!id)return;loading(true);await db.collection('makeups').doc(id).update({makeupStatus:$('mk-status').value,makeupDate:$('mk-date').value,makeupTime:$('mk-time').value,makeupNote:$('mk-note').value,makeupContent:$('mk-content').value,updatedAt:new Date().toISOString()});await loadMakeups();renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();toast('✅ 업데이트');}
+async function saveMakeup(){var id=$('mk-id').value;if(!id)return;loading(true);var mkDate=$('mk-date').value;var mkTime=$('mk-time').value;var mkNote=$('mk-note').value;var mkContent=$('mk-content').value;var autoStatus=mkDate?'scheduled':'pending';var updateData={makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupNote:mkNote,makeupContent:mkContent,updatedAt:new Date().toISOString()};await db.collection('makeups').doc(id).update(updateData);
+  // Update local array immediately
+  var idx=makeups.findIndex(function(m){return m.id===id;});
+  if(idx>=0)Object.assign(makeups[idx],updateData);
+  renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();toast('✅ 업데이트');}
 async function deleteMakeupEntry(){var id=$('mk-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('makeups').doc(id).delete();makeups=makeups.filter(function(m){return m.id!==id;});renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
 function openMakeupStatusModal(id){
   var m=makeups.find(function(x){return x.id===id;});if(!m)return;
   // Close day view modal
-  document.querySelectorAll('.mo').forEach(function(el){if(el.querySelector('.mt')&&el.querySelector('.mt').textContent.indexOf('보강 현황')>=0)el.remove();});
+  document.querySelectorAll('.mo').forEach(function(el){if(el.querySelector('.mt')&&(el.querySelector('.mt').textContent.indexOf('보강 현황')>=0||el.querySelector('.mt').textContent.indexOf('보강 등록')>=0))el.remove();});
   var statusVal=m.makeupResult||'';
   var html='<div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div class="mt">보강 현황</div>'
     +'<div style="padding:10px 12px;background:var(--surface2);border-radius:8px;margin-bottom:12px">'
-    +'<div style="font-size:15px;font-weight:700;color:var(--navy)">'+m.studentName+'</div>'
-    +'<div style="font-size:12px;color:var(--txt3);margin-top:4px">결석일 : '+m.absentDate+'</div></div>'
+    +'<div style="font-size:14px;font-weight:700;color:var(--navy)">'+m.studentName+' <span style="font-size:12px;font-weight:400;color:var(--txt3)">· 결석일 : '+m.absentDate+'</span></div></div>'
     +'<div class="field"><div class="fl">보강 상태</div>'
     +'<select class="fi" id="mks-result">'
     +'<option value="">미정</option>'
@@ -1776,8 +1779,11 @@ async function saveMakeupStatus(id){
   var result=$('mks-result')?.value||'';
   var memo=$('mks-memo')?.value||'';
   var status=result==='보강 ⭕'?'done':result==='보강 ❌'?'scheduled':'pending';
-  await db.collection('makeups').doc(id).update({makeupResult:result,makeupResultMemo:memo,makeupStatus:status,updatedAt:new Date().toISOString()});
-  await loadMakeups();renderMakeupCalendar();renderSchedule();
+  var updateData={makeupResult:result,makeupResultMemo:memo,makeupStatus:status,updatedAt:new Date().toISOString()};
+  await db.collection('makeups').doc(id).update(updateData);
+  var idx=makeups.findIndex(function(m){return m.id===id;});
+  if(idx>=0)Object.assign(makeups[idx],updateData);
+  renderMakeupCalendar();renderSchedule();
   document.querySelectorAll('.mo').forEach(function(el){if(el.id!=='modal-makeup')el.remove();});
   loading(false);saveCacheDebounced();toast('✅ 보강 현황 저장됨');
 }
@@ -1798,7 +1804,7 @@ function openMakeupDayView(dateStr){
   scheduledHere.forEach(function(m){if(!seenIds.has(m.studentId)){seenIds.add(m.studentId);allMakeups.push(m);}});
   var statusColors={'pending':'bg-red','scheduled':'bg-gold','done':'bg-green'};
   var statusLabels={'pending':'미처리','scheduled':'예정','done':'완료'};
-  var html='<div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div class="mt">📅 '+dateLabel+' 보강</div>';
+  var html='<div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div class="mt">📅 '+dateLabel+' 보강 등록</div>';
   // Makeups for this date (결석일 기준)
   var absentHere=allMakeups.filter(function(m){return m.absentDate===dateStr;});
   if(absentHere.length){
