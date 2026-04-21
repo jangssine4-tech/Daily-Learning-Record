@@ -3,947 +3,626 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>출석 체크 | 잉글리시아이위드멘토링</title>
+<title>스마트 출결</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'Noto Sans KR',sans-serif;background:#0b1120;color:#f0f4ff;min-height:100vh;overflow:hidden;overscroll-behavior:none}
+:root{
+  --bg:#f0f4f8;
+  --sidebar:#ffffff;
+  --primary:#4a90d9;
+  --arrive:#5cb85c;
+  --arrive-dark:#449d44;
+  --depart:#d4a843;
+  --depart-dark:#b8912e;
+  --text:#2c3e50;
+  --text-soft:#7f8c8d;
+  --text-light:#bdc3c7;
+  --border:#e8ecef;
+  --key-bg:#ffffff;
+  --key-shadow:0 2px 8px rgba(0,0,0,0.08);
+  --radius:16px;
+  --sidebar-w:280px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden}
 
-.screen{display:none;position:fixed;inset:0;flex-direction:column}
+.screen{display:none;position:fixed;inset:0}
 .screen.active{display:flex}
 
 /* ─── MAIN ─── */
-#screen-main{background:linear-gradient(155deg,#0b1120 0%,#0f2040 60%,#0b1120 100%);padding:28px 28px 20px}
-.main-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
-.academy-name{font-size:13px;font-weight:700;color:#3b82f6;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:6px}
-.main-title{font-size:30px;font-weight:900;color:#fff;line-height:1.1}
-.main-title span{color:#60a5fa}
-.clock-block{text-align:right}
-.clock{font-size:42px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;line-height:1}
-.clock-date{font-size:13px;color:#64748b;margin-top:4px}
+#screen-main{flex-direction:row;background:var(--bg)}
 
-.classes-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.classes-label{font-size:13px;font-weight:600;color:#475569;letter-spacing:0.1em;text-transform:uppercase}
-.refresh-btn{background:none;border:none;color:#334155;cursor:pointer;font-size:18px;transition:transform 0.3s}
-.refresh-btn:hover{color:#64748b;transform:rotate(90deg)}
+.sidebar{width:var(--sidebar-w);background:var(--sidebar);display:flex;flex-direction:column;align-items:center;padding:32px 20px 28px;border-right:1px solid var(--border);flex-shrink:0}
 
-.classes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;overflow-y:auto;flex:1;padding-bottom:20px}
-.classes-grid::-webkit-scrollbar{width:4px}
-.classes-grid::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
+.logo-area{width:100%;text-align:center;margin-bottom:24px;cursor:pointer;position:relative}
+.logo-placeholder{width:180px;height:70px;background:linear-gradient(135deg,#4a90d9,#2d6db5);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto;color:#fff}
+.logo-placeholder .lp1{font-size:18px;font-weight:900;letter-spacing:-0.5px}
+.logo-placeholder .lp2{font-size:9px;font-weight:500;opacity:0.8;letter-spacing:0.05em;margin-top:2px}
+.logo-img{max-width:180px;max-height:80px;object-fit:contain;display:block;margin:0 auto;border-radius:8px}
+.logo-edit-badge{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;white-space:nowrap;letter-spacing:0.04em;box-shadow:0 2px 8px rgba(74,144,217,0.4)}
+#logo-input{display:none}
 
-.class-card{background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.06);border-radius:20px;padding:22px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden}
-.class-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity 0.2s;background:rgba(255,255,255,0.04)}
-.class-card:hover::before{opacity:1}
-.class-card:active{transform:scale(0.97)}
-.class-card.now{border-color:rgba(34,197,94,0.5);background:rgba(34,197,94,0.07)}
-.class-card.soon{border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.06)}
-.class-card.past{opacity:0.45}
+.sidebar-title{font-size:24px;font-weight:900;color:var(--text);letter-spacing:-0.5px;margin-bottom:4px;text-align:center}
+.sidebar-date{font-size:12px;color:var(--text-soft);font-weight:500;text-align:center;margin-bottom:4px}
+.sidebar-time{font-size:44px;font-weight:900;color:var(--primary);letter-spacing:-2px;text-align:center;line-height:1;margin:8px 0 24px}
+.sidebar-div{width:100%;height:1px;background:var(--border);margin-bottom:18px}
 
-.class-status{font-size:11px;font-weight:700;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:14px}
-.status-now{background:rgba(34,197,94,0.2);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}
-.status-soon{background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.3)}
-.status-upcoming{background:rgba(255,255,255,0.06);color:#475569;border:1px solid rgba(255,255,255,0.08)}
-.status-past{background:rgba(255,255,255,0.03);color:#374151;border:1px solid rgba(255,255,255,0.05)}
+.menu-item{width:100%;padding:14px 18px;border-radius:12px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;color:var(--text-soft);display:flex;align-items:center;gap:10px;transition:all 0.18s;margin-bottom:6px}
+.menu-item:hover{background:#f0f4f8;color:var(--text)}
+.menu-icon{font-size:18px;width:26px;text-align:center}
 
-.class-card-name{font-size:21px;font-weight:800;color:#fff;margin-bottom:6px}
-.class-card-time{font-size:15px;color:#60a5fa;font-weight:600;margin-bottom:6px}
-.class-card-teacher{font-size:13px;color:#475569}
-.class-card-count{position:absolute;right:20px;top:20px;font-size:28px;font-weight:900;color:rgba(255,255,255,0.07);line-height:1}
-.class-card-progress{position:absolute;bottom:0;left:0;height:3px;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:0 0 20px 20px;transition:width 0.3s}
+.keypad-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px}
 
-.no-class-msg{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:#1e293b;text-align:center}
-.no-class-msg .icon{font-size:56px;margin-bottom:16px}
-.no-class-msg p{font-size:17px;color:#334155}
+.display-box{background:#fff;border-radius:20px;padding:16px 28px;margin-bottom:20px;width:100%;max-width:360px;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:2px solid var(--border)}
+.display-label{font-size:10px;font-weight:700;color:var(--text-light);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:5px}
+.display-number{font-size:36px;font-weight:900;color:var(--text);letter-spacing:4px;min-height:42px;display:flex;align-items:center;gap:4px}
+.display-hint{font-size:14px;color:var(--text-light);font-weight:500;letter-spacing:0}
 
-.fab-admin{position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#334155;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
-.fab-admin:hover{background:rgba(255,255,255,0.09);color:#64748b}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;width:100%;max-width:360px;margin-bottom:14px}
+.key{background:var(--key-bg);border:none;border-radius:14px;height:70px;font-family:inherit;font-size:26px;font-weight:700;color:var(--text);cursor:pointer;box-shadow:var(--key-shadow);transition:all 0.1s;display:flex;align-items:center;justify-content:center}
+.key:active{transform:scale(0.93);background:#f0f4f8;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.key.del{background:#fff5f5;color:#e74c3c;font-size:20px}
+.key.blank{background:transparent;box-shadow:none;pointer-events:none}
 
-/* ─── CHECKIN ─── */
-#screen-checkin{background:#090e1a}
-.ci-header{background:linear-gradient(135deg,#1a3a7c,#1d4ed8);padding:18px 22px;display:flex;align-items:center;gap:14px;flex-shrink:0}
-.back-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.12);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s}
-.back-btn:hover{background:rgba(255,255,255,0.2)}
-.ci-header-info{flex:1;min-width:0}
-.ci-header-info h2{font-size:20px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ci-header-info p{font-size:13px;color:rgba(255,255,255,0.6);margin-top:2px}
-.qr-btn{background:rgba(255,255,255,0.12);border:none;color:#fff;padding:10px 16px;border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:background 0.2s;flex-shrink:0}
-.qr-btn:hover{background:rgba(255,255,255,0.2)}
+.action-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:360px}
+.action-btn{height:62px;border:none;border-radius:16px;font-family:inherit;font-size:20px;font-weight:800;cursor:pointer;transition:all 0.12s;letter-spacing:0.02em;box-shadow:0 4px 16px rgba(0,0,0,0.12)}
+.btn-arrive{background:linear-gradient(135deg,var(--arrive),var(--arrive-dark));color:#fff}
+.btn-arrive:active{transform:scale(0.96)}
+.btn-depart{background:linear-gradient(135deg,var(--depart),var(--depart-dark));color:#fff}
+.btn-depart:active{transform:scale(0.96)}
 
-.ci-stats{display:flex;background:#0f1829;border-bottom:1px solid #1a2540;flex-shrink:0}
-.stat{flex:1;padding:14px 8px;text-align:center}
-.stat-n{font-size:30px;font-weight:900;line-height:1}
-.stat-n.blue{color:#60a5fa}
-.stat-n.green{color:#4ade80}
-.stat-n.red{color:#f87171}
-.stat-l{font-size:11px;color:#475569;font-weight:600;margin-top:3px}
-
-.students-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:16px;overflow-y:auto;flex:1}
-.students-grid::-webkit-scrollbar{width:4px}
-.students-grid::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
-
-.student-card{background:#0f1829;border:2px solid transparent;border-radius:16px;padding:18px 12px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;transition:all 0.15s;min-height:90px;justify-content:center}
-.student-card:active{transform:scale(0.94)}
-.student-card.present{background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.5)}
-
-.s-avatar{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;transition:background 0.2s}
-.student-card.present .s-avatar{background:linear-gradient(135deg,#16a34a,#22c55e)}
-
-.s-name{font-size:15px;font-weight:700;color:#e2e8f0}
-.s-time{font-size:11px;color:#4ade80;font-weight:600}
-.s-absent{font-size:11px;color:#334155}
-
-/* ─── QR ─── */
-#screen-qr{background:#000;position:relative}
-#qr-video{width:100%;height:100%;object-fit:cover}
-#qr-canvas{display:none}
-.qr-ui{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.qr-finder{width:240px;height:240px;position:relative}
-.qr-finder::before,.qr-finder::after{content:'';position:absolute;width:36px;height:36px;border:4px solid #60a5fa;border-style:solid}
-.qr-finder::before{top:0;left:0;border-right:none;border-bottom:none;border-radius:6px 0 0 0}
-.qr-finder::after{bottom:0;right:0;border-left:none;border-top:none;border-radius:0 0 6px 0}
-.qr-finder-br{position:absolute;bottom:0;left:0;width:36px;height:36px;border:4px solid #60a5fa;border-right:none;border-top:none;border-radius:0 0 0 6px}
-.qr-finder-tr{position:absolute;top:0;right:0;width:36px;height:36px;border:4px solid #60a5fa;border-left:none;border-bottom:none;border-radius:0 6px 0 0}
-.qr-shadow{position:absolute;inset:0;box-shadow:inset 0 0 0 9999px rgba(0,0,0,0.65)}
-.qr-label{color:#fff;font-size:15px;font-weight:600;margin-top:20px;text-shadow:0 2px 8px rgba(0,0,0,0.9)}
-.qr-back{position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);border:none;color:#fff;padding:10px 18px;border-radius:20px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit}
-.qr-scan-line{width:220px;height:2px;background:linear-gradient(90deg,transparent,#60a5fa,transparent);position:absolute;animation:scanline 2s ease-in-out infinite}
-@keyframes scanline{0%,100%{top:20px}50%{top:calc(100% - 20px)}}
-
-/* ─── SUCCESS ─── */
-#screen-success{background:#090e1a;align-items:center;justify-content:center;text-align:center}
-.success-circle{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.25),transparent);border:3px solid rgba(34,197,94,0.4);display:flex;align-items:center;justify-content:center;font-size:64px;margin-bottom:24px;animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
-.success-student{font-size:44px;font-weight:900;color:#4ade80;margin-bottom:8px}
-.success-text{font-size:22px;color:#64748b;font-weight:600}
-.success-method{font-size:13px;color:#334155;margin-top:10px}
-.success-bar{position:absolute;bottom:0;left:0;height:4px;background:#22c55e;animation:bar 2s linear forwards}
-@keyframes bar{from{width:100%}to{width:0%}}
-
-/* ─── ADMIN ─── */
-#screen-admin{background:#090e1a}
-.admin-top{background:#0f1829;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1a2540;flex-shrink:0}
-.admin-top h2{font-size:18px;font-weight:800}
-.admin-tabs{display:flex;background:#090e1a;border-bottom:1px solid #1a2540;flex-shrink:0}
-.a-tab{flex:1;padding:13px;background:none;border:none;color:#334155;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border-bottom:3px solid transparent;transition:all 0.2s;letter-spacing:0.04em}
-.a-tab.active{color:#60a5fa;border-bottom-color:#60a5fa}
-.admin-body{flex:1;overflow-y:auto;padding:20px}
-.admin-body::-webkit-scrollbar{width:4px}
-.admin-body::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
-
-/* ─── SHARED COMPONENTS ─── */
-.btn{padding:11px 22px;border-radius:12px;border:none;cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;transition:all 0.15s}
-.btn-blue{background:#2563eb;color:#fff}
-.btn-blue:hover{background:#1d4ed8}
-.btn-red{background:#dc2626;color:#fff}
-.btn-red:hover{background:#b91c1c}
-.btn-ghost{background:rgba(255,255,255,0.05);color:#64748b}
-.btn-ghost:hover{background:rgba(255,255,255,0.09)}
-
-.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.section-label{font-size:11px;font-weight:800;color:#334155;letter-spacing:0.12em;text-transform:uppercase}
-
-.cls-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
-.cls-item{background:#0f1829;border:1px solid #1a2540;border-radius:14px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.cls-item-info h3{font-size:16px;font-weight:700;margin-bottom:4px}
-.cls-item-info p{font-size:12px;color:#475569}
-.cls-actions{display:flex;gap:8px;flex-shrink:0}
-
-/* MODAL */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:200;animation:fadeIn 0.2s}
+/* ─── POPUP ─── */
+.popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100;animation:fadeIn 0.2s}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.modal{background:#0f1829;border:1px solid #1a2540;border-radius:22px;padding:26px;width:min(92vw,480px);max-height:88vh;overflow-y:auto}
-.modal::-webkit-scrollbar{width:4px}
-.modal::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
-.modal h3{font-size:18px;font-weight:800;margin-bottom:20px}
+.popup-box{background:#fff;border-radius:24px;padding:36px 40px;text-align:center;min-width:300px;box-shadow:0 20px 60px rgba(0,0,0,0.2);animation:popUp 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes popUp{from{transform:scale(0.8);opacity:0}to{transform:scale(1);opacity:1}}
+.popup-icon{font-size:60px;margin-bottom:10px;line-height:1}
+.popup-name{font-size:34px;font-weight:900;color:var(--text);margin-bottom:8px}
+.popup-mode{font-size:17px;font-weight:700;padding:5px 18px;border-radius:20px;display:inline-block;margin-bottom:6px}
+.mode-arrive{background:#e8f8e8;color:#27ae60}
+.mode-depart{background:#fef9e7;color:#d4a843}
+.popup-time{font-size:13px;color:var(--text-soft)}
+.popup-bar{height:4px;background:#e8ecef;border-radius:4px;margin-top:18px;overflow:hidden}
+.popup-bar-fill{height:100%;background:var(--primary);border-radius:4px;animation:shrink 3s linear forwards}
+@keyframes shrink{from{width:100%}to{width:0%}}
 
-.fg{margin-bottom:14px}
-.fl{font-size:12px;color:#475569;font-weight:700;margin-bottom:6px;display:block;letter-spacing:0.06em;text-transform:uppercase}
-.fi{width:100%;padding:11px 14px;background:#090e1a;border:1px solid #1a2540;border-radius:10px;color:#f0f4ff;font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s}
-.fi:focus{border-color:#2563eb}
-.fi option{background:#0f1829}
+/* ─── SETTINGS ─── */
+#screen-settings{flex-direction:column;background:var(--bg)}
+.top-bar{background:#fff;padding:16px 22px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.back-btn{width:38px;height:38px;border-radius:50%;background:var(--bg);border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-soft);transition:background 0.2s}
+.back-btn:hover{background:var(--border)}
+.top-bar h2{font-size:19px;font-weight:800}
 
-.day-row{display:flex;gap:8px;flex-wrap:wrap}
-.day-btn{width:42px;height:42px;border-radius:50%;border:2px solid #1a2540;background:none;color:#475569;cursor:pointer;font-weight:800;font-family:inherit;font-size:14px;transition:all 0.15s}
-.day-btn.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.settings-body{flex:1;overflow-y:auto;padding:18px 18px 40px;max-width:700px;margin:0 auto;width:100%}
+.settings-body::-webkit-scrollbar{width:4px}
+.settings-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px}
 
-.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:8px}
-.tag{display:inline-flex;align-items:center;gap:5px;background:#1a2540;border-radius:8px;padding:5px 10px;font-size:13px;color:#94a3b8}
-.tag button{background:none;border:none;color:#64748b;cursor:pointer;font-size:15px;line-height:1;padding:0;transition:color 0.15s}
-.tag button:hover{color:#ef4444}
+.s-section{background:#fff;border-radius:var(--radius);margin-bottom:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.05)}
+.s-section-title{padding:14px 18px 0;font-size:10px;font-weight:800;color:var(--text-light);letter-spacing:0.12em;text-transform:uppercase}
+.s-row{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #f5f5f5}
+.s-row:last-child{border-bottom:none}
+.s-info h4{font-size:15px;font-weight:700;margin-bottom:3px}
+.s-info p{font-size:12px;color:var(--text-soft);line-height:1.4}
 
-.s-input-row{display:flex;gap:8px}
+.toggle{position:relative;width:50px;height:28px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.t-slider{position:absolute;inset:0;background:#ddd;border-radius:28px;transition:background 0.25s;cursor:pointer}
+.t-slider::before{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform 0.25s;box-shadow:0 1px 4px rgba(0,0,0,0.2)}
+.toggle input:checked + .t-slider{background:var(--primary)}
+.toggle input:checked + .t-slider::before{transform:translateX(22px)}
 
-.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:22px}
+.small-btn{padding:8px 16px;background:#f0f4f8;border:none;border-radius:10px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);transition:background 0.2s}
+.small-btn:hover{background:var(--border)}
 
-/* PIN */
-.pin-modal{background:#0f1829;border:1px solid #1a2540;border-radius:22px;padding:36px 28px;width:min(92vw,340px);text-align:center}
-.pin-modal h3{font-size:22px;font-weight:800;margin-bottom:6px}
-.pin-modal p{font-size:13px;color:#475569;margin-bottom:22px}
-.pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:22px}
-.pin-dot{width:14px;height:14px;border-radius:50%;background:#1a2540;transition:all 0.15s}
-.pin-dot.on{background:#3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.6)}
-.pin-dot.err{background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,0.6)}
-.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.np{padding:16px;background:#1a2540;border:none;color:#fff;font-size:22px;font-weight:800;border-radius:14px;cursor:pointer;font-family:inherit;transition:background 0.1s}
-.np:active{background:#243255}
-.np.del{background:#0f1829;font-size:16px;color:#64748b}
-.np.blank{background:transparent;pointer-events:none}
+.logout-btn{width:100%;padding:16px;background:none;border:none;font-family:inherit;font-size:15px;font-weight:700;color:#e74c3c;cursor:pointer;text-align:center;transition:background 0.2s}
+.logout-btn:hover{background:#fff5f5}
 
-/* QR print cards */
-.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-.qr-card-p{background:#fff;border-radius:14px;padding:18px;text-align:center;color:#0b1120}
-.qr-card-p .qr-name{font-size:15px;font-weight:700;margin-top:10px;color:#1e293b}
-.qr-card-p .qr-cls{font-size:11px;color:#64748b;margin-top:3px}
+/* ─── LIST ─── */
+#screen-list{flex-direction:column;background:var(--bg)}
+.list-body{flex:1;overflow-y:auto;padding:16px;max-width:700px;margin:0 auto;width:100%}
+.list-body::-webkit-scrollbar{width:4px}
+.list-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px}
+.list-date-label{font-size:11px;font-weight:800;color:var(--text-light);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding:0 2px}
+.list-table-wrap{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.05);margin-bottom:18px}
+.list-table-wrap table{width:100%;border-collapse:collapse}
+.list-table-wrap th{background:#f8fafc;padding:10px 16px;text-align:left;font-size:10px;font-weight:800;color:var(--text-light);letter-spacing:0.08em;text-transform:uppercase}
+.list-table-wrap td{padding:12px 16px;font-size:14px;border-top:1px solid #f5f5f5;color:var(--text)}
+.chip{display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700}
+.chip-a{background:#e8f8e8;color:#27ae60}
+.chip-d{background:#fef9e7;color:#d4a843}
+.empty{text-align:center;padding:60px 20px;color:var(--text-light)}
+.empty .icon{font-size:48px;margin-bottom:12px}
 
-/* TOAST */
-.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;border:1px solid #334155;color:#f0f4ff;padding:11px 22px;border-radius:22px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:999;opacity:0;transition:all 0.3s;pointer-events:none;white-space:nowrap}
+/* ─── PIN ─── */
+.pin-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:200}
+.pin-box{background:#fff;border-radius:22px;padding:34px 30px;text-align:center;width:min(90vw,320px)}
+.pin-box h3{font-size:19px;font-weight:800;margin-bottom:5px}
+.pin-box p{font-size:12px;color:var(--text-soft);margin-bottom:20px}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:20px}
+.pin-dot{width:13px;height:13px;border-radius:50%;background:#e8ecef;transition:all 0.15s}
+.pin-dot.on{background:var(--primary);box-shadow:0 0 8px rgba(74,144,217,0.4)}
+.pin-dot.err{background:#e74c3c}
+.pin-numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.pn{height:54px;background:#f8fafc;border:none;border-radius:11px;font-family:inherit;font-size:21px;font-weight:800;color:var(--text);cursor:pointer;transition:background 0.1s}
+.pn:active{background:#e8ecef}
+.pn.del{font-size:15px;color:var(--text-soft)}
+.pn.blank{background:transparent;pointer-events:none}
+.pin-cancel{margin-top:14px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--text-soft);cursor:pointer;padding:8px 20px}
+
+/* ─── TOAST ─── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2c3e50;color:#fff;padding:11px 22px;border-radius:22px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all 0.3s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ATTENDANCE TABLE */
-.att-table{width:100%;border-collapse:collapse;font-size:13px}
-.att-table th{background:#0b1120;padding:10px 12px;text-align:left;color:#334155;font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase}
-.att-table td{padding:11px 12px;border-bottom:1px solid #0f1829;color:#94a3b8}
-.att-table td:first-child{color:#e2e8f0;font-weight:600}
-.chip{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700}
-.chip-ok{background:rgba(34,197,94,0.12);color:#4ade80;border:1px solid rgba(34,197,94,0.2)}
-
-.att-block{background:#0f1829;border:1px solid #1a2540;border-radius:16px;margin-bottom:14px;overflow:hidden}
-.att-block-head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #0b1120}
-.att-block-head h4{font-size:15px;font-weight:700}
-.att-block-head span{font-size:12px;color:#475569}
-
-@media print{body>*:not(#print-area){display:none!important}#print-area{display:block!important;background:#fff;color:#000}}
-#print-area{display:none}
+.s-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.2s;background:#fff}
+.s-input:focus{border-color:var(--primary)}
 </style>
 </head>
 <body>
 
-<!-- ───────── MAIN SCREEN ───────── -->
+<!-- ══════════ MAIN ══════════ -->
 <div id="screen-main" class="screen active">
-  <div class="main-top">
-    <div>
-      <div class="academy-name">잉글리시아이위드멘토링</div>
-      <div class="main-title">✅ <span>출석</span> 체크</div>
+  <div class="sidebar">
+    <div class="logo-area" onclick="document.getElementById('logo-input').click()">
+      <div id="logo-default">
+        <div class="logo-placeholder">
+          <span class="lp1">잉글리시아이</span>
+          <span class="lp2">WITH MENTORING</span>
+        </div>
+      </div>
+      <img id="logo-img" class="logo-img" src="" style="display:none">
+      <div class="logo-edit-badge">📷 로고 터치하여 변경</div>
     </div>
-    <div class="clock-block">
-      <div class="clock" id="clock">00:00</div>
-      <div class="clock-date" id="clock-date"></div>
+    <input type="file" id="logo-input" accept="image/*" onchange="changeLogo(this)">
+
+    <div class="sidebar-title">스마트 출결</div>
+    <div class="sidebar-date" id="sidebar-date">-</div>
+    <div class="sidebar-time" id="sidebar-time">00:00</div>
+    <div class="sidebar-div"></div>
+
+    <button class="menu-item" onclick="openWithPin('list')">
+      <span class="menu-icon">≡</span> 출결 목록
+    </button>
+    <button class="menu-item" onclick="openWithPin('settings')">
+      <span class="menu-icon">⚙</span> 상세 설정
+    </button>
+  </div>
+
+  <div class="keypad-area">
+    <div class="display-box">
+      <div class="display-label">출결 번호 입력</div>
+      <div class="display-number" id="display">
+        <span class="display-hint">번호를 눌러주세요</span>
+      </div>
+    </div>
+
+    <div class="keypad">
+      <button class="key" onclick="kp('1')">1</button>
+      <button class="key" onclick="kp('2')">2</button>
+      <button class="key" onclick="kp('3')">3</button>
+      <button class="key" onclick="kp('4')">4</button>
+      <button class="key" onclick="kp('5')">5</button>
+      <button class="key" onclick="kp('6')">6</button>
+      <button class="key" onclick="kp('7')">7</button>
+      <button class="key" onclick="kp('8')">8</button>
+      <button class="key" onclick="kp('9')">9</button>
+      <button class="key blank"></button>
+      <button class="key" onclick="kp('0')">0</button>
+      <button class="key del" onclick="kd()">⌫</button>
+    </div>
+
+    <div class="action-row">
+      <button class="action-btn btn-arrive" onclick="submit('arrive')">등원</button>
+      <button class="action-btn btn-depart" onclick="submit('depart')">하원</button>
     </div>
   </div>
-  <div class="classes-header">
-    <div class="classes-label">오늘의 수업</div>
-    <button class="refresh-btn" onclick="loadToday()" title="새로고침">↻</button>
-  </div>
-  <div class="classes-grid" id="classes-grid">
-    <div class="no-class-msg"><div class="icon">⏳</div><p>불러오는 중...</p></div>
-  </div>
-  <button class="fab-admin" onclick="openPinModal()" title="관리자">⚙️</button>
 </div>
 
-<!-- ───────── CHECKIN SCREEN ───────── -->
-<div id="screen-checkin" class="screen">
-  <div class="ci-header">
-    <button class="back-btn" onclick="goMain()">←</button>
-    <div class="ci-header-info">
-      <h2 id="ci-class-name">-</h2>
-      <p id="ci-class-detail">-</p>
+<!-- ══════════ SETTINGS ══════════ -->
+<div id="screen-settings" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" onclick="show('main')">←</button>
+    <h2>출결앱</h2>
+  </div>
+  <div class="settings-body">
+
+    <div class="s-section">
+      <div class="s-section-title">보안</div>
+      <div class="s-row">
+        <div class="s-info"><h4>보안 / 잠금</h4><p>출결 현황, 설정 변경은 보안을 위해 암호를 입력합니다.</p></div>
+        <label class="toggle"><input type="checkbox" id="set-lock" onchange="sv('lock',this.checked)"><span class="t-slider"></span></label>
+      </div>
+      <div class="s-row">
+        <div class="s-info"><h4>PIN 변경</h4><p>관리자 PIN 번호를 변경합니다.</p></div>
+        <button class="small-btn" onclick="openPinChange()">변경</button>
+      </div>
     </div>
-    <button class="qr-btn" onclick="startQR()">📷 QR</button>
-  </div>
-  <div class="ci-stats">
-    <div class="stat"><div class="stat-n blue" id="s-total">0</div><div class="stat-l">전체</div></div>
-    <div class="stat"><div class="stat-n green" id="s-present">0</div><div class="stat-l">출석</div></div>
-    <div class="stat"><div class="stat-n red" id="s-absent">0</div><div class="stat-l">미확인</div></div>
-  </div>
-  <div class="students-grid" id="students-grid"></div>
-</div>
 
-<!-- ───────── QR SCREEN ───────── -->
-<div id="screen-qr" class="screen">
-  <video id="qr-video" playsinline autoplay muted></video>
-  <canvas id="qr-canvas"></canvas>
-  <div class="qr-ui">
-    <div class="qr-shadow"></div>
-    <div class="qr-finder">
-      <div class="qr-finder-br"></div>
-      <div class="qr-finder-tr"></div>
-      <div class="qr-scan-line"></div>
+    <div class="s-section">
+      <div class="s-section-title">입력</div>
+      <div class="s-row">
+        <div class="s-info"><h4>번호 표기</h4><p>타인에게 노출되지 않도록 출결번호 표기를 방지합니다.</p></div>
+        <label class="toggle"><input type="checkbox" id="set-mask" onchange="sv('mask',this.checked)"><span class="t-slider"></span></label>
+      </div>
+      <div class="s-row">
+        <div class="s-info"><h4>등하원 모드</h4><p>등원, 하원 시 출결번호를 각각 입력하도록 활성화합니다.</p></div>
+        <label class="toggle"><input type="checkbox" id="set-mode" onchange="sv('separateMode',this.checked)"><span class="t-slider"></span></label>
+      </div>
     </div>
-    <div class="qr-label">학생 QR 코드를 스캔하세요</div>
+
+    <div class="s-section">
+      <div class="s-section-title">알림</div>
+      <div class="s-row">
+        <div class="s-info"><h4>팝업 종료</h4><p>등하원 성공 확인 팝업을 3초 뒤 자동 종료합니다.</p></div>
+        <label class="toggle"><input type="checkbox" id="set-auto" onchange="sv('autoClose',this.checked)"><span class="t-slider"></span></label>
+      </div>
+      <div class="s-row">
+        <div class="s-info"><h4>출결 확인 팝업</h4><p>출결번호 입력 후, 확인차 학생 정보 팝업을 표기합니다.</p></div>
+        <label class="toggle"><input type="checkbox" id="set-popup" onchange="sv('showPopup',this.checked)"><span class="t-slider"></span></label>
+      </div>
+      <div class="s-row">
+        <div class="s-info"><h4>소리 설정</h4><p>출결번호 입력 후, 띵동~ 효과음을 제어합니다.</p></div>
+        <label class="toggle"><input type="checkbox" id="set-sound" onchange="sv('sound',this.checked)"><span class="t-slider"></span></label>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-section-title">학생 관리</div>
+      <div class="s-row" style="flex-direction:column;align-items:stretch;gap:12px">
+        <div class="s-info"><h4>학생 번호 등록</h4><p>출결번호와 이름을 등록합니다.</p></div>
+        <div id="student-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div style="display:flex;gap:8px">
+          <input id="new-num" type="number" placeholder="번호 (101)" class="s-input" style="width:110px">
+          <input id="new-name" type="text" placeholder="이름" class="s-input" style="flex:1"
+            onkeydown="if(event.key==='Enter')addStudent()">
+          <button onclick="addStudent()" style="padding:10px 16px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">추가</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="s-section">
+      <button class="logout-btn" onclick="logout()">로그아웃</button>
+    </div>
+
   </div>
-  <button class="qr-back" onclick="stopQR()">← 돌아가기</button>
 </div>
 
-<!-- ───────── SUCCESS SCREEN ───────── -->
-<div id="screen-success" class="screen">
-  <div class="success-circle">✅</div>
-  <div class="success-student" id="success-name">-</div>
-  <div class="success-text">출석 완료!</div>
-  <div class="success-method" id="success-method"></div>
-  <div class="success-bar" id="success-bar"></div>
-</div>
-
-<!-- ───────── ADMIN SCREEN ───────── -->
-<div id="screen-admin" class="screen">
-  <div class="admin-top">
-    <h2>⚙️ 관리자 패널</h2>
-    <button class="btn btn-ghost" onclick="goMain()">← 나가기</button>
+<!-- ══════════ LIST ══════════ -->
+<div id="screen-list" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" onclick="show('main')">←</button>
+    <h2>출결 목록</h2>
   </div>
-  <div class="admin-tabs">
-    <button class="a-tab active" onclick="switchTab('classes')">반 관리</button>
-    <button class="a-tab" onclick="switchTab('attendance')">출석 현황</button>
-    <button class="a-tab" onclick="switchTab('qrcards')">QR 카드</button>
+  <div class="list-body" id="list-body">
+    <div class="empty"><div class="icon">⏳</div><p>불러오는 중...</p></div>
   </div>
-  <div class="admin-body" id="admin-body"></div>
 </div>
 
 <div class="toast" id="toast"></div>
 <div id="modals"></div>
-<div id="print-area"></div>
 
 <script>
-/* ═══════════════════════════════════════════════════════════
-   🔧 FIREBASE 설정 — 아래 값을 실제 Firebase 프로젝트 정보로 교체하세요
-   academy_v4와 동일한 프로젝트 사용 권장!
-═══════════════════════════════════════════════════════════ */
+/* ══ Firebase 설정 ══ */
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBaxcYn-PwBDTVoD4knE2awpwSrt0PscnE",
-  authDomain: "daily-report-5a26e.firebaseapp.com",
-  projectId: "daily-report-5a26e",
-  storageBucket: "daily-report-5a26e.firebasestorage.app",
-  messagingSenderId: "205436388270",
-  appId: "1:205436388270:web:90c7816c5d88fd2991be3f",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
-
-const ADMIN_PIN    = "1234"; // ← 변경 권장
-const ACADEMY_NAME = "잉글리시아이위드멘토링";
-
-/* ─── Firebase Init ─── */
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.firestore();
 
-/* ─── State ─── */
-const S = {
-  screen:       'main',
-  classes:      [],
-  todayClasses: [],
-  selected:     null,
-  checkins:     {},
-  listener:     null,
-  qrStream:     null,
-  qrFrame:      null,
-  adminTab:     'classes',
-  pin:          '',
-  modalStudents:[],
-  modalDays:    [],
-};
+/* ══ State ══ */
+let NUM = '';
+let CFG = { pin:'1234', lock:true, mask:false, separateMode:true, autoClose:true, showPopup:true, sound:true };
+let STUDENTS = {};
+const DAY = ['일','월','화','수','목','금','토'];
 
-const DAY_KR = ['일','월','화','수','목','금','토'];
+/* ══ Init ══ */
+(function init(){
+  const c = localStorage.getItem('att_cfg');
+  if(c) CFG = {...CFG, ...JSON.parse(c)};
+  const s = localStorage.getItem('att_stu');
+  if(s) STUDENTS = JSON.parse(s);
+  loadLogo();
+  clock();
+  setInterval(clock, 10000);
+})();
 
-/* ════════════════════════════════
-   CLOCK
-════════════════════════════════ */
-function startClock(){
-  function tick(){
-    const n = new Date();
-    const hh = String(n.getHours()).padStart(2,'0');
-    const mm = String(n.getMinutes()).padStart(2,'0');
-    document.getElementById('clock').textContent = `${hh}:${mm}`;
-    document.getElementById('clock-date').textContent =
-      `${n.getFullYear()}년 ${n.getMonth()+1}월 ${n.getDate()}일 (${DAY_KR[n.getDay()]})`;
-  }
-  tick();
-  setInterval(tick, 10000);
+function sv(k,v){ CFG[k]=v; localStorage.setItem('att_cfg', JSON.stringify(CFG)); }
+
+/* ══ Clock ══ */
+function clock(){
+  const n = new Date();
+  document.getElementById('sidebar-time').textContent =
+    `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('sidebar-date').textContent =
+    `${n.getFullYear()}.${String(n.getMonth()+1).padStart(2,'0')}.${String(n.getDate()).padStart(2,'0')} (${DAY[n.getDay()]})`;
 }
 
-/* ════════════════════════════════
-   SCREEN
-════════════════════════════════ */
+/* ══ Screen ══ */
 function show(id){
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
-  S.screen = id;
 }
 
-/* ════════════════════════════════
-   HELPERS
-════════════════════════════════ */
-function todayStr(){
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+/* ══ Logo ══ */
+function loadLogo(){
+  const d = localStorage.getItem('att_logo');
+  if(!d) return;
+  document.getElementById('logo-default').style.display='none';
+  const img = document.getElementById('logo-img');
+  img.src = d; img.style.display='block';
 }
-
-function todayDay(){ // 1=Mon...7=Sun
-  const d = new Date().getDay();
-  return d === 0 ? 7 : d;
-}
-
-function classStatus(cls){
-  const now = new Date();
-  const nowM = now.getHours()*60 + now.getMinutes();
-  const [sh,sm] = cls.startTime.split(':').map(Number);
-  const [eh,em] = cls.endTime.split(':').map(Number);
-  const startM = sh*60+sm, endM = eh*60+em;
-  if(nowM >= startM && nowM < endM) return 'now';
-  if(nowM < startM && startM - nowM <= 30) return 'soon';
-  if(nowM < startM) return 'upcoming';
-  return 'past';
-}
-
-function fmtTime(ts){
-  if(!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-
-/* ════════════════════════════════
-   MAIN SCREEN
-════════════════════════════════ */
-async function loadToday(){
-  const grid = document.getElementById('classes-grid');
-  grid.innerHTML = '<div class="no-class-msg"><div class="icon">⏳</div><p>불러오는 중...</p></div>';
-  try{
-    const snap = await db.collection('classes').get();
-    S.classes = snap.docs.map(d=>({id:d.id,...d.data()}));
-    S.todayClasses = S.classes
-      .filter(c=>(c.days||[]).includes(todayDay()))
-      .sort((a,b)=>a.startTime.localeCompare(b.startTime));
-    renderMain();
-  }catch(e){
-    grid.innerHTML = '<div class="no-class-msg"><div class="icon">⚠️</div><p style="color:#ef4444">Firebase 연결 실패<br><small>설정을 확인해주세요</small></p></div>';
-    console.error(e);
-  }
-}
-
-function renderMain(){
-  const grid = document.getElementById('classes-grid');
-  if(!S.todayClasses.length){
-    grid.innerHTML = '<div class="no-class-msg"><div class="icon">📅</div><p>오늘 예정된 수업이 없습니다</p></div>';
-    return;
-  }
-  const BADGE = {now:'🟢 수업 중',soon:'🟡 곧 시작',upcoming:'예정',past:'종료'};
-  grid.innerHTML = S.todayClasses.map(cls=>{
-    const st = classStatus(cls);
-    const count = (cls.students||[]).length;
-    return `
-      <div class="class-card ${st}" onclick="openCheckin('${cls.id}')">
-        <span class="class-status status-${st}">${BADGE[st]}</span>
-        <div class="class-card-name">${cls.name}</div>
-        <div class="class-card-time">⏰ ${cls.startTime} ~ ${cls.endTime}</div>
-        <div class="class-card-teacher">👨‍🏫 ${cls.teacherName||'선생님 미지정'}</div>
-        <div class="class-card-count">${count}</div>
-      </div>`;
-  }).join('');
-}
-
-function goMain(){
-  if(S.listener){ S.listener(); S.listener=null; }
-  stopQR();
-  loadToday();
-  show('main');
-}
-
-/* ════════════════════════════════
-   CHECK-IN
-════════════════════════════════ */
-async function openCheckin(classId){
-  const cls = S.classes.find(c=>c.id===classId);
-  if(!cls) return;
-  S.selected = cls;
-  S.checkins = {};
-
-  document.getElementById('ci-class-name').textContent = cls.name;
-  document.getElementById('ci-class-detail').textContent =
-    `${cls.startTime} ~ ${cls.endTime}  ·  ${cls.teacherName||''} 선생님`;
-
-  show('checkin');
-
-  const attId = `${todayStr()}_${classId}`;
-  if(S.listener){ S.listener(); S.listener=null; }
-  S.listener = db.collection('attendance').doc(attId).onSnapshot(snap=>{
-    S.checkins = snap.exists ? (snap.data().checkins||{}) : {};
-    renderStudents();
-  });
-}
-
-function renderStudents(){
-  const cls = S.selected;
-  const students = cls.students||[];
-  const present = students.filter(s=>S.checkins[s.id]).length;
-  document.getElementById('s-total').textContent   = students.length;
-  document.getElementById('s-present').textContent = present;
-  document.getElementById('s-absent').textContent  = students.length - present;
-
-  document.getElementById('students-grid').innerHTML = students.map(s=>{
-    const chk = S.checkins[s.id];
-    return `
-      <div class="student-card ${chk?'present':''}" onclick="handleTap('${s.id}','${s.name}')">
-        <div class="s-avatar">${chk ? '✓' : s.name.charAt(0)}</div>
-        <div class="s-name">${s.name}</div>
-        ${chk
-          ? `<div class="s-time">✅ ${fmtTime(chk.checkinTime)}</div>`
-          : `<div class="s-absent">미확인</div>`}
-      </div>`;
-  }).join('');
-}
-
-async function handleTap(studentId, studentName, method='touch'){
-  if(!S.selected) return;
-  const cls = S.selected;
-  const attId = `${todayStr()}_${cls.id}`;
-  const already = !!S.checkins[studentId];
-
-  if(already){
-    // 출석 취소
-    const updated = {...S.checkins};
-    delete updated[studentId];
-    await db.collection('attendance').doc(attId).set({
-      date:todayStr(), classId:cls.id, className:cls.name,
-      teacherName:cls.teacherName||'', subject:cls.subject||'',
-      checkins:updated,
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-    toast(`${studentName} 출석 취소`);
-  } else {
-    // 출석 체크
-    const entry = {
-      name: studentName,
-      checkinTime: firebase.firestore.FieldValue.serverTimestamp(),
-      method: method
-    };
-    await db.collection('attendance').doc(attId).set({
-      date:todayStr(), classId:cls.id, className:cls.name,
-      teacherName:cls.teacherName||'', subject:cls.subject||'',
-      checkins:{...S.checkins, [studentId]:entry},
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-    showSuccess(studentName, method);
-  }
-}
-
-/* ════════════════════════════════
-   SUCCESS
-════════════════════════════════ */
-function showSuccess(name, method){
-  document.getElementById('success-name').textContent   = name;
-  document.getElementById('success-method').textContent =
-    method==='qr' ? '📷 QR 코드 스캔' : '👆 직접 터치';
-  // Reset bar animation
-  const bar = document.getElementById('success-bar');
-  bar.style.animation = 'none';
-  void bar.offsetWidth;
-  bar.style.animation = 'bar 2s linear forwards';
-
-  show('success');
-  setTimeout(()=>{ if(S.screen==='success') show('checkin'); }, 2000);
-}
-
-/* ════════════════════════════════
-   QR SCAN
-════════════════════════════════ */
-async function startQR(){
-  show('qr');
-  const video = document.getElementById('qr-video');
-  const canvas = document.getElementById('qr-canvas');
-  const ctx = canvas.getContext('2d');
-
-  try{
-    S.qrStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-    video.srcObject = S.qrStream;
-    await video.play();
-
-    function tick(){
-      if(S.screen !== 'qr') return;
-      if(video.readyState === video.HAVE_ENOUGH_DATA){
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video,0,0);
-        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code = jsQR(img.data,img.width,img.height);
-        if(code){ handleQR(code.data); return; }
-      }
-      S.qrFrame = requestAnimationFrame(tick);
-    }
-    S.qrFrame = requestAnimationFrame(tick);
-  }catch(e){
-    toast('카메라 권한이 필요합니다');
-    show('checkin');
-  }
-}
-
-function stopQR(){
-  if(S.qrStream){ S.qrStream.getTracks().forEach(t=>t.stop()); S.qrStream=null; }
-  if(S.qrFrame){ cancelAnimationFrame(S.qrFrame); S.qrFrame=null; }
-  const v = document.getElementById('qr-video');
-  if(v) v.srcObject=null;
-}
-
-function handleQR(data){
-  stopQR();
-  // QR format: "STUDENT:{id}:{name}"
-  if(data.startsWith('STUDENT:')){
-    const [,id,name] = data.split(':');
-    const student = (S.selected?.students||[]).find(s=>s.id===id);
-    if(student){
-      show('checkin');
-      handleTap(id, student.name, 'qr');
-    } else {
-      toast('이 수업 학생이 아닙니다');
-      show('checkin');
-    }
-  } else {
-    toast('올바른 QR 코드가 아닙니다');
-    show('checkin');
-  }
-}
-
-/* ════════════════════════════════
-   PIN AUTH
-════════════════════════════════ */
-function openPinModal(){
-  S.pin = '';
-  const el = document.createElement('div');
-  el.className = 'overlay';
-  el.id = 'pin-overlay';
-  el.innerHTML = `
-    <div class="pin-modal">
-      <h3>🔒 관리자 인증</h3>
-      <p>PIN 번호 4자리를 입력하세요</p>
-      <div class="pin-dots">
-        ${[0,1,2,3].map(i=>`<div class="pin-dot" id="pd-${i}"></div>`).join('')}
-      </div>
-      <div class="numpad">
-        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="np" onclick="pinKey('${n}')">${n}</button>`).join('')}
-        <button class="np blank"></button>
-        <button class="np" onclick="pinKey('0')">0</button>
-        <button class="np del" onclick="pinDel()">⌫</button>
-      </div>
-      <button onclick="closePinModal()" style="margin-top:18px;background:none;border:none;color:#334155;cursor:pointer;font-family:inherit;font-size:13px">취소</button>
-    </div>`;
-  document.getElementById('modals').appendChild(el);
-}
-
-function pinKey(d){
-  if(S.pin.length>=4) return;
-  S.pin += d;
-  updateDots();
-  if(S.pin.length===4){
-    setTimeout(()=>{
-      if(S.pin === ADMIN_PIN){
-        closePinModal();
-        openAdmin();
-      } else {
-        for(let i=0;i<4;i++) document.getElementById(`pd-${i}`)?.classList.add('err');
-        setTimeout(()=>{
-          S.pin='';
-          updateDots(true);
-        }, 600);
-      }
-    },100);
-  }
-}
-
-function pinDel(){
-  S.pin = S.pin.slice(0,-1);
-  updateDots();
-}
-
-function updateDots(err=false){
-  for(let i=0;i<4;i++){
-    const d = document.getElementById(`pd-${i}`);
-    if(!d) return;
-    d.classList.toggle('on', !err && i < S.pin.length);
-    d.classList.toggle('err', err && i < 4);
-    if(!err) d.classList.remove('err');
-  }
-}
-
-function closePinModal(){
-  document.getElementById('pin-overlay')?.remove();
-}
-
-/* ════════════════════════════════
-   ADMIN
-════════════════════════════════ */
-async function openAdmin(){
-  const snap = await db.collection('classes').orderBy('startTime').get();
-  S.classes = snap.docs.map(d=>({id:d.id,...d.data()}));
-  show('admin');
-  switchTab('classes');
-}
-
-function switchTab(tab){
-  S.adminTab = tab;
-  document.querySelectorAll('.a-tab').forEach((el,i)=>{
-    el.classList.toggle('active', ['classes','attendance','qrcards'][i]===tab);
-  });
-  renderAdmin();
-}
-
-function renderAdmin(){
-  if(S.adminTab==='classes')    renderClassesTab();
-  else if(S.adminTab==='attendance') renderAttendanceTab();
-  else renderQRTab();
-}
-
-/* ── Classes Tab ── */
-function renderClassesTab(){
-  const b = document.getElementById('admin-body');
-  b.innerHTML = `
-    <div class="section-head">
-      <div class="section-label">수업 목록 (${S.classes.length}개)</div>
-      <button class="btn btn-blue" onclick="openClassModal()">+ 반 추가</button>
-    </div>
-    <div class="cls-list">
-      ${S.classes.map(c=>`
-        <div class="cls-item">
-          <div class="cls-item-info">
-            <h3>${c.name}</h3>
-            <p>${(c.days||[]).map(d=>DAY_KR[d]).join('·')}요일 &nbsp;${c.startTime}~${c.endTime} &nbsp;·&nbsp; ${c.teacherName||'선생님 미지정'} &nbsp;·&nbsp; ${(c.students||[]).length}명</p>
-          </div>
-          <div class="cls-actions">
-            <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="openClassModal('${c.id}')">수정</button>
-            <button class="btn btn-red" style="padding:8px 14px;font-size:13px" onclick="deleteClass('${c.id}','${c.name}')">삭제</button>
-          </div>
-        </div>`).join('')||'<div style="color:#334155;text-align:center;padding:48px">아직 등록된 반이 없습니다<br><small style="color:#1e293b">위의 + 반 추가 버튼을 눌러 시작하세요</small></div>'}
-    </div>`;
-}
-
-/* ── Attendance Tab ── */
-async function renderAttendanceTab(){
-  const b = document.getElementById('admin-body');
-  b.innerHTML = '<div style="color:#334155;text-align:center;padding:48px">불러오는 중...</div>';
-  const today = todayStr();
-  try{
-    const snap = await db.collection('attendance').where('date','==',today).get();
-    if(snap.empty){
-      b.innerHTML=`<div style="color:#334155;text-align:center;padding:60px"><div style="font-size:48px;margin-bottom:12px">📋</div><p>오늘(${today}) 출석 기록이 없습니다</p></div>`;
-      return;
-    }
-    let html = `<div class="section-label" style="margin-bottom:16px">오늘 출석 현황 (${today})</div>`;
-    snap.docs.forEach(doc=>{
-      const data = doc.data();
-      const chks = data.checkins||{};
-      const entries = Object.entries(chks);
-      const clsData = S.classes.find(c=>c.id===data.classId);
-      const total = clsData?.students?.length || entries.length;
-      html += `
-        <div class="att-block">
-          <div class="att-block-head">
-            <h4>${data.className}</h4>
-            <span>${entries.length} / ${total}명 출석</span>
-          </div>
-          <table class="att-table">
-            <thead><tr><th>이름</th><th>상태</th><th>시간</th><th>방법</th></tr></thead>
-            <tbody>
-              ${entries.map(([id,c])=>`
-                <tr>
-                  <td>${c.name}</td>
-                  <td><span class="chip chip-ok">출석</span></td>
-                  <td>${fmtTime(c.checkinTime)}</td>
-                  <td>${c.method==='qr'?'📷 QR':'👆 터치'}</td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>`;
-    });
-    b.innerHTML = html;
-  }catch(e){ b.innerHTML='<div style="color:#ef4444;text-align:center;padding:48px">데이터 로드 실패</div>'; }
-}
-
-/* ── QR Cards Tab ── */
-function renderQRTab(){
-  const b = document.getElementById('admin-body');
-  const all = [];
-  S.classes.forEach(c=>(c.students||[]).forEach(s=>all.push({...s,className:c.name})));
-  if(!all.length){
-    b.innerHTML='<div style="color:#334155;text-align:center;padding:60px">등록된 학생이 없습니다</div>';
-    return;
-  }
-  b.innerHTML = `
-    <div class="section-head">
-      <div class="section-label">학생 QR 카드 (${all.length}명)</div>
-      <button class="btn btn-blue" onclick="printQR()">🖨️ 인쇄</button>
-    </div>
-    <div class="qr-grid" id="qr-grid"></div>`;
-
-  setTimeout(()=>{
-    all.forEach(s=>{
-      const card = document.createElement('div');
-      card.className='qr-card-p';
-      const qid=`qr-${s.id}`;
-      card.innerHTML=`<div id="${qid}"></div><div class="qr-name">${s.name}</div><div class="qr-cls">${s.className}</div>`;
-      document.getElementById('qr-grid').appendChild(card);
-      new QRCode(document.getElementById(qid),{
-        text:`STUDENT:${s.id}:${s.name}`,
-        width:130,height:130,colorDark:'#0b1120',colorLight:'#ffffff'
-      });
-    });
-  },80);
-}
-
-function printQR(){
-  const grid = document.getElementById('qr-grid');
-  const pa = document.getElementById('print-area');
-  pa.innerHTML = `<h2 style="text-align:center;margin-bottom:20px">${ACADEMY_NAME} — 학생 QR 카드</h2>` + grid.outerHTML;
-  window.print();
-}
-
-/* ════════════════════════════════
-   CLASS MODAL
-════════════════════════════════ */
-function openClassModal(cid=''){
-  const cls = cid ? S.classes.find(c=>c.id===cid) : null;
-  S.modalStudents = cls ? JSON.parse(JSON.stringify(cls.students||[])) : [];
-  S.modalDays     = cls ? [...(cls.days||[])] : [];
-
-  const el = document.createElement('div');
-  el.className='overlay'; el.id='cls-modal';
-  el.innerHTML=`
-    <div class="modal">
-      <h3>${cls?'반 수정':'새 반 추가'}</h3>
-      <div class="fg">
-        <label class="fl">반 이름</label>
-        <input class="fi" id="m-name" placeholder="예: 파닉스 A반" value="${cls?.name||''}">
-      </div>
-      <div class="fg">
-        <label class="fl">과목</label>
-        <select class="fi" id="m-sub">
-          <option value="english" ${cls?.subject==='english'?'selected':''}>영어</option>
-          <option value="math"    ${cls?.subject==='math'?'selected':''}>수학</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label class="fl">담당 선생님</label>
-        <input class="fi" id="m-teacher" placeholder="선생님 이름" value="${cls?.teacherName||''}">
-      </div>
-      <div class="fg">
-        <label class="fl">수업 요일</label>
-        <div class="day-row">
-          ${[1,2,3,4,5,6,7].map(d=>`
-            <button class="day-btn ${S.modalDays.includes(d)?'on':''}" onclick="toggleDay(${d},this)">${DAY_KR[d]}</button>`).join('')}
-        </div>
-      </div>
-      <div class="fg">
-        <label class="fl">수업 시간</label>
-        <div style="display:flex;gap:10px;align-items:center">
-          <input class="fi" id="m-start" type="time" value="${cls?.startTime||'15:00'}" style="flex:1">
-          <span style="color:#334155">~</span>
-          <input class="fi" id="m-end" type="time" value="${cls?.endTime||'16:00'}" style="flex:1">
-        </div>
-      </div>
-      <div class="fg">
-        <label class="fl">학생 명단</label>
-        <div class="tags" id="m-tags"></div>
-        <div class="s-input-row">
-          <input class="fi" id="m-stu" placeholder="이름 입력 후 Enter" style="flex:1"
-            onkeydown="if(event.key==='Enter'){addStudent();event.preventDefault()}">
-          <button class="btn btn-ghost" onclick="addStudent()" style="white-space:nowrap">추가</button>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeClsModal()">취소</button>
-        <button class="btn btn-blue" onclick="saveClass('${cid}')">저장</button>
-      </div>
-    </div>`;
-  document.getElementById('modals').appendChild(el);
-  renderModalTags();
-}
-
-function toggleDay(d, btn){
-  const i = S.modalDays.indexOf(d);
-  if(i>=0){ S.modalDays.splice(i,1); btn.classList.remove('on'); }
-  else    { S.modalDays.push(d);     btn.classList.add('on');    }
-}
-
-function addStudent(){
-  const inp = document.getElementById('m-stu');
-  const name = inp.value.trim();
-  if(!name) return;
-  S.modalStudents.push({id:'S'+Date.now()+Math.random().toString(36).substr(2,4), name});
-  inp.value='';
-  renderModalTags();
-}
-
-function removeStudent(id){
-  S.modalStudents = S.modalStudents.filter(s=>s.id!==id);
-  renderModalTags();
-}
-
-function renderModalTags(){
-  const el = document.getElementById('m-tags');
-  if(!el) return;
-  el.innerHTML = S.modalStudents.map(s=>
-    `<div class="tag">${s.name}<button onclick="removeStudent('${s.id}')">×</button></div>`
-  ).join('');
-}
-
-async function saveClass(cid){
-  const name    = document.getElementById('m-name').value.trim();
-  const subject = document.getElementById('m-sub').value;
-  const teacher = document.getElementById('m-teacher').value.trim();
-  const start   = document.getElementById('m-start').value;
-  const end     = document.getElementById('m-end').value;
-  if(!name||!start||!end){ toast('반 이름과 수업 시간은 필수입니다'); return; }
-  if(!S.modalDays.length){ toast('수업 요일을 선택해주세요'); return; }
-
-  const data = {
-    name, subject, teacherName:teacher,
-    startTime:start, endTime:end,
-    days:[...S.modalDays].sort(),
-    students:S.modalStudents,
-    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+function changeLogo(inp){
+  const f = inp.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    localStorage.setItem('att_logo', e.target.result);
+    document.getElementById('logo-default').style.display='none';
+    const img = document.getElementById('logo-img');
+    img.src = e.target.result; img.style.display='block';
+    toast('로고가 변경되었습니다');
   };
-  if(cid){
-    await db.collection('classes').doc(cid).update(data);
-    toast('반 정보가 수정되었습니다');
-  } else {
-    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-    await db.collection('classes').add(data);
-    toast('새 반이 추가되었습니다');
+  r.readAsDataURL(f);
+  inp.value='';
+}
+
+/* ══ Keypad ══ */
+function kp(d){
+  if(NUM.length>=6) return;
+  NUM+=d;
+  if(CFG.sound) beep();
+  renderNum();
+}
+function kd(){ NUM=NUM.slice(0,-1); renderNum(); }
+function renderNum(){
+  const el = document.getElementById('display');
+  if(!NUM){ el.innerHTML='<span class="display-hint">번호를 눌러주세요</span>'; return; }
+  el.textContent = CFG.mask ? '●'.repeat(NUM.length) : NUM;
+}
+
+/* ══ Submit ══ */
+async function submit(mode){
+  if(!NUM){ toast('출결 번호를 입력해주세요'); return; }
+  const name = STUDENTS[NUM] || `번호 ${NUM}`;
+  const n = new Date();
+  const date = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  const time = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  try{
+    await db.collection('attendance_log').add({
+      number:NUM, name, mode, date, time,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){ console.warn('Firestore 저장 실패:', e); }
+  if(CFG.sound) ding();
+  if(CFG.showPopup) popup(name, mode, time);
+  NUM=''; renderNum();
+}
+
+/* ══ Popup ══ */
+function popup(name, mode, time){
+  const el = document.createElement('div');
+  el.className='popup-overlay';
+  el.innerHTML=`
+    <div class="popup-box">
+      <div class="popup-icon">${mode==='arrive'?'🎒':'🏠'}</div>
+      <div class="popup-name">${name}</div>
+      <div class="popup-mode ${mode==='arrive'?'mode-arrive':'mode-depart'}">${mode==='arrive'?'등원':'하원'} 완료</div>
+      <div class="popup-time">${time}</div>
+      <div class="popup-bar"><div class="popup-bar-fill"></div></div>
+    </div>`;
+  el.onclick = ()=>el.remove();
+  document.body.appendChild(el);
+  if(CFG.autoClose) setTimeout(()=>el.remove(), 3000);
+}
+
+/* ══ Sound ══ */
+function beep(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.frequency.value=880;g.gain.value=0.08;
+    o.start();o.stop(ctx.currentTime+0.04);
+  }catch(e){}
+}
+function ding(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [523,659,784].forEach((f,i)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=f;
+      g.gain.setValueAtTime(0.25,ctx.currentTime+i*0.14);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.14+0.28);
+      o.start(ctx.currentTime+i*0.14);o.stop(ctx.currentTime+i*0.14+0.3);
+    });
+  }catch(e){}
+}
+
+/* ══ PIN Modal ══ */
+let _pinCb=null, _pinE='';
+function openPinModal(cb){
+  if(!CFG.lock){ cb(); return; }
+  _pinCb=cb; _pinE='';
+  const el=document.createElement('div');
+  el.className='pin-overlay';el.id='pin-ov';
+  el.innerHTML=`
+    <div class="pin-box">
+      <h3>🔒 보안 확인</h3><p>PIN 번호 4자리를 입력하세요</p>
+      <div class="pin-dots">${[0,1,2,3].map(i=>`<div class="pin-dot" id="pd${i}"></div>`).join('')}</div>
+      <div class="pin-numpad">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="pn" onclick="pnk('${n}')">${n}</button>`).join('')}
+        <button class="pn blank"></button><button class="pn" onclick="pnk('0')">0</button>
+        <button class="pn del" onclick="pnb()">⌫</button>
+      </div>
+      <button class="pin-cancel" onclick="document.getElementById('pin-ov').remove()">취소</button>
+    </div>`;
+  document.getElementById('modals').appendChild(el);
+}
+function pnk(d){
+  if(_pinE.length>=4) return;
+  _pinE+=d;
+  updPD();
+  if(_pinE.length===4){
+    setTimeout(()=>{
+      if(_pinE===CFG.pin){ document.getElementById('pin-ov')?.remove(); _pinCb&&_pinCb(); }
+      else{
+        [0,1,2,3].forEach(i=>document.getElementById(`pd${i}`)?.classList.add('err'));
+        setTimeout(()=>{ _pinE=''; updPD(true); },600);
+        toast('PIN이 올바르지 않습니다');
+      }
+    },80);
   }
-  closeClsModal();
-  const snap = await db.collection('classes').orderBy('startTime').get();
-  S.classes = snap.docs.map(d=>({id:d.id,...d.data()}));
-  renderAdmin();
+}
+function pnb(){ _pinE=_pinE.slice(0,-1); updPD(); }
+function updPD(r=false){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById(`pd${i}`);
+    if(!d)return;
+    d.classList.toggle('on',!r&&i<_pinE.length);
+    if(r)d.classList.remove('err');
+  }
 }
 
-function closeClsModal(){ document.getElementById('cls-modal')?.remove(); }
-
-async function deleteClass(cid, name){
-  if(!confirm(`"${name}" 반을 삭제하시겠습니까?`)) return;
-  await db.collection('classes').doc(cid).delete();
-  toast('삭제되었습니다');
-  const snap = await db.collection('classes').orderBy('startTime').get();
-  S.classes = snap.docs.map(d=>({id:d.id,...d.data()}));
-  renderAdmin();
+/* ══ Open with pin ══ */
+function openWithPin(target){
+  openPinModal(()=>{
+    if(target==='settings'){
+      syncSettingsUI();
+      renderStudentList();
+      show('settings');
+    } else {
+      show('list');
+      loadList();
+    }
+  });
 }
 
-/* ════════════════════════════════
-   TOAST
-════════════════════════════════ */
+function syncSettingsUI(){
+  document.getElementById('set-lock').checked  = CFG.lock;
+  document.getElementById('set-mask').checked  = CFG.mask;
+  document.getElementById('set-mode').checked  = CFG.separateMode;
+  document.getElementById('set-auto').checked  = CFG.autoClose;
+  document.getElementById('set-popup').checked = CFG.showPopup;
+  document.getElementById('set-sound').checked = CFG.sound;
+}
+
+/* ══ PIN Change ══ */
+function openPinChange(){
+  let step=1, newP='', e2='';
+  const ov=document.createElement('div');
+  ov.className='pin-overlay';ov.id='pch-ov';
+  let entry='';
+  function render(){
+    const titles=['','현재 PIN 확인','새 PIN 입력','새 PIN 확인'];
+    const subs=['','현재 PIN을 입력하세요','새 PIN 4자리를 입력하세요','PIN을 한번 더 입력하세요'];
+    ov.innerHTML=`
+      <div class="pin-box">
+        <h3>${titles[step]}</h3><p>${subs[step]}</p>
+        <div class="pin-dots">${[0,1,2,3].map(i=>`<div class="pin-dot" id="pcd${i}"></div>`).join('')}</div>
+        <div class="pin-numpad">
+          ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="pn" onclick="pc_k('${n}')">${n}</button>`).join('')}
+          <button class="pn blank"></button><button class="pn" onclick="pc_k('0')">0</button>
+          <button class="pn del" onclick="pc_b()">⌫</button>
+        </div>
+        <button class="pin-cancel" onclick="document.getElementById('pch-ov').remove()">취소</button>
+      </div>`;
+    entry='';
+  }
+  window.pc_k=d=>{
+    if(entry.length>=4)return;
+    entry+=d;
+    for(let i=0;i<4;i++) document.getElementById(`pcd${i}`)?.classList.toggle('on',i<entry.length);
+    if(entry.length===4){
+      setTimeout(()=>{
+        if(step===1){
+          if(entry===CFG.pin){step=2;render();}
+          else{[0,1,2,3].forEach(i=>document.getElementById(`pcd${i}`)?.classList.add('err'));setTimeout(()=>render(),600);toast('현재 PIN이 올바르지 않습니다');}
+        } else if(step===2){newP=entry;step=3;render();}
+        else{
+          if(entry===newP){CFG.pin=newP;localStorage.setItem('att_cfg',JSON.stringify(CFG));document.getElementById('pch-ov').remove();toast('PIN이 변경되었습니다');}
+          else{[0,1,2,3].forEach(i=>document.getElementById(`pcd${i}`)?.classList.add('err'));setTimeout(()=>{step=2;newP='';render();},600);toast('PIN이 일치하지 않습니다');}
+        }
+      },80);
+    }
+  };
+  window.pc_b=()=>{entry=entry.slice(0,-1);for(let i=0;i<4;i++)document.getElementById(`pcd${i}`)?.classList.toggle('on',i<entry.length);};
+  render();
+  document.getElementById('modals').appendChild(ov);
+}
+
+/* ══ Students ══ */
+function addStudent(){
+  const num=document.getElementById('new-num').value.trim();
+  const name=document.getElementById('new-name').value.trim();
+  if(!num||!name){toast('번호와 이름을 모두 입력하세요');return;}
+  STUDENTS[num]=name;
+  localStorage.setItem('att_stu',JSON.stringify(STUDENTS));
+  document.getElementById('new-num').value='';
+  document.getElementById('new-name').value='';
+  renderStudentList();
+  toast(`${name} 학생 등록 완료`);
+}
+function delStudent(num){
+  delete STUDENTS[num];
+  localStorage.setItem('att_stu',JSON.stringify(STUDENTS));
+  renderStudentList();
+}
+function renderStudentList(){
+  const el=document.getElementById('student-list');
+  const entries=Object.entries(STUDENTS);
+  if(!entries.length){el.innerHTML='<p style="font-size:13px;color:var(--text-light)">등록된 학생이 없습니다</p>';return;}
+  el.innerHTML=entries.map(([n,nm])=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:10px;padding:10px 14px">
+      <span style="font-weight:800;color:var(--primary);min-width:48px">${n}</span>
+      <span style="font-weight:600;flex:1;padding:0 8px">${nm}</span>
+      <button onclick="delStudent('${n}')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:17px;padding:0">✕</button>
+    </div>`).join('');
+}
+
+/* ══ Attendance List ══ */
+async function loadList(){
+  const el=document.getElementById('list-body');
+  el.innerHTML='<div class="empty"><div class="icon">⏳</div><p>불러오는 중...</p></div>';
+  try{
+    const snap=await db.collection('attendance_log').orderBy('timestamp','desc').limit(300).get();
+    if(snap.empty){el.innerHTML='<div class="empty"><div class="icon">📋</div><p>출결 기록이 없습니다</p></div>';return;}
+    const grouped={};
+    snap.docs.forEach(d=>{
+      const data=d.data();
+      if(!grouped[data.date])grouped[data.date]=[];
+      grouped[data.date].push(data);
+    });
+    el.innerHTML=Object.entries(grouped).map(([date,rows])=>`
+      <div class="list-date-label">${date}</div>
+      <div class="list-table-wrap">
+        <table>
+          <thead><tr><th>번호</th><th>이름</th><th>구분</th><th>시간</th></tr></thead>
+          <tbody>${rows.map(r=>`
+            <tr>
+              <td>${r.number}</td>
+              <td>${r.name}</td>
+              <td><span class="chip ${r.mode==='arrive'?'chip-a':'chip-d'}">${r.mode==='arrive'?'등원':'하원'}</span></td>
+              <td>${r.time}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`).join('');
+  }catch(e){el.innerHTML='<div class="empty"><div class="icon">⚠️</div><p style="color:#e74c3c">데이터 로드 실패<br><small>Firebase 설정을 확인하세요</small></p></div>';}
+}
+
+/* ══ Logout / Toast ══ */
+function logout(){ if(confirm('로그아웃 하시겠습니까?')){ show('main'); toast('로그아웃 되었습니다'); } }
 let _tt=null;
-function toast(msg){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  if(_tt) clearTimeout(_tt);
-  _tt=setTimeout(()=>el.classList.remove('show'), 2500);
-}
-
-/* ════════════════════════════════
-   BOOT
-════════════════════════════════ */
-startClock();
-loadToday();
-setInterval(loadToday, 300_000); // 5분마다 새로고침
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); if(_tt)clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2500); }
 </script>
 </body>
 </html>
