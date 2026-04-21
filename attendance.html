@@ -12,293 +12,347 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <style>
 :root{
-  --bg:#f0f4f8;
-  --sidebar:#ffffff;
-  --primary:#4a90d9;
-  --arrive:#5cb85c;
-  --arrive-dark:#449d44;
-  --depart:#d4a843;
-  --depart-dark:#b8912e;
+  --green:#6abf4b;
+  --green-dark:#4da82e;
+  --gold:#d4a832;
+  --gold-dark:#b88c20;
+  --blue:#4a90d9;
   --text:#2c3e50;
-  --text-soft:#7f8c8d;
-  --text-light:#bdc3c7;
+  --soft:#7f8c8d;
   --border:#e8ecef;
-  --key-bg:#ffffff;
-  --key-shadow:0 2px 8px rgba(0,0,0,0.08);
-  --radius:16px;
-  --sidebar-w:280px;
+  --sidebar-w:230px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none}
-body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans KR',sans-serif;background:#fff;color:var(--text)}
 
 .screen{display:none;position:fixed;inset:0}
 .screen.active{display:flex}
 
-/* ─── MAIN ─── */
-#screen-main{flex-direction:row;background:var(--bg)}
+/* ══════════════════════════
+   MAIN
+══════════════════════════ */
+#screen-main{flex-direction:row;background:#fff}
 
-.sidebar{width:var(--sidebar-w);background:var(--sidebar);display:flex;flex-direction:column;align-items:center;padding:32px 20px 28px;border-right:1px solid var(--border);flex-shrink:0}
+/* ── Sidebar ── */
+.sidebar{
+  width:var(--sidebar-w);
+  background:#fff;
+  border-right:1.5px solid var(--border);
+  display:flex;flex-direction:column;
+  align-items:center;
+  padding:28px 16px 24px;
+  flex-shrink:0;
+}
 
-.logo-area{width:100%;text-align:center;margin-bottom:24px;cursor:pointer;position:relative}
-.logo-placeholder{width:180px;height:70px;background:linear-gradient(135deg,#4a90d9,#2d6db5);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto;color:#fff}
-.logo-placeholder .lp1{font-size:18px;font-weight:900;letter-spacing:-0.5px}
-.logo-placeholder .lp2{font-size:9px;font-weight:500;opacity:0.8;letter-spacing:0.05em;margin-top:2px}
-.logo-img{max-width:180px;max-height:80px;object-fit:contain;display:block;margin:0 auto;border-radius:8px}
-.logo-edit-badge{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;white-space:nowrap;letter-spacing:0.04em;box-shadow:0 2px 8px rgba(74,144,217,0.4)}
-#logo-input{display:none}
+/* Logo */
+.logo-wrap{width:100%;text-align:center;margin-bottom:20px;cursor:pointer;position:relative}
+.logo-default{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.logo-default .l1{font-size:26px;font-weight:900;letter-spacing:-0.5px}
+.logo-default .l1 span.blue{color:#4a90d9}
+.logo-default .l1 span.gold{color:#d4a832}
+.logo-default .l2{font-size:9px;font-weight:600;color:var(--soft);letter-spacing:0.12em;text-transform:uppercase;margin-top:2px}
+#logo-img-el{max-width:180px;max-height:72px;object-fit:contain;display:none;border-radius:6px}
+#logo-file{display:none}
 
-.sidebar-title{font-size:24px;font-weight:900;color:var(--text);letter-spacing:-0.5px;margin-bottom:4px;text-align:center}
-.sidebar-date{font-size:12px;color:var(--text-soft);font-weight:500;text-align:center;margin-bottom:4px}
-.sidebar-time{font-size:44px;font-weight:900;color:var(--primary);letter-spacing:-2px;text-align:center;line-height:1;margin:8px 0 24px}
-.sidebar-div{width:100%;height:1px;background:var(--border);margin-bottom:18px}
+/* Sidebar info */
+.sb-title{font-size:22px;font-weight:900;color:var(--text);margin-bottom:4px;text-align:center}
+.sb-datetime{font-size:13px;color:var(--soft);font-weight:500;text-align:center;line-height:1.6;margin-bottom:20px}
+.sb-div{width:100%;height:1px;background:var(--border);margin-bottom:16px}
 
-.menu-item{width:100%;padding:14px 18px;border-radius:12px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;color:var(--text-soft);display:flex;align-items:center;gap:10px;transition:all 0.18s;margin-bottom:6px}
-.menu-item:hover{background:#f0f4f8;color:var(--text)}
-.menu-icon{font-size:18px;width:26px;text-align:center}
+.menu-btn{
+  width:100%;padding:13px 16px;border:none;background:none;
+  cursor:pointer;font-family:inherit;font-size:15px;font-weight:600;
+  color:var(--soft);display:flex;align-items:center;gap:10px;
+  border-radius:10px;transition:all 0.15s;margin-bottom:4px;text-align:left;
+}
+.menu-btn:hover{background:#f4f6f8;color:var(--text)}
+.menu-icon{font-size:17px;width:24px;text-align:center}
 
-.keypad-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px}
+/* ── Main content ── */
+.main-content{
+  flex:1;display:flex;flex-direction:row;
+  align-items:stretch;padding:20px 20px 20px 16px;gap:14px;
+  min-width:0;
+}
 
-.display-box{background:#fff;border-radius:20px;padding:16px 28px;margin-bottom:20px;width:100%;max-width:360px;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:2px solid var(--border)}
-.display-label{font-size:10px;font-weight:700;color:var(--text-light);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:5px}
-.display-number{font-size:36px;font-weight:900;color:var(--text);letter-spacing:4px;min-height:42px;display:flex;align-items:center;gap:4px}
-.display-hint{font-size:14px;color:var(--text-light);font-weight:500;letter-spacing:0}
+/* 등원/하원 버튼 — 세로로 전체 높이 */
+.action-col{
+  display:flex;flex-direction:column;gap:14px;flex-shrink:0;
+  width:90px;
+}
+.act-btn{
+  flex:1;border:none;border-radius:18px;
+  font-family:inherit;font-size:22px;font-weight:900;
+  color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  letter-spacing:0.04em;
+  transition:transform 0.1s, filter 0.1s;
+  writing-mode:initial;
+}
+.act-btn:active{transform:scale(0.95);filter:brightness(0.93)}
+.btn-arrive{background:linear-gradient(180deg,#7dcf5a,var(--green-dark))}
+.btn-depart{background:linear-gradient(180deg,#e8c050,var(--gold-dark))}
 
-.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;width:100%;max-width:360px;margin-bottom:14px}
-.key{background:var(--key-bg);border:none;border-radius:14px;height:70px;font-family:inherit;font-size:26px;font-weight:700;color:var(--text);cursor:pointer;box-shadow:var(--key-shadow);transition:all 0.1s;display:flex;align-items:center;justify-content:center}
-.key:active{transform:scale(0.93);background:#f0f4f8;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
-.key.del{background:#fff5f5;color:#e74c3c;font-size:20px}
-.key.blank{background:transparent;box-shadow:none;pointer-events:none}
+/* 키패드 */
+.keypad-col{
+  flex:1;display:flex;flex-direction:column;gap:0;min-width:0;
+}
 
-.action-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:360px}
-.action-btn{height:62px;border:none;border-radius:16px;font-family:inherit;font-size:20px;font-weight:800;cursor:pointer;transition:all 0.12s;letter-spacing:0.02em;box-shadow:0 4px 16px rgba(0,0,0,0.12)}
-.btn-arrive{background:linear-gradient(135deg,var(--arrive),var(--arrive-dark));color:#fff}
-.btn-arrive:active{transform:scale(0.96)}
-.btn-depart{background:linear-gradient(135deg,var(--depart),var(--depart-dark));color:#fff}
-.btn-depart:active{transform:scale(0.96)}
+/* 입력 표시 — 미니멀 */
+.num-display{
+  height:52px;display:flex;align-items:center;justify-content:center;
+  font-size:32px;font-weight:900;color:var(--text);letter-spacing:6px;
+  margin-bottom:12px;
+}
 
-/* ─── POPUP ─── */
-.popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100;animation:fadeIn 0.2s}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.popup-box{background:#fff;border-radius:24px;padding:36px 40px;text-align:center;min-width:300px;box-shadow:0 20px 60px rgba(0,0,0,0.2);animation:popUp 0.3s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes popUp{from{transform:scale(0.8);opacity:0}to{transform:scale(1);opacity:1}}
-.popup-icon{font-size:60px;margin-bottom:10px;line-height:1}
-.popup-name{font-size:34px;font-weight:900;color:var(--text);margin-bottom:8px}
-.popup-mode{font-size:17px;font-weight:700;padding:5px 18px;border-radius:20px;display:inline-block;margin-bottom:6px}
-.mode-arrive{background:#e8f8e8;color:#27ae60}
-.mode-depart{background:#fef9e7;color:#d4a843}
-.popup-time{font-size:13px;color:var(--text-soft)}
-.popup-bar{height:4px;background:#e8ecef;border-radius:4px;margin-top:18px;overflow:hidden}
-.popup-bar-fill{height:100%;background:var(--primary);border-radius:4px;animation:shrink 3s linear forwards}
-@keyframes shrink{from{width:100%}to{width:0%}}
+.keypad{
+  flex:1;display:grid;
+  grid-template-columns:repeat(3,1fr);
+  grid-template-rows:repeat(4,1fr);
+  gap:10px;
+}
+.key{
+  background:#f4f6f8;border:none;border-radius:14px;
+  font-family:inherit;font-size:36px;font-weight:700;color:var(--text);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background 0.1s,transform 0.08s;
+}
+.key:active{background:#e4e8ec;transform:scale(0.94)}
+.key.del{font-size:24px;color:#e74c3c;background:#fff0f0}
+.key.del:active{background:#fde0e0}
+.key.blank{background:transparent;pointer-events:none}
 
-/* ─── SETTINGS ─── */
-#screen-settings{flex-direction:column;background:var(--bg)}
-.top-bar{background:#fff;padding:16px 22px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0}
-.back-btn{width:38px;height:38px;border-radius:50%;background:var(--bg);border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-soft);transition:background 0.2s}
-.back-btn:hover{background:var(--border)}
-.top-bar h2{font-size:19px;font-weight:800}
+/* ══════════════════════════
+   SUCCESS POPUP
+══════════════════════════ */
+.popup-ov{
+  position:fixed;inset:0;background:rgba(0,0,0,0.38);
+  display:flex;align-items:center;justify-content:center;z-index:100;
+  animation:fi 0.18s;
+}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.popup-box{
+  background:#fff;border-radius:24px;padding:40px 44px;text-align:center;
+  min-width:300px;box-shadow:0 16px 48px rgba(0,0,0,0.18);
+  animation:pu 0.28s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes pu{from{transform:scale(0.82);opacity:0}to{transform:scale(1);opacity:1}}
+.popup-icon{font-size:58px;margin-bottom:10px;line-height:1}
+.popup-name{font-size:38px;font-weight:900;margin-bottom:8px}
+.popup-mode{font-size:18px;font-weight:700;padding:6px 20px;border-radius:20px;display:inline-block;margin-bottom:6px}
+.m-arrive{background:#edfae5;color:#3a9c1f}
+.m-depart{background:#fef9e4;color:#b88c20}
+.popup-time{font-size:14px;color:var(--soft)}
+.popup-bar{height:4px;background:#eee;border-radius:4px;margin-top:18px;overflow:hidden}
+.popup-bar-fill{height:100%;background:var(--blue);border-radius:4px;animation:shrink 3s linear forwards}
+@keyframes shrink{from{width:100%}to{width:0}}
 
-.settings-body{flex:1;overflow-y:auto;padding:18px 18px 40px;max-width:700px;margin:0 auto;width:100%}
-.settings-body::-webkit-scrollbar{width:4px}
-.settings-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px}
+/* ══════════════════════════
+   SETTINGS
+══════════════════════════ */
+#screen-settings,#screen-list{flex-direction:column;background:#f4f6f8}
+.top-bar{background:#fff;padding:15px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.back-btn{width:38px;height:38px;border-radius:50%;background:#f4f6f8;border:none;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--soft)}
+.back-btn:active{background:#e4e8ec}
+.top-bar h2{font-size:18px;font-weight:800}
 
-.s-section{background:#fff;border-radius:var(--radius);margin-bottom:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.05)}
-.s-section-title{padding:14px 18px 0;font-size:10px;font-weight:800;color:var(--text-light);letter-spacing:0.12em;text-transform:uppercase}
-.s-row{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #f5f5f5}
+.s-body{flex:1;overflow-y:auto;padding:16px;max-width:680px;margin:0 auto;width:100%}
+.s-body::-webkit-scrollbar{width:3px}
+.s-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px}
+
+.s-card{background:#fff;border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+.s-card-title{padding:13px 18px 0;font-size:10px;font-weight:800;color:#aaa;letter-spacing:0.12em;text-transform:uppercase}
+.s-row{padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid #f5f5f5}
 .s-row:last-child{border-bottom:none}
-.s-info h4{font-size:15px;font-weight:700;margin-bottom:3px}
-.s-info p{font-size:12px;color:var(--text-soft);line-height:1.4}
+.s-info h4{font-size:14px;font-weight:700;margin-bottom:2px}
+.s-info p{font-size:11px;color:var(--soft);line-height:1.4}
 
-.toggle{position:relative;width:50px;height:28px;flex-shrink:0}
+.toggle{position:relative;width:48px;height:27px;flex-shrink:0}
 .toggle input{opacity:0;width:0;height:0}
-.t-slider{position:absolute;inset:0;background:#ddd;border-radius:28px;transition:background 0.25s;cursor:pointer}
-.t-slider::before{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform 0.25s;box-shadow:0 1px 4px rgba(0,0,0,0.2)}
-.toggle input:checked + .t-slider{background:var(--primary)}
-.toggle input:checked + .t-slider::before{transform:translateX(22px)}
+.tsl{position:absolute;inset:0;background:#ddd;border-radius:27px;transition:background 0.22s;cursor:pointer}
+.tsl::before{content:'';position:absolute;width:21px;height:21px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform 0.22s;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+.toggle input:checked+.tsl{background:var(--blue)}
+.toggle input:checked+.tsl::before{transform:translateX(21px)}
 
-.small-btn{padding:8px 16px;background:#f0f4f8;border:none;border-radius:10px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);transition:background 0.2s}
-.small-btn:hover{background:var(--border)}
+.sm-btn{padding:8px 14px;background:#f4f6f8;border:none;border-radius:9px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:var(--text)}
+.sm-btn:active{background:#e4e8ec}
+.logout-btn{width:100%;padding:15px;background:none;border:none;font-family:inherit;font-size:15px;font-weight:700;color:#e74c3c;cursor:pointer;text-align:center}
+.logout-btn:active{background:#fff5f5}
 
-.logout-btn{width:100%;padding:16px;background:none;border:none;font-family:inherit;font-size:15px;font-weight:700;color:#e74c3c;cursor:pointer;text-align:center;transition:background 0.2s}
-.logout-btn:hover{background:#fff5f5}
+.fi{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;outline:none;background:#fff}
+.fi:focus{border-color:var(--blue)}
 
-/* ─── LIST ─── */
-#screen-list{flex-direction:column;background:var(--bg)}
-.list-body{flex:1;overflow-y:auto;padding:16px;max-width:700px;margin:0 auto;width:100%}
-.list-body::-webkit-scrollbar{width:4px}
+/* LIST */
+.list-body{flex:1;overflow-y:auto;padding:14px;max-width:680px;margin:0 auto;width:100%}
+.list-body::-webkit-scrollbar{width:3px}
 .list-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px}
-.list-date-label{font-size:11px;font-weight:800;color:var(--text-light);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding:0 2px}
-.list-table-wrap{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.05);margin-bottom:18px}
-.list-table-wrap table{width:100%;border-collapse:collapse}
-.list-table-wrap th{background:#f8fafc;padding:10px 16px;text-align:left;font-size:10px;font-weight:800;color:var(--text-light);letter-spacing:0.08em;text-transform:uppercase}
-.list-table-wrap td{padding:12px 16px;font-size:14px;border-top:1px solid #f5f5f5;color:var(--text)}
-.chip{display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700}
-.chip-a{background:#e8f8e8;color:#27ae60}
-.chip-d{background:#fef9e7;color:#d4a843}
-.empty{text-align:center;padding:60px 20px;color:var(--text-light)}
-.empty .icon{font-size:48px;margin-bottom:12px}
+.dl{font-size:10px;font-weight:800;color:#aaa;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:7px;padding:0 2px}
+.lt{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);margin-bottom:16px}
+.lt table{width:100%;border-collapse:collapse}
+.lt th{background:#f8fafc;padding:9px 14px;text-align:left;font-size:10px;font-weight:800;color:#aaa;letter-spacing:0.06em;text-transform:uppercase}
+.lt td{padding:11px 14px;font-size:13px;border-top:1px solid #f5f5f5}
+.lt td:first-child{font-weight:700}
+.chip{display:inline-block;padding:2px 11px;border-radius:20px;font-size:11px;font-weight:700}
+.ca{background:#edfae5;color:#3a9c1f}
+.cd{background:#fef9e4;color:#b88c20}
+.empty{text-align:center;padding:60px 20px;color:#ccc}
+.empty .ei{font-size:44px;margin-bottom:10px}
 
-/* ─── PIN ─── */
-.pin-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:200}
-.pin-box{background:#fff;border-radius:22px;padding:34px 30px;text-align:center;width:min(90vw,320px)}
-.pin-box h3{font-size:19px;font-weight:800;margin-bottom:5px}
-.pin-box p{font-size:12px;color:var(--text-soft);margin-bottom:20px}
-.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:20px}
-.pin-dot{width:13px;height:13px;border-radius:50%;background:#e8ecef;transition:all 0.15s}
-.pin-dot.on{background:var(--primary);box-shadow:0 0 8px rgba(74,144,217,0.4)}
+/* PIN */
+.pin-ov{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:200}
+.pin-box{background:#fff;border-radius:20px;padding:30px 28px;text-align:center;width:min(90vw,310px)}
+.pin-box h3{font-size:18px;font-weight:800;margin-bottom:4px}
+.pin-box p{font-size:12px;color:var(--soft);margin-bottom:18px}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:18px}
+.pin-dot{width:13px;height:13px;border-radius:50%;background:#eee;transition:all 0.14s}
+.pin-dot.on{background:var(--blue)}
 .pin-dot.err{background:#e74c3c}
-.pin-numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-.pn{height:54px;background:#f8fafc;border:none;border-radius:11px;font-family:inherit;font-size:21px;font-weight:800;color:var(--text);cursor:pointer;transition:background 0.1s}
-.pn:active{background:#e8ecef}
-.pn.del{font-size:15px;color:var(--text-soft)}
+.pin-np{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pn{height:52px;background:#f4f6f8;border:none;border-radius:10px;font-family:inherit;font-size:20px;font-weight:800;color:var(--text);cursor:pointer}
+.pn:active{background:#e4e8ec}
+.pn.del{font-size:14px;color:var(--soft)}
 .pn.blank{background:transparent;pointer-events:none}
-.pin-cancel{margin-top:14px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--text-soft);cursor:pointer;padding:8px 20px}
+.pin-cancel{margin-top:12px;background:none;border:none;font-family:inherit;font-size:12px;color:var(--soft);cursor:pointer;padding:6px 16px}
 
-/* ─── TOAST ─── */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#2c3e50;color:#fff;padding:11px 22px;border-radius:22px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all 0.3s;pointer-events:none;white-space:nowrap}
+/* TOAST */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(16px);background:#2c3e50;color:#fff;padding:10px 20px;border-radius:20px;font-size:12px;font-weight:600;z-index:999;opacity:0;transition:all 0.25s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-.s-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.2s;background:#fff}
-.s-input:focus{border-color:var(--primary)}
 </style>
 </head>
 <body>
 
-<!-- ══════════ MAIN ══════════ -->
+<!-- ══ MAIN ══ -->
 <div id="screen-main" class="screen active">
   <div class="sidebar">
-    <div class="logo-area" onclick="document.getElementById('logo-input').click()">
-      <div id="logo-default">
-        <div class="logo-placeholder">
-          <span class="lp1">잉글리시아이</span>
-          <span class="lp2">WITH MENTORING</span>
+    <!-- 로고 -->
+    <div class="logo-wrap" onclick="document.getElementById('logo-file').click()">
+      <div class="logo-default" id="logo-default">
+        <div class="l1">
+          <span class="blue">english</span><span class="gold">eye</span>
         </div>
+        <div class="l2">Story Based Real English</div>
       </div>
-      <img id="logo-img" class="logo-img" src="" style="display:none">
-      <div class="logo-edit-badge">📷 로고 터치하여 변경</div>
+      <img id="logo-img-el" src="" alt="로고">
     </div>
-    <input type="file" id="logo-input" accept="image/*" onchange="changeLogo(this)">
+    <input type="file" id="logo-file" accept="image/*" onchange="changeLogo(this)">
 
-    <div class="sidebar-title">스마트 출결</div>
-    <div class="sidebar-date" id="sidebar-date">-</div>
-    <div class="sidebar-time" id="sidebar-time">00:00</div>
-    <div class="sidebar-div"></div>
+    <div class="sb-title">스마트 출결</div>
+    <div class="sb-datetime" id="sb-dt">-</div>
+    <div class="sb-div"></div>
 
-    <button class="menu-item" onclick="openWithPin('list')">
-      <span class="menu-icon">≡</span> 출결 목록
+    <button class="menu-btn" onclick="openWithPin('list')">
+      <span class="menu-icon">≡</span>출결 목록
     </button>
-    <button class="menu-item" onclick="openWithPin('settings')">
-      <span class="menu-icon">⚙</span> 상세 설정
+    <button class="menu-btn" onclick="openWithPin('settings')">
+      <span class="menu-icon">⚙</span>상세 설정
     </button>
   </div>
 
-  <div class="keypad-area">
-    <div class="display-box">
-      <div class="display-label">출결 번호 입력</div>
-      <div class="display-number" id="display">
-        <span class="display-hint">번호를 눌러주세요</span>
+  <div class="main-content">
+    <!-- 등원/하원 버튼 (세로) -->
+    <div class="action-col">
+      <button class="act-btn btn-arrive" onclick="submit('arrive')">등원</button>
+      <button class="act-btn btn-depart" onclick="submit('depart')">하원</button>
+    </div>
+
+    <!-- 키패드 -->
+    <div class="keypad-col">
+      <div class="num-display" id="num-display"></div>
+      <div class="keypad">
+        <button class="key" onclick="kp('1')">1</button>
+        <button class="key" onclick="kp('2')">2</button>
+        <button class="key" onclick="kp('3')">3</button>
+        <button class="key" onclick="kp('4')">4</button>
+        <button class="key" onclick="kp('5')">5</button>
+        <button class="key" onclick="kp('6')">6</button>
+        <button class="key" onclick="kp('7')">7</button>
+        <button class="key" onclick="kp('8')">8</button>
+        <button class="key" onclick="kp('9')">9</button>
+        <button class="key blank"></button>
+        <button class="key" onclick="kp('0')">0</button>
+        <button class="key del" onclick="kd()">⌫</button>
       </div>
-    </div>
-
-    <div class="keypad">
-      <button class="key" onclick="kp('1')">1</button>
-      <button class="key" onclick="kp('2')">2</button>
-      <button class="key" onclick="kp('3')">3</button>
-      <button class="key" onclick="kp('4')">4</button>
-      <button class="key" onclick="kp('5')">5</button>
-      <button class="key" onclick="kp('6')">6</button>
-      <button class="key" onclick="kp('7')">7</button>
-      <button class="key" onclick="kp('8')">8</button>
-      <button class="key" onclick="kp('9')">9</button>
-      <button class="key blank"></button>
-      <button class="key" onclick="kp('0')">0</button>
-      <button class="key del" onclick="kd()">⌫</button>
-    </div>
-
-    <div class="action-row">
-      <button class="action-btn btn-arrive" onclick="submit('arrive')">등원</button>
-      <button class="action-btn btn-depart" onclick="submit('depart')">하원</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════ SETTINGS ══════════ -->
+<!-- ══ SETTINGS ══ -->
 <div id="screen-settings" class="screen">
   <div class="top-bar">
     <button class="back-btn" onclick="show('main')">←</button>
     <h2>출결앱</h2>
   </div>
-  <div class="settings-body">
+  <div class="s-body">
 
-    <div class="s-section">
-      <div class="s-section-title">보안</div>
+    <div class="s-card">
+      <div class="s-card-title">보안</div>
       <div class="s-row">
         <div class="s-info"><h4>보안 / 잠금</h4><p>출결 현황, 설정 변경은 보안을 위해 암호를 입력합니다.</p></div>
-        <label class="toggle"><input type="checkbox" id="set-lock" onchange="sv('lock',this.checked)"><span class="t-slider"></span></label>
+        <label class="toggle"><input type="checkbox" id="set-lock" onchange="sv('lock',this.checked)"><span class="tsl"></span></label>
       </div>
       <div class="s-row">
         <div class="s-info"><h4>PIN 변경</h4><p>관리자 PIN 번호를 변경합니다.</p></div>
-        <button class="small-btn" onclick="openPinChange()">변경</button>
+        <button class="sm-btn" onclick="openPinChange()">변경</button>
       </div>
     </div>
 
-    <div class="s-section">
-      <div class="s-section-title">입력</div>
+    <div class="s-card">
+      <div class="s-card-title">입력</div>
       <div class="s-row">
         <div class="s-info"><h4>번호 표기</h4><p>타인에게 노출되지 않도록 출결번호 표기를 방지합니다.</p></div>
-        <label class="toggle"><input type="checkbox" id="set-mask" onchange="sv('mask',this.checked)"><span class="t-slider"></span></label>
+        <label class="toggle"><input type="checkbox" id="set-mask" onchange="sv('mask',this.checked)"><span class="tsl"></span></label>
       </div>
       <div class="s-row">
         <div class="s-info"><h4>등하원 모드</h4><p>등원, 하원 시 출결번호를 각각 입력하도록 활성화합니다.</p></div>
-        <label class="toggle"><input type="checkbox" id="set-mode" onchange="sv('separateMode',this.checked)"><span class="t-slider"></span></label>
+        <label class="toggle"><input type="checkbox" id="set-mode" onchange="sv('separateMode',this.checked)"><span class="tsl"></span></label>
       </div>
     </div>
 
-    <div class="s-section">
-      <div class="s-section-title">알림</div>
+    <div class="s-card">
+      <div class="s-card-title">알림</div>
       <div class="s-row">
         <div class="s-info"><h4>팝업 종료</h4><p>등하원 성공 확인 팝업을 3초 뒤 자동 종료합니다.</p></div>
-        <label class="toggle"><input type="checkbox" id="set-auto" onchange="sv('autoClose',this.checked)"><span class="t-slider"></span></label>
+        <label class="toggle"><input type="checkbox" id="set-auto" onchange="sv('autoClose',this.checked)"><span class="tsl"></span></label>
       </div>
       <div class="s-row">
         <div class="s-info"><h4>출결 확인 팝업</h4><p>출결번호 입력 후, 확인차 학생 정보 팝업을 표기합니다.</p></div>
-        <label class="toggle"><input type="checkbox" id="set-popup" onchange="sv('showPopup',this.checked)"><span class="t-slider"></span></label>
+        <label class="toggle"><input type="checkbox" id="set-popup" onchange="sv('showPopup',this.checked)"><span class="tsl"></span></label>
       </div>
       <div class="s-row">
         <div class="s-info"><h4>소리 설정</h4><p>출결번호 입력 후, 띵동~ 효과음을 제어합니다.</p></div>
-        <label class="toggle"><input type="checkbox" id="set-sound" onchange="sv('sound',this.checked)"><span class="t-slider"></span></label>
+        <label class="toggle"><input type="checkbox" id="set-sound" onchange="sv('sound',this.checked)"><span class="tsl"></span></label>
       </div>
     </div>
 
-    <div class="s-section">
-      <div class="s-section-title">학생 관리</div>
-      <div class="s-row" style="flex-direction:column;align-items:stretch;gap:12px">
+    <div class="s-card">
+      <div class="s-card-title">학생 관리</div>
+      <div class="s-row" style="flex-direction:column;align-items:stretch;gap:10px">
         <div class="s-info"><h4>학생 번호 등록</h4><p>출결번호와 이름을 등록합니다.</p></div>
-        <div id="student-list" style="display:flex;flex-direction:column;gap:8px"></div>
-        <div style="display:flex;gap:8px">
-          <input id="new-num" type="number" placeholder="번호 (101)" class="s-input" style="width:110px">
-          <input id="new-name" type="text" placeholder="이름" class="s-input" style="flex:1"
-            onkeydown="if(event.key==='Enter')addStudent()">
-          <button onclick="addStudent()" style="padding:10px 16px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">추가</button>
+        <div id="student-list" style="display:flex;flex-direction:column;gap:7px"></div>
+        <div style="display:flex;gap:7px">
+          <input id="new-num" type="number" placeholder="번호 (101)" class="fi" style="width:100px">
+          <input id="new-name" type="text" placeholder="이름" class="fi" style="flex:1"
+            onkeydown="if(event.key==='Enter')addStu()">
+          <button onclick="addStu()" style="padding:9px 14px;background:var(--blue);color:#fff;border:none;border-radius:9px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap">추가</button>
         </div>
       </div>
     </div>
 
-    <div class="s-section">
+    <div class="s-card">
       <button class="logout-btn" onclick="logout()">로그아웃</button>
     </div>
 
   </div>
 </div>
 
-<!-- ══════════ LIST ══════════ -->
+<!-- ══ LIST ══ -->
 <div id="screen-list" class="screen">
   <div class="top-bar">
     <button class="back-btn" onclick="show('main')">←</button>
     <h2>출결 목록</h2>
   </div>
   <div class="list-body" id="list-body">
-    <div class="empty"><div class="icon">⏳</div><p>불러오는 중...</p></div>
+    <div class="empty"><div class="ei">⏳</div><p>불러오는 중...</p></div>
   </div>
 </div>
 
@@ -306,7 +360,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 <div id="modals"></div>
 
 <script>
-/* ══ Firebase 설정 ══ */
+/* ══ Firebase ══ */
 const FIREBASE_CONFIG = {
   apiKey:            "YOUR_API_KEY",
   authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
@@ -320,31 +374,27 @@ const db = firebase.firestore();
 
 /* ══ State ══ */
 let NUM = '';
-let CFG = { pin:'1234', lock:true, mask:false, separateMode:true, autoClose:true, showPopup:true, sound:true };
-let STUDENTS = {};
+let CFG = {pin:'1234',lock:true,mask:false,separateMode:true,autoClose:true,showPopup:true,sound:true};
+let STU = {};
 const DAY = ['일','월','화','수','목','금','토'];
 
 /* ══ Init ══ */
-(function init(){
-  const c = localStorage.getItem('att_cfg');
-  if(c) CFG = {...CFG, ...JSON.parse(c)};
-  const s = localStorage.getItem('att_stu');
-  if(s) STUDENTS = JSON.parse(s);
+(function(){
+  const c=localStorage.getItem('att_cfg'); if(c) CFG={...CFG,...JSON.parse(c)};
+  const s=localStorage.getItem('att_stu'); if(s) STU=JSON.parse(s);
   loadLogo();
-  clock();
-  setInterval(clock, 10000);
+  tick(); setInterval(tick,10000);
 })();
 
-function sv(k,v){ CFG[k]=v; localStorage.setItem('att_cfg', JSON.stringify(CFG)); }
+function sv(k,v){CFG[k]=v;localStorage.setItem('att_cfg',JSON.stringify(CFG));}
 
 /* ══ Clock ══ */
-function clock(){
-  const n = new Date();
-  document.getElementById('sidebar-time').textContent =
-    `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
-  document.getElementById('sidebar-date').textContent =
-    `${n.getFullYear()}.${String(n.getMonth()+1).padStart(2,'0')}.${String(n.getDate()).padStart(2,'0')} (${DAY[n.getDay()]})`;
+function tick(){
+  const n=new Date();
+  document.getElementById('sb-dt').textContent=
+    `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())} ${pad(n.getHours())}:${pad(n.getMinutes())}`;
 }
+function pad(v){return String(v).padStart(2,'0');}
 
 /* ══ Screen ══ */
 function show(id){
@@ -354,24 +404,20 @@ function show(id){
 
 /* ══ Logo ══ */
 function loadLogo(){
-  const d = localStorage.getItem('att_logo');
-  if(!d) return;
+  const d=localStorage.getItem('att_logo'); if(!d) return;
   document.getElementById('logo-default').style.display='none';
-  const img = document.getElementById('logo-img');
-  img.src = d; img.style.display='block';
+  const el=document.getElementById('logo-img-el'); el.src=d; el.style.display='block';
 }
 function changeLogo(inp){
-  const f = inp.files[0]; if(!f) return;
-  const r = new FileReader();
-  r.onload = e => {
-    localStorage.setItem('att_logo', e.target.result);
+  const f=inp.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    localStorage.setItem('att_logo',e.target.result);
     document.getElementById('logo-default').style.display='none';
-    const img = document.getElementById('logo-img');
-    img.src = e.target.result; img.style.display='block';
+    const el=document.getElementById('logo-img-el'); el.src=e.target.result; el.style.display='block';
     toast('로고가 변경되었습니다');
   };
-  r.readAsDataURL(f);
-  inp.value='';
+  r.readAsDataURL(f); inp.value='';
 }
 
 /* ══ Keypad ══ */
@@ -381,248 +427,223 @@ function kp(d){
   if(CFG.sound) beep();
   renderNum();
 }
-function kd(){ NUM=NUM.slice(0,-1); renderNum(); }
+function kd(){NUM=NUM.slice(0,-1);renderNum();}
 function renderNum(){
-  const el = document.getElementById('display');
-  if(!NUM){ el.innerHTML='<span class="display-hint">번호를 눌러주세요</span>'; return; }
-  el.textContent = CFG.mask ? '●'.repeat(NUM.length) : NUM;
+  const el=document.getElementById('num-display');
+  if(!NUM){el.textContent='';return;}
+  el.textContent=CFG.mask?'●'.repeat(NUM.length):NUM;
 }
 
 /* ══ Submit ══ */
 async function submit(mode){
-  if(!NUM){ toast('출결 번호를 입력해주세요'); return; }
-  const name = STUDENTS[NUM] || `번호 ${NUM}`;
-  const n = new Date();
-  const date = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
-  const time = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  if(!NUM){toast('출결 번호를 입력해주세요');return;}
+  const name=STU[NUM]||`번호 ${NUM}`;
+  const n=new Date();
+  const date=`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
+  const time=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
   try{
     await db.collection('attendance_log').add({
-      number:NUM, name, mode, date, time,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      number:NUM,name,mode,date,time,
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()
     });
-  }catch(e){ console.warn('Firestore 저장 실패:', e); }
+  }catch(e){console.warn('저장 실패:',e);}
   if(CFG.sound) ding();
-  if(CFG.showPopup) popup(name, mode, time);
+  if(CFG.showPopup) popup(name,mode,time);
   NUM=''; renderNum();
 }
 
 /* ══ Popup ══ */
-function popup(name, mode, time){
-  const el = document.createElement('div');
-  el.className='popup-overlay';
+function popup(name,mode,time){
+  const el=document.createElement('div');
+  el.className='popup-ov';
   el.innerHTML=`
     <div class="popup-box">
       <div class="popup-icon">${mode==='arrive'?'🎒':'🏠'}</div>
       <div class="popup-name">${name}</div>
-      <div class="popup-mode ${mode==='arrive'?'mode-arrive':'mode-depart'}">${mode==='arrive'?'등원':'하원'} 완료</div>
+      <div class="popup-mode ${mode==='arrive'?'m-arrive':'m-depart'}">${mode==='arrive'?'등원':'하원'} 완료</div>
       <div class="popup-time">${time}</div>
       <div class="popup-bar"><div class="popup-bar-fill"></div></div>
     </div>`;
-  el.onclick = ()=>el.remove();
+  el.onclick=()=>el.remove();
   document.body.appendChild(el);
-  if(CFG.autoClose) setTimeout(()=>el.remove(), 3000);
+  if(CFG.autoClose) setTimeout(()=>el.remove(),3000);
 }
 
 /* ══ Sound ══ */
 function beep(){
   try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    const o=ctx.createOscillator(),g=ctx.createGain();
-    o.connect(g);g.connect(ctx.destination);
-    o.frequency.value=880;g.gain.value=0.08;
-    o.start();o.stop(ctx.currentTime+0.04);
+    const c=new(window.AudioContext||window.webkitAudioContext)();
+    const o=c.createOscillator(),g=c.createGain();
+    o.connect(g);g.connect(c.destination);
+    o.frequency.value=880;g.gain.value=0.07;
+    o.start();o.stop(c.currentTime+0.04);
   }catch(e){}
 }
 function ding(){
   try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const c=new(window.AudioContext||window.webkitAudioContext)();
     [523,659,784].forEach((f,i)=>{
-      const o=ctx.createOscillator(),g=ctx.createGain();
-      o.connect(g);g.connect(ctx.destination);
+      const o=c.createOscillator(),g=c.createGain();
+      o.connect(g);g.connect(c.destination);
       o.frequency.value=f;
-      g.gain.setValueAtTime(0.25,ctx.currentTime+i*0.14);
-      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.14+0.28);
-      o.start(ctx.currentTime+i*0.14);o.stop(ctx.currentTime+i*0.14+0.3);
+      g.gain.setValueAtTime(0.22,c.currentTime+i*0.13);
+      g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+i*0.13+0.26);
+      o.start(c.currentTime+i*0.13);o.stop(c.currentTime+i*0.13+0.28);
     });
   }catch(e){}
 }
 
-/* ══ PIN Modal ══ */
-let _pinCb=null, _pinE='';
+/* ══ PIN ══ */
+let _pcb=null,_pe='';
 function openPinModal(cb){
-  if(!CFG.lock){ cb(); return; }
-  _pinCb=cb; _pinE='';
+  if(!CFG.lock){cb();return;}
+  _pcb=cb;_pe='';
   const el=document.createElement('div');
-  el.className='pin-overlay';el.id='pin-ov';
+  el.className='pin-ov';el.id='pov';
   el.innerHTML=`
     <div class="pin-box">
       <h3>🔒 보안 확인</h3><p>PIN 번호 4자리를 입력하세요</p>
       <div class="pin-dots">${[0,1,2,3].map(i=>`<div class="pin-dot" id="pd${i}"></div>`).join('')}</div>
-      <div class="pin-numpad">
+      <div class="pin-np">
         ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="pn" onclick="pnk('${n}')">${n}</button>`).join('')}
-        <button class="pn blank"></button><button class="pn" onclick="pnk('0')">0</button>
+        <button class="pn blank"></button>
+        <button class="pn" onclick="pnk('0')">0</button>
         <button class="pn del" onclick="pnb()">⌫</button>
       </div>
-      <button class="pin-cancel" onclick="document.getElementById('pin-ov').remove()">취소</button>
+      <button class="pin-cancel" onclick="document.getElementById('pov').remove()">취소</button>
     </div>`;
   document.getElementById('modals').appendChild(el);
 }
 function pnk(d){
-  if(_pinE.length>=4) return;
-  _pinE+=d;
-  updPD();
-  if(_pinE.length===4){
+  if(_pe.length>=4)return;
+  _pe+=d;upd();
+  if(_pe.length===4){
     setTimeout(()=>{
-      if(_pinE===CFG.pin){ document.getElementById('pin-ov')?.remove(); _pinCb&&_pinCb(); }
+      if(_pe===CFG.pin){document.getElementById('pov')?.remove();_pcb&&_pcb();}
       else{
         [0,1,2,3].forEach(i=>document.getElementById(`pd${i}`)?.classList.add('err'));
-        setTimeout(()=>{ _pinE=''; updPD(true); },600);
+        setTimeout(()=>{_pe='';upd(true);},600);
         toast('PIN이 올바르지 않습니다');
       }
     },80);
   }
 }
-function pnb(){ _pinE=_pinE.slice(0,-1); updPD(); }
-function updPD(r=false){
+function pnb(){_pe=_pe.slice(0,-1);upd();}
+function upd(r=false){
   for(let i=0;i<4;i++){
-    const d=document.getElementById(`pd${i}`);
-    if(!d)return;
-    d.classList.toggle('on',!r&&i<_pinE.length);
+    const d=document.getElementById(`pd${i}`);if(!d)return;
+    d.classList.toggle('on',!r&&i<_pe.length);
     if(r)d.classList.remove('err');
   }
 }
 
-/* ══ Open with pin ══ */
-function openWithPin(target){
+function openWithPin(t){
   openPinModal(()=>{
-    if(target==='settings'){
-      syncSettingsUI();
-      renderStudentList();
-      show('settings');
-    } else {
-      show('list');
-      loadList();
-    }
+    if(t==='settings'){syncUI();renderStuList();show('settings');}
+    else{show('list');loadList();}
   });
 }
 
-function syncSettingsUI(){
-  document.getElementById('set-lock').checked  = CFG.lock;
-  document.getElementById('set-mask').checked  = CFG.mask;
-  document.getElementById('set-mode').checked  = CFG.separateMode;
-  document.getElementById('set-auto').checked  = CFG.autoClose;
-  document.getElementById('set-popup').checked = CFG.showPopup;
-  document.getElementById('set-sound').checked = CFG.sound;
+function syncUI(){
+  ['lock','mask','mode','auto','popup','sound'].forEach(k=>{
+    const map={lock:'lock',mask:'mask',mode:'separateMode',auto:'autoClose',popup:'showPopup',sound:'sound'};
+    const el=document.getElementById('set-'+k);
+    if(el) el.checked=CFG[map[k]];
+  });
 }
 
 /* ══ PIN Change ══ */
 function openPinChange(){
-  let step=1, newP='', e2='';
+  let step=1,newP='',entry='';
   const ov=document.createElement('div');
-  ov.className='pin-overlay';ov.id='pch-ov';
-  let entry='';
+  ov.className='pin-ov';ov.id='pcov';
+  const titles=['','현재 PIN 확인','새 PIN 입력','새 PIN 확인'];
+  const subs=['','현재 PIN을 입력하세요','새 PIN 4자리를 입력하세요','PIN을 한번 더 입력하세요'];
   function render(){
-    const titles=['','현재 PIN 확인','새 PIN 입력','새 PIN 확인'];
-    const subs=['','현재 PIN을 입력하세요','새 PIN 4자리를 입력하세요','PIN을 한번 더 입력하세요'];
+    entry='';
     ov.innerHTML=`
       <div class="pin-box">
         <h3>${titles[step]}</h3><p>${subs[step]}</p>
         <div class="pin-dots">${[0,1,2,3].map(i=>`<div class="pin-dot" id="pcd${i}"></div>`).join('')}</div>
-        <div class="pin-numpad">
-          ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="pn" onclick="pc_k('${n}')">${n}</button>`).join('')}
-          <button class="pn blank"></button><button class="pn" onclick="pc_k('0')">0</button>
-          <button class="pn del" onclick="pc_b()">⌫</button>
+        <div class="pin-np">
+          ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="pn" onclick="pck('${n}')">${n}</button>`).join('')}
+          <button class="pn blank"></button>
+          <button class="pn" onclick="pck('0')">0</button>
+          <button class="pn del" onclick="pcb2()">⌫</button>
         </div>
-        <button class="pin-cancel" onclick="document.getElementById('pch-ov').remove()">취소</button>
+        <button class="pin-cancel" onclick="document.getElementById('pcov').remove()">취소</button>
       </div>`;
-    entry='';
   }
-  window.pc_k=d=>{
+  window.pck=d=>{
     if(entry.length>=4)return;
     entry+=d;
-    for(let i=0;i<4;i++) document.getElementById(`pcd${i}`)?.classList.toggle('on',i<entry.length);
+    for(let i=0;i<4;i++)document.getElementById(`pcd${i}`)?.classList.toggle('on',i<entry.length);
     if(entry.length===4){
       setTimeout(()=>{
         if(step===1){
           if(entry===CFG.pin){step=2;render();}
-          else{[0,1,2,3].forEach(i=>document.getElementById(`pcd${i}`)?.classList.add('err'));setTimeout(()=>render(),600);toast('현재 PIN이 올바르지 않습니다');}
-        } else if(step===2){newP=entry;step=3;render();}
+          else{[0,1,2,3].forEach(i=>document.getElementById(`pcd${i}`)?.classList.add('err'));setTimeout(render,600);toast('현재 PIN이 올바르지 않습니다');}
+        }else if(step===2){newP=entry;step=3;render();}
         else{
-          if(entry===newP){CFG.pin=newP;localStorage.setItem('att_cfg',JSON.stringify(CFG));document.getElementById('pch-ov').remove();toast('PIN이 변경되었습니다');}
+          if(entry===newP){CFG.pin=newP;localStorage.setItem('att_cfg',JSON.stringify(CFG));document.getElementById('pcov').remove();toast('PIN이 변경되었습니다');}
           else{[0,1,2,3].forEach(i=>document.getElementById(`pcd${i}`)?.classList.add('err'));setTimeout(()=>{step=2;newP='';render();},600);toast('PIN이 일치하지 않습니다');}
         }
       },80);
     }
   };
-  window.pc_b=()=>{entry=entry.slice(0,-1);for(let i=0;i<4;i++)document.getElementById(`pcd${i}`)?.classList.toggle('on',i<entry.length);};
+  window.pcb2=()=>{entry=entry.slice(0,-1);for(let i=0;i<4;i++)document.getElementById(`pcd${i}`)?.classList.toggle('on',i<entry.length);};
   render();
   document.getElementById('modals').appendChild(ov);
 }
 
 /* ══ Students ══ */
-function addStudent(){
-  const num=document.getElementById('new-num').value.trim();
-  const name=document.getElementById('new-name').value.trim();
-  if(!num||!name){toast('번호와 이름을 모두 입력하세요');return;}
-  STUDENTS[num]=name;
-  localStorage.setItem('att_stu',JSON.stringify(STUDENTS));
-  document.getElementById('new-num').value='';
-  document.getElementById('new-name').value='';
-  renderStudentList();
-  toast(`${name} 학생 등록 완료`);
+function addStu(){
+  const n=document.getElementById('new-num').value.trim();
+  const nm=document.getElementById('new-name').value.trim();
+  if(!n||!nm){toast('번호와 이름을 모두 입력하세요');return;}
+  STU[n]=nm;localStorage.setItem('att_stu',JSON.stringify(STU));
+  document.getElementById('new-num').value='';document.getElementById('new-name').value='';
+  renderStuList();toast(`${nm} 학생 등록 완료`);
 }
-function delStudent(num){
-  delete STUDENTS[num];
-  localStorage.setItem('att_stu',JSON.stringify(STUDENTS));
-  renderStudentList();
-}
-function renderStudentList(){
+function delStu(n){delete STU[n];localStorage.setItem('att_stu',JSON.stringify(STU));renderStuList();}
+function renderStuList(){
   const el=document.getElementById('student-list');
-  const entries=Object.entries(STUDENTS);
-  if(!entries.length){el.innerHTML='<p style="font-size:13px;color:var(--text-light)">등록된 학생이 없습니다</p>';return;}
-  el.innerHTML=entries.map(([n,nm])=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:10px;padding:10px 14px">
-      <span style="font-weight:800;color:var(--primary);min-width:48px">${n}</span>
-      <span style="font-weight:600;flex:1;padding:0 8px">${nm}</span>
-      <button onclick="delStudent('${n}')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:17px;padding:0">✕</button>
+  const e=Object.entries(STU);
+  if(!e.length){el.innerHTML='<p style="font-size:12px;color:#ccc">등록된 학생이 없습니다</p>';return;}
+  el.innerHTML=e.map(([n,nm])=>`
+    <div style="display:flex;align-items:center;gap:10px;background:#f4f6f8;border-radius:9px;padding:9px 12px">
+      <span style="font-weight:800;color:var(--blue);min-width:44px;font-size:14px">${n}</span>
+      <span style="font-weight:600;flex:1;font-size:14px">${nm}</span>
+      <button onclick="delStu('${n}')" style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:16px;padding:0">✕</button>
     </div>`).join('');
 }
 
-/* ══ Attendance List ══ */
+/* ══ List ══ */
 async function loadList(){
   const el=document.getElementById('list-body');
-  el.innerHTML='<div class="empty"><div class="icon">⏳</div><p>불러오는 중...</p></div>';
+  el.innerHTML='<div class="empty"><div class="ei">⏳</div><p>불러오는 중...</p></div>';
   try{
     const snap=await db.collection('attendance_log').orderBy('timestamp','desc').limit(300).get();
-    if(snap.empty){el.innerHTML='<div class="empty"><div class="icon">📋</div><p>출결 기록이 없습니다</p></div>';return;}
-    const grouped={};
-    snap.docs.forEach(d=>{
-      const data=d.data();
-      if(!grouped[data.date])grouped[data.date]=[];
-      grouped[data.date].push(data);
-    });
-    el.innerHTML=Object.entries(grouped).map(([date,rows])=>`
-      <div class="list-date-label">${date}</div>
-      <div class="list-table-wrap">
-        <table>
-          <thead><tr><th>번호</th><th>이름</th><th>구분</th><th>시간</th></tr></thead>
-          <tbody>${rows.map(r=>`
-            <tr>
-              <td>${r.number}</td>
-              <td>${r.name}</td>
-              <td><span class="chip ${r.mode==='arrive'?'chip-a':'chip-d'}">${r.mode==='arrive'?'등원':'하원'}</span></td>
-              <td>${r.time}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`).join('');
-  }catch(e){el.innerHTML='<div class="empty"><div class="icon">⚠️</div><p style="color:#e74c3c">데이터 로드 실패<br><small>Firebase 설정을 확인하세요</small></p></div>';}
+    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>출결 기록이 없습니다</p></div>';return;}
+    const g={};
+    snap.docs.forEach(d=>{const data=d.data();if(!g[data.date])g[data.date]=[];g[data.date].push(data);});
+    el.innerHTML=Object.entries(g).map(([date,rows])=>`
+      <div class="dl">${date}</div>
+      <div class="lt"><table>
+        <thead><tr><th>번호</th><th>이름</th><th>구분</th><th>시간</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr>
+          <td>${r.number}</td><td>${r.name}</td>
+          <td><span class="chip ${r.mode==='arrive'?'ca':'cd'}">${r.mode==='arrive'?'등원':'하원'}</span></td>
+          <td>${r.time}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`).join('');
+  }catch(e){el.innerHTML='<div class="empty"><div class="ei">⚠️</div><p style="color:#e74c3c">데이터 로드 실패<br><small>Firebase 설정을 확인하세요</small></p></div>';}
 }
 
-/* ══ Logout / Toast ══ */
-function logout(){ if(confirm('로그아웃 하시겠습니까?')){ show('main'); toast('로그아웃 되었습니다'); } }
+/* ══ Misc ══ */
+function logout(){if(confirm('로그아웃 하시겠습니까?')){show('main');toast('로그아웃 되었습니다');}}
 let _tt=null;
-function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); if(_tt)clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2500); }
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');if(_tt)clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2500);}
 </script>
 </body>
 </html>
