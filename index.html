@@ -890,11 +890,22 @@ function renderSchedule(){
   todayMakeups.forEach(function(m){
     var s=students.find(function(x){return x.id===m.studentId;});
     if(!s)return;
-    var mt=m.makeupTime||'';var pKey='보강_'+mt;
-    if(!byPeriod[pKey])byPeriod[pKey]={pNum:0,students:[],firstTime:'99:99'};
+    var mt=m.makeupTime||'';
+    // Match makeup time to existing period, same logic as regular students
+    var pNum=0;
+    if(mt&&customPeriods.length>0){
+      var tMin=timeToMin(mt);
+      customPeriods.forEach(function(cp){
+        var cpStart=timeToMin(cp.time);var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
+        if(tMin>=cpStart&&tMin<cpEnd)pNum=cp.period;
+      });
+    }
+    var pKey=pNum?String(pNum):'미설정';
+    if(!byPeriod[pKey])byPeriod[pKey]={pNum:pNum,students:[],firstTime:'99:99'};
     byPeriod[pKey].students.push({...s,_isMakeup:true,_makeupTime:mt,_makeupId:m.id});
+    if(mt&&mt<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=mt;
   });
-  var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;if(a.startsWith('보강_'))return 1;if(b.startsWith('보강_'))return 1;return parseInt(a)-parseInt(b);});
+  var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;return parseInt(a)-parseInt(b);});
   if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';return;}
   var html='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0 12px;font-size:11px;color:var(--txt2);align-items:center">'
     +'<span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span>'
@@ -924,10 +935,9 @@ function renderSchedule(){
     else{if(!actionMemoMap[m.studentId])actionMemoMap[m.studentId]=[];actionMemoMap[m.studentId].push(m);}
   });
   sorted.forEach(function(pKey){
-    var p=byPeriod[pKey];var isMakeupGrp=pKey.startsWith('보강_');
+    var p=byPeriod[pKey];
     var headerTitle='';
     if(pKey==='미설정')headerTitle='교시 미설정';
-    else if(isMakeupGrp)headerTitle='보강 '+pKey.replace('보강_','');
     else{var pn=parseInt(pKey);var cp=customPeriods.find(function(x){return x.period===pn;});headerTitle=(pn?pn+'교시 ':'')+((cp&&cp.time)?'('+cp.time+')':'');}
     var blocks={};
     p.students.forEach(function(s){
