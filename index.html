@@ -891,14 +891,36 @@ function renderSchedule(){
     var s=students.find(function(x){return x.id===m.studentId;});
     if(!s)return;
     var mt=m.makeupTime||'';
-    // Match makeup time to existing period, same logic as regular students
     var pNum=0;
-    if(mt&&customPeriods.length>0){
+    if(mt){
       var tMin=timeToMin(mt);
-      customPeriods.forEach(function(cp){
-        var cpStart=timeToMin(cp.time);var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
-        if(tMin>=cpStart&&tMin<cpEnd)pNum=cp.period;
-      });
+      // Try matching customPeriods first
+      if(customPeriods.length>0){
+        customPeriods.forEach(function(cp){
+          var cpStart=timeToMin(cp.time);var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
+          if(tMin>=cpStart&&tMin<cpEnd)pNum=cp.period;
+        });
+      }
+      // If no customPeriod match, find the closest existing period group by time
+      if(!pNum){
+        var bestDiff=9999;
+        Object.keys(byPeriod).forEach(function(pk){
+          if(pk==='미설정')return;
+          var grp=byPeriod[pk];
+          if(grp.firstTime&&grp.firstTime!=='99:99'){
+            var diff=Math.abs(tMin-timeToMin(grp.firstTime));
+            if(diff<30&&diff<bestDiff){bestDiff=diff;pNum=parseInt(pk);}
+          }
+        });
+      }
+      // If still no match, find nearest customPeriod
+      if(!pNum&&customPeriods.length>0){
+        var bestDiff2=9999;
+        customPeriods.forEach(function(cp){
+          var diff2=Math.abs(tMin-timeToMin(cp.time));
+          if(diff2<bestDiff2){bestDiff2=diff2;pNum=cp.period;}
+        });
+      }
     }
     var pKey=pNum?String(pNum):'미설정';
     if(!byPeriod[pKey])byPeriod[pKey]={pNum:pNum,students:[],firstTime:'99:99'};
@@ -945,7 +967,7 @@ function renderSchedule(){
       if(s._isMakeup)pTime2=s._makeupTime;
       else if(pData&&typeof pData==='object')pTime2=pData.time||'';
       var blkLabel='시간미설정';
-      if(pTime2){var mm=pTime2.match(/(\d{1,2}):(\d{2})/);if(mm){var h=parseInt(mm[1]),min=parseInt(mm[2]);blkLabel=pad(h)+':'+pad(min)+'~'+pad(min<30?h:h+1)+':'+pad(min<30?30:0);}}
+      if(pTime2){var mm=pTime2.match(/(\d{1,2}):(\d{2})/);if(mm){var h=parseInt(mm[1]),min=parseInt(mm[2]);var blkMin=min<30?0:30;var blkEndMin=min<30?30:0;var blkEndH=min<30?h:h+1;blkLabel=pad(h)+':'+pad(blkMin)+'~'+pad(blkEndH)+':'+pad(blkEndMin);}}
       if(!blocks[blkLabel])blocks[blkLabel]={time:pTime2,students:[]};
       blocks[blkLabel].students.push(s);
     });
