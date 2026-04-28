@@ -301,11 +301,13 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <button class="rev-tab active" id="mktab-calendar" onclick="switchMktTab('calendar')">📅 콘텐츠 캘린더</button>
 <button class="rev-tab" id="mktab-stats" onclick="switchMktTab('stats')">📊 채널별 실적</button>
 <button class="rev-tab" id="mktab-funnel" onclick="switchMktTab('funnel')">🔍 유입 경로 분석</button>
+<button class="rev-tab" id="mktab-routine" onclick="switchMktTab('routine')">📱 카톡 채널 루틴</button>
 </div>
 <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="mk-year"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="mk-month"></select></div>
 <div id="mk-panel-calendar" class="cp"><div id="mk-calendar-area"></div></div>
 <div id="mk-panel-stats" style="display:none" class="cp"><div id="mk-stats-area"></div></div>
 <div id="mk-panel-funnel" style="display:none" class="cp"><div id="mk-funnel-area"></div></div>
+<div id="mk-panel-routine" style="display:none" class="cp"><div id="mk-routine-area"></div></div>
 </div>
 <div class="view" id="view-reference"><div class="page-top"><h2>참고</h2><p>교육비 기준 및 레벨별 진도를 관리합니다</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex"><button class="rev-tab active" id="reftab-fees" onclick="switchRefTab('fees')">💰 교육비 기준</button><button class="rev-tab" id="reftab-curriculum" onclick="switchRefTab('curriculum')">📚 레벨별 진도</button><button class="rev-tab" id="reftab-eval" onclick="switchRefTab('eval')">📊 평가 모듈</button></div><div id="ref-panel-fees" class="cp"><div class="expense-section"><h4>💰 교육비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('tuition')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th style="text-align:center">학년</th><th style="text-align:center">단계</th><th style="text-align:center">기본 교육비</th><th style="text-align:center">주 3회</th><th style="text-align:center">주 4회</th><th style="text-align:center">주 5회</th><th></th></tr></thead><tbody id="ref-tuition-tbody"></tbody></table></div></div><div class="expense-section"><h4>📚 교재비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('textbook')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th>학년</th><th>단계</th><th style="text-align:right">교재비</th><th>부교재명</th><th style="text-align:right">부교재비</th><th></th></tr></thead><tbody id="ref-textbook-tbody"></tbody></table></div></div></div><div id="ref-panel-curriculum" style="display:none" class="cp"><input class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="max-width:280px;font-size:12px;padding:6px 10px;margin-bottom:12px"><div id="ref-curriculum-area"></div></div><div id="ref-panel-eval" style="display:none" class="cp"><div id="eval-modules-area"></div></div></div>
 <div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
@@ -3119,7 +3121,7 @@ function initMkSelects(){
   if(ysel&&!ysel.options.length){var cy=new Date().getFullYear();for(var y=cy-1;y<=cy+1;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';ysel.appendChild(o);}ysel.value=cy;ysel.onchange=function(){renderMarketing();};}
   if(msel&&!msel.options.length){for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';msel.appendChild(o2);}msel.value=new Date().getMonth()+1;msel.onchange=function(){renderMarketing();};}
 }
-function switchMktTab(tab){_mkTab=tab;['calendar','stats','funnel'].forEach(function(t){var btn=$('mktab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mk-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});renderMarketing();}
+function switchMktTab(tab){_mkTab=tab;['calendar','stats','funnel','routine'].forEach(function(t){var btn=$('mktab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mk-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='routine')renderMkRoutine();else renderMarketing();}
 async function loadMkContents(){try{var snap=await db.collection('mkContents').get();_mkContents=snap.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){_mkContents=[];}}
 async function loadMkStats(){try{var snap=await db.collection('mkStats').get();_mkStats=snap.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){_mkStats=[];}}
 function renderMarketing(){
@@ -3222,6 +3224,95 @@ function renderMkFunnel(yr,mo){
     +'<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue);font-size:20px">'+(totalConsult>0?Math.round(totalReg/totalConsult*100):0)+'%</div><div class="rev-sum-lbl">전환율</div></div>'
     +'</div>'
     +'<table class="rev-tbl"><thead><tr><th>유입 채널</th><th style="text-align:center">상담 건수</th><th style="text-align:center">등록 전환</th><th style="text-align:center">전환율</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function renderMkRoutine(){
+  var el=$('mk-routine-area');if(!el)return;
+  var dayNames=['일','월','화','수','목','금','토'];
+  var today=new Date();var todayDay=dayNames[today.getDay()];
+  var dailyTasks=[
+    {time:'09:30',task:'1:1 채팅 확인 — 학부모 문의/숙제 관련 답변',icon:'💬'},
+    {time:'10:00',task:'Push 메시지 발송 (월·목)',icon:'📢'},
+    {time:'수업 후',task:'숙제 관리 메시지 발송 (미제출 학생)',icon:'📋'},
+    {time:'퇴근 전',task:'내일 마케팅 메모 정리',icon:'📝'}
+  ];
+  var weeklyTasks={
+    '월':{task:'블로그 글 아이디어 메모',detail:'학부모 자주 묻는 질문에서 소재 발굴',icon:'📝'},
+    '화':{task:'인스타 콘텐츠 제작',detail:'수업 현장, 학생 성과, 교재 소개',icon:'📸'},
+    '수':{task:'블로그 글 작성 + 발행',detail:'교육 정보, 학습법, 단계별 로드맵',icon:'✍️'},
+    '목':{task:'카톡 채널 Push 발송',detail:'교육 정보/이벤트/전달사항 (10시 발송)',icon:'📢'},
+    '금':{task:'주간 성과 점검',detail:'채널 추가 수, 메시지 클릭률, 블로그 조회',icon:'📊'},
+    '토':{task:'다음 주 콘텐츠 기획',detail:'월간 캘린더 기반 다음 주 계획',icon:'💡'}
+  };
+  var monthlyTasks=[
+    {day:'1일',task:'월간 소식지 발송',detail:'학사 일정, 전달사항',icon:'📰'},
+    {day:'5일',task:'채널 추가 이벤트 기획/갱신',detail:'동네 학부모 유입 전략',icon:'🎯'},
+    {day:'15일',task:'무료 PDF 배포 콘텐츠 제작',detail:'학습 가이드, 체크리스트 등',icon:'📄'},
+    {day:'20일',task:'다음 달 콘텐츠 캘린더 작성',detail:'월간 주제 및 발행 일정',icon:'📅'},
+    {day:'25일',task:'월간 성과 분석',detail:'유입, 전환, 채널 추가 수 리뷰',icon:'📈'}
+  ];
+  var strategyItems=[
+    {title:'1. 노출',items:['블로그에 카톡 채널 오픈 소식 알리기','블로그에 위젯 달기','무료 PDF 배포']},
+    {title:'2. 콘텐츠 큐레이션',items:['자주 묻는 답변 세팅 (교육비, 다음 단계 소개, 학사 일정, 전달 사항)','다음 단계 소개: 학습 목표, 수업 방식, 숙제 안내, 로드맵']},
+    {title:'3. 채널 추가 유도',items:['상담 신청을 채널로 유도','채널 추가 시 혜택 제공','채널 추가 이벤트 기획 & 실행']},
+    {title:'4. Push Message',items:['월 1회 소식지, 교육 정보, 전달 사항','특정 이벤트, 강의 모집, 특강, 홍보','발송 시간: 10시 (클릭 최적 시간대)']},
+    {title:'5. 비즈니스 도구',items:['쿠폰 활용']},
+    {title:'6. 1:1 채팅',items:['숙제 관리, 학부모 소통']}
+  ];
+  // Today highlight
+  var todayWeekly=weeklyTasks[todayDay];
+  var html='<div style="margin-bottom:20px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">📱 카카오톡 채널 운영 루틴</div>';
+  // Today's focus
+  if(todayWeekly){
+    html+='<div style="background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:2px solid var(--mint);border-radius:12px;padding:14px;margin-bottom:16px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">🎯 오늘('+todayDay+'요일) 핵심 업무</div>'
+      +'<div style="font-size:15px;font-weight:800;color:var(--mint)">'+todayWeekly.icon+' '+todayWeekly.task+'</div>'
+      +'<div style="font-size:12px;color:var(--txt2);margin-top:4px">'+todayWeekly.detail+'</div></div>';
+  }
+  // Daily routine
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">⏰ 일간 루틴 (매일 30분)</div>';
+  dailyTasks.forEach(function(t){
+    html+='<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);align-items:center">'
+      +'<span style="font-size:11px;font-weight:700;color:var(--blue);min-width:55px">'+t.time+'</span>'
+      +'<span style="font-size:12px">'+t.icon+' '+t.task+'</span></div>';
+  });
+  html+='</div>';
+  // Weekly routine
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">📆 주간 루틴</div>';
+  ['월','화','수','목','금','토'].forEach(function(d){
+    var t=weeklyTasks[d];if(!t)return;
+    var isToday=d===todayDay;
+    html+='<div style="display:flex;gap:10px;padding:6px 4px;border-bottom:1px solid var(--border);align-items:center;'+(isToday?'background:#f0fdf4;border-radius:6px;font-weight:700':'')+'">'
+      +'<span style="font-size:12px;font-weight:700;min-width:24px;color:'+(isToday?'var(--mint)':'var(--txt2)')+'">'+d+'</span>'
+      +'<span style="font-size:12px;flex:1">'+t.icon+' '+t.task+'</span>'
+      +'<span style="font-size:10px;color:var(--txt3)">'+t.detail+'</span></div>';
+  });
+  html+='</div>';
+  // Monthly routine
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">📅 월간 루틴</div>';
+  monthlyTasks.forEach(function(t){
+    html+='<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);align-items:center">'
+      +'<span style="font-size:11px;font-weight:700;color:var(--blue);min-width:30px">'+t.day+'</span>'
+      +'<span style="font-size:12px;flex:1">'+t.icon+' '+t.task+'</span>'
+      +'<span style="font-size:10px;color:var(--txt3)">'+t.detail+'</span></div>';
+  });
+  html+='</div>';
+  // Strategy overview
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">🗺️ 채널 운영 전략 요약</div>';
+  strategyItems.forEach(function(s){
+    html+='<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:4px">'+s.title+'</div>';
+    s.items.forEach(function(item){
+      html+='<div style="font-size:11px;color:var(--txt2);padding:2px 0 2px 12px">• '+item+'</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div></div>';
+  el.innerHTML=html;
 }
 
 // ══ STAFF ══
