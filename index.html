@@ -243,7 +243,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </nav>
 
 <div id="content">
-<div class="view active" id="view-schedule"><div class="page-top" style="display:flex;align-items:center;justify-content:space-between"><h2 id="schedule-day-title">오늘 시간표</h2><div style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button></div></div><div class="cp" id="schedule-list"></div></div>
+<div class="view active" id="view-schedule"><div class="page-top" style="display:flex;align-items:center;justify-content:space-between"><h2 id="schedule-day-title">오늘 시간표</h2><div style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button class="btn btn-navy btn-xs" onclick="toggleWeeklyTimetable()">📋 주간 시간표</button></div></div><div id="weekly-timetable-area" style="display:none;margin-bottom:16px"></div><div class="cp" id="schedule-list"></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
   <div class="cp" style="max-width:560px"><div class="card" style="padding:16px">
     <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
@@ -855,6 +855,85 @@ function goto(view){
 var _scheduleDate=null; // null = today
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
 function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
+function toggleWeeklyTimetable(){
+  var area=$('weekly-timetable-area');if(!area)return;
+  if(area.style.display==='none'){area.style.display='block';renderWeeklyTimetable();}
+  else{area.style.display='none';}
+}
+function renderWeeklyTimetable(){
+  var area=$('weekly-timetable-area');if(!area)return;
+  var days=['월','화','수','목','금'];
+  // Collect all active students with their time slots
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  // Gather all unique time slots (normalized to 30-min blocks)
+  var timeSet={};
+  activeStudents.forEach(function(s){
+    if(!s.days||!s.days.length)return;
+    s.days.forEach(function(d){
+      if(!days.includes(d))return;
+      var pData=(s.periods||{})[d];
+      var t='';
+      if(pData&&typeof pData==='object')t=pData.time||'';
+      if(!t)return;
+      var mm=t.match(/(\d{1,2}):(\d{2})/);
+      if(mm){
+        var h=parseInt(mm[1]),min=parseInt(mm[2]);
+        var blkMin=min<30?0:30;
+        var blkKey=String(h).padStart(2,'0')+':'+String(blkMin).padStart(2,'0');
+        timeSet[blkKey]=true;
+      }
+    });
+  });
+  var timeSlots=Object.keys(timeSet).sort();
+  if(!timeSlots.length){area.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:var(--txt3)">시간 설정된 학생이 없습니다</div>';return;}
+  // Build grid data: timeSlot → day → [students]
+  var grid={};
+  timeSlots.forEach(function(ts){grid[ts]={};days.forEach(function(d){grid[ts][d]=[];});});
+  activeStudents.forEach(function(s){
+    if(!s.days||!s.days.length)return;
+    s.days.forEach(function(d){
+      if(!days.includes(d))return;
+      var pData=(s.periods||{})[d];
+      var t='';
+      if(pData&&typeof pData==='object')t=pData.time||'';
+      if(!t)return;
+      var mm=t.match(/(\d{1,2}):(\d{2})/);
+      if(mm){
+        var h=parseInt(mm[1]),min=parseInt(mm[2]);
+        var blkKey=String(h).padStart(2,'0')+':'+String(min<30?0:30).padStart(2,'0');
+        if(grid[blkKey]&&grid[blkKey][d])grid[blkKey][d].push(s);
+      }
+    });
+  });
+  // Render table
+  var html='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:14px;font-weight:800;color:var(--navy)">📋 주간 시간표</div><button class="btn btn-outline btn-xs" onclick="toggleWeeklyTimetable()">접기 ▲</button></div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<thead><tr><th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
+  days.forEach(function(d){html+='<th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:70px">'+d+'</th>';});
+  html+='</tr></thead><tbody>';
+  timeSlots.forEach(function(ts){
+    var h=parseInt(ts.split(':')[0]),m=parseInt(ts.split(':')[1]);
+    var endH=m===0?h:h+1;var endM=m===0?30:0;
+    var label=ts+'~'+String(endH).padStart(2,'0')+':'+String(endM).padStart(2,'0');
+    html+='<tr><td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'+label+'</td>';
+    days.forEach(function(d){
+      var sList=grid[ts][d]||[];
+      var cellContent=sList.map(function(s){
+        var lvl=s.level==='직접입력'?(s.customLevel||''):s.level||'';
+        var shortLvl=lvl.length>6?lvl.substring(0,6)+'..':lvl;
+        return '<div style="padding:2px 4px;margin:1px 0;background:var(--surface2);border-radius:4px;white-space:nowrap">'
+          +'<span style="font-weight:600">'+s.name+'</span>'
+          +(shortLvl?' <span style="font-size:9px;color:var(--txt3)">'+shortLvl+'</span>':'')
+          +'</div>';
+      }).join('');
+      html+='<td style="padding:3px;border:1px solid var(--border);vertical-align:top">'+cellContent+'</td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  area.innerHTML=html;
+}
 function renderSchedule(){
   var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
   var dow=targetDate.getDay();var dayName=DAY_MAP[dow];
