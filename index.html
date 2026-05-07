@@ -2276,7 +2276,7 @@ function calcMonthExpTotal(yr,mo){
   }
   // Auto 카드수수료
   if(!list.some(function(e2){return e2.category==='카드 수수료'&&e2.autoFromLedger;})){
-    var cRevs=revenues.filter(function(r2){if(r2.isManualMeta||r2.extraType)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===yr&&r2.revMonth===mo;return false;}).filter(function(r2){return r2.method==='카드'||r2.method==='결제 선생';});
+    var cRevs=revenues.filter(function(r2){if(r2.isManualMeta||r2.extraType)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===yr&&r2.revMonth===mo;return false;}).filter(function(r2){return r2.method==='카드'||r2.method==='결제 선생'||r2.method==='지역화폐';});
     var cf=Math.round(cRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0)*0.008);
     if(cf>0)list.push({category:'카드 수수료',amount:cf,autoFromLedger:true});
   }
@@ -2317,13 +2317,25 @@ function calcExpectedRevenue(yr,mo){
 function renderRevMonthly(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
   var totalRev=list.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
-  var cardRevAmt=list.filter(function(r){return r.method==='카드'||r.method==='결제 선생';}).reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
-  var cashRevAmt=list.filter(function(r){return r.method==='현금'||r.method==='계좌이체'||r.method==='지역화폐';}).reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
+  var cardRevAmt=list.filter(function(r){return r.method==='카드'||r.method==='결제 선생'||r.method==='지역화폐';}).reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
+  var cashRevAmt=list.filter(function(r){return r.method==='현금'||r.method==='계좌이체';}).reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
   var extraRevAmt=list.reduce(function(s,r){return s+(parseInt(r.extra1Amount)||0)+(parseInt(r.extra2Amount)||0);},0);
   var paidIds=new Set(list.filter(function(r){return(parseInt(r.amount)||0)>0;}).map(function(r){return r.studentId;}));
   // Only show 재원/신규 students for this month
   var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
-  $('rev-summary').innerHTML='<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--mint)">'+totalRev.toLocaleString()+'원</div><div class="rev-sum-lbl">총 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue)">'+cardRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">카드 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--navy)">'+cashRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">현금 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--gold)">'+extraRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">기타 매출</div></div><div style="margin-left:auto;display:flex;gap:6px;align-items:center"><button class="btn btn-outline btn-sm" onclick="openPrintRevModal('+yr+','+mo+')">🖨 인쇄</button></div>';
+  // Calculate unpaid total
+  var unpaidTotal=0;
+  activeStudents.forEach(function(s){
+    var paid=paidIds.has(s.id);
+    if(!paid){
+      var tuitionFee=parseInt(s.tuitionFee)||0;
+      var textbookFee=parseInt(s.textbookFee)||0;
+      var discountAmt=parseInt(s.discountAmount)||0;
+      var expected=tuitionFee+textbookFee-discountAmt;
+      if(expected>0)unpaidTotal+=expected;
+    }
+  });
+  $('rev-summary').innerHTML='<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--mint)">'+totalRev.toLocaleString()+'원</div><div class="rev-sum-lbl">총 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue)">'+cardRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">카드 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--navy)">'+cashRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">현금 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--gold)">'+extraRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">기타 매출</div></div><div style="margin-left:auto;display:flex;gap:6px;align-items:center">'+(unpaidTotal>0?'<span style="font-size:12px;font-weight:700;color:#dc2626;margin-right:4px">미납 '+unpaidTotal.toLocaleString()+'원</span>':'')+'<button class="btn btn-outline btn-sm" onclick="openPrintRevModal('+yr+','+mo+')">🖨 인쇄</button></div>';
   var tb=$('rev-monthly-tbody');if(!tb)return;
   var active=[...activeStudents].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
   if(!active.length){tb.innerHTML='<tr><td colspan="21" style="text-align:center;padding:20px;color:var(--txt3)">학생 없음</td></tr>';return;}
