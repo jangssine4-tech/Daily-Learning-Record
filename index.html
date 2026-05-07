@@ -2323,19 +2323,21 @@ function renderRevMonthly(yr,mo){
   var paidIds=new Set(list.filter(function(r){return(parseInt(r.amount)||0)>0;}).map(function(r){return r.studentId;}));
   // Only show 재원/신규 students for this month
   var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
-  // Calculate unpaid total
-  var unpaidTotal=0;
+  // Pre-calculate total expected for summary
+  var preExpectedTotal=0;
   activeStudents.forEach(function(s){
-    var paid=paidIds.has(s.id);
-    if(!paid){
-      var tuitionFee=parseInt(s.tuitionFee)||0;
-      var textbookFee=parseInt(s.textbookFee)||0;
-      var discountAmt=parseInt(s.discountAmount)||0;
-      var expected=tuitionFee+textbookFee-discountAmt;
-      if(expected>0)unpaidTotal+=expected;
-    }
+    var tuitionFee=parseInt(s.tuitionFee)||0;var textbookFee=parseInt(s.textbookFee)||0;var discountAmt=parseInt(s.discountAmount)||0;
+    var mh=getStudentMonthlyHours(s);
+    var pendingMk=makeups.filter(function(m){return m.studentId===s.id&&m.makeupStatus!=='done'&&m.absentDate&&m.absentDate.startsWith(yr+'-'+String(mo).padStart(2,'0'));}).length;
+    var perHourFee=mh>0?tuitionFee/mh:0;var absDed=Math.round(pendingMk*perHourFee);
+    var lastRev2=revenues.find(function(r2){return r2.studentId===s.id&&r2.revYear===yr&&r2.revMonth===mo&&!r2.isManualMeta&&!r2.extraType;});
+    var subMat2=lastRev2?.subMaterial||'';var subMatFee2=getSubMaterialFee(subMat2);
+    var ex1=lastRev2?parseInt(lastRev2.extra1Amount)||0:0;var ex2=lastRev2?parseInt(lastRev2.extra2Amount)||0:0;
+    var exp=tuitionFee+textbookFee+subMatFee2-absDed-discountAmt+ex1+ex2;
+    if(exp>0)preExpectedTotal+=exp;
   });
-  $('rev-summary').innerHTML='<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--mint)">'+totalRev.toLocaleString()+'원</div><div class="rev-sum-lbl">총 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue)">'+cardRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">카드 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--navy)">'+cashRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">현금 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--gold)">'+extraRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">기타 매출</div></div><div style="margin-left:auto;display:flex;gap:6px;align-items:center">'+(unpaidTotal>0?'<span style="font-size:12px;font-weight:700;color:#dc2626;margin-right:4px">미납 '+unpaidTotal.toLocaleString()+'원</span>':'')+'<button class="btn btn-outline btn-sm" onclick="openPrintRevModal('+yr+','+mo+')">🖨 인쇄</button></div>';
+  var unpaidTotal=preExpectedTotal-totalRev;if(unpaidTotal<0)unpaidTotal=0;
+  $('rev-summary').innerHTML='<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--navy)">'+preExpectedTotal.toLocaleString()+'원</div><div class="rev-sum-lbl">예상 총 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--mint)">'+totalRev.toLocaleString()+'원</div><div class="rev-sum-lbl">총 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue)">'+cardRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">카드 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--navy)">'+cashRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">현금 매출</div></div><div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--gold)">'+extraRevAmt.toLocaleString()+'원</div><div class="rev-sum-lbl">기타 매출</div></div>'+(unpaidTotal>0?'<div class="rev-sum-card" style="border-color:#fca5a5"><div class="rev-sum-val" style="color:#dc2626">'+unpaidTotal.toLocaleString()+'원</div><div class="rev-sum-lbl">미납</div></div>':'')+'<div style="margin-left:auto;display:flex;align-items:center"><button class="btn btn-outline btn-sm" onclick="openPrintRevModal('+yr+','+mo+')">🖨 인쇄</button></div>';
   var tb=$('rev-monthly-tbody');if(!tb)return;
   var active=[...activeStudents].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
   if(!active.length){tb.innerHTML='<tr><td colspan="21" style="text-align:center;padding:20px;color:var(--txt3)">학생 없음</td></tr>';return;}
