@@ -1707,7 +1707,7 @@ function _doSaveReportAsImage(r){
 function exportHistoryCSV(){var rows=reports.map(function(r){return[r.date,(r.teacherTablet||r.teacher||'')+(r.teacherBook?'/'+r.teacherBook:''),r.studentName,r.level,r.progress,r.absent?'O':'',r.reviewTest,r.attitude,r.dailyQuiz,r.homework,r.comment,r.memo].map(function(v){return'"'+(v||'').replace(/"/g,'""')+'"';}).join(',');});var csv='\uFEFF날짜,교사,학생,단계,진도,결석,복습테스트,태도,퀴즈,숙제,코멘트,전달사항\n'+rows.join('\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='학습일지_'+todayISO()+'.csv';a.click();}
 
 // ══ STUDENTS ══
-function getStudentWeeklyHours(s){if(s.weeklyHours)return s.weeklyHours;if(!s.days||!s.days.length)return 0;var total=0;s.days.forEach(function(d){var p=(s.periods||{})[d];total+=(p&&typeof p==='object'&&p.hours)?parseFloat(p.hours):1;});return total;}
+function getStudentWeeklyHours(s){if(s.weeklyHours)return s.weeklyHours;if(!s.days||!s.days.length)return 0;var total=0;s.days.forEach(function(d){var p=(s.periods||{})[d];total+=(p&&typeof p==='object'&&p.hours!==undefined&&p.hours!==null&&p.hours!=='')?parseFloat(p.hours):1;});return total;}
 function getStudentMonthlyHours(s){return getStudentWeeklyHours(s)*4;}
 function renderStudents(){
   var filter=$('s-filter-status').value;var cls2=$('s-filter-cls').value;var search=($('s-search').value||'').trim().toLowerCase();
@@ -1744,7 +1744,7 @@ function renderStudents(){
     var clsName=(classes.find(function(c){return c.id===s.classId;})||{}).name||'-';
     var status=getDisplayStatus(s);
     var mh=getStudentMonthlyHours(s);
-    var dayInfo=s.days&&s.days.length?s.days.map(function(d){var p=(s.periods||{})[d];var h=(p&&typeof p==='object'&&p.hours)?p.hours:1;return d+'('+h+')';}).join(' '):'';
+    var dayInfo=s.days&&s.days.length?s.days.map(function(d){var p=(s.periods||{})[d];var h=(p&&typeof p==='object'&&p.hours!==undefined&&p.hours!==null&&p.hours!=='')?p.hours:1;return d+'('+h+')';}).join(' '):'';
     return'<tr onclick="openStudentModal(\''+s.id+'\')" style="cursor:pointer">'
       +'<td style="text-align:center"><span class="badge '+(statusColor[status]||'bg-gray')+'">'+status+'</span></td>'
       +'<td style="text-align:center;font-size:12px;color:var(--txt2)">'+(s.studentNumber||'-')+'</td>'
@@ -1807,7 +1807,7 @@ function openStudentModal(id){
   var lvSel=$('s-level');if(lvSel){lvSel.value=s?.level||'';var cLv=$('s-custom-level');if(cLv){cLv.value=s?.customLevel||'';cLv.style.display=s?.level==='직접입력'?'block':'none';}}
   document.querySelectorAll('#s-days .day-pill').forEach(function(el){el.classList.toggle('on',(s?.days||[]).includes(el.dataset.day));});
   updateWeeklyHours();renderPeriodInputs();
-  setTimeout(function(){(s?.days||[]).forEach(function(day){var pData=(s.periods||{})[day];if(pData&&typeof pData==='object'){var pNum=$('per-num-'+day);var pTime=$('per-time-'+day);var pHours=$('per-hours-'+day);if(pNum)pNum.value=pData.period||1;if(pTime)pTime.value=pData.time||'';if(pHours)pHours.value=pData.hours||1;}});updateWeeklyHours();},50);
+  setTimeout(function(){(s?.days||[]).forEach(function(day){var pData=(s.periods||{})[day];if(pData&&typeof pData==='object'){var pNum=$('per-num-'+day);var pTime=$('per-time-'+day);var pHours=$('per-hours-'+day);if(pNum)pNum.value=pData.period||1;if(pTime)pTime.value=pData.time||'';if(pHours)pHours.value=(pData.hours!==undefined&&pData.hours!==null&&pData.hours!=='')?pData.hours:'1';}});updateWeeklyHours();},50);
   var sibArea=$('siblings-area');if(sibArea)sibArea.innerHTML='';siblingCount=0;
   (s?.siblings||[]).forEach(function(sib){var i=siblingCount++;var d2=document.createElement('div');d2.id='sib-'+i;d2.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px';d2.innerHTML='<input class="fi" value="'+sib.name+'" id="sib-name-'+i+'" style="flex:2;font-size:11px;padding:5px 8px"><select class="fi" id="sib-grade-'+i+'" style="flex:1;font-size:11px;padding:5px 8px"><option value="">학년</option>'+GRADE_ORDER.map(function(g){return'<option value="'+g+'"'+(g===sib.grade?' selected':'')+'>'+g+'</option>';}).join('')+'</select><label style="font-size:11px;white-space:nowrap"><input type="checkbox" id="sib-enrolled-'+i+'"'+(sib.enrolled===false?'':' checked')+'> 재원중</label><button class="btn btn-red btn-xs" onclick="document.getElementById(\'sib-'+i+'\').remove()">✕</button>';sibArea.appendChild(d2);});
   $('modal-student').style.display='flex';
@@ -1815,7 +1815,7 @@ function openStudentModal(id){
 async function saveStudent(){
   var name=$('s-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}loading(true);
   var selectedDays=[...document.querySelectorAll('#s-days .day-pill.on')].map(function(el){return el.dataset.day;});
-  var periods={};var weeklyHours=0;selectedDays.forEach(function(day){var pNum=$('per-num-'+day);var pTime=$('per-time-'+day);var pHours=$('per-hours-'+day);var h=parseFloat(pHours?.value)||1;periods[day]={period:parseInt(pNum?.value)||1,time:pTime?.value||'',hours:h};weeklyHours+=h;});
+  var periods={};var weeklyHours=0;selectedDays.forEach(function(day){var pNum=$('per-num-'+day);var pTime=$('per-time-'+day);var pHours=$('per-hours-'+day);var h=pHours?.value!==undefined&&pHours?.value!==''?parseFloat(pHours.value):1;periods[day]={period:parseInt(pNum?.value)||1,time:pTime?.value||'',hours:h};weeklyHours+=h;});
   var siblings=[];document.querySelectorAll('[id^="sib-name-"]').forEach(function(el){var i2=el.id.replace('sib-name-','');var sibName=el.value.trim();if(!sibName)return;siblings.push({name:sibName,grade:$('sib-grade-'+i2)?.value||'',enrolled:$('sib-enrolled-'+i2)?.checked!==false});});
   var data={name:name,studentNumber:parseInt($('s-number').value)||0,level:$('s-level').value,customLevel:$('s-custom-level').value.trim(),grade:$('s-grade').value,enrollYear:parseInt($('s-enroll-year').value)||new Date().getFullYear(),classId:$('s-class').value,days:selectedDays,periods:periods,weeklyHours:weeklyHours,phoneMom:$('s-phone-mom').value.trim(),school:$('s-school').value.trim(),enrollDate:$('s-enroll-date').value,siblings:siblings,memo:$('s-memo').value.trim(),msgConsent:$('s-msg-consent').value||'동의',status:$('s-status').value||'재원',discount:$('s-discount').value||'',quitReason:$('s-quit-reason').value||'',quitDate:$('s-quit-date').value||'',updatedAt:new Date().toISOString()};
   var id=$('s-id').value;
