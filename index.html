@@ -2280,13 +2280,17 @@ function calcMonthExpTotal(yr,mo){
     var cf=Math.round(cRevs.reduce(function(s2,r2){return s2+(parseInt(r2.amount)||0);},0)*0.008);
     if(cf>0)list.push({category:'카드 수수료',amount:cf,autoFromLedger:true});
   }
-  // Auto 고정비 전월복사
-  fixedC.forEach(function(fc){
-    if(!list.some(function(e2){return e2.category===fc&&!e2.autoFromPrevMonth;})){
-      var prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pyr&&e2.revMonth===pmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pyr&&d2.getMonth()===pmo-1;}).filter(function(e2){return e2.category===fc;});
-      prev.forEach(function(pe){list.push({category:fc,amount:parseInt(pe.amount)||0,autoFromPrevMonth:true,autoFromLedger:true});});
-    }
-  });
+  // Auto 고정비 전월 복사 (2026년 5월 이후부터)
+  var autoFixedEnabled2=(yr>2026||(yr===2026&&mo>5));
+  if(autoFixedEnabled2){
+    fixedC.forEach(function(fc){
+      if(!list.some(function(e2){return e2.category===fc&&!e2.autoFromPrevMonth;})){
+        var prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pyr&&e2.revMonth===pmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pyr&&d2.getMonth()===pmo-1;}).filter(function(e2){return e2.category===fc&&!e2.autoFromPrevMonth;});
+        if(!prev.length){prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pyr&&e2.revMonth===pmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pyr&&d2.getMonth()===pmo-1;}).filter(function(e2){return e2.category===fc;});}
+        prev.forEach(function(pe){list.push({category:fc,amount:parseInt(pe.amount)||0,autoFromPrevMonth:true,autoFromLedger:true});});
+      }
+    });
+  }
   // Sum ONLY allCats categories
   var ct={};allCats.forEach(function(cat){ct[cat]=list.filter(function(e2){return e2.category===cat;}).reduce(function(s,e2){return s+(parseInt(e2.amount)||0);},0);});
   return Object.values(ct).reduce(function(s,v){return s+v;},0);
@@ -3719,21 +3723,31 @@ function renderRevExpense(yr,mo){
     var autoCardFee=Math.round(cardSum*0.008);
     if(autoCardFee>0) list.push({id:'auto_cardfee',category:'카드 수수료',name:'카드 수수료 0.8% (자동 계산)',amount:autoCardFee,date:'',autoFromLedger:true,method:'-'});
   }
-  // ── Auto: 고정비 전월 복사 ──
+  // ── Auto: 고정비 전월 복사 (2026년 5월 이후부터) ──
   var fixedCats=catGroups['학원 운영비']['고정비'].concat(catGroups['개인 지출']['고정비']);
-  var prevMoF=mo-1,prevYrF=yr;if(prevMoF<1){prevMoF=12;prevYrF--;}
-  fixedCats.forEach(function(fcat){
-    var hasManual=list.some(function(e2){return e2.category===fcat&&!e2.autoFromPrevMonth;});
-    if(!hasManual){
-      var prevFixed=expenses.filter(function(e2){
-        if(e2.revYear&&e2.revMonth)return e2.revYear===prevYrF&&e2.revMonth===prevMoF;
-        var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===prevYrF&&d2.getMonth()===prevMoF-1;
-      }).filter(function(e2){return e2.category===fcat;});
-      prevFixed.forEach(function(pe){
-        list.push({id:'prev_'+pe.id,category:fcat,name:(pe.name||fcat)+' [전월]',amount:parseInt(pe.amount)||0,date:'',autoFromPrevMonth:true,autoFromLedger:true,method:pe.method||'-'});
-      });
-    }
-  });
+  var autoFixedEnabled=(yr>2026||(yr===2026&&mo>5));
+  if(autoFixedEnabled){
+    var prevMoF=mo-1,prevYrF=yr;if(prevMoF<1){prevMoF=12;prevYrF--;}
+    fixedCats.forEach(function(fcat){
+      var hasManual=list.some(function(e2){return e2.category===fcat&&!e2.autoFromPrevMonth;});
+      if(!hasManual){
+        var srcFixed=expenses.filter(function(e2){
+          if(e2.revYear&&e2.revMonth)return e2.revYear===prevYrF&&e2.revMonth===prevMoF;
+          var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===prevYrF&&d2.getMonth()===prevMoF-1;
+        }).filter(function(e2){return e2.category===fcat&&!e2.autoFromPrevMonth;});
+        if(!srcFixed.length){
+          // If prev month also has no manual, look for its auto entries
+          srcFixed=expenses.filter(function(e2){
+            if(e2.revYear&&e2.revMonth)return e2.revYear===prevYrF&&e2.revMonth===prevMoF;
+            var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===prevYrF&&d2.getMonth()===prevMoF-1;
+          }).filter(function(e2){return e2.category===fcat;});
+        }
+        srcFixed.forEach(function(pe){
+          list.push({id:'prev_'+pe.id,category:fcat,name:(pe.name||fcat).replace(/ \[전월\]/g,'').replace(/ \[5월 기준\]/g,'')+' [전월]',amount:parseInt(pe.amount)||0,date:'',autoFromPrevMonth:true,autoFromLedger:true,method:pe.method||'-'});
+        });
+      }
+    });
+  }
   // ── catTotals ──
   var catTotals={};allCats.forEach(function(cat){catTotals[cat]=list.filter(function(e2){return e2.category===cat;}).reduce(function(s,e2){return s+(parseInt(e2.amount)||0);},0);});
   var totalExp=Object.values(catTotals).reduce(function(s,v){return s+v;},0);
