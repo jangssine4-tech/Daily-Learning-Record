@@ -2285,8 +2285,13 @@ function calcMonthExpTotal(yr,mo){
   if(autoFixedEnabled2){
     fixedC.forEach(function(fc){
       if(!list.some(function(e2){return e2.category===fc&&!e2.autoFromPrevMonth;})){
-        var prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pyr&&e2.revMonth===pmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pyr&&d2.getMonth()===pmo-1;}).filter(function(e2){return e2.category===fc&&!e2.autoFromPrevMonth;});
-        if(!prev.length){prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===pyr&&e2.revMonth===pmo;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===pyr&&d2.getMonth()===pmo-1;}).filter(function(e2){return e2.category===fc;});}
+        var sY=yr,sM=mo,prev=[],maxLook=24;
+        while(maxLook-->0){
+          sM--;if(sM<1){sM=12;sY--;}
+          if(sY<2026||(sY===2026&&sM<5))break;
+          prev=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===sY&&e2.revMonth===sM;var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===sY&&d2.getMonth()===sM-1;}).filter(function(e2){return e2.category===fc&&!e2.autoFromPrevMonth;});
+          if(prev.length)break;
+        }
         prev.forEach(function(pe){list.push({category:fc,amount:parseInt(pe.amount)||0,autoFromPrevMonth:true,autoFromLedger:true});});
       }
     });
@@ -3727,23 +3732,22 @@ function renderRevExpense(yr,mo){
   var fixedCats=catGroups['학원 운영비']['고정비'].concat(catGroups['개인 지출']['고정비']);
   var autoFixedEnabled=(yr>2026||(yr===2026&&mo>5));
   if(autoFixedEnabled){
-    var prevMoF=mo-1,prevYrF=yr;if(prevMoF<1){prevMoF=12;prevYrF--;}
     fixedCats.forEach(function(fcat){
       var hasManual=list.some(function(e2){return e2.category===fcat&&!e2.autoFromPrevMonth;});
       if(!hasManual){
-        var srcFixed=expenses.filter(function(e2){
-          if(e2.revYear&&e2.revMonth)return e2.revYear===prevYrF&&e2.revMonth===prevMoF;
-          var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===prevYrF&&d2.getMonth()===prevMoF-1;
-        }).filter(function(e2){return e2.category===fcat&&!e2.autoFromPrevMonth;});
-        if(!srcFixed.length){
-          // If prev month also has no manual, look for its auto entries
+        // Walk back month by month to find actual (manual) entries
+        var sY=yr,sM=mo,srcFixed=[],maxLook=24;
+        while(maxLook-->0){
+          sM--;if(sM<1){sM=12;sY--;}
+          if(sY<2026||(sY===2026&&sM<5))break;
           srcFixed=expenses.filter(function(e2){
-            if(e2.revYear&&e2.revMonth)return e2.revYear===prevYrF&&e2.revMonth===prevMoF;
-            var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===prevYrF&&d2.getMonth()===prevMoF-1;
-          }).filter(function(e2){return e2.category===fcat;});
+            if(e2.revYear&&e2.revMonth)return e2.revYear===sY&&e2.revMonth===sM;
+            var d2=new Date(e2.date||e2.createdAt);return d2.getFullYear()===sY&&d2.getMonth()===sM-1;
+          }).filter(function(e2){return e2.category===fcat&&!e2.autoFromPrevMonth;});
+          if(srcFixed.length)break;
         }
         srcFixed.forEach(function(pe){
-          list.push({id:'prev_'+pe.id,category:fcat,name:(pe.name||fcat).replace(/ \[전월\]/g,'').replace(/ \[5월 기준\]/g,'')+' [전월]',amount:parseInt(pe.amount)||0,date:'',autoFromPrevMonth:true,autoFromLedger:true,method:pe.method||'-'});
+          list.push({id:'prev_'+pe.id+'_'+yr+'_'+mo,category:fcat,name:(pe.name||fcat).replace(/ \[전월\]/g,'')+' [전월]',amount:parseInt(pe.amount)||0,date:'',autoFromPrevMonth:true,autoFromLedger:true,method:pe.method||'-'});
         });
       }
     });
