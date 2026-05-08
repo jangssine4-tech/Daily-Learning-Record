@@ -463,6 +463,20 @@ function loading(on){$('loading').style.display=on?'flex':'none';}
 function closeM(id){$('modal-'+id).style.display='none';}
 
 function getStudentLevel(s){return s?(s.customLevel||s.level||''):'';}
+function getStudentLevelAtMonth(s,yr,mo){
+  if(!s)return '';
+  var history=s.levelHistory||[];
+  if(!history.length)return getStudentLevel(s);
+  // Find the level that was active during yr/mo (last entry before or during that month)
+  var monthEnd=yr+'-'+String(mo).padStart(2,'0')+'-31';
+  var matched=null;
+  history.sort(function(a,b){return a.date>b.date?1:-1;});
+  for(var i=0;i<history.length;i++){
+    if(history[i].date<=monthEnd)matched=history[i];
+    else break;
+  }
+  return matched?(matched.customLevel||matched.level||''):getStudentLevel(s);
+}
 function isHoliday(yr,mo,d){var h={'0101':'신정','0301':'삼일절','0505':'어린이날','0606':'현충일','0815':'광복절','1003':'개천절','1009':'한글날','1225':'성탄절'};return h[String(mo+1).padStart(2,'0')+String(d).padStart(2,'0')]||null;}
 
 // Firebase init
@@ -1466,12 +1480,17 @@ async function saveReport(){
   var newLevel=$('r-level').value;
   if(newLevel&&s&&getStudentLevel(s)!==newLevel){
     var lvUpdate=s.level==='직접입력'?{customLevel:newLevel}:{level:newLevel,customLevel:''};
+    // Record level history
+    var lvHistory=s.levelHistory||[];
+    if(!lvHistory.length)lvHistory.push({level:s.level||'',customLevel:s.customLevel||'',date:s.enrollDate||s.createdAt?.split('T')[0]||todayISO()});
+    lvHistory.push({level:lvUpdate.level||'직접입력',customLevel:lvUpdate.customLevel||'',date:todayISO()});
+    lvUpdate.levelHistory=lvHistory;
     // Also auto-update module (classId) to match new level
     var newEvalMod=getEvalModuleForLevel(newLevel);
     if(newEvalMod){var matchCls=classes.find(function(c){return c.evalModule===newEvalMod;});if(matchCls&&matchCls.id!==s.classId)lvUpdate.classId=matchCls.id;}
     await db.collection('students').doc(sId).update(lvUpdate);
     var si=students.findIndex(function(x){return x.id===sId;});
-    if(si>=0){if(lvUpdate.customLevel!==undefined)students[si].customLevel=lvUpdate.customLevel;if(lvUpdate.level)students[si].level=lvUpdate.level;if(lvUpdate.classId)students[si].classId=lvUpdate.classId;}
+    if(si>=0){if(lvUpdate.customLevel!==undefined)students[si].customLevel=lvUpdate.customLevel;if(lvUpdate.level)students[si].level=lvUpdate.level;if(lvUpdate.classId)students[si].classId=lvUpdate.classId;students[si].levelHistory=lvHistory;}
   }
   window._evalState={};_lastLoadedReportTs=data.updatedAt;
   // Clear temp data after successful DB save
@@ -1819,6 +1838,19 @@ async function saveStudent(){
   var siblings=[];document.querySelectorAll('[id^="sib-name-"]').forEach(function(el){var i2=el.id.replace('sib-name-','');var sibName=el.value.trim();if(!sibName)return;siblings.push({name:sibName,grade:$('sib-grade-'+i2)?.value||'',enrolled:$('sib-enrolled-'+i2)?.checked!==false});});
   var data={name:name,studentNumber:parseInt($('s-number').value)||0,level:$('s-level').value,customLevel:$('s-custom-level').value.trim(),grade:$('s-grade').value,enrollYear:parseInt($('s-enroll-year').value)||new Date().getFullYear(),classId:$('s-class').value,days:selectedDays,periods:periods,weeklyHours:weeklyHours,phoneMom:$('s-phone-mom').value.trim(),school:$('s-school').value.trim(),enrollDate:$('s-enroll-date').value,siblings:siblings,memo:$('s-memo').value.trim(),msgConsent:$('s-msg-consent').value||'동의',status:$('s-status').value||'재원',discount:$('s-discount').value||'',quitReason:$('s-quit-reason').value||'',quitDate:$('s-quit-date').value||'',updatedAt:new Date().toISOString()};
   var id=$('s-id').value;
+  // Record level history if level changed
+  if(id){
+    var oldS=students.find(function(x){return x.id===id;});
+    var oldLevel=oldS?getStudentLevel(oldS):'';
+    var newLevel=data.customLevel||data.level||'';
+    if(oldLevel&&newLevel&&oldLevel!==newLevel){
+      var history=oldS?.levelHistory||[];
+      // Add old level if history is empty (first change)
+      if(!history.length&&oldLevel)history.push({level:oldS.level||'',customLevel:oldS.customLevel||'',date:oldS.enrollDate||oldS.createdAt?.split('T')[0]||todayISO()});
+      history.push({level:data.level,customLevel:data.customLevel,date:todayISO()});
+      data.levelHistory=history;
+    }
+  }
   if(id)await db.collection('students').doc(id).update(data);
   else await db.collection('students').add({...data,createdAt:new Date().toISOString()});
   await loadStudents();renderStudents();renderSchedule();_fullyPopulated=false;
@@ -2307,7 +2339,7 @@ function calcExpectedRevenue(yr,mo){
   activeStudents.forEach(function(s){
     var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
-    var rawLevel=getStudentLevel(s);
+    var rawLevel=getStudentLevelAtMonth(s,yr,mo);
     var tuitionItem=findRefItem(rawLevel,'tuition');var textbookItem=findRefItem(rawLevel,'textbook');
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
     totalTextbook+=textbookFee;
@@ -2335,7 +2367,7 @@ function renderRevMonthly(yr,mo){
   // Pre-calculate total expected for summary (same logic as table rows)
   var preExpectedTotal=0;
   activeStudents.forEach(function(s){
-    var rawLevel=getStudentLevel(s);
+    var rawLevel=getStudentLevelAtMonth(s,yr,mo);
     var tuitionItem=findRefItem(rawLevel,'tuition');
     var textbookItem=findRefItem(rawLevel,'textbook');
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
@@ -2368,7 +2400,7 @@ function renderRevMonthly(yr,mo){
     var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
     var paidAmt=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);var paid=paidAmt>0;
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
-    var rawLevel=getStudentLevel(s);
+    var rawLevel=getStudentLevelAtMonth(s,yr,mo);
     var tuitionItem=findRefItem(rawLevel,'tuition');
     var textbookItem=findRefItem(rawLevel,'textbook');
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
