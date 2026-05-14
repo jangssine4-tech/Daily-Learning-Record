@@ -569,7 +569,7 @@ async function bootApp(){
     toast('👋 환영합니다, '+currentUser.name+'님!');
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -598,7 +598,7 @@ async function bootApp(){
       applyMenuPerms();
       // Stage 2: Non-essential data in background
       setTimeout(async function(){
-        try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules()]);}catch(e){}
+        try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes()]);}catch(e){}
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return {id:d.id,...d.data()};});}catch(e){}
         saveCache();applyMenuPerms();
         startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();
@@ -741,6 +741,14 @@ function startRealtimeListeners(){
       applyMenuPerms();
     },function(err){});
     _rtListeners.push(unsub8);
+  }catch(e){}
+  // TeacherNotes listener - real-time 전달 사항
+  try{
+    var unsub9=db.collection('teacherNotes').where('confirmed','==',false).onSnapshot(function(snap){
+      window._teacherNotes=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      renderTeacherNotes();
+    },function(err){});
+    _rtListeners.push(unsub9);
   }catch(e){}
 }
 // Periodic full sync every 60 seconds
@@ -1032,6 +1040,23 @@ function renderSchedule(){
     +'</div>';
   // Students who need report cards & awards (prev progress was Level Test or 전체 Review)
   var allActive=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  // ── 📌 전달 사항 (교사 간) ──
+  html+='<div style="background:var(--surface);border:2px solid var(--blue);border-radius:10px;padding:12px 14px;margin-bottom:12px">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📌 전달 사항</div>'
+    +'<div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'
+    +'<select id="tn-to" class="fi" style="width:auto;font-size:11px;padding:4px 8px"><option value="전체">→ 전체</option></select>'
+    +'<input id="tn-input" class="fi" style="flex:1;font-size:12px;padding:6px 8px;min-width:120px" placeholder="전달할 내용을 입력하세요">'
+    +'<button class="btn btn-navy btn-xs" onclick="addTeacherNote()">등록</button></div>'
+    +'<div id="tn-list"></div></div>';
+  // Populate teacher note recipient dropdown and render notes after DOM insert
+  setTimeout(function(){
+    var tnTo=$('tn-to');if(tnTo){
+      var activeU=users.filter(function(u){return['teacher','admin'].includes(u.role)&&!u.adminDeleted;});
+      activeU.forEach(function(u){var nm=u.engName||u.name;if(nm!==(currentUser?.engName||currentUser?.name))tnTo.innerHTML+='<option value="'+nm+'">→ '+nm+'</option>';});
+    }
+    renderTeacherNotes();
+  },50);
+  // ── 🏆 성적표 & 상장 ──
   var awardStudents=[];
   var _todayStr2=todayISO();
   allActive.forEach(function(s){
@@ -1217,6 +1242,47 @@ function showAbsentNotifyModal(s){
 function copyAbsentMsg(){
   var ta=document.getElementById('absent-notify-msg');
   if(ta){navigator.clipboard.writeText(ta.value);toast('📋 메시지가 복사되었습니다. 카카오톡에 붙여넣기 하세요!');}
+}
+
+// ══ TEACHER NOTES (전달 사항) ══
+window._teacherNotes=[];
+async function loadTeacherNotes(){
+  try{var snap=await db.collection('teacherNotes').where('confirmed','==',false).get();
+    window._teacherNotes=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+  }catch(e){window._teacherNotes=[];}
+}
+async function addTeacherNote(){
+  var content=$('tn-input')?.value.trim();if(!content){toast('⚠️ 내용을 입력하세요');return;}
+  var to=$('tn-to')?.value||'전체';
+  var myName=currentUser?.engName||currentUser?.name||'관리자';
+  var now=new Date();
+  var data={from:myName,to:to,content:content,confirmed:false,confirmedBy:'',createdAt:now.toISOString(),dateStr:todayISO(),timeStr:String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')};
+  var ref=await db.collection('teacherNotes').add(data);
+  window._teacherNotes.push({id:ref.id,...data});
+  $('tn-input').value='';
+  renderTeacherNotes();toast('📌 전달 사항 등록됨');
+}
+function renderTeacherNotes(){
+  var el=$('tn-list');if(!el)return;
+  var list=window._teacherNotes.filter(function(n){return!n.confirmed;}).sort(function(a,b){return b.createdAt>a.createdAt?1:-1;});
+  if(!list.length){el.innerHTML='<div style="font-size:11px;color:var(--txt3);text-align:center;padding:6px 0">전달 사항 없음</div>';return;}
+  var myName=currentUser?.engName||currentUser?.name||'관리자';
+  el.innerHTML=list.map(function(n){
+    var isMyNote=(n.to===myName||n.to==='전체');
+    var toLabel=n.to==='전체'?'<span style="color:var(--blue)">전체</span>':'<span style="color:var(--mint)">'+n.to+'</span>';
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px">'
+      +'<div style="flex:1">'
+      +'<div style="font-size:10px;color:var(--txt3)">'+n.from+' → '+(n.to==='전체'?'<span style="color:var(--blue)">전체</span>':'<span style="color:var(--mint)">'+n.to+'</span>')+' · '+n.dateStr+' '+n.timeStr+'</div>'
+      +'<div style="font-size:12px;color:var(--txt);margin-top:2px">'+n.content+'</div></div>'
+      +(isMyNote?'<button class="btn btn-green btn-xs" style="white-space:nowrap" onclick="confirmTeacherNote(\''+n.id+'\')">✓ 확인</button>':'')
+      +'</div>';
+  }).join('');
+}
+async function confirmTeacherNote(id){
+  var myName=currentUser?.engName||currentUser?.name||'관리자';
+  await db.collection('teacherNotes').doc(id).update({confirmed:true,confirmedBy:myName,confirmedAt:new Date().toISOString()});
+  window._teacherNotes=window._teacherNotes.filter(function(n){return n.id!==id;});
+  renderTeacherNotes();toast('✓ 확인 완료');
 }
 
 function _cleanComment(c){return (c||'').replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'');}
@@ -1587,10 +1653,19 @@ function renderCommentView(){
   if(!list.length){$('history-scroll-wrap').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">'+(s?.name||'')+'의 코멘트가 없습니다</div></div>';return;}
   var html='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">💬 '+(s?.name||'')+' 코멘트 모아보기 <span style="font-size:13px;font-weight:500;color:var(--txt3)">('+list.length+'건)</span></div>';
   html+=list.map(function(r){
+    var _hwS2=splitHw(r.homework||'');
+    var hwText='';if(_hwS2.video||_hwS2.book){var hp=[];if(_hwS2.video)hp.push('영상 '+_hwS2.video);if(_hwS2.book)hp.push('교재 '+_hwS2.book);hwText=hp.join(' / ');}else{hwText=r.homework||'-';}
+    var dictText='';if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictText=pct+'점('+dm[1]+'/'+dm[2]+')';}else dictText=r.dictation;}
     return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-      +'<div style="display:flex;gap:6px;align-items:center"><span class="badge bg-navy">'+r.date+'</span><span style="font-size:11px;color:var(--txt3)">'+(r.teacherTablet||r.teacher||'-')+'</span></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+      +'<div style="display:flex;gap:6px;align-items:center"><span class="badge bg-navy">'+r.date+'</span><span style="font-size:11px;color:var(--txt3)">'+(r.teacherTablet||r.teacher||'-')+(r.teacherBook?' / '+r.teacherBook:'')+'</span></div>'
       +'<span style="font-size:11px;color:var(--blue)">'+(r.level||'')+' · '+(r.progress||'')+'</span></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--txt2);margin-bottom:6px;padding:3px 0;border-bottom:1px solid var(--border)">'
+      +(dictText?'<span>📝 '+dictText+'</span>':'')
+      +(r.reviewTest?'<span>복습: '+r.reviewTest+'</span>':'')
+      +'<span>태도: '+(r.attitude||'-')+'</span>'
+      +'<span>숙제: '+hwText+'</span>'
+      +'</div>'
       +'<div style="font-size:13px;color:var(--txt);line-height:1.6">'+r.comment+'</div>'
       +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📢 '+r.memo+'</div>':'')
       +'</div>';
@@ -1603,7 +1678,9 @@ function printCommentView(){
   var s=students.find(function(x){return x.id===sId;});
   var list=reports.filter(function(r){return r.studentId===sId&&r.comment;}).sort(function(a,b){return b.date>a.date?1:-1;});
   var rows=list.map(function(r){
-    return '<tr><td style="text-align:center;white-space:nowrap">'+r.date+'</td><td style="text-align:center">'+(r.teacherTablet||r.teacher||'-')+(r.teacherBook?' / '+r.teacherBook:'')+'</td><td style="text-align:center">'+(r.level||'-')+'</td><td style="text-align:center">'+(r.progress||'-')+'</td><td>'+r.comment+'</td><td>'+(r.memo||'-')+'</td></tr>';
+    var _hwP=splitHw(r.homework||'');var hwT='';if(_hwP.video||_hwP.book){var hp2=[];if(_hwP.video)hp2.push('영상 '+_hwP.video);if(_hwP.book)hp2.push('교재 '+_hwP.book);hwT=hp2.join('/');}else hwT=r.homework||'-';
+    var dictT='';if(r.dictation){var dm2=r.dictation.match(/^(\d+)\/(\d+)/);if(dm2){var p2=parseInt(dm2[2])>0?Math.round(parseInt(dm2[1])/parseInt(dm2[2])*100):0;dictT=p2+'점('+dm2[1]+'/'+dm2[2]+')';}else dictT=r.dictation;}
+    return '<tr><td style="text-align:center;white-space:nowrap">'+r.date+'</td><td style="text-align:center">'+(r.teacherTablet||r.teacher||'-')+(r.teacherBook?' / '+r.teacherBook:'')+'</td><td style="text-align:center">'+(r.level||'-')+'</td><td style="text-align:center">'+(r.progress||'-')+'</td><td style="text-align:center">'+(dictT||'-')+'</td><td style="text-align:center">'+(r.attitude||'-')+'</td><td style="text-align:center">'+hwT+'</td><td>'+r.comment+'</td><td>'+(r.memo||'-')+'</td></tr>';
   }).join('');
   var existing=document.getElementById('print-area');
   if(existing)existing.remove();
@@ -1612,7 +1689,7 @@ function printCommentView(){
   printDiv.style.display='none';
   printDiv.innerHTML='<h2>💬 '+(s?.name||'')+' 코멘트 모아보기 ('+list.length+'건)</h2>'
     +'<div class="print-date">출력일: '+todayISO()+'</div>'
-    +'<table><thead><tr><th>날짜</th><th>교사</th><th>단계</th><th>진도</th><th>코멘트</th><th>전달사항</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    +'<table><thead><tr><th>날짜</th><th>교사</th><th>단계</th><th>진도</th><th>점수</th><th>태도</th><th>숙제</th><th>코멘트</th><th>전달사항</th></tr></thead><tbody>'+rows+'</tbody></table>';
   document.body.appendChild(printDiv);
   setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
