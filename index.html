@@ -302,12 +302,16 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <button class="rev-tab" id="mktab-stats" onclick="switchMktTab('stats')">📊 채널별 실적</button>
 <button class="rev-tab" id="mktab-funnel" onclick="switchMktTab('funnel')">🔍 유입 경로 분석</button>
 <button class="rev-tab" id="mktab-routine" onclick="switchMktTab('routine')">📱 카톡 채널 루틴</button>
+<button class="rev-tab" id="mktab-events" onclick="switchMktTab('events')">🎉 월별 이벤트</button>
+<button class="rev-tab" id="mktab-promo" onclick="switchMktTab('promo')">📣 월별 홍보</button>
 </div>
 <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="mk-year"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="mk-month"></select></div>
 <div id="mk-panel-calendar" class="cp"><div id="mk-calendar-area"></div></div>
 <div id="mk-panel-stats" style="display:none" class="cp"><div id="mk-stats-area"></div></div>
 <div id="mk-panel-funnel" style="display:none" class="cp"><div id="mk-funnel-area"></div></div>
 <div id="mk-panel-routine" style="display:none" class="cp"><div id="mk-routine-area"></div></div>
+<div id="mk-panel-events" style="display:none" class="cp"><div id="mk-events-area"></div></div>
+<div id="mk-panel-promo" style="display:none" class="cp"><div id="mk-promo-area"></div></div>
 </div>
 <div class="view" id="view-reference"><div class="page-top"><h2>참고</h2><p>교육비 기준 및 레벨별 진도를 관리합니다</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex"><button class="rev-tab active" id="reftab-fees" onclick="switchRefTab('fees')">💰 교육비 기준</button><button class="rev-tab" id="reftab-curriculum" onclick="switchRefTab('curriculum')">📚 레벨별 진도</button><button class="rev-tab" id="reftab-eval" onclick="switchRefTab('eval')">📊 평가 모듈</button></div><div id="ref-panel-fees" class="cp"><div class="expense-section"><h4>💰 교육비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('tuition')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th style="text-align:center">학년</th><th style="text-align:center">단계</th><th style="text-align:center">기본 교육비</th><th style="text-align:center">주 3회</th><th style="text-align:center">주 4회</th><th style="text-align:center">주 5회</th><th></th></tr></thead><tbody id="ref-tuition-tbody"></tbody></table></div></div><div class="expense-section"><h4>📚 교재비 기준 설정 <button class="btn btn-green btn-xs" style="float:right" onclick="openRefItemModal('textbook')">+ 추가</button></h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:500px"><thead><tr><th>학년</th><th>단계</th><th style="text-align:right">교재비</th><th>부교재명</th><th style="text-align:right">부교재비</th><th></th></tr></thead><tbody id="ref-textbook-tbody"></tbody></table></div></div></div><div id="ref-panel-curriculum" style="display:none" class="cp"><input class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="max-width:280px;font-size:12px;padding:6px 10px;margin-bottom:12px"><div id="ref-curriculum-area"></div></div><div id="ref-panel-eval" style="display:none" class="cp"><div id="eval-modules-area"></div></div></div>
 <div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
@@ -646,10 +650,10 @@ async function syncFromFirestore(){
     await Promise.all([loadStudents(),loadClasses(),loadTeachers(),loadUsers(),loadPeriods(),loadRefItems()]);
     _fullyPopulated=false;
     applyMenuPerms();
-    renderSchedule();
+    renderScheduleThrottled();
     setTimeout(async function(){
       await Promise.all([loadReports(),loadMakeups()]);
-      renderSchedule();
+      renderScheduleThrottled();
       setTimeout(async function(){
         await Promise.all([loadRevenues(),loadExpenses(),loadConsultations()]);
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){}
@@ -670,7 +674,7 @@ function startRealtimeListeners(){
       var cv=document.querySelector('.view.active');
       if(cv){
         var vid=cv.id.replace('view-','');
-        if(vid==='schedule')renderSchedule();
+        if(vid==='schedule')renderScheduleThrottled();
         else if(vid==='history')renderHistory();
         else if(vid==='write')refreshWriteFormIfNeeded();
       }
@@ -682,7 +686,7 @@ function startRealtimeListeners(){
     var unsub2=db.collection('studentMemos').onSnapshot(function(snap){
       window._studentMemos=snap.docs.map(function(d){return{id:d.id,...d.data()};});
       var cv2=document.querySelector('.view.active');
-      if(cv2){if(cv2.id==='view-memo')renderMemoPage();if(cv2.id==='view-schedule')renderSchedule();}
+      if(cv2){if(cv2.id==='view-memo')renderMemoPage();if(cv2.id==='view-schedule')renderScheduleThrottled();}
     },function(err){console.error('memos listener:',err);});
     _rtListeners.push(unsub2);
   }catch(e){}
@@ -708,7 +712,7 @@ function startRealtimeListeners(){
     var unsub5=db.collection('makeups').onSnapshot(function(snap){
       makeups=snap.docs.map(function(d){return{id:d.id,...d.data()};});
       var cv5=document.querySelector('.view.active');
-      if(cv5){if(cv5.id==='view-makeup')renderMakeupCalendar();if(cv5.id==='view-schedule')renderSchedule();}
+      if(cv5){if(cv5.id==='view-makeup')renderMakeupCalendar();if(cv5.id==='view-schedule')renderScheduleThrottled();}
     },function(err){});
     _rtListeners.push(unsub5);
   }catch(e){}
@@ -956,7 +960,16 @@ function renderWeeklyTimetable(){
   html+='</tbody></table></div>';
   area.innerHTML=html;
 }
+var _scheduleRenderTimer=null;
+function renderScheduleThrottled(){
+  if(_scheduleRenderTimer)return;
+  _scheduleRenderTimer=setTimeout(function(){_scheduleRenderTimer=null;renderSchedule();},300);
+}
 function renderSchedule(){
+  var schedList=$('schedule-list');
+  var savedScroll=schedList?schedList.scrollTop:0;
+  var parentScroll=schedList?.parentElement?.scrollTop||0;
+  var windowScroll=window.scrollY||0;
   var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
   var dow=targetDate.getDay();var dayName=DAY_MAP[dow];
   var dayNames=['월','화','수','목','금','토','일'];
@@ -966,7 +979,7 @@ function renderSchedule(){
   var dp=$('schedule-date-pick');if(dp&&!dp.value)dp.value=todayISO();
   var todayStr=_scheduleDate||todayISO();
   var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&m.makeupStatus==='scheduled';});
-  if(!DAYS.includes(dayName)&&dayName!=='토'&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';return;}
+  if(!DAYS.includes(dayName)&&dayName!=='토'&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);});return;}
   function timeToMin(t){if(!t)return 9999;var m2=t.match(/(\d{1,2}):(\d{2})/);return m2?parseInt(m2[1])*60+parseInt(m2[2]):9999;}
   function pad(n){return String(n).padStart(2,'0');}
   var byPeriod={};
@@ -1031,7 +1044,7 @@ function renderSchedule(){
     if(mt&&mt<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=mt;
   });
   var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;return parseInt(a)-parseInt(b);});
-  if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';return;}
+  if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);});return;}
   var html='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0 12px;font-size:11px;color:var(--txt2);align-items:center">'
     +'<span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span>'
     +'<span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span>'
@@ -1161,6 +1174,7 @@ function renderSchedule(){
     html+='</div>';
   });
   $('schedule-list').innerHTML=html;
+  requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);});
 }
 
 async function markAttendance(studentId, action){
@@ -3427,7 +3441,7 @@ function initMkSelects(){
   if(ysel&&!ysel.options.length){var cy=new Date().getFullYear();for(var y=cy-1;y<=cy+1;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';ysel.appendChild(o);}ysel.value=cy;ysel.onchange=function(){renderMarketing();};}
   if(msel&&!msel.options.length){for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';msel.appendChild(o2);}msel.value=new Date().getMonth()+1;msel.onchange=function(){renderMarketing();};}
 }
-function switchMktTab(tab){_mkTab=tab;['calendar','stats','funnel','routine'].forEach(function(t){var btn=$('mktab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mk-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='routine')renderMkRoutine();else renderMarketing();}
+function switchMktTab(tab){_mkTab=tab;['calendar','stats','funnel','routine','events','promo'].forEach(function(t){var btn=$('mktab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mk-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='routine')renderMkRoutine();else if(tab==='events')renderMkEvents();else if(tab==='promo')renderMkPromo();else renderMarketing();}
 async function loadMkContents(){try{var snap=await db.collection('mkContents').get();_mkContents=snap.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){_mkContents=[];}}
 async function loadMkStats(){try{var snap=await db.collection('mkStats').get();_mkStats=snap.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){_mkStats=[];}}
 function renderMarketing(){
@@ -3530,6 +3544,82 @@ function renderMkFunnel(yr,mo){
     +'<div class="rev-sum-card"><div class="rev-sum-val" style="color:var(--blue);font-size:20px">'+(totalConsult>0?Math.round(totalReg/totalConsult*100):0)+'%</div><div class="rev-sum-lbl">전환율</div></div>'
     +'</div>'
     +'<table class="rev-tbl"><thead><tr><th>유입 채널</th><th style="text-align:center">상담 건수</th><th style="text-align:center">등록 전환</th><th style="text-align:center">전환율</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function renderMkEvents(){
+  var el=$('mk-events-area');if(!el)return;
+  var yr=parseInt($('mk-year')?.value)||new Date().getFullYear();
+  var months=[];for(var i=1;i<=12;i++)months.push(i);
+  var tbodyHTML=months.map(function(m){
+    return '<tr>'
+      +'<td style="text-align:center;font-weight:700;color:var(--navy)">'+m+'월</td>'
+      +'<td><textarea class="fi" id="mkev-event-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="이벤트/행사"></textarea></td>'
+      +'<td><textarea class="fi" id="mkev-target-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="대상/목적"></textarea></td>'
+      +'<td><textarea class="fi" id="mkev-channel-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="홍보 채널/방법"></textarea></td>'
+      +'<td><textarea class="fi" id="mkev-memo-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="메모/결과"></textarea></td>'
+      +'</tr>';
+  }).join('');
+  el.innerHTML='<div class="expense-section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="margin:0">🎉 '+yr+'년 월별 이벤트</h4><button class="btn btn-green btn-sm" onclick="saveMkEvents('+yr+')">💾 저장</button></div>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:650px"><thead><tr><th style="width:50px">월</th><th>이벤트/행사</th><th>대상/목적</th><th>홍보 채널</th><th>메모/결과</th></tr></thead><tbody>'+tbodyHTML+'</tbody></table></div></div>';
+  loadMkEvents(yr);
+}
+async function loadMkEvents(yr){
+  try{var doc=await db.collection('mkEvents').doc(String(yr)).get();
+    if(!doc||!doc.exists)return;var data=doc.data();
+    for(var i=1;i<=12;i++){
+      var m=data['m'+i]||{};
+      var ev=$('mkev-event-'+i);var tg=$('mkev-target-'+i);var ch=$('mkev-channel-'+i);var me=$('mkev-memo-'+i);
+      if(ev)ev.value=m.event||'';if(tg)tg.value=m.target||'';if(ch)ch.value=m.channel||'';if(me)me.value=m.memo||'';
+    }
+  }catch(e){}
+}
+async function saveMkEvents(yr){
+  var data={};
+  for(var i=1;i<=12;i++){
+    var ev=$('mkev-event-'+i);var tg=$('mkev-target-'+i);var ch=$('mkev-channel-'+i);var me=$('mkev-memo-'+i);
+    data['m'+i]={event:ev?ev.value:'',target:tg?tg.value:'',channel:ch?ch.value:'',memo:me?me.value:''};
+  }
+  data.updatedAt=new Date().toISOString();
+  await db.collection('mkEvents').doc(String(yr)).set(data);
+  toast('✅ 월별 이벤트 저장됨');
+}
+
+function renderMkPromo(){
+  var el=$('mk-promo-area');if(!el)return;
+  var yr=parseInt($('mk-year')?.value)||new Date().getFullYear();
+  var months=[];for(var i=1;i<=12;i++)months.push(i);
+  var tbodyHTML=months.map(function(m){
+    return '<tr>'
+      +'<td style="text-align:center;font-weight:700;color:var(--navy)">'+m+'월</td>'
+      +'<td><textarea class="fi" id="mkpr-content-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="홍보 내용"></textarea></td>'
+      +'<td><textarea class="fi" id="mkpr-target-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="대상/목적"></textarea></td>'
+      +'<td><textarea class="fi" id="mkpr-channel-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="홍보 채널/방법"></textarea></td>'
+      +'<td><textarea class="fi" id="mkpr-memo-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="메모/결과"></textarea></td>'
+      +'</tr>';
+  }).join('');
+  el.innerHTML='<div class="expense-section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="margin:0">📣 '+yr+'년 월별 홍보</h4><button class="btn btn-green btn-sm" onclick="saveMkPromo('+yr+')">💾 저장</button></div>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:650px"><thead><tr><th style="width:50px">월</th><th>홍보 내용</th><th>대상/목적</th><th>홍보 채널</th><th>메모/결과</th></tr></thead><tbody>'+tbodyHTML+'</tbody></table></div></div>';
+  loadMkPromo(yr);
+}
+async function loadMkPromo(yr){
+  try{var doc=await db.collection('mkPromo').doc(String(yr)).get();
+    if(!doc||!doc.exists)return;var data=doc.data();
+    for(var i=1;i<=12;i++){
+      var m=data['m'+i]||{};
+      var ct=$('mkpr-content-'+i);var tg=$('mkpr-target-'+i);var ch=$('mkpr-channel-'+i);var me=$('mkpr-memo-'+i);
+      if(ct)ct.value=m.content||'';if(tg)tg.value=m.target||'';if(ch)ch.value=m.channel||'';if(me)me.value=m.memo||'';
+    }
+  }catch(e){}
+}
+async function saveMkPromo(yr){
+  var data={};
+  for(var i=1;i<=12;i++){
+    var ct=$('mkpr-content-'+i);var tg=$('mkpr-target-'+i);var ch=$('mkpr-channel-'+i);var me=$('mkpr-memo-'+i);
+    data['m'+i]={content:ct?ct.value:'',target:tg?tg.value:'',channel:ch?ch.value:'',memo:me?me.value:''};
+  }
+  data.updatedAt=new Date().toISOString();
+  await db.collection('mkPromo').doc(String(yr)).set(data);
+  toast('✅ 월별 홍보 저장됨');
 }
 
 function renderMkRoutine(){
