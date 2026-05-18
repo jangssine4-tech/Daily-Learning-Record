@@ -978,6 +978,7 @@ function renderSchedule(){
   var savedScroll=schedList?schedList.scrollTop:0;
   var parentScroll=schedList?.parentElement?.scrollTop||0;
   var windowScroll=window.scrollY||0;
+  var sidebarScroll=document.getElementById('sidebar')?.scrollTop||0;
   var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
   var dow=targetDate.getDay();var dayName=DAY_MAP[dow];
   var dayNames=['월','화','수','목','금','토','일'];
@@ -987,7 +988,7 @@ function renderSchedule(){
   var dp=$('schedule-date-pick');if(dp&&!dp.value)dp.value=todayISO();
   var todayStr=_scheduleDate||todayISO();
   var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&m.makeupStatus==='scheduled';});
-  if(!DAYS.includes(dayName)&&dayName!=='토'&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);});return;}
+  if(!DAYS.includes(dayName)&&dayName!=='토'&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);var sb=document.getElementById('sidebar');if(sb)sb.scrollTop=sidebarScroll;});return;}
   function timeToMin(t){if(!t)return 9999;var m2=t.match(/(\d{1,2}):(\d{2})/);return m2?parseInt(m2[1])*60+parseInt(m2[2]):9999;}
   function pad(n){return String(n).padStart(2,'0');}
   var byPeriod={};
@@ -1052,7 +1053,7 @@ function renderSchedule(){
     if(mt&&mt<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=mt;
   });
   var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;return parseInt(a)-parseInt(b);});
-  if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);});return;}
+  if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);var sb=document.getElementById('sidebar');if(sb)sb.scrollTop=sidebarScroll;});return;}
   var html='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0 12px;font-size:11px;color:var(--txt2);align-items:center">'
     +'<span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span>'
     +'<span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span>'
@@ -1183,7 +1184,7 @@ function renderSchedule(){
     html+='</div>';
   });
   $('schedule-list').innerHTML=html;
-  requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);});
+  requestAnimationFrame(function(){if(schedList)schedList.scrollTop=savedScroll;if(schedList?.parentElement)schedList.parentElement.scrollTop=parentScroll;window.scrollTo(0,windowScroll);var sb=document.getElementById('sidebar');if(sb)sb.scrollTop=sidebarScroll;});
 }
 
 async function markAttendance(studentId, action){
