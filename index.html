@@ -244,7 +244,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </nav>
 
 <div id="content">
-<div class="view active" id="view-schedule"><div class="page-top" style="display:flex;align-items:center;justify-content:space-between"><h2 id="schedule-day-title">오늘 시간표</h2><div style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button class="btn btn-navy btn-xs" onclick="toggleWeeklyTimetable()">📋 주간 시간표</button><button class="btn btn-outline btn-xs" onclick="toggleCapacityView()">📊 수용 현황</button></div></div><div id="weekly-timetable-area" style="display:none;margin-bottom:16px"></div><div class="cp" id="schedule-list"></div></div>
+<div class="view active" id="view-schedule"><div class="page-top" style="display:flex;align-items:center;justify-content:space-between"><h2 id="schedule-day-title">오늘 시간표</h2><div style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button class="btn btn-navy btn-xs" onclick="toggleWeeklyTimetable()">📋 주간 시간표</button><button class="btn btn-outline btn-xs" onclick="toggleCapacityView()">📊 수용 현황</button></div></div><div id="weekly-timetable-area" style="display:none;margin-bottom:16px"></div><div id="schedule-notes-area" style="margin-bottom:0"></div><div class="cp" id="schedule-list"></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
   <div class="cp" style="max-width:560px"><div class="card" style="padding:16px">
     <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
@@ -866,7 +866,7 @@ function goto(view){
   var bEl=$('snav-'+view);if(bEl)bEl.classList.add('active');
   // Only populate selects when navigating away from schedule
   if(view!=='schedule') ensureFullPopulate();
-  if(view==='schedule')renderSchedule();
+  if(view==='schedule'){renderSchedule();renderScheduleNotes();}
   else if(view==='history'){loadReports().then(renderHistory);}
   else if(view==='students'){
     var syf=$('s-filter-year'),smf2=$('s-filter-month');
@@ -977,6 +977,41 @@ function renderWeeklyTimetable(){
   html+='</tbody></table></div>';
   area.innerHTML=html;
 }
+var _scheduleNotesRendered=false;
+function renderScheduleNotes(){
+  var el=$('schedule-notes-area');if(!el)return;
+  var allActive=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var html='';
+  // 📌 전달 사항
+  html+='<div style="background:var(--surface);border:2px solid var(--blue);border-radius:10px;padding:12px 14px;margin-bottom:12px">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📌 전달 사항</div>'
+    +'<div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'
+    +'<select id="tn-to" class="fi" style="width:auto;font-size:11px;padding:4px 8px"><option value="전체">→ 전체</option></select>'
+    +'<input id="tn-input" class="fi" style="flex:1;font-size:12px;padding:6px 8px;min-width:120px" placeholder="전달할 내용을 입력하세요">'
+    +'<button class="btn btn-navy btn-xs" onclick="addTeacherNote()">등록</button></div>'
+    +'<div id="tn-list"></div></div>';
+  // 🏆 성적표 & 상장
+  var awardStudents=[];var _todayStr2=todayISO();
+  allActive.forEach(function(s){
+    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.date<_todayStr2;}).sort(function(a,b){return b.date>a.date?1:-1;});
+    if(sReps.length){var lastProg=sReps[0].progress||'';if(lastProg==='Level Test'||lastProg==='전체 Review'){var aKey='award_'+_todayStr2+'_'+s.id+'_'+lastProg;if(!localStorage.getItem(aKey))awardStudents.push({name:s.name,level:sReps[0].level||'',progress:lastProg,aKey:aKey});}}
+  });
+  if(awardStudents.length){
+    html+='<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:2px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-bottom:12px">'
+      +'<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px">🏆 오늘 성적표 & 상장 나가야 할 학생 ('+awardStudents.length+'명)</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
+    awardStudents.forEach(function(as){html+='<div style="display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #fde68a;border-radius:20px;padding:4px 8px 4px 10px"><span style="font-size:12px;font-weight:700;color:#1e3a5f">'+as.name+'</span><span class="badge '+(as.progress==='Level Test'?'bg-red':'bg-gold')+'" style="font-size:8px">'+as.level+'</span><button onclick="event.stopPropagation();localStorage.setItem(\''+as.aKey+'\',\'1\');renderScheduleNotes();toast(\'✅ '+as.name+' 확인\')" style="background:var(--mint);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center">✓</button></div>';});
+    html+='</div></div>';
+  }
+  el.innerHTML=html;
+  // Populate dropdown
+  var tnTo=$('tn-to');if(tnTo){
+    var activeU=users.filter(function(u){return['teacher','admin'].includes(u.role)&&!u.adminDeleted;});
+    activeU.forEach(function(u){var nm=u.engName||u.name;if(nm!==(currentUser?.engName||currentUser?.name))tnTo.innerHTML+='<option value="'+nm+'">→ '+nm+'</option>';});
+  }
+  renderTeacherNotes();
+  _scheduleNotesRendered=true;
+}
+
 var _scheduleRenderTimer=null;
 function renderScheduleThrottled(){
   if(_scheduleRenderTimer)return;
@@ -984,7 +1019,6 @@ function renderScheduleThrottled(){
 }
 function renderSchedule(){
   var schedList=$('schedule-list');
-  var parentScroll=document.getElementById('content')?.scrollTop||0;
   var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
   var dow=targetDate.getDay();var dayName=DAY_MAP[dow];
   var dayNames=['월','화','수','목','금','토','일'];
@@ -994,7 +1028,7 @@ function renderSchedule(){
   var dp=$('schedule-date-pick');if(dp&&!dp.value)dp.value=todayISO();
   var todayStr=_scheduleDate||todayISO();
   var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&m.makeupStatus==='scheduled';});
-  if(!DAYS.includes(dayName)&&dayName!=='토'&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';requestAnimationFrame(function(){var ct=document.getElementById('content');if(ct)ct.scrollTop=parentScroll;});return;}
+  if(!DAYS.includes(dayName)&&dayName!=='토'&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';return;}
   function timeToMin(t){if(!t)return 9999;var m2=t.match(/(\d{1,2}):(\d{2})/);return m2?parseInt(m2[1])*60+parseInt(m2[2]):9999;}
   function pad(n){return String(n).padStart(2,'0');}
   var byPeriod={};
@@ -1059,60 +1093,15 @@ function renderSchedule(){
     if(mt&&mt<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=mt;
   });
   var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;return parseInt(a)-parseInt(b);});
-  if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';requestAnimationFrame(function(){var ct=document.getElementById('content');if(ct)ct.scrollTop=parentScroll;});return;}
+  if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';return;}
   var html='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0 12px;font-size:11px;color:var(--txt2);align-items:center">'
     +'<span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span>'
     +'<span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span>'
     +'<span><span style="color:#d97706;font-weight:700">▲</span> 조퇴/학습 마무리 못함</span>'
     +'<span>📝 일지 작성</span>'
     +'</div>';
-  // Students who need report cards & awards (prev progress was Level Test or 전체 Review)
+  // allActive for notToday section
   var allActive=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
-  // ── 📌 전달 사항 (교사 간) ──
-  html+='<div style="background:var(--surface);border:2px solid var(--blue);border-radius:10px;padding:12px 14px;margin-bottom:12px">'
-    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📌 전달 사항</div>'
-    +'<div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'
-    +'<select id="tn-to" class="fi" style="width:auto;font-size:11px;padding:4px 8px"><option value="전체">→ 전체</option></select>'
-    +'<input id="tn-input" class="fi" style="flex:1;font-size:12px;padding:6px 8px;min-width:120px" placeholder="전달할 내용을 입력하세요">'
-    +'<button class="btn btn-navy btn-xs" onclick="addTeacherNote()">등록</button></div>'
-    +'<div id="tn-list"></div></div>';
-  // Populate teacher note recipient dropdown and render notes after DOM insert
-  setTimeout(function(){
-    var _ct2=document.getElementById('content');var _ctS2=_ct2?_ct2.scrollTop:0;
-    var tnTo=$('tn-to');if(tnTo){
-      var activeU=users.filter(function(u){return['teacher','admin'].includes(u.role)&&!u.adminDeleted;});
-      activeU.forEach(function(u){var nm=u.engName||u.name;if(nm!==(currentUser?.engName||currentUser?.name))tnTo.innerHTML+='<option value="'+nm+'">→ '+nm+'</option>';});
-    }
-    renderTeacherNotes();
-    requestAnimationFrame(function(){if(_ct2)_ct2.scrollTop=_ctS2;});
-  },50);
-  // ── 🏆 성적표 & 상장 ──
-  var awardStudents=[];
-  var _todayStr2=todayISO();
-  allActive.forEach(function(s){
-    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.date<_todayStr2;}).sort(function(a,b){return b.date>a.date?1:-1;});
-    if(sReps.length){
-      var lastProg=sReps[0].progress||'';
-      if(lastProg==='Level Test'||lastProg==='전체 Review'){
-        var aKey='award_'+todayISO()+'_'+s.id+'_'+lastProg;
-        var confirmed=localStorage.getItem(aKey);
-        if(!confirmed)awardStudents.push({id:s.id,name:s.name,progress:lastProg,date:sReps[0].date,level:sReps[0].level||'',aKey:aKey});
-      }
-    }
-  });
-  if(awardStudents.length){
-    html+='<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:2px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-bottom:12px">'
-      +'<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px">🏆 오늘 성적표 & 상장 나가야 할 학생 ('+awardStudents.length+'명)</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    awardStudents.forEach(function(as){
-      html+='<div style="display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #fde68a;border-radius:20px;padding:4px 8px 4px 10px">'
-        +'<span style="font-size:12px;font-weight:700;color:#1e3a5f">'+as.name+'</span>'
-        +'<span class="badge '+(as.progress==='Level Test'?'bg-red':'bg-gold')+'" style="font-size:8px">'+as.level+'</span>'
-        +'<button onclick="event.stopPropagation();localStorage.setItem(\''+as.aKey+'\',\'1\');renderSchedule();toast(\'✅ '+as.name+' 확인\')" style="background:var(--mint);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center">✓</button>'
-        +'</div>';
-    });
-    html+='</div></div>';
-  }
   // Non-scheduled students (active but not coming today)
   var scheduledIds=new Set(todayStudents.map(function(s){return s.id;}));
   var notToday=allActive.filter(function(s){return!scheduledIds.has(s.id);});
@@ -1192,7 +1181,6 @@ function renderSchedule(){
     html+='</div>';
   });
   $('schedule-list').innerHTML=html;
-  requestAnimationFrame(function(){var ct=document.getElementById('content');if(ct)ct.scrollTop=parentScroll;});
 }
 
 async function markAttendance(studentId, action){
@@ -1246,9 +1234,7 @@ async function markAttendance(studentId, action){
     else if(isEarly) toast('⚠️ '+s.name+' 조퇴 (보강 계획표 등록)');
     else toast('✅ '+s.name+' 출석');
   }
-  var _ct=document.getElementById('content');var _ctS=_ct?_ct.scrollTop:0;
   renderSchedule();saveCacheDebounced();
-  requestAnimationFrame(function(){if(_ct)_ct.scrollTop=_ctS;});
 }
 
 function showAbsentNotifyModal(s){
