@@ -231,7 +231,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="sb-item" id="snav-memo" onclick="goto('memo')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>메모</div>
   <div class="sb-item active" id="snav-schedule" onclick="goto('schedule')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>오늘의 시간표</div>
   <div class="sb-item" id="snav-write" onclick="goto('write')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>학습 일지 작성</div>
-  <div class="sb-item" id="snav-history" onclick="goto('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>기록 조회</div>
+  <div class="sb-item" id="snav-history" onclick="goto('history')" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>기록 조회</div>
   <div class="sb-item" id="snav-consult" onclick="goto('consult')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>상담 일지</div>
   <div class="sb-item" id="snav-homework" onclick="goto('homework')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>숙제 관리</div>
   <div class="sb-sec">보강</div>
@@ -542,7 +542,7 @@ function applyMenuPerms(){
   var matchedUser=users.find(function(u){return u.loginId===currentUser.loginId;})||users.find(function(u){return u.id===currentUser.docId;});
   if(matchedUser&&matchedUser.menuPerms)currentUser.menuPerms=matchedUser.menuPerms;
   var perms=currentUser.menuPerms||{};
-  var menuMap={goals:'snav-goals',summary:'snav-summary',students:'snav-students',classes:'snav-classes',portfolio:'snav-portfolio',memo:'snav-memo',schedule:'snav-schedule',write:'snav-write',history:'snav-history',consult:'snav-consult',homework:'snav-homework',makeup:'snav-makeup',marketing:'snav-marketing',reference:'snav-reference',admin:'snav-admin',settings:'snav-settings'};
+  var menuMap={goals:'snav-goals',summary:'snav-summary',students:'snav-students',classes:'snav-classes',portfolio:'snav-portfolio',memo:'snav-memo',schedule:'snav-schedule',write:'snav-write',consult:'snav-consult',homework:'snav-homework',makeup:'snav-makeup',marketing:'snav-marketing',reference:'snav-reference',admin:'snav-admin',settings:'snav-settings'};
   Object.keys(menuMap).forEach(function(key){
     var el=document.getElementById(menuMap[key]);
     if(el)el.style.display=perms[key]===false?'none':'';
@@ -1343,9 +1343,16 @@ async function savePfStyle(sId){
 function renderPfReport(sId){
   var el=$('pf-report-area');if(!el)return;
   var s=students.find(function(x){return x.id===sId;});
-  var list=reports.filter(function(r){return r.studentId===sId&&r.comment;}).sort(function(a,b){return b.date>a.date?1:-1;});
-  if(!list.length){el.innerHTML='<div class="empty"><div class="ei">📊</div><div class="et">학습 리포트 없음</div></div>';return;}
-  var html='<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">📊 '+(s?.name||'')+' 학습 리포트 ('+list.length+'건)</div>';
+  var allList=reports.filter(function(r){return r.studentId===sId&&r.comment;}).sort(function(a,b){return b.date>a.date?1:-1;});
+  // Month filter
+  var selMonth=document.getElementById('pf-report-month')?.value||'';
+  var list=selMonth?allList.filter(function(r){return r.date&&r.date.substring(0,7)===selMonth;}):allList;
+  // Month options
+  var months={};allList.forEach(function(r){if(r.date)months[r.date.substring(0,7)]=true;});
+  var monthOpts='<option value="">전체</option>'+Object.keys(months).sort().reverse().map(function(m){return'<option value="'+m+'"'+(m===selMonth?' selected':'')+'>'+m.replace('-','년 ')+'월</option>';}).join('');
+  var toolbar='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><select class="fi" id="pf-report-month" style="width:auto;font-size:12px;padding:5px 10px" onchange="renderPfReport(\''+sId+'\')">'+monthOpts+'</select><span style="font-size:12px;color:var(--txt3)">'+(s?.name||'')+' · '+list.length+'건</span><div style="margin-left:auto"><button class="btn btn-outline btn-xs" onclick="printPfReport(\''+sId+'\')">🖨 인쇄</button></div></div>';
+  if(!allList.length){el.innerHTML=toolbar+'<div class="empty"><div class="ei">📊</div><div class="et">학습 리포트 없음</div></div>';return;}
+  var html=toolbar;
   html+=list.map(function(r){
     var _hw=splitHw(r.homework||'');var hwT='';if(_hw.video||_hw.book){var hp=[];if(_hw.video)hp.push('영상 '+_hw.video);if(_hw.book)hp.push('교재 '+_hw.book);hwT=hp.join(' / ');}else hwT=r.homework||'-';
     var dictT='';if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var p=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictT=p+'점('+dm[1]+'/'+dm[2]+')';}else dictT=r.dictation;}
@@ -1363,6 +1370,22 @@ function renderPfReport(sId){
       +'</div>';
   }).join('');
   el.innerHTML=html;
+}
+function printPfReport(sId){
+  var s=students.find(function(x){return x.id===sId;});
+  var selMonth=document.getElementById('pf-report-month')?.value||'';
+  var list=reports.filter(function(r){return r.studentId===sId&&r.comment;}).sort(function(a,b){return b.date>a.date?1:-1;});
+  if(selMonth)list=list.filter(function(r){return r.date&&r.date.substring(0,7)===selMonth;});
+  var rows=list.map(function(r){
+    var _hw2=splitHw(r.homework||'');var hwT2='';if(_hw2.video||_hw2.book){var hp2=[];if(_hw2.video)hp2.push('영상 '+_hw2.video);if(_hw2.book)hp2.push('교재 '+_hw2.book);hwT2=hp2.join('/');}else hwT2=r.homework||'-';
+    var dictT2='';if(r.dictation){var dm2=r.dictation.match(/^(\d+)\/(\d+)/);if(dm2){var p2=parseInt(dm2[2])>0?Math.round(parseInt(dm2[1])/parseInt(dm2[2])*100):0;dictT2=p2+'점('+dm2[1]+'/'+dm2[2]+')';}else dictT2=r.dictation;}
+    return '<tr><td>'+r.date+'</td><td>'+(r.teacherTablet||r.teacher||'-')+'</td><td>'+(r.level||'-')+'</td><td>'+(r.progress||'-')+'</td><td>'+(dictT2||'-')+'</td><td>'+(r.attitude||'-')+'</td><td>'+hwT2+'</td><td>'+r.comment+'</td></tr>';
+  }).join('');
+  var existing=document.getElementById('print-area');if(existing)existing.remove();
+  var pd=document.createElement('div');pd.id='print-area';pd.style.display='none';
+  pd.innerHTML='<h2>📊 '+(s?.name||'')+' 학습 리포트'+(selMonth?' ('+selMonth+')':'')+'</h2><div class="print-date">출력일: '+todayISO()+'</div><table><thead><tr><th>날짜</th><th>교사</th><th>단계</th><th>진도</th><th>점수</th><th>태도</th><th>숙제</th><th>코멘트</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  document.body.appendChild(pd);
+  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
 
 // ══ TEACHER NOTES (전달 사항) ══
