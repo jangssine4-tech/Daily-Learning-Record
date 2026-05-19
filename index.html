@@ -1295,10 +1295,10 @@ function renderPortfolio(){
 }
 function renderPfNewcon(sId){
   var el=$('pf-newcon-area');if(!el)return;
-  var list=newConsults.filter(function(c){return c.studentId===sId;}).sort(function(a,b){return b.date>a.date?1:-1;});
-  var btnHtml='<div style="margin-bottom:10px"><button class="btn btn-green btn-sm" onclick="openNewConsultModal()">+ 입회 상담 기록</button></div>';
-  if(!list.length){el.innerHTML=btnHtml+'<div class="empty"><div class="ei">📋</div><div class="et">입회 상담 기록 없음</div></div>';return;}
-  el.innerHTML=btnHtml+list.map(function(c){
+  var s=students.find(function(x){return x.id===sId;});
+  var list=newConsults.filter(function(c){return c.studentId===sId||(s&&(c.prospectName===s.name||c.studentName===s.name));}).sort(function(a,b){return b.date>a.date?1:-1;});
+  if(!list.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><div class="et">입회 상담 기록 없음</div></div>';return;}
+  el.innerHTML=list.map(function(c){
     return '<div class="card" style="padding:12px;margin-bottom:8px">'
       +'<div style="display:flex;justify-content:space-between;margin-bottom:6px"><strong>'+c.studentName+'</strong><span class="badge bg-gray">'+c.date+'</span></div>'
       +'<div style="font-size:11px;color:var(--txt2);margin-bottom:4px">'+(c.type||'-')+' · '+(c.teacher||'-')+'</div>'
@@ -1322,23 +1322,147 @@ function renderPfConsult(sId){
       +'</div>';
   }).join('');
 }
+var _lsCategories=[
+  {id:'attitude',title:'1. 학습 태도 및 수업 참여',items:[
+    '수업을 시작할 때 바로 몰입하기보다는, 짧은 준비 시간이 주어졌을 때 더 안정적으로 참여합니다.',
+    '스스로 먼저 말하기보다는, 예시를 본 뒤 따라 하면서 자신감을 얻는 편입니다.',
+    '수업 시작 준비가 빠르고, 지시를 한 번에 이해하여 바로 활동에 참여합니다.',
+    '적극적으로 먼저 손을 들고 발표하려는 태도가 좋습니다.',
+    '모르는 부분이 있으면 질문을 통해 해결하려는 자세가 있습니다.',
+    '과제를 끝까지 완성하는 지속력이 좋은 편입니다.',
+    '활동 참여는 하지만, 시키지 않으면 소극적으로 넘어가는 경향이 있습니다.',
+    '지시를 한 번에 이해하기보다 반복 설명이 필요한 편입니다.',
+    '수업 초반에 간단한 복습 활동으로 집중을 끌어올리면 참여도가 높아집니다.',
+    '처음부터 발표를 요구하기보다, 짧은 문장부터 성공 경험을 쌓으면 효과적입니다.']},
+  {id:'focus',title:'2. 집중력과 과제 지속',items:[
+    '긴 설명을 듣는 활동보다는, 짧은 단위로 나누어진 활동에서 집중이 더 잘 유지됩니다.',
+    '처음에는 집중이 흔들릴 때가 있지만, 목표를 다시 짚어주면 다시 과제로 돌아오는 힘이 있습니다.',
+    '20분 이상 집중이 안정적으로 유지되며, 독립적으로 과제를 수행합니다.',
+    '작은 목표를 하나씩 완성하게 하면 성취감을 느끼며 집중이 유지됩니다.',
+    '어려운 문제를 만나면 집중이 흐트러지는 경향이 있습니다.',
+    '말하기 활동에서 집중이 가장 잘 유지되는 편입니다.',
+    '듣기 활동에서 집중이 가장 잘 유지되는 편입니다.',
+    '혼자 할 때보다 교사와 함께할 때 집중도가 더 높습니다.',
+    '스스로 체크하면서 집중을 회복하는 연습이 필요한 단계입니다.',
+    '반복 활동에서 지루해하기보다 안정감을 느끼는 편입니다.']},
+  {id:'input',title:'3. 영어 입력 (듣기·읽기)',items:[
+    '단어 단위 이해는 안정적이지만, 문장이 길어지면 전체 의미를 잡는 데 시간이 필요합니다.',
+    '들은 문장을 따라 말하는 힘이 좋으며, 반복 노출을 통해 익숙해지는 유형입니다.',
+    '핵심 단어를 중심으로 전체 의미를 추측하는 능력이 있습니다.',
+    '짧은 문장 읽기는 안정적이나 긴 문장에서 속도가 느려집니다.',
+    '파닉스 규칙을 적용하여 새로운 단어도 읽으려고 시도합니다.',
+    '의미 단위로 끊어 읽는 연습이 필요한 단계입니다.',
+    '한 번 들어서 이해하기보다 2~3회 반복 후 파악하는 편입니다.',
+    '읽기 속도는 적절하며, 중심 내용과 세부 정보를 잘 구분합니다.',
+    '모르는 단어가 있어도 문맥으로 의미를 짐작하려는 시도가 보입니다.',
+    '짧은 문장을 여러 번 듣고 따라 말하는 방식이 가장 효과적입니다.']},
+  {id:'output',title:'4. 영어 출력 (말하기·쓰기)',items:[
+    '바로 길게 말하기보다는, 짧은 문장부터 정확하게 말하려는 성향이 있습니다.',
+    'Yes/No 대답에서 끝나지 않고, 이유를 한 문장 덧붙이는 연습을 하고 있습니다.',
+    '쓰기에서 아이디어는 잘 떠올리지만, 영어 문장 순서로 정리하는 데 도움이 필요합니다.',
+    '발음이 또렷하고 자신감 있게 말하는 편입니다.',
+    '틀리더라도 다시 시도하려는 태도가 좋습니다.',
+    '문장으로 답변하기보다 단어로 답하는 경향이 있어 문장 확장 연습 중입니다.',
+    '배운 문법을 문장에 적용하는 힘이 점차 좋아지고 있습니다.',
+    '한글로 먼저 생각을 정리한 뒤, 영어 문장 틀에 맞춰 표현하는 방식으로 지도 중입니다.',
+    '자기 생각을 영어로 옮기는 시도가 활발해지고 있습니다.',
+    '피드백 후 고쳐 쓸 수 있는 수정 능력이 있습니다.']},
+  {id:'memory',title:'5. 기억 방식과 반복 학습',items:[
+    '한 번에 많이 외우는 방식보다, 짧은 양을 여러 번 반복할 때 기억이 더 잘 유지됩니다.',
+    '소리 내어 말하면서 외울 때 효과가 좋습니다.',
+    '배운 표현을 기억하는 힘은 있으나, 새 상황에 적용하는 데는 연습이 더 필요합니다.',
+    '패턴 문장을 잘 기억하고 비슷한 구조에 적용하는 힘이 있습니다.',
+    '지난주 배운 내용도 안정적으로 유지하는 장기 기억력이 좋습니다.',
+    '눈으로만 보는 복습보다 소리 내어 읽는 복습이 효과적입니다.',
+    '반복 연습을 지루해하기보다 안정감을 느끼는 편입니다.',
+    '단순 암기 후 비슷한 문장을 바꿔 말하는 활동이 효과적입니다.',
+    '보고 외우는 시각적 학습보다 소리를 통한 청각적 학습이 잘 맞습니다.',
+    '외운 표현을 새 문장에 활용하는 적용력이 점차 발전하고 있습니다.']},
+  {id:'emotion',title:'6. 정서적 성향과 자신감',items:[
+    '확신이 없을 때는 말하기를 조심스러워하며, 부담 적은 활동부터 시작하면 효과적입니다.',
+    '칭찬을 받았을 때 다음 활동에 더 적극적으로 참여하는 모습이 있습니다.',
+    '틀리는 것에 대한 부담감이 있어, 시도하는 경험을 먼저 쌓도록 지도 중입니다.',
+    '실수해도 다시 시도하려는 회복력이 좋습니다.',
+    '작은 성공 경험을 자주 확인해 주면 영어 자신감이 빠르게 성장합니다.',
+    '친구 앞에서 발표할 때 긴장하는 편이지만, 점차 익숙해지고 있습니다.',
+    '수정 안내를 잘 받아들이고 고치려는 태도가 좋습니다.',
+    '모르면 조용히 넘어가기보다 질문하는 습관이 자리 잡고 있습니다.',
+    '영어에 대한 거부감 없이 수업에 즐겁게 참여합니다.',
+    '정답에 대한 책임감이 있어 확신이 생기면 안정적으로 수행합니다.']},
+  {id:'selfStudy',title:'7. 자기주도 학습과 숙제',items:[
+    '수업 중 이해도는 괜찮지만, 짧은 가정 복습이 더해지면 실력이 안정적으로 쌓일 수 있습니다.',
+    '숙제를 끝내는 것은 가능하지만, 틀린 부분을 다시 확인하는 습관을 기르고 있습니다.',
+    '정해진 시간에 짧게 확인해 주는 관리가 도움이 되는 단계입니다.',
+    '스스로 복습 루틴을 만들기 시작하고 있어 긍정적입니다.',
+    '숙제의 양보다 복습의 질을 높이는 방향이 효과적입니다.',
+    '혼자서도 숙제를 완성할 수 있으며 자기 점검 능력이 있습니다.',
+    '하루 5분 소리 내어 읽는 복습만으로도 큰 효과를 볼 수 있는 학생입니다.',
+    '미루지 않고 꾸준히 수행하는 습관이 잘 잡혀 있습니다.',
+    '부모님의 확인이 아직 필요한 단계이나, 점차 독립적으로 전환 중입니다.',
+    '틀린 문장 한 번 더 말하기처럼 복습의 질을 높이는 방향으로 안내 중입니다.']}
+];
 function renderPfStyle(sId){
   var el=$('pf-style-area');if(!el)return;
   var s=students.find(function(x){return x.id===sId;});if(!s)return;
   var ls=s.learningStyle||{};
-  el.innerHTML='<div class="card" style="padding:14px"><div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">🧠 '+s.name+' 학습 성향</div>'
-    +'<div class="field"><div class="fl">학습 특성 (강점/약점)</div><textarea class="fi" id="pf-ls-trait" rows="3" style="font-size:12px" placeholder="예: 어휘력 우수, 문법 응용 약함, 꼼꼼한 성격">'+(ls.trait||'')+'</textarea></div>'
-    +'<div class="field"><div class="fl">수업 태도/집중도</div><textarea class="fi" id="pf-ls-attitude" rows="2" style="font-size:12px" placeholder="예: 수업 초반 집중 좋음, 후반 산만해지는 경향">'+(ls.attitude||'')+'</textarea></div>'
-    +'<div class="field"><div class="fl">효과적인 학습 방법</div><textarea class="fi" id="pf-ls-method" rows="2" style="font-size:12px" placeholder="예: 반복 쓰기보다 문맥 속 학습이 효과적">'+(ls.method||'')+'</textarea></div>'
-    +'<div class="field"><div class="fl">학부모 요청/참고 사항</div><textarea class="fi" id="pf-ls-parent" rows="2" style="font-size:12px" placeholder="예: 숙제량 조절 요청, 발표 연습 희망">'+(ls.parent||'')+'</textarea></div>'
-    +'<div class="field"><div class="fl">기타 메모</div><textarea class="fi" id="pf-ls-memo" rows="2" style="font-size:12px">'+(ls.memo||'')+'</textarea></div>'
-    +'<button class="btn btn-green btn-block" style="margin-top:10px" onclick="savePfStyle(\''+sId+'\')">💾 저장</button></div>';
+  var html='<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:14px">🧠 '+s.name+' 학습 성향 리포트</div>';
+  _lsCategories.forEach(function(cat){
+    var saved=ls[cat.id]||[];
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">'+cat.title+'</div>'
+      +'<select class="fi pf-ls-select" data-cat="'+cat.id+'" style="font-size:11px;margin-bottom:6px" onchange="addLsItem(\''+sId+'\',\''+cat.id+'\',this.value);this.value=\'\'">'
+      +'<option value="">+ 항목 선택하여 추가...</option>';
+    cat.items.forEach(function(item,i){html+='<option value="'+i+'">'+item+'</option>';});
+    html+='</select>'
+      +'<div id="ls-items-'+cat.id+'">';
+    saved.forEach(function(idx,si){
+      var text=cat.items[idx]||'';
+      if(text)html+='<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;line-height:1.5"><span style="flex:1;color:var(--txt)">• '+text+'</span><button onclick="removeLsItem(\''+sId+'\',\''+cat.id+'\','+si+')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:10px;flex-shrink:0">✕</button></div>';
+    });
+    html+='</div></div>';
+  });
+  html+='<div class="field" style="margin-top:10px"><div class="fl">추가 메모 (직접 입력)</div><textarea class="fi" id="pf-ls-memo" rows="3" style="font-size:12px">'+(ls.memo||'')+'</textarea></div>'
+    +'<div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-green btn-block" onclick="savePfStyle(\''+sId+'\')">💾 저장</button><button class="btn btn-outline btn-block" onclick="printPfStyle(\''+sId+'\')">🖨 인쇄</button></div>';
+  el.innerHTML=html;
+}
+function addLsItem(sId,catId,val){
+  if(val==='')return;
+  var s=students.find(function(x){return x.id===sId;});if(!s)return;
+  if(!s.learningStyle)s.learningStyle={};
+  if(!s.learningStyle[catId])s.learningStyle[catId]=[];
+  var idx=parseInt(val);
+  if(!s.learningStyle[catId].includes(idx))s.learningStyle[catId].push(idx);
+  renderPfStyle(sId);
+}
+function removeLsItem(sId,catId,si){
+  var s=students.find(function(x){return x.id===sId;});if(!s||!s.learningStyle||!s.learningStyle[catId])return;
+  s.learningStyle[catId].splice(si,1);
+  renderPfStyle(sId);
 }
 async function savePfStyle(sId){
-  var data={learningStyle:{trait:$('pf-ls-trait')?.value||'',attitude:$('pf-ls-attitude')?.value||'',method:$('pf-ls-method')?.value||'',parent:$('pf-ls-parent')?.value||'',memo:$('pf-ls-memo')?.value||'',updatedAt:new Date().toISOString()}};
-  await db.collection('students').doc(sId).update(data);
-  var si=students.findIndex(function(x){return x.id===sId;});if(si>=0)students[si].learningStyle=data.learningStyle;
+  var s=students.find(function(x){return x.id===sId;});if(!s)return;
+  var ls=s.learningStyle||{};
+  ls.memo=$('pf-ls-memo')?.value||'';
+  ls.updatedAt=new Date().toISOString();
+  await db.collection('students').doc(sId).update({learningStyle:ls});
+  var si=students.findIndex(function(x){return x.id===sId;});if(si>=0)students[si].learningStyle=ls;
   toast('✅ 학습 성향 저장됨');
+}
+function printPfStyle(sId){
+  var s=students.find(function(x){return x.id===sId;});if(!s)return;
+  var ls=s.learningStyle||{};
+  var html='<h2>🧠 '+s.name+' 학습 성향 리포트</h2><div class="print-date">출력일: '+todayISO()+'</div>';
+  _lsCategories.forEach(function(cat){
+    var saved=ls[cat.id]||[];if(!saved.length)return;
+    html+='<h3>'+cat.title+'</h3><ul>';
+    saved.forEach(function(idx){var t=cat.items[idx];if(t)html+='<li>'+t+'</li>';});
+    html+='</ul>';
+  });
+  if(ls.memo)html+='<h3>추가 메모</h3><p>'+ls.memo+'</p>';
+  var existing=document.getElementById('print-area');if(existing)existing.remove();
+  var pd=document.createElement('div');pd.id='print-area';pd.style.display='none';pd.innerHTML=html;
+  document.body.appendChild(pd);
+  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
 function renderPfReport(sId){
   var el=$('pf-report-area');if(!el)return;
@@ -1356,7 +1480,7 @@ function renderPfReport(sId){
   html+=list.map(function(r){
     var _hw=splitHw(r.homework||'');var hwT='';if(_hw.video||_hw.book){var hp=[];if(_hw.video)hp.push('영상 '+_hw.video);if(_hw.book)hp.push('교재 '+_hw.book);hwT=hp.join(' / ');}else hwT=r.homework||'-';
     var dictT='';if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var p=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictT=p+'점('+dm[1]+'/'+dm[2]+')';}else dictT=r.dictation;}
-    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">'
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer" onclick="togglePfReportDetail(this,\''+r.id+'\')">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
       +'<div style="display:flex;gap:6px;align-items:center"><span class="badge bg-navy">'+r.date+'</span><span style="font-size:11px;color:var(--txt3)">'+(r.teacherTablet||r.teacher||'-')+(r.teacherBook?' / '+r.teacherBook:'')+'</span></div>'
       +'<span style="font-size:11px;color:var(--blue)">'+(r.level||'')+' · '+(r.progress||'')+'</span></div>'
@@ -1367,9 +1491,37 @@ function renderPfReport(sId){
       +'<span>숙제: '+hwT+'</span></div>'
       +'<div style="font-size:13px;color:var(--txt);line-height:1.6">'+r.comment+'</div>'
       +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📢 '+r.memo+'</div>':'')
+      +'<div class="pf-report-detail" style="display:none"></div>'
       +'</div>';
   }).join('');
   el.innerHTML=html;
+}
+function togglePfReportDetail(el,rId){
+  var det=el.querySelector('.pf-report-detail');if(!det)return;
+  if(det.style.display!=='none'){det.style.display='none';el.style.borderColor='var(--border)';return;}
+  var r=reports.find(function(x){return x.id===rId;});if(!r)return;
+  var _c=_splitComment(r.comment||'');
+  var _hw=splitHw(r.homework||'');
+  var dictT='';if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var p=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictT=p+'점 ('+dm[1]+'/'+dm[2]+')';}else dictT=r.dictation;}
+  var items=[];
+  items.push(['단계',r.level||'-']);
+  items.push(['진도',r.progress||'-']);
+  if(r.reviewYN)items.push(['Review',r.reviewYN]);
+  items.push(['복습 테스트',r.reviewTest||'-']);
+  items.push(['수업 태도',r.attitude||'-']);
+  items.push(['Daily Quiz',r.dailyQuiz||'-']);
+  items.push(['받아쓰기',dictT||'-']);
+  items.push(['영상 숙제',_hw.video||'-']);
+  items.push(['교재 숙제',_hw.book||'-']);
+  if(r.teacherTablet)items.push(['태블릿 교사',r.teacherTablet]);
+  if(r.teacherBook)items.push(['교재 교사',r.teacherBook]);
+  if(_c.t)items.push(['코멘트(태블릿)',_c.t]);
+  if(_c.b)items.push(['코멘트(교재)',_c.b]);
+  if(r.memo)items.push(['전달 사항',r.memo]);
+  det.innerHTML='<div style="margin-top:8px;padding-top:8px;border-top:2px solid var(--blue);font-size:11px">'
+    +items.map(function(it){return'<div style="display:flex;padding:3px 0;border-bottom:1px solid var(--border)"><span style="min-width:90px;font-weight:600;color:var(--navy)">'+it[0]+'</span><span style="color:var(--txt)">'+it[1]+'</span></div>';}).join('')
+    +'</div>';
+  det.style.display='block';el.style.borderColor='var(--blue)';
 }
 function printPfReport(sId){
   var s=students.find(function(x){return x.id===sId;});
@@ -2436,7 +2588,7 @@ function printConsultCommentView(){
 async function deleteConsult(){var id=$('con-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('consultations').doc(id).delete();await loadConsultations();renderConsults();closeM('consult');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
 function renderNewConsults(){if(!newConsults.length){$('new-consult-list').innerHTML='<div class="empty"><div class="ei">🆕</div><div class="et">신규 상담 없음</div></div>';return;}$('new-consult-list').innerHTML=newConsults.map(function(n){return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openNewConsultModal(\''+n.id+'\')"><div style="display:flex;justify-content:space-between"><strong>'+(n.prospectName||'이름없음')+'</strong><span class="badge bg-gray">'+n.date+'</span></div></div>';}).join('');}
 function openNewConsultModal(id){var n=id?newConsults.find(function(x){return x.id===id;}):null;$('nc-id').value=id||'';$('nc-modal-title').textContent=id?'신규 상담 수정':'신규 상담 기록';$('nc-del-wrap').style.display=id?'block':'none';$('nc-date').value=n?.date||todayISO();$('nc-teacher').value=n?.teacher||currentUser.name||'';$('nc-name').value=n?.prospectName||'';$('nc-grade').value=n?.grade||'';$('nc-school').value=n?.school||'';$('nc-phone').value=n?.phone||'';$('nc-type').value=n?.type||'전화';$('nc-inflow').value=n?.inflow||'';$('nc-level').value=n?.level||'';$('nc-content').value=n?.content||'';$('nc-memo').value=n?.memo||'';$('nc-result').value=n?.result||'';$('nc-nextdate').value=n?.nextDate||'';$('modal-newconsult').style.display='flex';}
-async function saveNewConsult(){loading(true);var data={date:$('nc-date').value,teacher:$('nc-teacher').value,prospectName:$('nc-name').value.trim(),grade:$('nc-grade').value,school:$('nc-school').value.trim(),phone:$('nc-phone').value.trim(),type:$('nc-type').value,inflow:$('nc-inflow').value,level:$('nc-level').value,content:$('nc-content').value.trim(),memo:$('nc-memo').value.trim(),result:$('nc-result').value,nextDate:$('nc-nextdate').value,updatedAt:new Date().toISOString()};var id=$('nc-id').value;if(id)await db.collection('newConsults').doc(id).update(data);else await db.collection('newConsults').add({...data,createdAt:new Date().toISOString()});var snap=await db.collection('newConsults').orderBy('date','desc').get();newConsults=snap.docs.map(function(d){return{id:d.id,...d.data()};});renderNewConsults();closeM('newconsult');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
+async function saveNewConsult(){loading(true);var pName=$('nc-name').value.trim();var matchS=students.find(function(s){return s.name===pName;});var data={date:$('nc-date').value,teacher:$('nc-teacher').value,prospectName:pName,studentId:matchS?.id||'',studentName:pName,grade:$('nc-grade').value,school:$('nc-school').value.trim(),phone:$('nc-phone').value.trim(),type:$('nc-type').value,inflow:$('nc-inflow').value,level:$('nc-level').value,content:$('nc-content').value.trim(),memo:$('nc-memo').value.trim(),result:$('nc-result').value,nextDate:$('nc-nextdate').value,updatedAt:new Date().toISOString()};var id=$('nc-id').value;if(id)await db.collection('newConsults').doc(id).update(data);else await db.collection('newConsults').add({...data,createdAt:new Date().toISOString()});var snap=await db.collection('newConsults').orderBy('date','desc').get();newConsults=snap.docs.map(function(d){return{id:d.id,...d.data()};});renderNewConsults();closeM('newconsult');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
 async function deleteNewConsult(){var id=$('nc-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('newConsults').doc(id).delete();newConsults=newConsults.filter(function(x){return x.id!==id;});renderNewConsults();closeM('newconsult');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
 
 // ══ REVENUE ══
