@@ -1455,45 +1455,23 @@ function renderPfLsReport(sId){
   var ls=s.learningStyle||{};
   var saved=ls.generatedReport||'';
   el.innerHTML='<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:12px">📝 '+s.name+' 맞춤 영어 성장 리포트</div>'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">🧠 학습 성향 탭에서 관찰 결과와 전달 문장을 먼저 선택한 후 생성하세요.</div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:10px"><button class="btn btn-green btn-sm" onclick="generateLsReport(\''+sId+'\')">🤖 AI 리포트 생성</button><button class="btn btn-outline btn-sm" onclick="printLsReport(\''+sId+'\')">🖨 인쇄</button></div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">🧠 학습 성향 데이터를 바탕으로 ChatGPT에서 리포트를 생성한 후 여기에 붙여넣기하세요.</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:10px"><button class="btn btn-navy btn-sm" onclick="copyLsDataForChat(\''+sId+'\')">📋 학습 성향 데이터 복사 (ChatGPT용)</button><button class="btn btn-outline btn-sm" onclick="printLsReport(\''+sId+'\')">🖨 인쇄</button></div>'
     +'<textarea class="fi" id="pf-lsreport-text" rows="20" style="font-size:12px;line-height:1.8;white-space:pre-wrap">'+saved+'</textarea>'
     +'<button class="btn btn-navy btn-block" style="margin-top:8px" onclick="saveLsReport(\''+sId+'\')">💾 리포트 저장</button>';
 }
-async function generateLsReport(sId){
+function copyLsDataForChat(sId){
   var s=students.find(function(x){return x.id===sId;});if(!s)return;
   var ls=s.learningStyle||{};
-  var cfg=getAiConfig();if(!cfg.apiKey){toast('⚠️ 설정에서 API Key를 입력하세요');return;}
-  // Build context from selected items and obs results
-  var ctx='학생명: '+s.name+'\n학년: '+(s.grade||'-')+'\n단계: '+getStudentLevel(s)+'\n수업 기간: '+(s.enrollDate?Math.max(1,Math.round((new Date()-new Date(s.enrollDate))/(1000*60*60*24*30)))+'개월':'-')+'\n관찰 기간: 최근 4주\n\n';
+  var ctx='학생명: '+s.name+'\n학년: '+(s.grade||'-')+'\n단계: '+getStudentLevel(s)+'\n\n';
   _lsCategories.forEach(function(cat){
-    var saved=ls[cat.id]||[];
-    var obsR=ls.obsResults||{};
-    var hasData=false;
-    var section=cat.title+'\n';
-    // Observation results
-    cat.obs.forEach(function(o,oi){
-      var v=obsR[cat.id+'_obs_'+oi];
-      if(v){section+='  '+o[0]+': '+v+'\n';hasData=true;}
-    });
-    // Selected statements
-    saved.forEach(function(idx){
-      var t=cat.items[idx];if(t){section+='  → '+t+'\n';hasData=true;}
-    });
+    var saved=ls[cat.id]||[];var obsR=ls.obsResults||{};var hasData=false;var section=cat.title+'\n';
+    cat.obs.forEach(function(o,oi){var v=obsR[cat.id+'_obs_'+oi];if(v){section+='  '+o[0]+': '+v+'\n';hasData=true;}});
+    saved.forEach(function(idx){var t=cat.items[idx];if(t){section+='  → '+t+'\n';hasData=true;}});
     if(hasData)ctx+=section+'\n';
   });
   if(ls.memo)ctx+='추가 메모: '+ls.memo+'\n';
-  var prompt='너는 EFL 환경의 초중등 영어 학습자를 잘 이해하는 영어교육 전문가이자 아동·청소년 학습 심리 전문가이다.\n\n아래 학생 관찰 정보를 바탕으로 학부모 상담용 "맞춤 영어 성장 리포트"를 작성하라.\n이 리포트는 아이를 평가하는 자료가 아니라, 아이에게 맞는 영어 학습 방향을 설명하고 학원에서 어떻게 세심하게 관리하고 있는지 전달하는 상담 자료이다.\n\n[작성 규칙]\n1. 학부모가 우리 아이를 세심하게 관찰하고 있구나라고 느끼도록 작성\n2. 아이의 부족한 점을 직접 지적하지 않음\n3. 보완점은 성장 과제, 앞으로 키워갈 부분으로 표현\n4. 학원 지도 계획은 구체적으로 작성\n5. 가정 연계 방법은 하루 5~10분 안에 가능한 방법으로 제안\n6. 아이를 다른 학생과 비교하지 않음\n7. 결과보다 학습 과정과 변화 가능성에 초점\n8. 관찰 정보가 부족한 부분은 앞으로 조금 더 관찰하며 지도하겠습니다로 표현\n9. 한국어로 작성\n\n[피해야 할 표현 → 대체 표현]\n- 집중력이 부족 → 짧은 단위 활동에서 더 안정적으로 집중합니다\n- 문법이 약함 → 문법 개념을 문장 안에서 적용하는 연습이 필요한 단계입니다\n- 말을 잘 못함 → 짧은 답변에서 문장 표현으로 확장해 가는 단계입니다\n- 숙제를 잘 안 해옴 → 가정 복습 루틴이 조금 더 잡히면 학습 효과가 커질 수 있습니다\n- 기초가 부족 → 기본 문장 구조를 다시 안정화하는 과정이 필요합니다\n- 자신감이 없음 → 확신이 생겼을 때 더 편안하게 표현하는 편입니다\n\n[출력 형식 - 반드시 아래 6개 항목 순서대로]\n\n1. 전체 학습 인상\n아이의 전반적인 학습 태도와 특징을 3~4문장으로 정리.\n\n2. 영역별 관찰 결과\n아래 영역별로 각각 2~3문장씩:\n듣기, 말하기, 읽기, 쓰기, 어휘, 문법, 수업 태도, 숙제 습관\n\n3. 아이의 강점\n긍정적 학습 자원과 성장 가능성 2~3가지. 구체적 수업 장면과 연결.\n\n4. 성장 과제\n앞으로 키워갈 부분 2~3가지.\n\n5. 학원 지도 계획\n수업 중 어떤 방식으로 지도할지 구체적으로.\n\n6. 가정 연계 방법\n하루 5~10분 안에 가능한 간단한 방법 제안.\n\n[학생 관찰 정보]\n'+ctx;
-
-  loading(true);
-  try{
-    var resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify({model:cfg.model||'gpt-4o-mini',messages:[{role:'user',content:prompt}],max_tokens:3000,temperature:0.7})});
-    var data=await resp.json();
-    var text=data.choices?.[0]?.message?.content||'생성 실패';
-    $('pf-lsreport-text').value=text;
-    toast('✅ 리포트 생성 완료');
-  }catch(e){toast('❌ 오류: '+e.message);}
-  loading(false);
+  navigator.clipboard.writeText(ctx);toast('📋 학습 성향 데이터가 복사되었습니다. ChatGPT에 붙여넣기하세요!');
 }
 async function saveLsReport(sId){
   var text=$('pf-lsreport-text')?.value||'';
