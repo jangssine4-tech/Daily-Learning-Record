@@ -604,6 +604,8 @@ async function bootApp(){
     bootProgress(100, '완료!');
     hideBootOverlay();
     toast('👋 환영합니다, '+currentUser.name+'님!');
+    // Load perms before applying
+    try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
     setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
@@ -632,6 +634,7 @@ async function bootApp(){
       bootProgress(100, '완료!');
       hideBootOverlay();
       toast('👋 환영합니다, '+currentUser.name+'님!');
+      try{var permSnap2=await db.collection('userPerms').get();permSnap2.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
       applyMenuPerms();
       // Stage 2: Non-essential data in background
       setTimeout(async function(){
