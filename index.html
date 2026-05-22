@@ -2739,7 +2739,7 @@ function findRefItem(rawLevel, refType){
   return catMatch||null;
 }
 function openPrintRevModal(yr,mo){
-  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return false;if(s.enrollDate){var ed=new Date(s.enrollDate);if(ed.getFullYear()>yr||(ed.getFullYear()===yr&&ed.getMonth()+1>mo))return false;}return true;});
   var sorted=[...activeStudents].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
   var checkboxes=sorted.map(function(s,i){
@@ -2842,7 +2842,7 @@ function calcMonthExpTotal(yr,mo){
 }
 function calcExpectedRevenue(yr,mo){
   var list=revenues.filter(function(r){if(r.isManualMeta)return false;if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;var d=new Date(r.paidDate);return d.getFullYear()===yr&&d.getMonth()===mo-1;});
-  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return false;if(s.enrollDate){var ed=new Date(s.enrollDate);if(ed.getFullYear()>yr||(ed.getFullYear()===yr&&ed.getMonth()+1>mo))return false;}return true;});
   var totalExpected=0;var totalTextbook=0;var totalRev=list.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
   activeStudents.forEach(function(s){
     var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
@@ -2870,8 +2870,8 @@ function renderRevMonthly(yr,mo){
   var cashRevAmt=list.filter(function(r){return r.method==='현금'||r.method==='계좌이체';}).reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
   var extraRevAmt=list.reduce(function(s,r){return s+(parseInt(r.extra1Amount)||0)+(parseInt(r.extra2Amount)||0);},0);
   var paidIds=new Set(list.filter(function(r){return(parseInt(r.amount)||0)>0;}).map(function(r){return r.studentId;}));
-  // Only show 재원/신규 students for this month
-  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  // Only show 재원/신규 students enrolled by this month
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return false;if(s.enrollDate){var ed=new Date(s.enrollDate);if(ed.getFullYear()>yr||(ed.getFullYear()===yr&&ed.getMonth()+1>mo))return false;}return true;});
   // Pre-calculate total expected for summary (same logic as table rows)
   var preExpectedTotal=0;
   activeStudents.forEach(function(s){
