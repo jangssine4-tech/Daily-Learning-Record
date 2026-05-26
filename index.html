@@ -923,7 +923,7 @@ function goto(view){
   else if(view==='homework'){loadHwData().then(function(){renderHwCheck();});}
   else if(view==='reference'){if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}
   else if(view==='marketing'){initMkSelects();renderMarketing();}
-  else if(view==='portfolio'){var pfSel=$('pf-student');if(pfSel&&pfSel.options.length<=1){var active=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name>b.name?1:-1;});active.forEach(function(s){pfSel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';});}}
+  else if(view==='portfolio'){var pfSel=$('pf-student');if(pfSel){var prevVal=pfSel.value;pfSel.innerHTML='<option value="">학생 선택</option>';students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name>b.name?1:-1;}).forEach(function(s){pfSel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';});if(prevVal)pfSel.value=prevVal;}}
   else if(view==='admin')renderUsers();
   else if(view==='settings'){renderPeriodSettings();renderSolapiSettings();loadAiConfigUI();}
   else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){var yr2=new Date().getFullYear();loadGoalTargets(yr2).then(function(){renderGoalsView();});}else renderGoalsView();}
@@ -1321,12 +1321,7 @@ function copyAbsentMsg(){
 var _pfTab='newcon';
 function switchPfTab(tab){_pfTab=tab;['newcon','style','lsreport','report','consult'].forEach(function(t){var btn=$('pftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('pf-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});renderPortfolio();}
 function renderPortfolio(){
-  // Populate student dropdown
   var sel=$('pf-student');if(!sel)return;
-  if(sel.options.length<=1){
-    var active=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name>b.name?1:-1;});
-    active.forEach(function(s){sel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';});
-  }
   var sId=sel.value;if(!sId)return;
   if(_pfTab==='newcon')renderPfNewcon(sId);
   else if(_pfTab==='consult')renderPfConsult(sId);
