@@ -2947,7 +2947,7 @@ function renderRevMonthly(yr,mo){
     var isManual=(manualExp!==undefined&&manualExp!==null&&manualExp!=='');
     totalExpected+=dispExpected;totalTuitionFee+=tuitionFee;totalTextbookFee+=textbookFee;
     var c='text-align:center;font-size:11px';
-    return'<tr style="'+(paid?'':'background:#fff8f8')+';cursor:pointer" onclick="openRevenueModal(\''+(lastRev?.id||'')+'\',\''+s.id+'\','+yr+','+mo+')">'
+    return'<tr style="'+(paid?'':'background:#fff8f8')+';cursor:pointer" onclick="if(_editingExpected)return;openRevenueModal(\''+(lastRev?.id||'')+'\',\''+s.id+'\','+yr+','+mo+')">'
       +'<td style="'+c+'">'+(rowNum++)+'</td>'
       +'<td style="'+c+';font-weight:700">'+s.name+'</td>'
       +'<td style="'+c+'">'+(s.grade||'-')+'</td>'
@@ -2959,7 +2959,7 @@ function renderRevMonthly(yr,mo){
       +'<td style="'+c+';color:var(--red)">'+(pendingMakeups>0?pendingMakeups:'-')+'</td>'
       +'<td style="'+c+'" onclick="event.stopPropagation()"><select style="font-size:10px;border:1px solid var(--border);border-radius:4px;padding:1px;max-width:80px" onchange="saveRevSubMat(\''+s.id+'\',this.value,'+yr+','+mo+')">'+subMatOpts.replace('value="'+subMat+'"','value="'+subMat+'" selected')+'</select></td>'
       +'<td style="'+c+'">'+(subMatFee>0?subMatFee.toLocaleString()+'원':'-')+'</td>'
-      +'<td style="'+c+';font-weight:600;'+(isManual?'color:var(--blue)':'')+'"><span style="cursor:pointer;display:block" onclick="event.stopPropagation();event.preventDefault();editExpectedAmt(this.parentElement,\''+s.id+'\','+yr+','+mo+','+dispExpected+');return false">'+(dispExpected>0?dispExpected.toLocaleString()+'원':'-')+'</span></td>'
+      +'<td style="'+c+';font-weight:600;'+(isManual?'color:var(--blue)':'')+'"><span style="cursor:pointer;display:block" onmousedown="_editingExpected=true" onclick="event.stopPropagation();editExpectedAmt(this.parentElement,\''+s.id+'\','+yr+','+mo+','+dispExpected+')">'+(dispExpected>0?dispExpected.toLocaleString()+'원':'-')+'</span></td>'
       +'<td style="'+c+';font-weight:600;color:'+(paid&&paidAmt!==dispExpected&&dispExpected>0?'#dc2626':paid?'var(--mint)':'var(--red)')+'">'+( paid?paidAmt.toLocaleString()+'원':'미납')+'</td>'
       +'<td style="'+c+'" onclick="event.stopPropagation()"><select style="font-size:10px;border:1px solid var(--border);border-radius:4px;padding:1px" onchange="saveRevMethod(\''+s.id+'\',this.value,'+yr+','+mo+')"><option value=""'+(curMethod===''?' selected':'')+'>-</option><option value="계좌이체"'+(curMethod==='계좌이체'?' selected':'')+'>계좌이체</option><option value="카드"'+(curMethod==='카드'?' selected':'')+'>카드</option><option value="현금"'+(curMethod==='현금'?' selected':'')+'>현금</option><option value="결제 선생"'+(curMethod==='결제 선생'?' selected':'')+'>결제 선생</option><option value="지역화폐"'+(curMethod==='지역화폐'?' selected':'')+'>지역화폐</option></select></td>'
       +'<td style="'+c+'">'+(lastRev?.paidDate||'-')+'</td>'
@@ -3018,7 +3018,7 @@ var _editingExpected=false;
 function editExpectedAmt(td,studentId,yr,mo,current){
   if(td.querySelector('input'))return;
   _editingExpected=true;
-  setTimeout(function(){_editingExpected=false;},100);
+  setTimeout(function(){_editingExpected=false;},500);
   td.innerHTML='<input type="number" style="width:70px;font-size:11px;padding:2px 4px;border:1px solid var(--blue);border-radius:4px" value="'+current+'" onclick="event.stopPropagation()" onblur="saveExpectedAmt(\''+studentId+'\',this.value,'+yr+','+mo+')" onkeydown="if(event.key===\'Enter\')this.blur()">';
   td.querySelector('input').focus();
 }
