@@ -112,6 +112,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .s-card.absent{border-color:var(--red);background:#fff8f8}
 .s-card.early{border-color:var(--gold);background:#fffbeb}
 .s-card.newstu{border-color:#fbbf24;background:#fef9c3}
+.s-card.observed{border-color:#fbbf24;background:#fef9c3}
 .s-card-name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px}
 .s-card-sub{font-size:11px;color:var(--txt3);margin-bottom:8px}
 .s-card-btns{display:flex;gap:5px}
@@ -917,6 +918,13 @@ function goto(view){
 
 // ══ SCHEDULE ══
 var _scheduleDate=null; // null = today
+function toggleObserve(sId,isJoy){
+  if(isJoy){toast('Joy 단계는 자동 관찰 대상입니다');return;}
+  var key='obs_'+sId;
+  var cur=localStorage.getItem(key)==='1';
+  if(cur)localStorage.removeItem(key);else localStorage.setItem(key,'1');
+  renderSchedule();
+}
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
 function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
 function renderWeeklyTimetable(){
@@ -1179,7 +1187,9 @@ function renderSchedule(){
         if(s._isMakeup)pTime3=s._makeupTime||'';
         else if(pData2&&typeof pData2==='object')pTime3=pData2.time||'';
         var isNew=(s.status||'재원')==='신규';
-        html+='<div class="s-card'+(done?' done':absent?' absent':early?' early':isNew?' newstu':'')+'">';
+        var isJoy=(getStudentLevel(s)||'').toLowerCase().startsWith('joy');
+        var isObserved=localStorage.getItem('obs_'+s.id)==='1'||isJoy;
+        html+='<div class="s-card'+(done?' done':absent?' absent':early?' early':isNew?' newstu':isObserved?' observed':'')+'">';
         // Pin memos (고정)
         var sPins=memoMap[s.id]||[];
         sPins.forEach(function(pm){
@@ -1194,7 +1204,7 @@ function renderSchedule(){
             +'<input type="checkbox" onclick="event.stopPropagation();completeMemo(\''+aMemo.id+'\')" title="완료 처리" style="width:13px;height:13px">'
             +'<span style="flex:1">⚡ '+aMemo.content+'</span></div>';
         });
-        html+='<div class="s-card-name">'+s.name+badge+(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;margin-left:5px;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')+(pTime3?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+pTime3+'</span>':'')+'</div>';
+        html+='<div class="s-card-name">'+s.name+badge+(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;margin-left:5px;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')+(pTime3?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+pTime3+'</span>':'')+'<span style="cursor:pointer;margin-left:5px;font-size:11px;opacity:'+(isObserved?'1':'0.4')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')" title="관찰">👁</span></div>';
         html+='<div class="s-card-sub">'+getStudentLevel(s)+'</div>';
         html+='<div class="s-card-btns">';
         html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'present\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
