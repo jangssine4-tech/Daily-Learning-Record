@@ -1089,10 +1089,11 @@ function renderSchedule(){
   var todayStudents=students.filter(function(s){var st=s.status||'재원';return(st==='재원'||st==='신규')&&(s.days||[]).includes(dayName);});
   todayStudents.forEach(function(s){
     var pData=(s.periods||{})[dayName];var pNum=0,pTime='';
-    if(pData&&typeof pData==='object'){pNum=pData.period||0;pTime=pData.time||'';}else if(pData)pNum=parseInt(pData)||0;
-    // Fix: 시간이 있으면 customPeriods 시간 범위로 올바른 교시 결정
+    if(pData&&typeof pData==='object'){pTime=pData.time||'';}
+    // 시간 기반으로만 교시 결정 (등록 모달의 교시 설정 무시)
     if(pTime&&customPeriods.length>0){
       var tMin=timeToMin(pTime);
+      if(tMin<600)tMin+=720; // 10시 이전 → 오후로 변환
       var bestP=null;
       customPeriods.forEach(function(cp){
         var cpStart=timeToMin(cp.time);var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
@@ -1112,6 +1113,7 @@ function renderSchedule(){
     var pNum=0;
     if(mt){
       var tMin=timeToMin(mt);
+      if(tMin<600)tMin+=720; // 10시 이전 → 오후로 변환
       // Try matching customPeriods first
       if(customPeriods.length>0){
         customPeriods.forEach(function(cp){
@@ -1200,10 +1202,12 @@ function renderSchedule(){
         var done=rep&&!rep.absent&&!rep.earlyLeave;
         var absent=rep&&rep.absent;
         var early=rep&&rep.earlyLeave;
-        var badge=s._isMakeup?'<span class="badge bg-blue" style="font-size:9px;margin-left:4px">보강</span>':'';
+        var badge='';
         var pData2=(s.periods||{})[dayName];var pTime3='';
         if(s._isMakeup)pTime3=s._makeupTime||'';
         else if(pData2&&typeof pData2==='object')pTime3=pData2.time||'';
+        // Auto PM conversion for display
+        if(pTime3){var _tM=timeToMin(pTime3);if(_tM<600){var _h=parseInt(pTime3.split(':')[0])+12;pTime3=_h+':'+pTime3.split(':')[1];}}
         var isNew=(s.status||'재원')==='신규';
         var isJoy=(getStudentLevel(s)||'').toLowerCase().startsWith('joy');
         var isObserved=localStorage.getItem('obs_'+s.id)==='1';
