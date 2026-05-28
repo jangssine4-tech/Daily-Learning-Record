@@ -288,7 +288,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <button class="rev-tab active" id="mktab-calendar" onclick="switchMktTab('calendar')">📅 콘텐츠 캘린더</button>
 <button class="rev-tab" id="mktab-stats" onclick="switchMktTab('stats')">📊 채널별 실적</button>
 <button class="rev-tab" id="mktab-funnel" onclick="switchMktTab('funnel')">🔍 유입 경로 분석</button>
-<button class="rev-tab" id="mktab-routine" onclick="switchMktTab('routine')">📱 카톡 채널 루틴</button>
+<button class="rev-tab" id="mktab-routine" onclick="switchMktTab('routine')">📋 마케팅 루틴</button>
 <button class="rev-tab" id="mktab-events" onclick="switchMktTab('events')">🎉 월별 이벤트</button>
 <button class="rev-tab" id="mktab-promo" onclick="switchMktTab('promo')">📣 월별 홍보</button>
 </div>
@@ -525,7 +525,7 @@ async function login(){
 var _menuStruct=[
 {sec:'연간 계획',items:[
   {id:'goals',label:'목표 관리',subs:[{id:'goals_annual',label:'연간 목표'},{id:'goals_monthly',label:'월별 목표'},{id:'goals_memo',label:'월별 메모'}]},
-  {id:'marketing',label:'마케팅 관리',subs:[{id:'mk_calendar',label:'콘텐츠 캘린더'},{id:'mk_stats',label:'채널별 실적'},{id:'mk_funnel',label:'유입 경로 분석'},{id:'mk_routine',label:'카톡 채널 루틴'},{id:'mk_events',label:'월별 이벤트'},{id:'mk_promo',label:'월별 홍보'}]},
+  {id:'marketing',label:'마케팅 관리',subs:[{id:'mk_calendar',label:'콘텐츠 캘린더'},{id:'mk_stats',label:'채널별 실적'},{id:'mk_funnel',label:'유입 경로 분석'},{id:'mk_routine',label:'마케팅 루틴'},{id:'mk_events',label:'월별 이벤트'},{id:'mk_promo',label:'월별 홍보'}]},
   {id:'summary',label:'월별 현황',subs:[{id:'sum_overview',label:'현황 요약'},{id:'sum_revenue',label:'월별 매출현황'},{id:'sum_expense',label:'월별 수입지출'},{id:'sum_teacher',label:'강사'}]}]},
 {sec:'학생 관리',items:[
   {id:'students',label:'학생 목록'},
@@ -3790,7 +3790,7 @@ function initMkSelects(){
   if(ysel&&!ysel.options.length){var cy=new Date().getFullYear();for(var y=cy-1;y<=cy+1;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';ysel.appendChild(o);}ysel.value=cy;ysel.onchange=function(){renderMarketing();};}
   if(msel&&!msel.options.length){for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';msel.appendChild(o2);}msel.value=new Date().getMonth()+1;msel.onchange=function(){renderMarketing();};}
 }
-function switchMktTab(tab){_mkTab=tab;['calendar','stats','funnel','routine','events','promo'].forEach(function(t){var btn=$('mktab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mk-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='routine')renderMkRoutine();else if(tab==='events')renderMkEvents();else if(tab==='promo')renderMkPromo();else renderMarketing();}
+function switchMktTab(tab){_mkTab=tab;['calendar','stats','funnel','routine','events','promo'].forEach(function(t){var btn=$('mktab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mk-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='routine'){loadMkRoutineData().then(function(){renderMkRoutine();});}else if(tab==='events')renderMkEvents();else if(tab==='promo')renderMkPromo();else renderMarketing();}
 async function loadMkContents(){try{var snap=await db.collection('mkContents').get();_mkContents=snap.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){_mkContents=[];}}
 async function loadMkStats(){try{var snap=await db.collection('mkStats').get();_mkStats=snap.docs.map(function(d){return{id:d.id,...d.data()};});}catch(e){_mkStats=[];}}
 function renderMarketing(){
@@ -3973,99 +3973,96 @@ async function saveMkPromo(yr){
 
 function renderMkRoutine(){
   var el=$('mk-routine-area');if(!el)return;
+  var today=new Date();var dow=today.getDay();
   var dayNames=['일','월','화','수','목','금','토'];
-  var today=new Date();var todayDay=dayNames[today.getDay()];
-  var dailyTasks=[
-    {time:'09:30',task:'카톡 채널 확인 및 응답 (1:1 채팅, 신규 채널 추가자, 상담 요청)',icon:'💬'},
-    {time:'10:00',task:'Push 메시지 발송 (월·목)',icon:'📢'},
-    {time:'틈날 때',task:'블로그 글 주제 선정',icon:'💡',hasMemo:true},
-    {time:'퇴근 전',task:'내일 마케팅 메모 정리',icon:'📝'}
-  ];
-  var weeklyTasks={
-    '월':{task:'블로그 글 아이디어 메모',detail:'학부모 자주 묻는 질문에서 소재 발굴',icon:'📝'},
-    '화':{task:'인스타 콘텐츠 제작',detail:'수업 현장, 학생 성과, 교재 소개',icon:'📸'},
-    '수':{task:'블로그 글 작성 + 발행',detail:'교육 정보, 학습법, 단계별 로드맵',icon:'✍️'},
-    '목':{task:'카톡 채널 Push 발송',detail:'교육 정보/이벤트/전달사항 (10시 발송)',icon:'📢'},
-    '금':{task:'주간 성과 점검',detail:'채널 추가 수, 메시지 클릭률, 블로그 조회',icon:'📊'},
-    '토':{task:'다음 주 콘텐츠 기획',detail:'월간 캘린더 기반 다음 주 계획',icon:'💡'}
+  var dateKey=todayISO();
+  // Day-specific tasks from reference docs
+  var weekPlan={
+    1:{title:'📐 주간 설계일',tasks:['지난주 성과 확인 (문의/상담/등록)','이번 주 블로그·인스타·카카오 주제 확정','CRM 리마인드 대상 분류','광고 예산 점검']},
+    2:{title:'🔍 검색 유입 강화일',tasks:['블로그 글 1건 발행 (하단 상담 CTA 포함)','네이버 플레이스 사진/후기 업데이트','자주 묻는 질문 1개 추가','지역 커뮤니티 노출 문구 준비']},
+    3:{title:'📸 SNS 노출일',tasks:['인스타 피드 1건 발행','릴스/숏폼 1건 업로드','스토리 3~5회 게시','댓글/DM 응답 완료']},
+    4:{title:'🎯 전환 강화일',tasks:['카카오채널 메시지 발송','미응답 문의 1차 재접촉','상담 예약 미확정 고객 정리','후기 요청 메시지 발송','체험수업 안내 발송']},
+    5:{title:'📍 지역 확산일',tasks:['당근 게시글/홍보물 등록','전단지/현수막 위치 점검','오프라인 이벤트 안내문 확인','주말 체험수업 안내 발송']},
+    6:{title:'🤝 상담·체험 운영일',tasks:['상담 진행 및 기록 입력','체험수업 운영','상담 후 당일 후속 연락','후기 수집·현장 사진 확보']},
+    0:{title:'📊 정리·개선일',tasks:['주간 KPI 점검 (문의→상담→등록)','잘 된 콘텐츠 1개 분석','다음 주 콘텐츠 제목 3개 뽑기','CRM 미전환자 재분류']}
   };
-  var monthlyTasks=[
-    {day:'1일',task:'월간 소식지 발송',detail:'학사 일정, 전달사항',icon:'📰'},
-    {day:'5일',task:'채널 추가 이벤트 기획/갱신',detail:'동네 학부모 유입 전략',icon:'🎯'},
-    {day:'15일',task:'무료 PDF 배포 콘텐츠 제작',detail:'학습 가이드, 체크리스트 등',icon:'📄'},
-    {day:'20일',task:'다음 달 콘텐츠 캘린더 작성',detail:'월간 주제 및 발행 일정',icon:'📅'},
-    {day:'25일',task:'월간 성과 분석',detail:'유입, 전환, 채널 추가 수 리뷰',icon:'📈'}
-  ];
-  var strategyItems=[
-    {title:'1. 노출',items:['블로그에 카톡 채널 오픈 소식 알리기','블로그에 위젯 달기','무료 PDF 배포']},
-    {title:'2. 콘텐츠 큐레이션',items:['자주 묻는 답변 세팅 (교육비, 다음 단계 소개, 학사 일정, 전달 사항)','다음 단계 소개: 학습 목표, 수업 방식, 숙제 안내, 로드맵']},
-    {title:'3. 채널 추가 유도',items:['상담 신청을 채널로 유도','채널 추가 시 혜택 제공','채널 추가 이벤트 기획 & 실행']},
-    {title:'4. Push Message',items:['월 1회 소식지, 교육 정보, 전달 사항','특정 이벤트, 강의 모집, 특강, 홍보','발송 시간: 10시 (클릭 최적 시간대)']},
-    {title:'5. 비즈니스 도구',items:['쿠폰 활용']},
-    {title:'6. 1:1 채팅',items:['숙제 관리, 학부모 소통']}
-  ];
-  // Today highlight
-  var todayWeekly=weeklyTasks[todayDay];
-  var html='<div style="margin-bottom:20px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">📱 카카오톡 채널 운영 루틴</div>';
+  var dailyTasks=['오늘 발행 콘텐츠 1건 확인','댓글/DM/채널 문의 응답 (30분 내)','상담 리드 상태 업데이트','후기 요청 1건 발송','당일 광고/노출 체크','내일 게시물 예약 확인'];
+  // Load saved checks from Firestore cache
+  var saved=window._mkRoutineChecks||{};var todaySaved=saved[dateKey]||{};
+  var todayPlan=weekPlan[dow]||{title:'',tasks:[]};
+  var html='<div style="margin-bottom:16px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px">📋 마케팅 루틴</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">'+dateKey+' '+dayNames[dow]+'요일</div>';
   // Today's focus
-  if(todayWeekly){
-    html+='<div style="background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:2px solid var(--mint);border-radius:12px;padding:14px;margin-bottom:16px">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">🎯 오늘('+todayDay+'요일) 핵심 업무</div>'
-      +'<div style="font-size:15px;font-weight:800;color:var(--mint)">'+todayWeekly.icon+' '+todayWeekly.task+'</div>'
-      +'<div style="font-size:12px;color:var(--txt2);margin-top:4px">'+todayWeekly.detail+'</div></div>';
-  }
+  html+='<div style="background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:2px solid var(--mint);border-radius:12px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:8px">'+todayPlan.title+'</div>';
+  todayPlan.tasks.forEach(function(t,i){
+    var ck=todaySaved['w'+i]?'checked':'';
+    html+='<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:12px">'
+      +'<input type="checkbox" class="mk-rt-check" data-key="w'+i+'" '+ck+' onchange="saveMkRoutineCheck(\''+dateKey+'\',\'w'+i+'\',this.checked)">'
+      +'<span style="'+(ck?'text-decoration:line-through;color:var(--txt3)':'')+'">'+t+'</span></label>';
+  });
+  html+='</div>';
   // Daily routine
-  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">⏰ 일간 루틴 (매일 30분)</div>';
-  var blogMemo=localStorage.getItem('mk_blog_memo')||'';
-  dailyTasks.forEach(function(t,ti){
-    html+='<div style="padding:6px 0;border-bottom:1px solid var(--border)">'
-      +'<div style="display:flex;gap:10px;align-items:center">'
-      +'<span style="font-size:11px;font-weight:700;color:var(--blue);min-width:55px">'+t.time+'</span>'
-      +'<span style="font-size:12px">'+t.icon+' '+t.task+'</span></div>';
-    if(t.hasMemo){
-      html+='<div style="margin-top:6px;margin-left:65px">'
-        +'<textarea id="mk-blog-memo" class="fi" rows="2" style="font-size:12px;background:#fffbeb;border:1px solid #fde68a" placeholder="떠오르는 블로그 주제를 메모하세요..." oninput="localStorage.setItem(\'mk_blog_memo\',this.value)">'+blogMemo+'</textarea>'
-        +'</div>';
-    }
-    html+='</div>';
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">⏰ 일간 루틴 (매일)</div>';
+  dailyTasks.forEach(function(t,i){
+    var ck=todaySaved['d'+i]?'checked':'';
+    html+='<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:12px">'
+      +'<input type="checkbox" class="mk-rt-check" data-key="d'+i+'" '+ck+' onchange="saveMkRoutineCheck(\''+dateKey+'\',\'d'+i+'\',this.checked)">'
+      +'<span style="'+(ck?'text-decoration:line-through;color:var(--txt3)':'')+'">'+t+'</span></label>';
   });
   html+='</div>';
-  // Weekly routine
-  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">📆 주간 루틴</div>';
-  ['월','화','수','목','금','토'].forEach(function(d){
-    var t=weeklyTasks[d];if(!t)return;
-    var isToday=d===todayDay;
-    html+='<div style="display:flex;gap:10px;padding:6px 4px;border-bottom:1px solid var(--border);align-items:center;'+(isToday?'background:#f0fdf4;border-radius:6px;font-weight:700':'')+'">'
-      +'<span style="font-size:12px;font-weight:700;min-width:24px;color:'+(isToday?'var(--mint)':'var(--txt2)')+'">'+d+'</span>'
-      +'<span style="font-size:12px;flex:1">'+t.icon+' '+t.task+'</span>'
-      +'<span style="font-size:10px;color:var(--txt3)">'+t.detail+'</span></div>';
+  // Weekly overview
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📆 주간 핵심 업무 요약</div>';
+  [1,2,3,4,5,6,0].forEach(function(d){
+    var p=weekPlan[d];var isToday=d===dow;
+    html+='<div style="padding:6px 4px;border-bottom:1px solid var(--border);'+(isToday?'background:#f0fdf4;border-radius:6px;font-weight:700':'')+'">'
+      +'<span style="font-size:11px;font-weight:700;min-width:20px;display:inline-block;color:'+(isToday?'var(--mint)':'var(--txt2)')+'">'+dayNames[d]+'</span> '
+      +'<span style="font-size:12px">'+p.title+'</span></div>';
   });
   html+='</div>';
-  // Monthly routine
-  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">📅 월간 루틴</div>';
-  monthlyTasks.forEach(function(t){
-    html+='<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--border);align-items:center">'
-      +'<span style="font-size:11px;font-weight:700;color:var(--blue);min-width:30px">'+t.day+'</span>'
-      +'<span style="font-size:12px;flex:1">'+t.icon+' '+t.task+'</span>'
-      +'<span style="font-size:10px;color:var(--txt3)">'+t.detail+'</span></div>';
-  });
-  html+='</div>';
-  // Strategy overview
+  // Monthly targets
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 월간 콘텐츠 기준</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">'
+    +'<div style="padding:6px;background:#f0fdf4;border-radius:6px">📝 블로그 8~12건</div>'
+    +'<div style="padding:6px;background:#eff6ff;border-radius:6px">📸 인스타 피드 8건</div>'
+    +'<div style="padding:6px;background:#fef3c7;border-radius:6px">💬 카카오채널 2~4회</div>'
+    +'<div style="padding:6px;background:#fce7f3;border-radius:6px">🥕 당근 2~4회</div>'
+    +'<div style="padding:6px;background:#f3e8ff;border-radius:6px">📍 플레이스 업데이트 2회+</div>'
+    +'<div style="padding:6px;background:#ecfdf5;border-radius:6px">🎓 체험수업/설명회 월1회</div>'
+    +'</div></div>';
+  // KPI section
+  var kpiSaved=window._mkKpi||{};var moKey=dateKey.substring(0,7);var moKpi=kpiSaved[moKey]||{};
   html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">'
-    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">🗺️ 채널 운영 전략 요약</div>';
-  strategyItems.forEach(function(s){
-    html+='<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:4px">'+s.title+'</div>';
-    s.items.forEach(function(item){
-      html+='<div style="font-size:11px;color:var(--txt2);padding:2px 0 2px 12px">• '+item+'</div>';
-    });
-    html+='</div>';
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📊 이번 달 KPI</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  [{k:'inquiry',l:'문의 수'},{k:'consult',l:'상담 예약'},{k:'visit',l:'방문 수'},{k:'enroll',l:'등록 수'},{k:'review',l:'후기 수'},{k:'referral',l:'소개 수'}].forEach(function(kpi){
+    html+='<div style="text-align:center"><div style="font-size:10px;color:var(--txt3)">'+kpi.l+'</div>'
+      +'<input type="number" class="fi mk-kpi-input" data-kpi="'+kpi.k+'" value="'+(moKpi[kpi.k]||0)+'" style="text-align:center;font-size:14px;font-weight:700;padding:4px;width:100%" onchange="saveMkKpi(\''+moKey+'\',\''+kpi.k+'\',this.value)"></div>';
   });
-  html+='</div></div>';
+  html+='</div></div></div>';
   el.innerHTML=html;
+}
+function saveMkRoutineCheck(dateKey,itemKey,checked){
+  if(!window._mkRoutineChecks)window._mkRoutineChecks={};
+  if(!window._mkRoutineChecks[dateKey])window._mkRoutineChecks[dateKey]={};
+  window._mkRoutineChecks[dateKey][itemKey]=checked;
+  db.collection('mkRoutine').doc(dateKey).set(window._mkRoutineChecks[dateKey]).catch(function(){});
+  // Update strikethrough
+  var label=event.target.closest('label');if(label){var sp=label.querySelector('span');if(sp)sp.style=checked?'text-decoration:line-through;color:var(--txt3)':'';}
+}
+function saveMkKpi(moKey,field,val){
+  if(!window._mkKpi)window._mkKpi={};
+  if(!window._mkKpi[moKey])window._mkKpi[moKey]={};
+  window._mkKpi[moKey][field]=parseInt(val)||0;
+  db.collection('mkKpi').doc(moKey).set(window._mkKpi[moKey]).catch(function(){});
+}
+async function loadMkRoutineData(){
+  try{var d=await db.collection('mkRoutine').doc(todayISO()).get();window._mkRoutineChecks={};if(d.exists)window._mkRoutineChecks[todayISO()]=d.data();}catch(e){}
+  try{var moKey=todayISO().substring(0,7);var k=await db.collection('mkKpi').doc(moKey).get();window._mkKpi={};if(k.exists)window._mkKpi[moKey]=k.data();}catch(e){}
 }
 
 // ══ STAFF ══
