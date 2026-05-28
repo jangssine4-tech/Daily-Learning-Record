@@ -925,6 +925,13 @@ function toggleObserve(sId,isJoy){
   if(cur)localStorage.removeItem(key);else localStorage.setItem(key,'1');
   renderSchedule();
 }
+function toggleCardTag(key,el){
+  var cur=localStorage.getItem(key)==='1';
+  if(cur)localStorage.removeItem(key);else localStorage.setItem(key,'1');
+  var colors=key.startsWith('tbl_')?['#3b82f6','#fff','#eff6ff','#1e40af']:['#7c3aed','#fff','#f3e8ff','#6b21a8'];
+  if(!cur){el.style.background=colors[0];el.style.color=colors[1];}
+  else{el.style.background=colors[2];el.style.color=colors[3];}
+}
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
 function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
 function renderWeeklyTimetable(){
@@ -1207,7 +1214,12 @@ function renderSchedule(){
             +'<input type="checkbox" onclick="event.stopPropagation();completeMemo(\''+aMemo.id+'\')" title="완료 처리" style="width:13px;height:13px">'
             +'<span style="flex:1">⚡ '+aMemo.content+'</span></div>';
         });
-        html+='<div class="s-card-name">'+s.name+badge+(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;margin-left:5px;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')+(pTime3?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+pTime3+'</span>':'')+'<span style="cursor:pointer;margin-left:5px;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')" title="관찰">관찰</span></div>';
+        var isTablet=localStorage.getItem('tbl_'+s.id)==='1';
+        var isBook=localStorage.getItem('bk_'+s.id)==='1';
+        html+='<div class="s-card-name">'+s.name+badge+(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;margin-left:5px;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')+(pTime3?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+pTime3+'</span>':'')+'<span style="cursor:pointer;margin-left:5px;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')" title="관찰">관찰</span>'
+          +'<span style="cursor:pointer;margin-left:3px;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #60a5fa;background:'+(isTablet?'#3b82f6;color:#fff':'#eff6ff;color:#1e40af')+'" onclick="event.stopPropagation();toggleCardTag(\'tbl_'+s.id+'\',this)">태블릿</span>'
+          +'<span style="cursor:pointer;margin-left:3px;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #a78bfa;background:'+(isBook?'#7c3aed;color:#fff':'#f3e8ff;color:#6b21a8')+'" onclick="event.stopPropagation();toggleCardTag(\'bk_'+s.id+'\',this)">교재</span>'
+          +'</div>';
         html+='<div class="s-card-sub">'+getStudentLevel(s)+'</div>';
         html+='<div class="s-card-btns">';
         html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'present\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
