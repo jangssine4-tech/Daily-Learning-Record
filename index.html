@@ -3848,25 +3848,60 @@ function renderMkCalendar(yr,mo){
   var el=$('mk-calendar-area');if(!el)return;
   if(!_mkContents.length){loadMkContents().then(function(){renderMkCalendar(yr,mo);});return;}
   var list=_mkContents.filter(function(c){var d=new Date(c.date);return d.getFullYear()===yr&&d.getMonth()===mo-1;}).sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
-  var channels={'블로그':'bg-green','당근마켓':'bg-gold','인스타그램':'bg-blue','카카오채널':'bg-navy'};
+  var channels={'블로그':'#86efac','당근마켓':'#fdba74','인스타그램':'#fda4af','카카오채널':'#fde68a','상담':'#99f6e4','체험수업':'#c4b5fd','오프라인':'#cbd5e1'};
+  var channelBadges={'블로그':'bg-green','당근마켓':'bg-gold','인스타그램':'bg-blue','카카오채널':'bg-navy','상담':'bg-mint','체험수업':'bg-red','오프라인':'bg-gray'};
+  // CRM summary from consultations
+  var moConsults=consultations.filter(function(c){return c.date&&c.date.substring(0,7)===yr+'-'+String(mo).padStart(2,'0');});
+  var moNewCon=newConsults.filter(function(c){return c.date&&c.date.substring(0,7)===yr+'-'+String(mo).padStart(2,'0');});
+  var html='<div style="margin-bottom:14px">';
+  // Summary cards
+  html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+    +'<div style="background:#eff6ff;border-radius:10px;padding:10px 14px;flex:1;min-width:70px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--blue)">'+moNewCon.length+'</div><div style="font-size:10px;color:var(--txt3)">신규 문의</div></div>'
+    +'<div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;flex:1;min-width:70px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--mint)">'+moConsults.length+'</div><div style="font-size:10px;color:var(--txt3)">상담</div></div>'
+    +'<div style="background:#fefce8;border-radius:10px;padding:10px 14px;flex:1;min-width:70px;text-align:center"><div style="font-size:18px;font-weight:800;color:#b45309">'+list.filter(function(c){return c.status==='완료';}).length+'/'+list.length+'</div><div style="font-size:10px;color:var(--txt3)">콘텐츠</div></div>'
+    +'</div>';
+  // Calendar grid
+  var firstDay=new Date(yr,mo-1,1).getDay();
+  var daysInMonth=new Date(yr,mo,0).getDate();
+  var contentByDate={};list.forEach(function(c){var d=parseInt(c.date.split('-')[2]);if(!contentByDate[d])contentByDate[d]=[];contentByDate[d].push(c);});
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="margin:0">📅 '+yr+'년 '+mo+'월</h4><button class="btn btn-green btn-xs" onclick="openMkContentModal()">+ 일정 추가</button></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;font-size:10px;text-align:center">';
+  ['일','월','화','수','목','금','토'].forEach(function(d){html+='<div style="padding:4px;font-weight:700;color:var(--navy);background:var(--surface2)">'+d+'</div>';});
+  for(var i=0;i<firstDay;i++)html+='<div style="padding:4px"></div>';
+  var today=new Date();var todayD=(today.getFullYear()===yr&&today.getMonth()+1===mo)?today.getDate():0;
+  for(var d=1;d<=daysInMonth;d++){
+    var items=contentByDate[d]||[];
+    var isToday=d===todayD;
+    html+='<div style="padding:3px 2px;min-height:40px;border:1px solid var(--border);border-radius:4px;'+(isToday?'background:#eff6ff;border-color:var(--blue)':'')+';cursor:pointer;vertical-align:top" onclick="openMkContentModal(null,'+yr+','+mo+','+d+')">'
+      +'<div style="font-size:11px;font-weight:'+(isToday?'800':'600')+';color:'+(isToday?'var(--blue)':'var(--txt)')+'">'+d+'</div>';
+    items.slice(0,2).forEach(function(c){var bg=channels[c.channel]||'#e2e8f0';html+='<div style="font-size:8px;background:'+bg+';border-radius:3px;padding:0 3px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1e293b">'+(c.topic||c.channel)+'</div>';});
+    if(items.length>2)html+='<div style="font-size:8px;color:var(--txt3)">+' +(items.length-2)+'</div>';
+    html+='</div>';
+  }
+  html+='</div></div>';
+  // Content list
   var rows=list.length?list.map(function(c){
-    var badge=channels[c.channel]||'bg-gray';
+    var badge=channelBadges[c.channel]||'bg-gray';
     var statusBadge=c.status==='완료'?'bg-mint':'bg-gold';
-    return '<tr onclick="openMkContentModal(\''+c.id+'\')" style="cursor:pointer"><td>'+(c.date||'-')+'</td><td><span class="badge '+badge+'">'+(c.channel||'-')+'</span></td><td style="font-weight:600">'+(c.topic||'-')+'</td><td style="font-size:11px;color:var(--txt3)">'+(c.keywords||'-')+'</td><td><span class="badge '+statusBadge+'">'+(c.status||'예정')+'</span></td><td style="font-size:11px">'+(c.memo||'-')+'</td></tr>';
-  }).join(''):'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--txt3)">등록된 콘텐츠 없음</td></tr>';
-  el.innerHTML='<div class="expense-section"><h4>📅 '+yr+'년 '+mo+'월 콘텐츠 캘린더 <button class="btn btn-green btn-xs" style="float:right" onclick="openMkContentModal()">+ 콘텐츠 추가</button></h4>'
-    +'<div style="display:flex;gap:8px;margin-bottom:10px;font-size:12px"><span>전체 '+list.length+'건</span><span style="color:var(--mint)">완료 '+list.filter(function(c){return c.status==='완료';}).length+'건</span><span style="color:var(--gold)">예정 '+list.filter(function(c){return c.status!=='완료';}).length+'건</span></div>'
-    +'<table class="rev-tbl"><thead><tr><th>발행일</th><th>채널</th><th>주제</th><th>키워드</th><th>상태</th><th>비고</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    return '<tr onclick="openMkContentModal(\''+c.id+'\')" style="cursor:pointer"><td>'+(c.date||'-')+'</td><td><span class="badge '+badge+'">'+(c.channel||'-')+'</span></td><td style="font-weight:600">'+(c.topic||'-')+'</td><td><span class="badge '+statusBadge+'">'+(c.status||'예정')+'</span></td><td style="font-size:11px">'+(c.memo||'-')+'</td></tr>';
+  }).join(''):'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--txt3)">등록된 일정 없음</td></tr>';
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📋 일정 목록</div>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl"><thead><tr><th>날짜</th><th>채널</th><th>주제/내용</th><th>상태</th><th>비고</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  html+='</div>';
+  el.innerHTML=html;
 }
-function openMkContentModal(id){
+function openMkContentModal(id,clickYr,clickMo,clickDay){
   var c=id?_mkContents.find(function(x){return x.id===id;}):null;
-  var yr=parseInt($('mk-year')?.value)||new Date().getFullYear();
-  var mo=parseInt($('mk-month')?.value)||new Date().getMonth()+1;
+  var yr=clickYr||parseInt($('mk-year')?.value)||new Date().getFullYear();
+  var mo=clickMo||parseInt($('mk-month')?.value)||new Date().getMonth()+1;
+  var defaultDate=clickDay?yr+'-'+String(mo).padStart(2,'0')+'-'+String(clickDay).padStart(2,'0'):yr+'-'+String(mo).padStart(2,'0')+'-01';
   var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
-  overlay.innerHTML='<div class="ms"><div class="mh"></div><div class="mt">'+(id?'콘텐츠 수정':'콘텐츠 추가')+'</div>'
-    +'<div class="field"><div class="fl">발행일</div><input type="date" class="fi" id="mkc-date" value="'+(c?.date||yr+'-'+String(mo).padStart(2,'0')+'-01')+'"></div>'
-    +'<div class="r2"><div class="field"><div class="fl">채널</div><select class="fi" id="mkc-channel"><option value="블로그">네이버 블로그</option><option value="당근마켓">당근마켓</option><option value="인스타그램">인스타그램</option><option value="카카오채널">카카오 채널</option></select></div>'
+  overlay.innerHTML='<div class="ms"><div class="mh"></div><div class="mt">'+(id?'일정 수정':'일정 추가')+'</div>'
+    +'<div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="mkc-date" value="'+(c?.date||defaultDate)+'"></div>'
+    +'<div class="r2"><div class="field"><div class="fl">채널/유형</div><select class="fi" id="mkc-channel"><option value="블로그">블로그</option><option value="인스타그램">인스타그램</option><option value="카카오채널">카카오 채널</option><option value="당근마켓">당근마켓</option><option value="상담">상담/체험</option><option value="오프라인">오프라인</option></select></div>'
     +'<div class="field"><div class="fl">상태</div><select class="fi" id="mkc-status"><option value="예정">예정</option><option value="완료">완료</option></select></div></div>'
     +'<div class="field"><div class="fl">주제</div><input class="fi" id="mkc-topic" value="'+(c?.topic||'')+'" placeholder="콘텐츠 주제"></div>'
     +'<div class="field"><div class="fl">키워드</div><input class="fi" id="mkc-keywords" value="'+(c?.keywords||'')+'" placeholder="#군포영어학원 #초등영어"></div>'
