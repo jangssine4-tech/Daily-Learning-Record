@@ -249,7 +249,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 
 <div id="content">
 <div id="mob-top-bar" onclick="toggleMobMenu()">☰ 메뉴</div>
-<div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">📅 오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">📋 주간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">📊 수용 현황</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">📌 전달 사항</button><button class="rev-tab" id="schtab-crm" onclick="switchSchTab('crm')">📋 오늘의 업무</button></div><div id="sch-panel-today" style="flex:1;overflow-y:auto"><div class="toolbar" style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button></div><div id="schedule-notes-award" style="margin-bottom:0"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="weekly-schedule-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div><div id="sch-panel-crm" style="display:none"><div class="cp" id="crm-daily-area"></div></div></div>
+<div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-crm" onclick="switchSchTab('crm')">📋 오늘의 업무</button><button class="rev-tab" id="schtab-today" onclick="switchSchTab('today')">📅 오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">📋 주간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">📊 수용 현황</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">📌 전달 사항</button></div><div id="sch-panel-crm"><div class="cp" id="crm-daily-area"></div></div><div id="sch-panel-today" style="display:none"><div class="toolbar" style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button></div><div id="schedule-notes-award" style="margin-bottom:0"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="weekly-schedule-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
   <div class="cp" style="max-width:560px"><div class="card" style="padding:16px">
     <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
@@ -598,7 +598,7 @@ async function bootApp(){
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCrmDone();db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCrmDone().then(function(){renderCrmDaily();});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -631,7 +631,7 @@ async function bootApp(){
         try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes()]);}catch(e){}
         try{var kDoc=await db.collection('config').doc('kakao').get();if(kDoc.exists)window._kakaoConfig=kDoc.data();}catch(e){}
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return {id:d.id,...d.data()};});}catch(e){}
-        saveCache();applyMenuPerms();
+        saveCache();applyMenuPerms();renderCrmDaily();
         startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();
       }, 500);
     } catch(e) {
@@ -904,7 +904,7 @@ function goto(view){
   var bEl=$('snav-'+view);if(bEl)bEl.classList.add('active');
   // Only populate selects when navigating away from schedule
   if(view!=='schedule') ensureFullPopulate();
-  if(view==='schedule'){renderSchedule();renderScheduleNotes();}
+  if(view==='schedule'){loadCrmDone().then(function(){renderCrmDaily();});renderScheduleNotes();}
   else if(view==='history'){loadReports().then(renderHistory);}
   else if(view==='students'){
     var syf=$('s-filter-year'),smf2=$('s-filter-month');
@@ -1024,13 +1024,14 @@ function renderScheduleNotes(){
 // ══ CRM 오늘의 업무 자동 생성 ══
 function renderCrmDaily(){
   var el=$('crm-daily-area');if(!el)return;
+  try{
   var today=new Date();var todayStr=todayISO();
   var tasks=[];
-  var activeS=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var activeS=(students||[]).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
   var doneKeys=window._crmDone||{};
 
   // 1. 상담 후 미등록 (newConsults: 3일 경과)
-  newConsults.forEach(function(nc){
+  (newConsults||[]).forEach(function(nc){
     if(!nc.date)return;
     var daysDiff=Math.floor((today-new Date(nc.date))/(86400000));
     if(daysDiff>=3&&daysDiff<=30&&nc.result!=='등록'&&nc.result!=='등록완료'){
@@ -1060,14 +1061,14 @@ function renderCrmDaily(){
   });
 
   // 4. 상담 예정 (consultations에서 상담 예정 상태)
-  consultations.forEach(function(c){
+  (consultations||[]).forEach(function(c){
     if(c.consultStatus==='상담 예정'&&c.date>=todayStr){
       tasks.push({id:'con_'+c.id,priority:2,cat:'🟡 학습 관리',type:'상담 예정',name:c.studentName||'-',reason:c.date+' '+c.type,action:'상담 준비',phone:''});
     }
   });
 
   // 5. 보강 예정 (오늘)
-  makeups.filter(function(m){return m.scheduledDate===todayStr&&m.status==='scheduled';}).forEach(function(m){
+  (makeups||[]).filter(function(m){return m.scheduledDate===todayStr&&m.status==='scheduled';}).forEach(function(m){
     var s=students.find(function(x){return x.id===m.studentId;});
     tasks.push({id:'mk_'+m.id,priority:2,cat:'🟡 학습 관리',type:'보강 수업',name:s?.name||m.studentName||'-',reason:'오늘 보강 예정',action:'보강 수업 진행',phone:s?.phoneMom||''});
   });
@@ -1081,7 +1082,7 @@ function renderCrmDaily(){
   });
 
   // 7. 퇴원생 재안내 (퇴원 30~90일)
-  students.filter(function(s){return s.status==='퇴원'&&s.leftDate;}).forEach(function(s){
+  (students||[]).filter(function(s){return s.status==='퇴원'&&s.leftDate;}).forEach(function(s){
     var daysSince=Math.floor((today-new Date(s.leftDate))/86400000);
     if(daysSince>=30&&daysSince<=90&&daysSince%30<7)
       tasks.push({id:'left_'+s.id,priority:3,cat:'🟢 CRM',type:'퇴원생 재안내',name:s.name,reason:'퇴원 '+daysSince+'일 경과',action:'재등록/특강 안내',phone:s.phoneMom||''});
@@ -1125,6 +1126,7 @@ function renderCrmDaily(){
   }
   html+='</div>';
   el.innerHTML=html;
+  }catch(e){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">📋 데이터 로딩 중... 잠시 후 탭을 다시 클릭해주세요.</div>';}
 }
 function completeCrmTask(id){
   if(!window._crmDone)window._crmDone={};
@@ -4725,7 +4727,7 @@ function renderRevSummary(yr){
   var cellR=function(i,val,style){if(isFuture(i)||!hasD(i))return'<td></td>';return'<td style="text-align:right;'+(style||'')+'">'+val+'</td>';};
   var mTHR=months.map(function(m){return'<th style="text-align:right;min-width:52px">'+m+'</th>';}).join('');
   var revRowsHTML='<tr><td>수강료 수입</td>'+monthData.map(function(d,i){return cellR(i,d.totalRev?d.totalRev.toLocaleString()+'원':'₩0','color:var(--mint);font-weight:600');}).join('')+'</tr><tr><td>지출 합계</td>'+monthData.map(function(d,i){return cellR(i,d.totalExp?d.totalExp.toLocaleString()+'원':'₩0','color:var(--red)');}).join('')+'</tr><tr style="background:var(--surface2)"><td style="font-weight:700">순수익</td>'+monthData.map(function(d,i){return cellR(i,d.net.toLocaleString()+'원',d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700');}).join('')+'</tr>';
-  el.innerHTML='<div class="expense-section"><h4>💰 매출 현황 ('+yr+'년)</h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px"><thead><tr><th>항목</th>'+mTHR+'</tr></thead><tbody>'+revRowsHTML+'</tbody></table></div></div><div class="expense-section"><h4>👥 원생 현황</h4><div style="text-align:center;padding:10px;color:var(--txt3)">재원 '+activeStudents2.length+'명 · 신규 '+students.filter(function(s){return s.status==='신규';}).length+'명 · 퇴원 '+students.filter(function(s){return s.status==='퇴원';}).length+'명 · 휴원 '+students.filter(function(s){return s.status==='휴원';}).length+'명</div></div>';
+  el.innerHTML='<div class="expense-section"><h4>💰 매출 현황 ('+yr+'년)</h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px"><thead><tr><th>항목</th>'+mTHR+'</tr></thead><tbody>'+revRowsHTML+'</tbody></table></div></div><div class="expense-section"><h4>👥 원생 현황</h4><div style="text-align:center;padding:10px;color:var(--txt3)">재원 '+activeStudents2.length+'명 · 신규 '+(students||[]).filter(function(s){return s.status==='신규';}).length+'명 · 퇴원 '+(students||[]).filter(function(s){return s.status==='퇴원';}).length+'명 · 휴원 '+(students||[]).filter(function(s){return s.status==='휴원';}).length+'명</div></div>';
 }
 
 // ══ GOALS ══
