@@ -2803,7 +2803,29 @@ function printConsultCommentView(){
   setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
 async function deleteConsult(){var id=$('con-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('consultations').doc(id).delete();await loadConsultations();renderConsults();closeM('consult');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
-function renderNewConsults(){if(!newConsults.length){$('new-consult-list').innerHTML='<div class="empty"><div class="ei">🆕</div><div class="et">신규 상담 없음</div></div>';return;}$('new-consult-list').innerHTML=newConsults.map(function(n){return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openNewConsultModal(\''+n.id+'\')"><div style="display:flex;justify-content:space-between"><strong>'+(n.prospectName||'이름없음')+'</strong><span class="badge bg-gray">'+n.date+'</span></div></div>';}).join('');}
+function renderNewConsults(){if(!newConsults.length){$('new-consult-list').innerHTML='<div class="empty"><div class="ei">🆕</div><div class="et">신규 상담 없음</div></div>';return;}
+  var statusColors={'신규 문의':'bg-blue','상담 예정':'bg-gold','상담 완료':'bg-green','체험 예정':'bg-navy','체험 완료':'bg-mint','등록 완료':'bg-red','미등록':'bg-gray'};
+  var rows=newConsults.map(function(n){
+    var isReg=n.ncStatus==='등록 완료';
+    var preview=n.content?(n.content.substring(0,30)+(n.content.length>30?'...':'')):'';
+    return '<tr style="cursor:pointer" onclick="openNewConsultModal(\''+n.id+'\')">'
+      +'<td style="white-space:nowrap">'+(n.inquiryDate||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+(n.date||'-')+'</td>'
+      +'<td style="font-weight:700">'+(n.prospectName||'-')+'</td>'
+      +'<td>'+(n.school||'-')+'</td>'
+      +'<td>'+(n.grade||'-')+'</td>'
+      +'<td>'+(n.type||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+(n.phone||'-')+'</td>'
+      +'<td>'+(n.inflow||'-')+'</td>'
+      +'<td><span class="badge '+(statusColors[n.ncStatus]||'bg-gray')+'" style="font-size:9px">'+(n.ncStatus||'-')+'</span></td>'
+      +'<td style="white-space:nowrap">'+(n.lastContact||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+(n.nextContact||'-')+'</td>'
+      +'<td>'+(isReg?(n.level||'-'):'-')+'</td>'
+      +'<td>'+(n.content?'<span onclick="event.stopPropagation();var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'block\':\'none\'" style="cursor:pointer;color:var(--blue);font-size:11px">'+preview+'</span><div style="display:none;font-size:11px;color:var(--txt);margin-top:4px;white-space:pre-wrap;max-width:200px">'+n.content+'</div>':'-')+'</td>'
+      +'</tr>';
+  }).join('');
+  $('new-consult-list').innerHTML='<div style="overflow-x:auto"><table class="rev-tbl" style="font-size:11px"><thead><tr><th>문의일</th><th>상담일</th><th>이름</th><th>학교</th><th>학년</th><th>유형</th><th>연락처</th><th>유입</th><th>상태</th><th>마지막 연락</th><th>다음 연락</th><th>단계</th><th>상담 내용</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
 function openNewConsultModal(id){var n=id?newConsults.find(function(x){return x.id===id;}):null;$('nc-id').value=id||'';$('nc-modal-title').textContent=id?'신규 상담 수정':'신규 상담 기록';$('nc-del-wrap').style.display=id?'block':'none';$('nc-inquiry-date').value=n?.inquiryDate||todayISO();$('nc-date').value=n?.date||todayISO();$('nc-teacher').value=n?.teacher||currentUser.name||'';$('nc-name').value=n?.prospectName||'';$('nc-grade').value=n?.grade||'';$('nc-school').value=n?.school||'';$('nc-phone').value=n?.phone||'';$('nc-type').value=n?.type||'전화';$('nc-inflow').value=n?.inflow||'';$('nc-status').value=n?.ncStatus||'신규 문의';$('nc-last-contact').value=n?.lastContact||'';$('nc-next-contact').value=n?.nextContact||'';$('nc-level').value=n?.level||'';$('nc-content').value=n?.content||'';$('nc-memo').value=n?.memo||'';$('nc-result').value=n?.result||'';$('nc-nextdate').value=n?.nextDate||'';$('modal-newconsult').style.display='flex';}
 async function saveNewConsult(){loading(true);var pName=$('nc-name').value.trim();var matchS=students.find(function(s){return s.name===pName;});var data={date:$('nc-date').value,inquiryDate:$('nc-inquiry-date').value,teacher:$('nc-teacher').value,prospectName:pName,studentId:matchS?.id||'',studentName:pName,grade:$('nc-grade').value,school:$('nc-school').value.trim(),phone:$('nc-phone').value.trim(),type:$('nc-type').value,inflow:$('nc-inflow').value,ncStatus:$('nc-status').value,lastContact:$('nc-last-contact').value,nextContact:$('nc-next-contact').value,level:$('nc-level').value,content:$('nc-content').value.trim(),memo:$('nc-memo').value.trim(),result:$('nc-result').value,nextDate:$('nc-nextdate').value,updatedAt:new Date().toISOString()};var id=$('nc-id').value;if(id)await db.collection('newConsults').doc(id).update(data);else await db.collection('newConsults').add({...data,createdAt:new Date().toISOString()});var snap=await db.collection('newConsults').orderBy('date','desc').get();newConsults=snap.docs.map(function(d){return{id:d.id,...d.data()};});renderNewConsults();closeM('newconsult');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
 async function deleteNewConsult(){var id=$('nc-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('newConsults').doc(id).delete();newConsults=newConsults.filter(function(x){return x.id!==id;});renderNewConsults();closeM('newconsult');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
