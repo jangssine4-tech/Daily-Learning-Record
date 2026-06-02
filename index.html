@@ -257,7 +257,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">태블릿 점검 교사</div><select class="fi" id="r-teacher-tablet"></select></div></div>
     <div class="r2"><div class="field"><div class="fl">단계</div><select class="fi" id="r-level" onchange="onReportLevelChange()"><option value="">선택</option></select></div><div class="field"><div class="fl">진도</div><div style="display:flex;gap:4px"><select class="fi" id="r-progress" style="flex:1"><option value="">선택</option></select><select class="fi" id="r-review-yn" style="width:85px;font-size:11px;padding:6px 4px"><option value="">Review</option><option value="Review">✔ Review</option></select></div></div></div>
     <div class="r2"><div class="field"><div class="fl">테스트 항목</div><input class="fi" id="r-review-items" placeholder="예: Unit 3 단어 20개"></div><div class="field"><div class="fl">복습 테스트</div><select class="fi" id="r-review"><option value="">-</option><option>매우잘함</option><option>잘함</option><option>보통</option><option>부진</option></select></div></div>
-    <div class="r2"><div class="field"><div class="fl">수업 태도</div><select class="fi" id="r-attitude"><option value="">-</option><option>매우 적극적</option><option>적극적</option><option>보통</option><option>산만함</option></select></div><div class="field"><div class="fl">Daily Quiz</div><input class="fi" id="r-quiz" placeholder="예: 9/10"></div></div>
+    <div class="r2"><div class="field"><div class="fl">수업 태도</div><select class="fi" id="r-attitude"><option value="">-</option><option>참여도가 매우 높음</option><option>기본적인 참여도를 보임</option><option>집중 유지에 도움이 필요한 모습</option></select></div><div class="field"><div class="fl">Daily Quiz</div><input class="fi" id="r-quiz" placeholder="예: 9/10"></div></div>
     <div class="r2"><div class="field"><div class="fl">영상 숙제</div><select class="fi" id="r-hw-video" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div><div class="field"><div class="fl">교재 숙제</div><select class="fi" id="r-hw-book" onchange="combineHw()"><option value="">-</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div></div><input type="hidden" id="r-hw" value=""><input type="hidden" id="r-hw-status" value="미확인">
     <div class="field"><div class="fl">교재 점검 교사</div><select class="fi" id="r-teacher-book"></select></div>
     <div id="eval-area"></div>
@@ -1124,6 +1124,24 @@ function renderCrmDaily(){
     var daysSince=Math.floor((today-new Date(s.leftDate))/86400000);
     if(daysSince>=30&&daysSince<=90&&daysSince%30<7)
       tasks.push({id:'left_'+s.id,priority:3,cat:'🟢 CRM',type:'퇴원생 재안내',name:s.name,reason:'퇴원 '+daysSince+'일 경과',action:'재등록/특강 안내',phone:s.phoneMom||''});
+  });
+
+  // 8. 수업 태도 하락 (최근 3회 중 2회 이상 집중 도움 필요/기본 참여)
+  activeS.forEach(function(s){
+    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.attitude;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,3);
+    if(sReps.length>=3){
+      var lowCount=sReps.filter(function(r){return r.attitude==='집중 유지에 도움이 필요한 모습'||r.attitude==='산만함';}).length;
+      if(lowCount>=2)tasks.push({id:'att_'+s.id,priority:2,cat:'🟡 학습 관리',type:'수업 태도 관찰',name:s.name,reason:'최근 3회 중 '+lowCount+'회 태도 주의 ('+sReps.map(function(r){return r.attitude;}).join('→')+')',action:'학부모 학습 태도 안내',phone:s.phoneMom||''});
+    }
+  });
+
+  // 9. 테스트 점수 하락 (최근 복습테스트 부진)
+  activeS.forEach(function(s){
+    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.reviewTest;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,2);
+    if(sReps.length>=1&&sReps[0].reviewTest==='부진'){
+      var trend=sReps.length>=2?(sReps[1].reviewTest+'→'+sReps[0].reviewTest):sReps[0].reviewTest;
+      tasks.push({id:'test_'+s.id,priority:2,cat:'🟡 학습 관리',type:'테스트 점수 하락',name:s.name,reason:'최근 복습테스트: '+trend,action:'학습 피드백 및 보충 안내',phone:s.phoneMom||''});
+    }
   });
 
   // Filter done tasks
@@ -3987,7 +4005,7 @@ async function aiConsultSummary(studentId,mode){
     var totalClasses=reps.length;
     var hwDone=reps.filter(function(r2){return r2.homework==='완료';}).length;
     var hwRate=totalClasses>0?Math.round(hwDone/totalClasses*100):0;
-    var attMap={'매우 적극적':4,'적극적':3,'보통':2,'산만함':1};
+    var attMap={'참여도가 매우 높음':3,'기본적인 참여도를 보임':2,'집중 유지에 도움이 필요한 모습':1,'매우 적극적':3,'적극적':3,'보통':2,'산만함':1};
     var attScores=reps.filter(function(r2){return attMap[r2.attitude];}).map(function(r2){return attMap[r2.attitude];});
     var attAvg=attScores.length>0?Math.round(attScores.reduce(function(a,b){return a+b;},0)/attScores.length*25):0;
     var revMap={'매우잘함':4,'잘함':3,'보통':2,'부진':1};
