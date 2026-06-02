@@ -1028,18 +1028,40 @@ function renderCrmDaily(){
   var activeS=(students||[]).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
   var doneKeys=window._crmDone||{};
 
-  // 1. 상담 후 미등록 (newConsults: 3일 경과)
+  // 1. 신규 상담 CRM 자동 분류
   (newConsults||[]).forEach(function(nc){
-    if(!nc.date)return;
-    // 다음 연락일 리마인드
-    if(nc.nextContact&&nc.nextContact===todayStr&&nc.ncStatus!=='등록 완료'){
-      tasks.push({id:'ncc_'+nc.id,priority:1,cat:'🔴 긴급',type:'연락 예정일',name:nc.prospectName||nc.studentName||'-',reason:'오늘 연락 예정 ('+(nc.ncStatus||'')+')',action:'연락 진행',phone:nc.phone||''});
-    }
+    if(!nc.date||nc.ncStatus==='등록 완료')return;
+    var name=nc.prospectName||nc.studentName||'-';
+    var phone=nc.phone||'';
     var daysDiff=Math.floor((today-new Date(nc.date))/(86400000));
-    if(daysDiff>=3&&daysDiff<=30&&nc.result!=='등록'&&nc.result!=='등록완료'&&nc.ncStatus!=='등록 완료'){
-      var matched=students.find(function(s){return s.name===(nc.prospectName||nc.studentName);});
-      if(!matched||matched.status!=='재원')
-        tasks.push({id:'nc_'+nc.id,priority:1,cat:'🔴 긴급',type:'상담 후 미등록',name:nc.prospectName||nc.studentName||'-',reason:'상담 '+nc.date+' ('+daysDiff+'일 경과)',action:'등록 여부 확인 연락',phone:nc.phone||''});
+    var matched=students.find(function(s){return s.name===name;});
+    if(matched&&matched.status==='재원')return;
+
+    // 다음 연락일 리마인드
+    if(nc.nextContact&&nc.nextContact===todayStr){
+      tasks.push({id:'ncc_'+nc.id,priority:1,cat:'🔴 긴급',type:'연락 예정일',name:name,reason:'오늘 연락 예정 ('+(nc.ncStatus||'')+')',action:'연락 진행',phone:phone});
+    }
+    // 신규 문의 미상담 (문의 후 2일 경과)
+    if(nc.ncStatus==='신규 문의'){
+      var inquiryDays=nc.inquiryDate?Math.floor((today-new Date(nc.inquiryDate))/(86400000)):daysDiff;
+      if(inquiryDays>=2)tasks.push({id:'nci_'+nc.id,priority:1,cat:'🔴 긴급',type:'신규 문의 미상담',name:name,reason:'문의 '+(nc.inquiryDate||nc.date)+' ('+inquiryDays+'일 경과)',action:'상담 일정 제안',phone:phone});
+    }
+    // 체험 예정 안내 (내일 체험)
+    if(nc.ncStatus==='체험 예정'&&nc.date){
+      if(daysDiff===-1)tasks.push({id:'nct_'+nc.id,priority:2,cat:'🟡 학습 관리',type:'체험 예정 안내',name:name,reason:'내일 체험수업 예정',action:'체험수업 안내 발송',phone:phone});
+    }
+    // 체험 후 미등록 (체험 완료 후 3일 경과)
+    if(nc.ncStatus==='체험 완료'&&daysDiff>=1&&daysDiff<=14){
+      tasks.push({id:'nce_'+nc.id,priority:1,cat:'🔴 긴급',type:'체험 후 미등록',name:name,reason:'체험 완료 '+nc.date+' ('+daysDiff+'일 경과)',action:'체험 피드백 + 등록 안내',phone:phone});
+    }
+    // 상담 후 미등록 (3~30일 경과)
+    if((nc.ncStatus==='상담 완료'||nc.ncStatus==='미등록')&&daysDiff>=3&&daysDiff<=30){
+      tasks.push({id:'nc_'+nc.id,priority:1,cat:'🔴 긴급',type:'상담 후 미등록',name:name,reason:'상담 '+nc.date+' ('+daysDiff+'일 경과)',action:'등록 여부 확인 연락',phone:phone});
+    }
+    // 장기 미응답 (마지막 연락 7일+ 경과)
+    if(nc.lastContact&&nc.ncStatus!=='신규 문의'){
+      var lastDays=Math.floor((today-new Date(nc.lastContact))/(86400000));
+      if(lastDays>=7&&lastDays<=30)tasks.push({id:'ncl_'+nc.id,priority:2,cat:'🟡 학습 관리',type:'장기 미응답',name:name,reason:'마지막 연락 '+nc.lastContact+' ('+lastDays+'일 경과)',action:'재접촉 필요',phone:phone});
     }
   });
 
