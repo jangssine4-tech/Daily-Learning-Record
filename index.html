@@ -598,7 +598,7 @@ async function bootApp(){
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCrmDone().then(function(){renderCrmDaily();});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -904,7 +904,7 @@ function goto(view){
   var bEl=$('snav-'+view);if(bEl)bEl.classList.add('active');
   // Only populate selects when navigating away from schedule
   if(view!=='schedule') ensureFullPopulate();
-  if(view==='schedule'){loadCrmDone().then(function(){renderCrmDaily();});renderScheduleNotes();}
+  if(view==='schedule'){loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});renderScheduleNotes();}
   else if(view==='history'){loadReports().then(renderHistory);}
   else if(view==='students'){
     var syf=$('s-filter-year'),smf2=$('s-filter-month');
@@ -1180,7 +1180,7 @@ function renderCrmDaily(){
         +'<button class="btn btn-green btn-xs" style="font-size:9px" onclick="completeCrmTask(\''+t.id+'\')">✓완료</button>'
         +'<button class="btn btn-outline btn-xs" style="font-size:9px" onclick="delayCrmTask(\''+t.id+'\')">3일 뒤</button>'
         +'</div></div>'
-        +(msg?'<div id="crm-msg-'+ti+'" style="display:none;margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px"><div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:4px">💬 추천 메시지</div><div style="font-size:12px;line-height:1.7;white-space:pre-wrap;color:var(--txt)">'+msg+'</div><button class="btn btn-outline btn-xs" style="margin-top:6px;font-size:10px" onclick="event.stopPropagation();navigator.clipboard.writeText(this.previousElementSibling.textContent);toast(\'📋 메시지 복사됨\')">📋 복사</button></div>':'')
+        +(msg?'<div id="crm-msg-'+ti+'" style="display:none;margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px"><div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:4px">💬 추천 메시지 <span style="font-weight:400;color:var(--txt3)">(직접 수정 가능)</span></div><textarea style="width:100%;font-size:12px;line-height:1.7;border:1px solid #e2e8f0;border-radius:6px;padding:8px;resize:vertical;min-height:100px;font-family:inherit" id="crm-txt-'+ti+'" onchange="saveCrmTemplate(\''+t.type.replace(/'/g,"\\'")+'\',this.value)">'+msg+'</textarea><div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-navy btn-xs" style="font-size:10px" onclick="event.stopPropagation();navigator.clipboard.writeText(document.getElementById(\'crm-txt-'+ti+'\').value);toast(\'📋 메시지 복사됨\')">📋 복사</button><button class="btn btn-outline btn-xs" style="font-size:10px" onclick="event.stopPropagation();document.getElementById(\'crm-txt-'+ti+'\').value=getCrmMessage(\''+t.type.replace(/'/g,"\\'")+'\',\''+t.name.replace(/'/g,"\\'")+'\',true);saveCrmTemplate(\''+t.type.replace(/'/g,"\\'")+'\',\'\');toast(\'↩️ 기본 메시지로 복원\')">↩️ 기본으로</button></div></div>':'')
         +'</div>';
     });
   }
@@ -1188,22 +1188,36 @@ function renderCrmDaily(){
   el.innerHTML=html;
   }catch(e){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">📋 데이터 로딩 중... 잠시 후 탭을 다시 클릭해주세요.</div>';}
 }
-function getCrmMessage(type,name){
+function getCrmMessage(type,name,forceDefault){
+  // Check saved custom template
+  if(!forceDefault){
+    var custom=(window._crmTemplates||{})[type];
+    if(custom)return custom.replace(/\{이름\}/g,name);
+  }
   var msgs={
-    '신규 문의 미상담':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난번 '+name+' 학생 관련 문의 주셔서 감사합니다.\n상담 가능한 시간을 안내드리고 싶은데, 편하신 요일과 시간대를 알려주시면 맞춰서 준비하겠습니다.\n\n궁금하신 점이 있으시면 편하게 말씀해 주세요~^^',
-    '체험 예정 안내':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n내일 '+name+' 학생 체험수업이 예정되어 있어 안내드립니다.\n준비물은 따로 없으시고, 편하게 오시면 됩니다.\n\n수업 후 아이의 현재 수준과 맞춤 방향도 함께 안내드리겠습니다.\n내일 뵙겠습니다~^^',
-    '체험 후 미등록':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난 체험수업 때 '+name+' 학생이 보여준 모습을 간단히 공유드립니다.\n\n수업 중 참여도와 반응이 좋았고, 현재 수준에서 어떤 방향으로 시작하면 좋을지 정리해 두었습니다.\n궁금하신 점이나 고민되시는 부분이 있으시면 편하게 말씀해 주세요~^^',
-    '상담 후 미등록':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난번 '+name+' 학생 상담 후 혹시 궁금하신 점이 더 있으실까 해서 연락드립니다.\n시간표나 수업 방식에 대해 추가로 안내드릴 수 있으니, 편하게 말씀해 주세요~^^',
-    '장기 미응답':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생 관련하여 지난번 안내드린 내용이 도움이 되셨는지 궁금합니다.\n필요하실 때 언제든 편하게 연락 주시면 바로 안내드리겠습니다~^^',
-    '결석 관리':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생이 최근 결석으로 놓친 부분이 있어 보강 일정을 잡으면 좋겠습니다.\n가능하신 요일이나 시간을 알려주시면 수업 흐름이 끊기지 않도록 맞춰보겠습니다~^^',
-    '숙제 관리':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생이 수업 참여는 잘하고 있으나, 최근 숙제 완성도가 조금 흔들리는 모습이 보여 공유드립니다.\n\n학원에서는 수업 시작 전 숙제 확인과 짧은 보완 시간을 넣어 관리하겠습니다.\n가정에서는 긴 공부보다 정해진 시간에 시작하는 루틴만 잡아주셔도 도움이 됩니다~^^',
-    '수업 태도 관찰':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생의 최근 수업 참여 모습을 간단히 공유드립니다.\n\n수업 중 집중이 조금 흔들리는 모습이 보여, 학원에서는 짧은 단위 활동과 성공 경험을 자주 만들어 집중을 도와주고 있습니다.\n가정에서도 "오늘 수업 어땠어?"라고 짧게 물어봐 주시면 아이의 참여 의지에 도움이 됩니다~^^',
-    '테스트 점수 하락':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생의 최근 복습 테스트 결과를 공유드립니다.\n\n이전보다 조금 어려워하는 부분이 있어, 학원에서 해당 부분을 중심으로 보충 지도하고 있습니다.\n가정에서는 하루 5분 정도 배운 문장을 소리 내어 읽어보는 것만으로도 큰 도움이 됩니다~^^',
-    '연락 예정일':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생 관련하여 안내드릴 내용이 있어 연락드립니다.\n편하신 시간에 통화 가능하시면 말씀해 주세요~^^',
-    '상담 후속':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난 상담 때 말씀드린 '+name+' 학생 관련 후속 사항 안내드립니다.\n궁금하신 점 있으시면 편하게 말씀해 주세요~^^',
-    '신규 적응 관찰':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생이 수업에 잘 적응하고 있는 모습을 공유드립니다.\n\n새로운 환경에서 차분하게 수업에 참여하고 있고, 앞으로도 아이의 속도에 맞춰 지도하겠습니다.\n가정에서 궁금하신 점이나 아이 반응에 대해 말씀해 주시면 수업에 반영하겠습니다~^^'
+    '신규 문의 미상담':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난번 {이름} 학생 관련 문의 주셔서 감사합니다.\n상담 가능한 시간을 안내드리고 싶은데, 편하신 요일과 시간대를 알려주시면 맞춰서 준비하겠습니다.\n\n궁금하신 점이 있으시면 편하게 말씀해 주세요~^^',
+    '체험 예정 안내':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n내일 {이름} 학생 체험수업이 예정되어 있어 안내드립니다.\n준비물은 따로 없으시고, 편하게 오시면 됩니다.\n\n수업 후 아이의 현재 수준과 맞춤 방향도 함께 안내드리겠습니다.\n내일 뵙겠습니다~^^',
+    '체험 후 미등록':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난 체험수업 때 {이름} 학생이 보여준 모습을 간단히 공유드립니다.\n\n수업 중 참여도와 반응이 좋았고, 현재 수준에서 어떤 방향으로 시작하면 좋을지 정리해 두었습니다.\n궁금하신 점이나 고민되시는 부분이 있으시면 편하게 말씀해 주세요~^^',
+    '상담 후 미등록':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난번 {이름} 학생 상담 후 혹시 궁금하신 점이 더 있으실까 해서 연락드립니다.\n시간표나 수업 방식에 대해 추가로 안내드릴 수 있으니, 편하게 말씀해 주세요~^^',
+    '장기 미응답':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생 관련하여 지난번 안내드린 내용이 도움이 되셨는지 궁금합니다.\n필요하실 때 언제든 편하게 연락 주시면 바로 안내드리겠습니다~^^',
+    '결석 관리':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생이 최근 결석으로 놓친 부분이 있어 보강 일정을 잡으면 좋겠습니다.\n가능하신 요일이나 시간을 알려주시면 수업 흐름이 끊기지 않도록 맞춰보겠습니다~^^',
+    '숙제 관리':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생이 수업 참여는 잘하고 있으나, 최근 숙제 완성도가 조금 흔들리는 모습이 보여 공유드립니다.\n\n학원에서는 수업 시작 전 숙제 확인과 짧은 보완 시간을 넣어 관리하겠습니다.\n가정에서는 긴 공부보다 정해진 시간에 시작하는 루틴만 잡아주셔도 도움이 됩니다~^^',
+    '수업 태도 관찰':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 최근 수업 참여 모습을 간단히 공유드립니다.\n\n수업 중 집중이 조금 흔들리는 모습이 보여, 학원에서는 짧은 단위 활동과 성공 경험을 자주 만들어 집중을 도와주고 있습니다.\n가정에서도 "오늘 수업 어땠어?"라고 짧게 물어봐 주시면 아이의 참여 의지에 도움이 됩니다~^^',
+    '테스트 점수 하락':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 최근 복습 테스트 결과를 공유드립니다.\n\n이전보다 조금 어려워하는 부분이 있어, 학원에서 해당 부분을 중심으로 보충 지도하고 있습니다.\n가정에서는 하루 5분 정도 배운 문장을 소리 내어 읽어보는 것만으로도 큰 도움이 됩니다~^^',
+    '연락 예정일':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생 관련하여 안내드릴 내용이 있어 연락드립니다.\n편하신 시간에 통화 가능하시면 말씀해 주세요~^^',
+    '상담 후속':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난 상담 때 말씀드린 {이름} 학생 관련 후속 사항 안내드립니다.\n궁금하신 점 있으시면 편하게 말씀해 주세요~^^',
+    '신규 적응 관찰':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생이 수업에 잘 적응하고 있는 모습을 공유드립니다.\n\n새로운 환경에서 차분하게 수업에 참여하고 있고, 앞으로도 아이의 속도에 맞춰 지도하겠습니다.\n가정에서 궁금하신 점이나 아이 반응에 대해 말씀해 주시면 수업에 반영하겠습니다~^^'
   };
-  return msgs[type]||'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n'+name+' 학생 관련하여 안내드릴 내용이 있어 연락드립니다.\n편하게 말씀해 주세요~^^';
+  return (msgs[type]||'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생 관련하여 안내드릴 내용이 있어 연락드립니다.\n편하게 말씀해 주세요~^^').replace(/\{이름\}/g,name);
+}
+function saveCrmTemplate(type,val){
+  if(!window._crmTemplates)window._crmTemplates={};
+  if(val)window._crmTemplates[type]=val;
+  else delete window._crmTemplates[type];
+  db.collection('config').doc('crmTemplates').set(window._crmTemplates).catch(function(){});
+}
+async function loadCrmTemplates(){
+  try{var d=await db.collection('config').doc('crmTemplates').get();window._crmTemplates=d.exists?d.data():{};}catch(e){window._crmTemplates={};}
 }
 function completeCrmTask(id){
   if(!window._crmDone)window._crmDone={};
@@ -1270,7 +1284,7 @@ function switchSchTab(tab){
   else if(tab==='weekly')renderWeeklyTimetable();
   else if(tab==='capacity')renderWeeklySchedule();
   else if(tab==='notes')renderScheduleNotes();
-  else if(tab==='crm'){loadCrmDone().then(function(){renderCrmDaily();});}
+  else if(tab==='crm'){loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});}
 }
 
 var _scheduleRenderTimer=null;
