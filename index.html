@@ -598,7 +598,7 @@ async function bootApp(){
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -631,7 +631,7 @@ async function bootApp(){
         try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes()]);}catch(e){}
         try{var kDoc=await db.collection('config').doc('kakao').get();if(kDoc.exists)window._kakaoConfig=kDoc.data();}catch(e){}
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return {id:d.id,...d.data()};});}catch(e){}
-        saveCache();applyMenuPerms();renderCrmDaily();
+        saveCache();applyMenuPerms();renderCrmDaily();setTimeout(showJarvisAlert,1500);
         startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();
       }, 500);
     } catch(e) {
@@ -660,6 +660,57 @@ function populateAll(){ ensureFullPopulate(); }
 
 function setFormDates(){var t=todayISO();['r-date','con-date','mk-date','exp-date','nc-date'].forEach(function(id){var el=$(id);if(el)el.value=t;});}
 
+function showJarvisAlert(){
+  try{
+    var today=new Date();var todayStr=todayISO();var doneKeys=window._crmDone||{};
+    var activeS=(students||[]).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+    // Quick count
+    var urgent=0;var manage=0;var crm=0;var riskNames=[];
+    // Risk students
+    activeS.forEach(function(s){
+      var twoWeeks=new Date(today);twoWeeks.setDate(twoWeeks.getDate()-14);
+      var sReps=reports.filter(function(r){return r.studentId===s.id&&new Date(r.date)>=twoWeeks;});
+      var risk=0;
+      if(sReps.filter(function(r){return r.absent;}).length>=2)risk+=2;
+      if(sReps.filter(function(r){return!r.absent&&(r.homework||'').includes('미');}).length>=2)risk+=2;
+      if(sReps.filter(function(r){return r.attitude==='집중 유지에 도움이 필요한 모습'||r.attitude==='산만함';}).length>=2)risk+=1;
+      if(risk>=3)riskNames.push(s.name);
+    });
+    // Count from CRM
+    var el=$('crm-daily-area');
+    if(el){
+      urgent=el.querySelectorAll('.badge.bg-gray').length||0;
+      var cards=el.querySelectorAll('div[style*="border-radius:10px"][style*="padding:12px"]');
+      urgent=0;manage=0;crm=0;
+    }
+    // Simple count from existing data
+    var ncUrgent=(newConsults||[]).filter(function(nc){return nc.ncStatus!=='등록 완료'&&nc.nextContact===todayStr;}).length;
+    var followups=(consultations||[]).filter(function(c){return c.followup&&c.fuStatus!=='처리 완료';}).length;
+    
+    var totalIssues=riskNames.length+ncUrgent+followups;
+    if(totalIssues===0&&riskNames.length===0)return;
+    
+    var msg='📋 오늘의 자비스 알림\n\n';
+    if(riskNames.length)msg+='⚠️ 퇴원 위험 학생: '+riskNames.join(', ')+'\n';
+    if(ncUrgent)msg+='📞 오늘 연락 예정: '+ncUrgent+'명\n';
+    if(followups)msg+='🔄 미처리 후속 업무: '+followups+'건\n';
+    msg+='\n오늘의 업무 탭에서 상세 내용을 확인하세요.';
+    
+    // Show popup
+    var overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+    overlay.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+      +'<div style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px">🤖 자비스</div>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:16px">'+todayStr+' 알림</div>'
+      +(riskNames.length?'<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:#dc2626">⚠️ 퇴원 위험 학생 '+riskNames.length+'명</div><div style="font-size:11px;color:#7f1d1d;margin-top:4px">'+riskNames.join(', ')+'</div></div>':'')
+      +(ncUrgent?'<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:var(--blue)">📞 오늘 연락 예정 '+ncUrgent+'명</div></div>':'')
+      +(followups?'<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:#92400e">🔄 미처리 후속 업무 '+followups+'건</div></div>':'')
+      +'<button style="width:100%;margin-top:12px;padding:10px;background:var(--navy);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer" onclick="this.closest(\'div[style*=position]\').remove()">확인</button>'
+      +'</div>';
+    document.body.appendChild(overlay);
+  }catch(e){}
+}
 function toggleMobMenu(){
   var sb=document.getElementById('sidebar');
   var ov=document.getElementById('mob-overlay');
@@ -1144,6 +1195,41 @@ function renderCrmDaily(){
     }
   });
 
+  // 10. 월간 리포트 미발송 (매월 25일~말일, 재원생 전체)
+  var dayOfMonth=today.getDate();
+  if(dayOfMonth>=25){
+    activeS.forEach(function(s){
+      var moKey=todayStr.substring(0,7);
+      var hasReport=reports.some(function(r){return r.studentId===s.id&&r.date&&r.date.substring(0,7)===moKey&&r.comment;});
+      if(!hasReport)tasks.push({id:'rpt_'+s.id,priority:3,cat:'🟢 CRM',type:'월간 리포트',name:s.name,reason:today.getMonth()+1+'월 학습 리포트 미작성',action:'학부모 리포트 작성',phone:s.phoneMom||''});
+    });
+  }
+
+  // 11. 수납 미납 (이번 달 납부 기록 없음)
+  var curMoKey=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+  activeS.forEach(function(s){
+    if(s.enrollDate){var ed=new Date(s.enrollDate);if(ed.getFullYear()>today.getFullYear()||(ed.getFullYear()===today.getFullYear()&&ed.getMonth()>today.getMonth()))return;}
+    var paid=(revenues||[]).some(function(r){return r.studentId===s.id&&r.paidDate&&r.paidDate.substring(0,7)===curMoKey&&parseInt(r.amount)>0;});
+    if(!paid&&dayOfMonth>=10)tasks.push({id:'pay_'+s.id,priority:2,cat:'🟡 학습 관리',type:'수납 미납',name:s.name,reason:today.getMonth()+1+'월 교육비 미납',action:'수납 확인',phone:s.phoneMom||''});
+  });
+
+  // 12. 퇴원 위험 종합 감지 (결석+숙제+태도 복합)
+  activeS.forEach(function(s){
+    var twoWeeks=new Date(today);twoWeeks.setDate(twoWeeks.getDate()-14);
+    var sReps=reports.filter(function(r){return r.studentId===s.id&&new Date(r.date)>=twoWeeks;});
+    var risk=0;var reasons=[];
+    var absCount=sReps.filter(function(r){return r.absent;}).length;
+    if(absCount>=2){risk+=2;reasons.push('결석 '+absCount+'회');}
+    var hwFail=sReps.filter(function(r){return!r.absent&&(r.homework||'').includes('미');}).length;
+    if(hwFail>=2){risk+=2;reasons.push('숙제 미완료 '+hwFail+'회');}
+    var attLow=sReps.filter(function(r){return r.attitude==='집중 유지에 도움이 필요한 모습'||r.attitude==='산만함';}).length;
+    if(attLow>=2){risk+=1;reasons.push('태도 주의 '+attLow+'회');}
+    var lastConsult=(consultations||[]).filter(function(c){return c.studentId===s.id;}).sort(function(a,b){return(b.date||'').localeCompare(a.date||'');});
+    var consultGap=lastConsult.length?Math.floor((today-new Date(lastConsult[0].date))/86400000):999;
+    if(consultGap>=30){risk+=1;reasons.push('상담 '+consultGap+'일 공백');}
+    if(risk>=3)tasks.push({id:'risk_'+s.id,priority:1,cat:'🔴 긴급',type:'⚠️ 퇴원 위험',name:s.name,reason:reasons.join(' · '),action:'학부모 긴급 상담 필요',phone:s.phoneMom||''});
+  });
+
   // Filter done tasks
   tasks=tasks.filter(function(t){return!doneKeys[t.id];});
   tasks.sort(function(a,b){return a.priority-b.priority;});
@@ -1206,7 +1292,10 @@ function getCrmMessage(type,name,forceDefault){
     '테스트 점수 하락':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 최근 복습 테스트 결과를 공유드립니다.\n\n이전보다 조금 어려워하는 부분이 있어, 학원에서 해당 부분을 중심으로 보충 지도하고 있습니다.\n가정에서는 하루 5분 정도 배운 문장을 소리 내어 읽어보는 것만으로도 큰 도움이 됩니다~^^',
     '연락 예정일':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생 관련하여 안내드릴 내용이 있어 연락드립니다.\n편하신 시간에 통화 가능하시면 말씀해 주세요~^^',
     '상담 후속':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난 상담 때 말씀드린 {이름} 학생 관련 후속 사항 안내드립니다.\n궁금하신 점 있으시면 편하게 말씀해 주세요~^^',
-    '신규 적응 관찰':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생이 수업에 잘 적응하고 있는 모습을 공유드립니다.\n\n새로운 환경에서 차분하게 수업에 참여하고 있고, 앞으로도 아이의 속도에 맞춰 지도하겠습니다.\n가정에서 궁금하신 점이나 아이 반응에 대해 말씀해 주시면 수업에 반영하겠습니다~^^'
+    '신규 적응 관찰':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생이 수업에 잘 적응하고 있는 모습을 공유드립니다.\n\n새로운 환경에서 차분하게 수업에 참여하고 있고, 앞으로도 아이의 속도에 맞춰 지도하겠습니다.\n가정에서 궁금하신 점이나 아이 반응에 대해 말씀해 주시면 수업에 반영하겠습니다~^^',
+    '월간 리포트':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 이번 달 학습 리포트를 공유드립니다.\n\n이번 달 수업에서 보여준 성장 포인트와 다음 달 학습 방향을 정리했습니다.\n궁금하신 점이 있으시면 편하게 말씀해 주세요~^^',
+    '수납 미납':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 이번 달 교육비 납부 확인 안내드립니다.\n혹시 이체가 누락되셨을 수도 있어 한 번 확인 부탁드립니다.\n궁금하신 점 있으시면 편하게 말씀해 주세요~^^',
+    '⚠️ 퇴원 위험':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 최근 수업 상황을 공유드리고 싶어 연락드립니다.\n\n아이의 현재 학습 흐름과 앞으로의 방향에 대해 잠깐 통화 가능하실까요?\n편하신 시간을 알려주시면 맞춰서 연락드리겠습니다~^^'
   };
   return (msgs[type]||'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생 관련하여 안내드릴 내용이 있어 연락드립니다.\n편하게 말씀해 주세요~^^').replace(/\{이름\}/g,name);
 }
