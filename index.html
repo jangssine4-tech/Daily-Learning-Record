@@ -979,7 +979,7 @@ function goto(view){
   else if(view==='msgboard'){initMsgBoard();}
   else if(view==='homework'){loadHwData().then(function(){renderHwCheck();});}
   else if(view==='reference'){if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}
-  else if(view==='mkplan'){renderMpToday();}
+  else if(view==='mkplan'){loadMpPlans().then(function(){renderMpToday();});}
   else if(view==='marketing'){initMkSelects();renderMarketing();}
   else if(view==='portfolio'){var pfSel=$('pf-student');if(pfSel){var prevVal=pfSel.value;pfSel.innerHTML='<option value="">학생 선택</option>';students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name>b.name?1:-1;}).forEach(function(s){pfSel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';});if(prevVal)pfSel.value=prevVal;}}
   else if(view==='admin')renderUsers();
@@ -4571,7 +4571,7 @@ async function saveMkPromo(yr){
 
 // ═══ 마케팅 플랜 & 루틴 ═══
 var _mpTab='today';
-function switchMpTab(tab){_mpTab=tab;['today','insta','danggeun','blog','kakao'].forEach(function(t){var btn=$('mptab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mp-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='today')renderMpToday();else renderMpChannel(tab);}
+function switchMpTab(tab){_mpTab=tab;['today','insta','danggeun','blog','kakao'].forEach(function(t){var btn=$('mptab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('mp-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='today')renderMpToday();else{if(!window._mpPlans)loadMpPlans().then(function(){renderMpChannel(tab);});else renderMpChannel(tab);}}
 function renderMpToday(){
   var el=$('mp-today-area');if(!el)return;
   var today=new Date();var dow=today.getDay();var todayStr=todayISO();
@@ -4615,41 +4615,49 @@ function renderMpChannel(ch){
   var elId='mp-'+ch+'-area';var el=$(elId);if(!el)return;
   var chInfo={insta:{name:'인스타그램',icon:'📸'},danggeun:{name:'당근마켓',icon:'🥕'},blog:{name:'블로그',icon:'📝'},kakao:{name:'카톡 채널',icon:'💬'}};
   var info=chInfo[ch]||{name:ch,icon:'📌'};
-  var weeklyData={
-    insta:['월: 이번 주 인스타 콘텐츠 확정','수: 피드 1건 + 릴스 1건 발행','수: 스토리 3~5회 게시','토: 수업 현장 사진 촬영','매일: 댓글/DM 응답'],
-    danggeun:['금: 당근 게시글/홍보물 등록','금: 지역 커뮤니티 노출','수시: 문의 응답'],
-    blog:['월: 이번 주 블로그 주제 확정','화: 블로그 글 1건 발행 (상담 CTA 포함)','화: 플레이스 사진/후기 업데이트','일: 조회수/유입 확인'],
-    kakao:['월: 이번 주 카카오채널 공지 확정','목: 카카오 채널 메시지 발송','목: 후기 요청 메시지 발송','토: 체험수업 안내 발송']
+  var defaults={
+    insta:{weekly:'월: 이번 주 인스타 콘텐츠 확정\n수: 피드 1건 + 릴스 1건 발행\n수: 스토리 3~5회 게시\n토: 수업 현장 사진 촬영\n매일: 댓글/DM 응답',monthly:'피드 8건 이상 발행\n릴스 4건 이상 발행\n팔로워 증감 확인\n인기 게시물 분석\n해시태그 전략 점검',yearly:'1~2월: 새학기 준비 콘텐츠\n3~4월: 신학기 적응기 콘텐츠\n5~6월: 여름방학 특강 홍보\n7~8월: 방학 프로그램 현장\n9~10월: 2학기 학습 콘텐츠\n11~12월: 겨울방학/성과 정리'},
+    danggeun:{weekly:'금: 당근 게시글/홍보물 등록\n금: 지역 커뮤니티 노출\n수시: 문의 응답',monthly:'홍보글 4건 이상 등록\n문의 전환율 확인\n지역별 반응 분석\n홍보 문구 갱신',yearly:'3월: 신학기 홍보 집중\n6월: 여름방학 특강 안내\n9월: 2학기 모집 홍보\n12월: 겨울방학 캠프 안내\n수시: 설명회/이벤트 안내'},
+    blog:{weekly:'월: 이번 주 블로그 주제 확정\n화: 블로그 글 1건 발행 (상담 CTA 포함)\n화: 플레이스 사진/후기 업데이트\n일: 조회수/유입 확인',monthly:'블로그 8~12건 발행\n키워드별 유입 분석\n상위 노출 키워드 확인\nCTA 클릭률 점검\n플레이스 후기 관리',yearly:'1~2월: 새학기 준비 시리즈\n3~4월: 학습법/문법 시리즈\n5~6월: 방학 활용법 시리즈\n7~8월: 방학 성과 시리즈\n9~10월: 내신 대비 시리즈\n11~12월: 연말 정리/겨울방학'},
+    kakao:{weekly:'월: 이번 주 카카오채널 공지 확정\n목: 카카오 채널 메시지 발송\n목: 후기 요청 메시지 발송\n토: 체험수업 안내 발송',monthly:'메시지 발송 2~4회\n오픈율/클릭률 확인\n친구 수 증감 확인\n메시지 템플릿 갱신\n후기 콘텐츠 발송',yearly:'3월: 신학기 안내\n6월: 여름방학 안내\n9월: 2학기 안내\n12월: 겨울방학 안내\n수시: 테스트 결과/이벤트/후기'}
   };
-  var monthlyData={
-    insta:['피드 8건 이상 발행','릴스 4건 이상 발행','팔로워 증감 확인','인기 게시물 분석','해시태그 전략 점검'],
-    danggeun:['홍보글 4건 이상 등록','문의 전환율 확인','지역별 반응 분석','홍보 문구 갱신'],
-    blog:['블로그 8~12건 발행','키워드별 유입 분석','상위 노출 키워드 확인','CTA 클릭률 점검','플레이스 후기 관리'],
-    kakao:['메시지 발송 2~4회','오픈율/클릭률 확인','친구 수 증감 확인','메시지 템플릿 갱신','후기 콘텐츠 발송']
-  };
-  var yearlyData={
-    insta:['1~2월: 새학기 준비 콘텐츠','3~4월: 신학기 적응기 콘텐츠','5~6월: 여름방학 특강 홍보','7~8월: 방학 프로그램 현장','9~10월: 2학기 학습 콘텐츠','11~12월: 겨울방학/성과 정리'],
-    danggeun:['3월: 신학기 홍보 집중','6월: 여름방학 특강 안내','9월: 2학기 모집 홍보','12월: 겨울방학 캠프 안내','수시: 설명회/이벤트 안내'],
-    blog:['1~2월: 새학기 준비 시리즈','3~4월: 학습법/문법 시리즈','5~6월: 방학 활용법 시리즈','7~8월: 방학 성과 시리즈','9~10월: 내신 대비 시리즈','11~12월: 연말 정리/겨울방학'],
-    kakao:['3월: 신학기 안내','6월: 여름방학 안내','9월: 2학기 안내','12월: 겨울방학 안내','수시: 테스트 결과/이벤트/후기']
-  };
+  var saved=(window._mpPlans||{})[ch]||{};
+  var sections=[
+    {key:'weekly',title:'📅 주간 루틴',bg:'#eff6ff',border:'#93c5fd',color:'var(--blue)'},
+    {key:'monthly',title:'📊 월간 계획',bg:'#fefce8',border:'#fde68a',color:'#92400e'},
+    {key:'yearly',title:'📆 연간 계획',bg:'#f0fdf4',border:'#86efac',color:'#16a34a'}
+  ];
   var html='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">'+info.icon+' '+info.name+' 플랜 & 루틴</div>';
-  // Weekly
-  html+='<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:8px">📅 주간 루틴</div>';
-  (weeklyData[ch]||[]).forEach(function(t){html+='<div style="padding:4px 0;font-size:12px;border-bottom:1px solid rgba(147,197,253,.3)">'+t+'</div>';});
-  html+='</div>';
-  // Monthly
-  html+='<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:8px">📊 월간 계획</div>';
-  (monthlyData[ch]||[]).forEach(function(t){html+='<div style="padding:4px 0;font-size:12px;border-bottom:1px solid rgba(253,230,138,.3)">'+t+'</div>';});
-  html+='</div>';
-  // Yearly
-  html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px;margin-bottom:12px">'
-    +'<div style="font-size:14px;font-weight:700;color:#16a34a;margin-bottom:8px">📆 연간 계획</div>';
-  (yearlyData[ch]||[]).forEach(function(t){html+='<div style="padding:4px 0;font-size:12px;border-bottom:1px solid rgba(134,239,172,.3)">'+t+'</div>';});
-  html+='</div>';
+  sections.forEach(function(sec){
+    var val=saved[sec.key]||defaults[ch]?.[sec.key]||'';
+    html+='<div style="background:'+sec.bg+';border:1px solid '+sec.border+';border-radius:10px;padding:14px;margin-bottom:12px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:14px;font-weight:700;color:'+sec.color+'">'+sec.title+'</div>'
+      +'<button class="btn btn-outline btn-xs" style="font-size:9px" onclick="toggleMpEdit(\''+ch+'\',\''+sec.key+'\')">✏️ 수정</button></div>'
+      +'<div id="mp-view-'+ch+'-'+sec.key+'">';
+    val.split('\n').forEach(function(line){if(line.trim())html+='<div style="padding:4px 0;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)">'+line+'</div>';});
+    html+='</div>'
+      +'<div id="mp-edit-'+ch+'-'+sec.key+'" style="display:none">'
+      +'<textarea style="width:100%;min-height:120px;font-size:12px;line-height:1.7;border:1px solid '+sec.border+';border-radius:6px;padding:8px;resize:vertical;font-family:inherit;background:#fff" id="mp-txt-'+ch+'-'+sec.key+'">'+val+'</textarea>'
+      +'<div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-green btn-xs" style="font-size:10px" onclick="saveMpPlan(\''+ch+'\',\''+sec.key+'\')">💾 저장</button>'
+      +'<button class="btn btn-outline btn-xs" style="font-size:10px" onclick="toggleMpEdit(\''+ch+'\',\''+sec.key+'\')">취소</button></div></div></div>';
+  });
   el.innerHTML=html;
+}
+function toggleMpEdit(ch,key){
+  var view=$('mp-view-'+ch+'-'+key);var edit=$('mp-edit-'+ch+'-'+key);
+  if(view&&edit){var show=edit.style.display==='none';view.style.display=show?'none':'';edit.style.display=show?'':'none';}
+}
+function saveMpPlan(ch,key){
+  var txt=$('mp-txt-'+ch+'-'+key);if(!txt)return;
+  if(!window._mpPlans)window._mpPlans={};
+  if(!window._mpPlans[ch])window._mpPlans[ch]={};
+  window._mpPlans[ch][key]=txt.value;
+  db.collection('config').doc('mpPlans').set(window._mpPlans).then(function(){
+    toast('💾 저장됨');renderMpChannel(ch);
+  }).catch(function(){toast('⚠️ 저장 실패');});
+}
+async function loadMpPlans(){
+  try{var d=await db.collection('config').doc('mpPlans').get();window._mpPlans=d.exists?d.data():{};}catch(e){window._mpPlans={};}
 }
 function saveMpCheck(dateKey,itemKey,checked){
   db.collection('mkPlanCheck').doc(dateKey).set({[itemKey]:checked},{merge:true}).catch(function(){});
