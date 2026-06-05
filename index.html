@@ -603,7 +603,7 @@ async function bootApp(){
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -633,7 +633,7 @@ async function bootApp(){
       applyMenuPerms();
       // Stage 2: Non-essential data in background
       setTimeout(async function(){
-        try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes()]);}catch(e){}
+        try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes(),loadCardBadges()]);}catch(e){}
         try{var kDoc=await db.collection('config').doc('kakao').get();if(kDoc.exists)window._kakaoConfig=kDoc.data();}catch(e){}
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return {id:d.id,...d.data()};});}catch(e){}
         saveCache();applyMenuPerms();renderCrmDaily();setTimeout(showJarvisAlert,1500);
@@ -991,17 +991,25 @@ function goto(view){
 // ══ SCHEDULE ══
 var _scheduleDate=null; // null = today
 function toggleObserve(sId,isJoy){
+  if(!window._cardBadges)window._cardBadges={};
   var key='obs_'+sId;
-  var cur=localStorage.getItem(key)==='1';
-  if(cur)localStorage.removeItem(key);else localStorage.setItem(key,'1');
+  if(window._cardBadges[key])delete window._cardBadges[key];
+  else window._cardBadges[key]=true;
+  db.collection('config').doc('cardBadges').set(window._cardBadges).catch(function(){});
   renderSchedule();
 }
 function toggleCardTag(key,el){
-  var cur=localStorage.getItem(key)==='1';
-  if(cur)localStorage.removeItem(key);else localStorage.setItem(key,'1');
+  if(!window._cardBadges)window._cardBadges={};
+  var cur=window._cardBadges[key];
+  if(cur)delete window._cardBadges[key];
+  else window._cardBadges[key]=true;
+  db.collection('config').doc('cardBadges').set(window._cardBadges).catch(function(){});
   var colors=key.startsWith('tbl_')?['#3b82f6','#fff','#eff6ff','#1e40af']:['#7c3aed','#fff','#f3e8ff','#6b21a8'];
   if(!cur){el.style.background=colors[0];el.style.color=colors[1];}
   else{el.style.background=colors[2];el.style.color=colors[3];}
+}
+async function loadCardBadges(){
+  try{var d=await db.collection('config').doc('cardBadges').get();window._cardBadges=d.exists?d.data():{};}catch(e){window._cardBadges={};}
 }
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
 function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
@@ -1549,7 +1557,7 @@ function renderSchedule(){
         if(pTime3){var _tM=timeToMin(pTime3);if(_tM<600){var _h=parseInt(pTime3.split(':')[0])+12;pTime3=_h+':'+pTime3.split(':')[1];}}
         var isNew=(s.status||'재원')==='신규';
         var isJoy=(getStudentLevel(s)||'').toLowerCase().startsWith('joy');
-        var isObserved=localStorage.getItem('obs_'+s.id)==='1';
+        var isObserved=(window._cardBadges||{})['obs_'+s.id];
         var cardCls='s-card';
         if(done)cardCls+=' done';else if(absent)cardCls+=' absent';else if(early)cardCls+=' early';
         if(isNew||isObserved)cardCls+=' observed';
@@ -1568,8 +1576,8 @@ function renderSchedule(){
             +'<input type="checkbox" onclick="event.stopPropagation();completeMemo(\''+aMemo.id+'\')" title="완료 처리" style="width:13px;height:13px">'
             +'<span style="flex:1">⚡ '+aMemo.content+'</span></div>';
         });
-        var isTablet=localStorage.getItem('tbl_'+s.id)==='1';
-        var isBook=localStorage.getItem('bk_'+s.id)==='1';
+        var isTablet=(window._cardBadges||{})['tbl_'+s.id];
+        var isBook=(window._cardBadges||{})['bk_'+s.id];
         var dispTime=pTime3;
         if(pTime3){var _hp=parseInt(pTime3.split(':')[0]);var _mp=pTime3.split(':')[1];if(_hp>12)dispTime=(_hp-12)+':'+_mp;else if(_hp===0)dispTime='12:'+_mp;}
         html+='<div class="s-card-name">'+s.name
