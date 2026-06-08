@@ -3008,13 +3008,26 @@ function openMakeupDayView(dateStr){
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
   overlay.innerHTML=html;document.body.appendChild(overlay);
 }
+async function autoCreateAbsentReport(studentId,dateStr){
+  var s=students.find(function(x){return x.id===studentId;});if(!s)return;
+  var existRep=reports.find(function(r){return r.studentId===studentId&&r.date===dateStr;});
+  if(!existRep){
+    var newRep={studentId:studentId,studentName:s.name,classId:s.classId||'',date:dateStr,teacher:s.teacher||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:true,earlyLeave:false,absentReason:'보강 예정',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s))||'',evalItems:{},praise:[],autoCreated:true,createdAt:new Date().toISOString()};
+    var ref=await db.collection('reports').add(newRep);
+    reports.push({...newRep,id:ref.id});
+  } else if(!existRep.absent){
+    await db.collection('reports').doc(existRep.id).update({absent:true,absentReason:'보강 예정',updatedAt:new Date().toISOString()});
+    existRep.absent=true;
+  }
+}
 async function addMakeupFromDay(studentId,studentName,dateStr,overlay){
   loading(true);
   var data={studentId:studentId,studentName:studentName,absentDate:dateStr,absentReason:'결석',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',createdAt:new Date().toISOString()};
   var ref=await db.collection('makeups').add(data);
   makeups.push({id:ref.id,...data});
+  await autoCreateAbsentReport(studentId,dateStr);
   if(overlay)overlay.remove();
-  renderMakeupCalendar();loading(false);toast('✅ 보강 등록됨');
+  renderMakeupCalendar();renderSchedule();loading(false);toast('✅ 보강 등록됨 · 결석 자동 처리');
 }
 async function addMakeupFromDayManual(dateStr,overlay){
   var sId=$('mkday-student')?.value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
@@ -3023,8 +3036,9 @@ async function addMakeupFromDayManual(dateStr,overlay){
   var data={studentId:sId,studentName:s.name,absentDate:dateStr,absentReason:'수동 등록',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',createdAt:new Date().toISOString()};
   var ref=await db.collection('makeups').add(data);
   makeups.push({id:ref.id,...data});
+  await autoCreateAbsentReport(sId,dateStr);
   if(overlay)overlay.remove();
-  renderMakeupCalendar();loading(false);toast('✅ '+s.name+' 보강 등록됨');
+  renderMakeupCalendar();renderSchedule();loading(false);toast('✅ '+s.name+' 보강 등록됨 · 결석 자동 처리');
 }
 
 // ══ CONSULT ══
