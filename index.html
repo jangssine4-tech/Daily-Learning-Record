@@ -2916,7 +2916,21 @@ async function saveMakeup(){var id=$('mk-id').value;if(!id)return;loading(true);
     } else { toast('✅ 업데이트'); }
   } else { toast('✅ 업데이트'); }
   renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();}
-async function deleteMakeupEntry(){var id=$('mk-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('makeups').doc(id).delete();makeups=makeups.filter(function(m){return m.id!==id;});renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
+async function deleteMakeupEntry(){
+  var id=$('mk-id').value;if(!id||!confirm('삭제?'))return;loading(true);
+  var mk=makeups.find(function(m){return m.id===id;});
+  await db.collection('makeups').doc(id).delete();
+  makeups=makeups.filter(function(m){return m.id!==id;});
+  // 자동 생성된 결석 보고서 삭제
+  if(mk&&mk.absentDate){
+    var absRep=reports.find(function(r){return r.studentId===mk.studentId&&r.date===mk.absentDate&&r.autoCreated;});
+    if(absRep){
+      await db.collection('reports').doc(absRep.id).delete();
+      reports=reports.filter(function(r){return r.id!==absRep.id;});
+    }
+  }
+  renderMakeupCalendar();renderSchedule();closeM('makeup');loading(false);saveCacheDebounced();toast('🗑 삭제됨 · 결석 처리 해제');
+}
 function openMakeupStatusModal(id){
   var m=makeups.find(function(x){return x.id===id;});if(!m)return;
   // Close day view modal
