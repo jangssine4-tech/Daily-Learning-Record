@@ -4636,24 +4636,47 @@ function renderMpToday(){
   var today=new Date();var dow=today.getDay();var todayStr=todayISO();
   var dayNames=['일','월','화','수','목','금','토'];
   var todayDay=dayNames[dow];
-  var chDefs=[
-    {key:'insta',name:'인스타',icon:'📸'},
-    {key:'danggeun',name:'당근',icon:'🥕'},
-    {key:'blog',name:'블로그',icon:'📝'},
-    {key:'kakao',name:'카톡 채널',icon:'💬'}
-  ];
+  var dateKey=todayStr;
+  var saved=window._mkRoutineChecks||{};var todaySaved=saved[dateKey]||{};
+
+  // ── 공유 데이터 (마케팅 루틴과 동일) ──
+  var weekPlan=getMkWeekPlan();
+  var dailyTasks=getMkDailyTasks();
+
   var html='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px">📋 오늘의 마케팅 업무</div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">'+todayStr+' '+todayDay+'요일</div>';
-  var hasTask=false;
-  // 주말이면 안내
-  if(dow===0||dow===6){
-    html+='<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;margin-bottom:10px"><div style="font-size:13px;color:var(--txt3)">주말에는 예정된 채널 루틴이 없습니다</div></div>';
-  } else {
+
+  // 1. 오늘의 핵심 업무 (weekPlan)
+  html+='<div style="background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:2px solid var(--mint);border-radius:12px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:8px">'+todayPlan.title+'</div>';
+  todayPlan.tasks.forEach(function(t,i){
+    var ck=todaySaved['w'+i]?'checked':'';
+    html+='<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:12px">'
+      +'<input type="checkbox" '+ck+' onchange="saveMkRoutineCheck(\''+dateKey+'\',\'w'+i+'\',this.checked)">'
+      +'<span style="'+(ck?'text-decoration:line-through;color:var(--txt3)':'')+'">'+colorMkLabel(t)+'</span></label>';
+  });
+  html+='</div>';
+
+  // 2. 일간 루틴
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">⏰ 일간 루틴 (매일)</div>';
+  dailyTasks.forEach(function(t,i){
+    var ck=todaySaved['d'+i]?'checked':'';
+    html+='<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:12px">'
+      +'<input type="checkbox" '+ck+' onchange="saveMkRoutineCheck(\''+dateKey+'\',\'d'+i+'\',this.checked)">'
+      +'<span style="'+(ck?'text-decoration:line-through;color:var(--txt3)':'')+'">'+colorMkLabel(t)+'</span></label>';
+  });
+  html+='</div>';
+
+  // 3. 채널별 입력 업무 (mpPlans에서)
+  var chDefs=[{key:'insta',name:'인스타',icon:'📸'},{key:'danggeun',name:'당근',icon:'🥕'},{key:'blog',name:'블로그',icon:'📝'},{key:'kakao',name:'카톡 채널',icon:'💬'}];
+  var hasChTask=false;
+  if(dow>0&&dow<6){
     chDefs.forEach(function(ch){
-      var saved=(window._mpPlans||{})[ch.key]||{};
-      var taskStr=saved['w_'+todayDay]||'';
+      var chSaved=(window._mpPlans||{})[ch.key]||{};
+      var taskStr=chSaved['w_'+todayDay]||'';
       if(!taskStr.trim())return;
-      hasTask=true;
+      hasChTask=true;
       var tasks=taskStr.split('\n').filter(function(t){return t.trim();});
       html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">'
         +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">'+ch.icon+' '+ch.name+'</div>';
@@ -4663,15 +4686,36 @@ function renderMpToday(){
       });
       html+='</div>';
     });
-    if(!hasTask){
-      html+='<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:14px;margin-bottom:10px">'
-        +'<div style="font-size:12px;color:#92400e">💡 각 채널 탭(인스타/당근/블로그/카톡)에서 주간 루틴을 입력하면 오늘 할 일이 자동으로 표시됩니다.</div></div>';
+    if(!hasChTask){
+      html+='<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px;margin-bottom:12px">'
+        +'<div style="font-size:12px;color:#92400e">💡 인스타/당근/블로그/카톡 채널 탭에서 주간 루틴을 입력하면 채널별 업무가 여기에 표시됩니다.</div></div>';
     }
   }
-  // CRM contacts
+
+  // 4. 주간 핵심 업무 요약
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📆 주간 핵심 업무 요약</div>';
+  [1,2,3,4,5,6,0].forEach(function(d){
+    var p=weekPlan[d];var isToday=d===dow;
+    html+='<div style="padding:5px 4px;border-bottom:1px solid var(--border);font-size:12px;'+(isToday?'background:#f0fdf4;border-radius:6px;font-weight:700':'')+'">'
+      +'<span style="font-size:11px;font-weight:700;min-width:22px;display:inline-block;color:'+(isToday?'var(--mint)':'var(--txt3)')+'">'+dayNames[d]+'</span>'
+      +'<span>'+p.title+'</span></div>';
+  });
+  html+='</div>';
+
+  // 5. 월간 콘텐츠 기준
+  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 월간 콘텐츠 기준</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  var bgColors=['#f0fdf4','#eff6ff','#fef3c7','#fce7f3','#f3e8ff','#ecfdf5','#fef9c3','#e0f2fe'];
+  getMkMonthlyCriteria().forEach(function(t,i){
+    html+='<div style="padding:6px;background:'+bgColors[i%bgColors.length]+';border-radius:6px;font-size:11px">'+t+'</div>';
+  });
+  html+='</div></div>';
+
+  // 6. CRM 재접촉 대상
   var ncUrgent=(newConsults||[]).filter(function(nc){return nc.ncStatus!=='등록 완료'&&nc.nextContact===todayStr;});
   if(ncUrgent.length){
-    hasTask=true;
     html+='<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:12px;margin-bottom:10px">'
       +'<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:6px">📞 오늘 재접촉 대상</div>';
     ncUrgent.forEach(function(nc){
@@ -4871,22 +4915,13 @@ function renderMkRoutine(){
   var dayNames=['일','월','화','수','목','금','토'];
   var dateKey=todayISO();
   // Day-specific tasks from reference docs
-  var weekPlan={
-    1:{title:'📐 주간 설계일',tasks:['[전체] 지난주 성과 확인 (문의/상담/등록)','[블로그] 이번 주 블로그 주제 확정','[인스타] 이번 주 인스타 콘텐츠 확정','[카카오] 이번 주 카카오채널 공지 확정','[CRM] 리마인드 대상 분류','[광고] 광고 예산 점검']},
-    2:{title:'🔍 검색 유입 강화일',tasks:['[블로그] 블로그 글 1건 발행 (하단 상담 CTA 포함)','[플레이스] 네이버 플레이스 사진/후기 업데이트','[블로그] 자주 묻는 질문 1개 추가','[커뮤니티] 지역 커뮤니티 노출 문구 준비']},
-    3:{title:'📸 SNS 노출일',tasks:['[인스타] 인스타 피드 1건 발행','[인스타] 릴스/숏폼 1건 업로드','[인스타] 스토리 3~5회 게시','[인스타] 댓글/DM 응답 완료']},
-    4:{title:'🎯 전환 강화일',tasks:['[카카오] 카카오채널 메시지 발송','[CRM] 미응답 문의 1차 재접촉','[CRM] 상담 예약 미확정 고객 정리','[CRM] 후기 요청 메시지 발송','[상담] 체험수업 안내 발송']},
-    5:{title:'📍 지역 확산일',tasks:['[당근] 당근 게시글/홍보물 등록','[오프라인] 전단지/현수막 위치 점검','[오프라인] 오프라인 이벤트 안내문 확인','[상담] 주말 체험수업 안내 발송']},
-    6:{title:'🤝 상담·체험 운영일',tasks:['[상담] 상담 진행 및 기록 입력','[상담] 체험수업 운영','[CRM] 상담 후 당일 후속 연락','[CRM] 후기 수집·현장 사진 확보']},
-    0:{title:'📊 정리·개선일',tasks:['[전체] 주간 KPI 점검 (문의→상담→등록)','[전체] 잘 된 콘텐츠 1개 분석','[전체] 다음 주 콘텐츠 제목 3개 뽑기','[CRM] 미전환자 재분류']}
-  };
-  var dailyTasks=['[전체] 오늘 발행 콘텐츠 1건 확인','[전체] 댓글/DM/채널 문의 응답 (30분 내)','[CRM] 상담 리드 상태 업데이트','[CRM] 후기 요청 1건 발송','[광고] 당일 광고/노출 체크','[전체] 내일 게시물 예약 확인'];
-  // Load saved checks from Firestore cache
+  var weekPlan=getMkWeekPlan();
+  var dailyTasks=getMkDailyTasks();
   var saved=window._mkRoutineChecks||{};var todaySaved=saved[dateKey]||{};
   var viewDow=window._mkViewDow!==undefined?window._mkViewDow:dow;
   var todayPlan=weekPlan[viewDow]||{title:'',tasks:[]};
   var isPreview=viewDow!==dow;  var html='<div style="margin-bottom:16px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px">📋 마케팅 루틴</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:16px;font-weight:800;color:var(--navy)">📋 마케팅 루틴</div><button class="btn btn-outline btn-xs" onclick="openMkConfigEditor()">✏️ 루틴 수정</button></div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">'+dateKey+' '+dayNames[dow]+'요일</div>';
   // Today's focus
   html+='<div style="background:linear-gradient(135deg,'+(isPreview?'#fefce8,#fef9c3':'#eff6ff,#f0fdf4')+');border:2px solid '+(isPreview?'#fbbf24':'var(--mint)')+';border-radius:12px;padding:14px;margin-bottom:14px">'
@@ -4953,14 +4988,12 @@ function renderMkRoutine(){
   // Monthly targets
   html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
     +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 월간 콘텐츠 기준</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">'
-    +'<div style="padding:6px;background:#f0fdf4;border-radius:6px">📝 블로그 8~12건</div>'
-    +'<div style="padding:6px;background:#eff6ff;border-radius:6px">📸 인스타 피드 8건</div>'
-    +'<div style="padding:6px;background:#fef3c7;border-radius:6px">💬 카카오채널 2~4회</div>'
-    +'<div style="padding:6px;background:#fce7f3;border-radius:6px">🥕 당근 2~4회</div>'
-    +'<div style="padding:6px;background:#f3e8ff;border-radius:6px">📍 플레이스 업데이트 2회+</div>'
-    +'<div style="padding:6px;background:#ecfdf5;border-radius:6px">🎓 체험수업/설명회 월1회</div>'
-    +'</div></div>';
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  var bgColors=['#f0fdf4','#eff6ff','#fef3c7','#fce7f3','#f3e8ff','#ecfdf5','#fef9c3','#e0f2fe'];
+  getMkMonthlyCriteria().forEach(function(t,i){
+    html+='<div style="padding:6px;background:'+bgColors[i%bgColors.length]+';border-radius:6px;font-size:11px">'+t+'</div>';
+  });
+  html+='</div></div>';
   // KPI section
   var kpiSaved=window._mkKpi||{};var moKey=dateKey.substring(0,7);var moKpi=kpiSaved[moKey]||{};
   html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px">'
@@ -4980,6 +5013,64 @@ function colorMkLabel(t){
   var label=m[1];var c=colors[label]||'#e2e8f0';
   return '<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;background:'+c+';color:#1e293b;margin-right:4px">'+label+'</span>'+t.replace(m[0],'').trim();
 }
+function openMkConfigEditor(){
+  if(!window._mkConfig)return;
+  var cfg=window._mkConfig;
+  var dayNames=['일','월','화','수','목','금','토'];
+  var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  var html='<div class="ms" style="max-height:93dvh;overflow-y:auto;max-width:500px"><div class="mh"></div><div class="mt">✏️ 마케팅 루틴 수정</div>';
+
+  // Tabs
+  html+='<div style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<button class="btn btn-navy btn-xs" onclick="showCfgTab(\'daily\',this)">일간 루틴</button>'
+    +'<button class="btn btn-outline btn-xs" onclick="showCfgTab(\'monthly\',this)">월간 기준</button>';
+  [1,2,3,4,5,6,0].forEach(function(d){html+='<button class="btn btn-outline btn-xs" onclick="showCfgTab(\'w'+d+'\',this)">'+dayNames[d]+'</button>';});
+  html+='</div>';
+
+  // Daily tab
+  html+='<div id="cfg-tab-daily"><div style="font-size:12px;color:var(--txt3);margin-bottom:6px">한 줄에 하나씩 입력</div>'
+    +'<textarea class="fi" style="min-height:140px;font-size:12px;line-height:1.7" id="cfg-daily">'+cfg.dailyTasks+'</textarea>'
+    +'<button class="btn btn-green btn-sm" style="margin-top:8px;width:100%" onclick="saveCfgTab(\'daily\')">💾 저장</button></div>';
+
+  // Monthly tab
+  html+='<div id="cfg-tab-monthly" style="display:none"><div style="font-size:12px;color:var(--txt3);margin-bottom:6px">한 줄에 하나씩 입력</div>'
+    +'<textarea class="fi" style="min-height:140px;font-size:12px;line-height:1.7" id="cfg-monthly">'+cfg.monthlyCriteria+'</textarea>'
+    +'<button class="btn btn-green btn-sm" style="margin-top:8px;width:100%" onclick="saveCfgTab(\'monthly\')">💾 저장</button></div>';
+
+  // Weekday tabs
+  [1,2,3,4,5,6,0].forEach(function(d){
+    var wp=cfg.weekPlan[d]||{title:'',tasks:''};
+    html+='<div id="cfg-tab-w'+d+'" style="display:none">'
+      +'<div class="field"><div class="fl">제목</div><input class="fi" id="cfg-w'+d+'-title" value="'+wp.title+'"></div>'
+      +'<div style="font-size:12px;color:var(--txt3);margin:6px 0 4px">업무 목록 (한 줄에 하나씩)</div>'
+      +'<textarea class="fi" style="min-height:140px;font-size:12px;line-height:1.7" id="cfg-w'+d+'-tasks">'+wp.tasks+'</textarea>'
+      +'<button class="btn btn-green btn-sm" style="margin-top:8px;width:100%" onclick="saveCfgTab(\'w'+d+'\')">💾 저장</button></div>';
+  });
+
+  html+='</div>';
+  overlay.innerHTML=html;
+  document.body.appendChild(overlay);
+}
+function showCfgTab(tab,btn){
+  document.querySelectorAll('[id^="cfg-tab-"]').forEach(function(el){el.style.display='none';});
+  var el=document.getElementById('cfg-tab-'+tab);if(el)el.style.display='';
+  document.querySelectorAll('.mo .btn').forEach(function(b){b.classList.remove('btn-navy');b.classList.add('btn-outline');});
+  if(btn){btn.classList.remove('btn-outline');btn.classList.add('btn-navy');}
+}
+function saveCfgTab(tab){
+  if(!window._mkConfig)return;
+  if(tab==='daily'){window._mkConfig.dailyTasks=document.getElementById('cfg-daily').value;}
+  else if(tab==='monthly'){window._mkConfig.monthlyCriteria=document.getElementById('cfg-monthly').value;}
+  else if(tab.startsWith('w')){
+    var d=parseInt(tab.substring(1));
+    if(!window._mkConfig.weekPlan[d])window._mkConfig.weekPlan[d]={};
+    window._mkConfig.weekPlan[d].title=document.getElementById('cfg-w'+d+'-title').value;
+    window._mkConfig.weekPlan[d].tasks=document.getElementById('cfg-w'+d+'-tasks').value;
+  }
+  saveMkRoutineConfig();
+  loadMkRoutineData().then(function(){renderMkRoutine();renderMpToday();});
+}
 function saveMkRoutineCheck(dateKey,itemKey,checked){
   if(!window._mkRoutineChecks)window._mkRoutineChecks={};
   if(!window._mkRoutineChecks[dateKey])window._mkRoutineChecks[dateKey]={};
@@ -4997,7 +5088,34 @@ function saveMkKpi(moKey,field,val){
 async function loadMkRoutineData(){
   try{var d=await db.collection('mkRoutine').doc(todayISO()).get();window._mkRoutineChecks={};if(d.exists)window._mkRoutineChecks[todayISO()]=d.data();}catch(e){}
   try{var moKey=todayISO().substring(0,7);var k=await db.collection('mkKpi').doc(moKey).get();window._mkKpi={};if(k.exists)window._mkKpi[moKey]=k.data();}catch(e){}
+  await loadMkRoutineConfig();
 }
+var _MK_DEFAULT_CONFIG={
+  weekPlan:{
+    1:{title:'📐 주간 설계일',tasks:'[전체] 지난주 성과 확인 (문의/상담/등록)\n[블로그] 이번 주 블로그 주제 확정\n[인스타] 이번 주 인스타 콘텐츠 확정\n[카카오] 이번 주 카카오채널 공지 확정\n[CRM] 리마인드 대상 분류\n[광고] 광고 예산 점검'},
+    2:{title:'🔍 검색 유입 강화일',tasks:'[블로그] 블로그 글 1건 발행 (하단 상담 CTA 포함)\n[플레이스] 네이버 플레이스 사진/후기 업데이트\n[블로그] 자주 묻는 질문 1개 추가\n[커뮤니티] 지역 커뮤니티 노출 문구 준비'},
+    3:{title:'📸 SNS 노출일',tasks:'[인스타] 인스타 피드 1건 발행\n[인스타] 릴스/숏폼 1건 업로드\n[인스타] 스토리 3~5회 게시\n[인스타] 댓글/DM 응답 완료'},
+    4:{title:'🎯 전환 강화일',tasks:'[카카오] 카카오채널 메시지 발송\n[CRM] 미응답 문의 1차 재접촉\n[CRM] 상담 예약 미확정 고객 정리\n[CRM] 후기 요청 메시지 발송\n[상담] 체험수업 안내 발송'},
+    5:{title:'📍 지역 확산일',tasks:'[당근] 당근 게시글/홍보물 등록\n[오프라인] 전단지/현수막 위치 점검\n[오프라인] 오프라인 이벤트 안내문 확인\n[상담] 주말 체험수업 안내 발송'},
+    6:{title:'🤝 상담·체험 운영일',tasks:'[상담] 상담 진행 및 기록 입력\n[상담] 체험수업 운영\n[CRM] 상담 후 당일 후속 연락\n[CRM] 후기 수집·현장 사진 확보'},
+    0:{title:'📊 정리·개선일',tasks:'[전체] 주간 KPI 점검 (문의→상담→등록)\n[전체] 잘 된 콘텐츠 1개 분석\n[전체] 다음 주 콘텐츠 제목 3개 뽑기\n[CRM] 미전환자 재분류'}
+  },
+  dailyTasks:'[전체] 오늘 발행 콘텐츠 1건 확인\n[전체] 댓글/DM/채널 문의 응답 (30분 내)\n[CRM] 상담 리드 상태 업데이트\n[CRM] 후기 요청 1건 발송\n[광고] 당일 광고/노출 체크\n[전체] 내일 게시물 예약 확인',
+  monthlyCriteria:'📝 블로그 8~12건\n📸 인스타 피드 8건\n💬 카카오채널 2~4회\n🥕 당근 2~4회\n📍 플레이스 업데이트 2회+\n🎓 체험수업/설명회 월1회'
+};
+async function loadMkRoutineConfig(){
+  try{
+    var d=await db.collection('config').doc('mkRoutineConfig').get();
+    if(d.exists){window._mkConfig=d.data();}
+    else{window._mkConfig=JSON.parse(JSON.stringify(_MK_DEFAULT_CONFIG));db.collection('config').doc('mkRoutineConfig').set(window._mkConfig).catch(function(){});}
+  }catch(e){window._mkConfig=JSON.parse(JSON.stringify(_MK_DEFAULT_CONFIG));}
+}
+function saveMkRoutineConfig(){
+  db.collection('config').doc('mkRoutineConfig').set(window._mkConfig).then(function(){toast('💾 저장됨');}).catch(function(){toast('⚠️ 저장 실패');});
+}
+function getMkWeekPlan(){var cfg=window._mkConfig||_MK_DEFAULT_CONFIG;var result={};Object.keys(cfg.weekPlan).forEach(function(d){var p=cfg.weekPlan[d];result[d]={title:p.title,tasks:(p.tasks||'').split('\n').filter(function(t){return t.trim();})};});return result;}
+function getMkDailyTasks(){var cfg=window._mkConfig||_MK_DEFAULT_CONFIG;return (cfg.dailyTasks||'').split('\n').filter(function(t){return t.trim();});}
+function getMkMonthlyCriteria(){var cfg=window._mkConfig||_MK_DEFAULT_CONFIG;return (cfg.monthlyCriteria||'').split('\n').filter(function(t){return t.trim();});}
 
 // ══ STAFF ══
 function renderStaffArea(){
