@@ -1418,6 +1418,18 @@ function renderScheduleThrottled(){
   if(_scheduleRenderTimer)return;
   _scheduleRenderTimer=setTimeout(function(){_scheduleRenderTimer=null;renderSchedule();},1000);
 }
+function _fmt12hRange(t){
+  if(!t)return t;
+  return t.split('~').map(function(p){
+    p=p.trim();if(!p)return p;
+    var _tM=timeToMin(p);
+    var h=parseInt(p.split(':')[0]),ms=p.split(':')[1]||'00';
+    if(_tM<600)h+=12;
+    if(h>12)return (h-12)+':'+ms;
+    if(h===0)return '12:'+ms;
+    return h+':'+ms;
+  }).join('~');
+}
 function renderSchedule(){
   var schedList=$('schedule-list');
   var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
@@ -1555,22 +1567,7 @@ function renderSchedule(){
         if(s._isMakeup)pTime3=s._makeupTime||'';
         else if(pData2&&typeof pData2==='object')pTime3=pData2.time||'';
         // Auto PM conversion + range time display fix
-        if(pTime3){
-          function _fmt12h(t){
-            if(!t)return t;
-            var parts=t.split('~');
-            return parts.map(function(p){
-              p=p.trim();
-              var _tM=timeToMin(p);
-              var h=parseInt(p.split(':')[0]),ms=p.split(':')[1];
-              if(_tM<600)h+=12;
-              if(h>12)return (h-12)+':'+ms;
-              if(h===0)return '12:'+ms;
-              return h+':'+ms;
-            }).join('~');
-          }
-          pTime3=_fmt12h(pTime3);
-        }
+        if(pTime3)pTime3=_fmt12hRange(pTime3);
         var isNew=(s.status||'재원')==='신규';
         var isJoy=(getStudentLevel(s)||'').toLowerCase().startsWith('joy');
         var isObserved=(window._cardBadges||{})['obs_'+s.id];
