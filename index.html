@@ -1554,8 +1554,23 @@ function renderSchedule(){
         var pData2=(s.periods||{})[dayName];var pTime3='';
         if(s._isMakeup)pTime3=s._makeupTime||'';
         else if(pData2&&typeof pData2==='object')pTime3=pData2.time||'';
-        // Auto PM conversion for display
-        if(pTime3){var _tM=timeToMin(pTime3);if(_tM<600){var _h=parseInt(pTime3.split(':')[0])+12;pTime3=_h+':'+pTime3.split(':')[1];}}
+        // Auto PM conversion + range time display fix
+        if(pTime3){
+          function _fmt12h(t){
+            if(!t)return t;
+            var parts=t.split('~');
+            return parts.map(function(p){
+              p=p.trim();
+              var _tM=timeToMin(p);
+              var h=parseInt(p.split(':')[0]),ms=p.split(':')[1];
+              if(_tM<600)h+=12;
+              if(h>12)return (h-12)+':'+ms;
+              if(h===0)return '12:'+ms;
+              return h+':'+ms;
+            }).join('~');
+          }
+          pTime3=_fmt12h(pTime3);
+        }
         var isNew=(s.status||'재원')==='신규';
         var isJoy=(getStudentLevel(s)||'').toLowerCase().startsWith('joy');
         var isObserved=(window._cardBadges||{})['obs_'+s.id];
@@ -1579,8 +1594,6 @@ function renderSchedule(){
         });
         var isTablet=(window._cardBadges||{})['tbl_'+s.id];
         var isBook=(window._cardBadges||{})['bk_'+s.id];
-        var dispTime=pTime3;
-        if(pTime3){var _hp=parseInt(pTime3.split(':')[0]);var _mp=pTime3.split(':')[1];if(_hp>12)dispTime=(_hp-12)+':'+_mp;else if(_hp===0)dispTime='12:'+_mp;}
         html+='<div class="s-card-name">'+s.name
           +(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')
           +(dispTime?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+dispTime+'</span>':'')
