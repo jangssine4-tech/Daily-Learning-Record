@@ -869,7 +869,6 @@ function renderMkBlogRoutine(){
     var todayStr=todayISO();
     var checks=(cfg.routineChecks||{});
     var lastDate=cfg.routineCheckDate||'';
-    // 날짜 바뀌면 체크 리셋
     if(lastDate!==todayStr){checks={};if(!window._mkBlogConfig)window._mkBlogConfig={};window._mkBlogConfig.routineChecks={};window._mkBlogConfig.routineCheckDate=todayStr;db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});}
     var defaultSteps=[
       {min:'5분',title:'글감 기록',desc:'오늘 수업에서 학부모에게 설명해 주고 싶은 장면 기록'},
@@ -879,20 +878,45 @@ function renderMkBlogRoutine(){
       {min:'5분',title:'마무리',desc:'상담 안내, 다음 글 예고, 카톡 채널 안내 추가'}
     ];
     var savedSteps=cfg.routineSteps||defaultSteps;
+    var dailyTitle=cfg.routineTitle||'매일 10분 기록';
+    var memo1=cfg.routineMemo1||'';
+    var memo2=cfg.routineMemo2||'';
+    var memo3=cfg.routineMemo3||'';
     var totalMin=savedSteps.reduce(function(a,s){return a+parseInt(s.min||0);},0);
     var doneCnt=Object.values(checks).filter(Boolean).length;
     var pct=Math.round(doneCnt/savedSteps.length*100);
+
     var html='<div style="max-width:700px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-      +'<div><div style="font-size:18px;font-weight:800;color:var(--navy)">✍️ 하루 글쓰기 루틴</div>'
-      +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">총 '+totalMin+'분 · '+todayStr+'</div></div>'
+      // Editable title
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+      +'<input id="routine-title-input" class="fi" style="font-size:18px;font-weight:800;color:var(--navy);border:none;background:transparent;flex:1;padding:4px 0" value="'+dailyTitle.replace(/"/g,'&quot;')+'" onblur="saveMkBlogRoutineField(\'routineTitle\',this.value)">'
+      +'<span style="font-size:10px;color:var(--txt3)">클릭해서 수정</span></div>'
+
+      // Memo sections
+      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">1. 오늘 아이들이 어려워 하는 것</div>'
+      +'<textarea class="fi" id="routine-memo1" style="font-size:12px;line-height:1.7;font-family:inherit;resize:none;overflow:hidden;min-height:36px" rows="1" placeholder="오늘 수업에서 아이들이 어려워한 부분을 메모하세요..." oninput="autoResize(this)" onblur="saveMkBlogRoutineField(\'routineMemo1\',this.value)">'+memo1+'</textarea></div>'
+
+      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">2. 학부모에게 설명해 주고 싶은 것</div>'
+      +'<textarea class="fi" id="routine-memo2" style="font-size:12px;line-height:1.7;font-family:inherit;resize:none;overflow:hidden;min-height:36px" rows="1" placeholder="오늘 학부모에게 전달하고 싶은 내용을 메모하세요..." oninput="autoResize(this)" onblur="saveMkBlogRoutineField(\'routineMemo2\',this.value)">'+memo2+'</textarea></div>'
+
+      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">3. 우리 학원 관리 방식</div>'
+      +'<textarea class="fi" id="routine-memo3" style="font-size:12px;line-height:1.7;font-family:inherit;resize:none;overflow:hidden;min-height:36px" rows="1" placeholder="우리 학원만의 관리 방식이나 차별점을 메모하세요..." oninput="autoResize(this)" onblur="saveMkBlogRoutineField(\'routineMemo3\',this.value)">'+memo3+'</textarea></div>'
+
+      // Divider
+      +'<div style="border-top:1px solid var(--border);margin-bottom:14px"></div>'
+
+      // Checklist header
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy)">✍️ 하루 글쓰기 루틴 · 총 '+totalMin+'분 · '+todayStr+'</div>'
       +'<button class="btn btn-outline btn-xs" onclick="toggleMkBlogRoutineEdit()">✏️ 수정</button></div>'
-      // Progress bar
-      +'<div style="background:#e2e8f0;border-radius:10px;height:8px;margin-bottom:14px"><div style="background:var(--mint);height:8px;border-radius:10px;width:'+pct+'%;transition:width .3s"></div></div>'
-      +'<div style="font-size:11px;color:var(--txt3);text-align:right;margin-top:-10px;margin-bottom:14px">'+doneCnt+'/'+savedSteps.length+' 완료</div>'
-      // Steps table (view mode)
-      +'<div id="mkbr-view">'
-      +'<table class="rev-tbl" style="width:100%">'
+      +'<div style="background:#e2e8f0;border-radius:10px;height:6px;margin-bottom:10px"><div style="background:var(--mint);height:6px;border-radius:10px;width:'+pct+'%;transition:width .3s"></div></div>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">'+doneCnt+'/'+savedSteps.length+' 완료</div>'
+
+      // Steps
+      +'<div id="mkbr-view"><table class="rev-tbl" style="width:100%">'
       +'<thead><tr><th style="width:36px"></th><th style="width:55px">시간</th><th style="width:120px">내용</th><th>비고</th></tr></thead><tbody>';
     savedSteps.forEach(function(s,i){
       var ck=checks['s'+i]?true:false;
@@ -903,53 +927,34 @@ function renderMkBlogRoutine(){
         +'<td style="font-size:11px;color:var(--txt2)">'+s.desc+'</td></tr>';
     });
     html+='</tbody></table></div>'
-      // Edit mode
-      +'<div id="mkbr-edit" style="display:none">'
-      +'<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">각 항목을 수정하세요</div>'
+      +'<div id="mkbr-edit" style="display:none"><div style="font-size:12px;color:var(--txt3);margin-bottom:8px">각 항목을 수정하세요</div>'
       +'<table class="rev-tbl"><thead><tr><th>시간</th><th>내용</th><th>비고</th></tr></thead><tbody>';
     savedSteps.forEach(function(s,i){
-      html+='<tr>'
-        +'<td><input class="fi" style="font-size:11px;width:50px" id="mkbr-min-'+i+'" value="'+s.min+'"></td>'
+      html+='<tr><td><input class="fi" style="font-size:11px;width:50px" id="mkbr-min-'+i+'" value="'+s.min+'"></td>'
         +'<td><input class="fi" style="font-size:11px" id="mkbr-title-'+i+'" value="'+s.title+'"></td>'
         +'<td><input class="fi" style="font-size:11px" id="mkbr-desc-'+i+'" value="'+s.desc+'"></td></tr>';
     });
-    html+='</tbody></table>'
-      +'<div style="display:flex;gap:6px;margin-top:10px">'
+    html+='</tbody></table><div style="display:flex;gap:6px;margin-top:10px">'
       +'<button class="btn btn-green btn-sm" onclick="saveMkBlogRoutineSteps('+savedSteps.length+')">💾 저장</button>'
       +'<button class="btn btn-outline btn-sm" onclick="toggleMkBlogRoutineEdit()">취소</button>'
       +'</div></div></div>';
     el.innerHTML=html;
+    // Auto-resize existing content
+    setTimeout(function(){
+      ['routine-memo1','routine-memo2','routine-memo3'].forEach(function(id){
+        var ta=document.getElementById(id);if(ta&&ta.value)autoResize(ta);
+      });
+    },50);
   });
 }
-function toggleMkBlogRoutineEdit(){
-  var view=$('mkbr-view');var edit=$('mkbr-edit');
-  if(!view||!edit)return;
-  var show=edit.style.display==='none';
-  view.style.display=show?'none':'';edit.style.display=show?'':'none';
+function autoResize(el){
+  el.style.height='auto';
+  el.style.height=(el.scrollHeight)+'px';
 }
-function saveMkBlogRoutineCheck(idx,checked){
+function saveMkBlogRoutineField(key,val){
   if(!window._mkBlogConfig)window._mkBlogConfig={};
-  if(!window._mkBlogConfig.routineChecks)window._mkBlogConfig.routineChecks={};
-  window._mkBlogConfig.routineChecks['s'+idx]=checked;
-  window._mkBlogConfig.routineCheckDate=todayISO();
-  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){
-    renderMkBlogRoutine();
-  }).catch(function(){});
-}
-function saveMkBlogRoutineSteps(cnt){
-  if(!window._mkBlogConfig)window._mkBlogConfig={};
-  var steps=[];
-  for(var i=0;i<cnt;i++){
-    steps.push({
-      min:document.getElementById('mkbr-min-'+i)?.value||'5분',
-      title:document.getElementById('mkbr-title-'+i)?.value||'',
-      desc:document.getElementById('mkbr-desc-'+i)?.value||''
-    });
-  }
-  window._mkBlogConfig.routineSteps=steps;
-  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){
-    toast('💾 저장됨');renderMkBlogRoutine();
-  }).catch(function(){toast('⚠️ 저장 실패');});
+  window._mkBlogConfig[key]=val;
+  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});
 }
 function switchMkBlogPlanTab(tab){
   ['yearly','weekly','monthly'].forEach(function(t){
@@ -975,27 +980,32 @@ function renderMkBlogPlanYearly(el,saved){
     {q:3,months:[7,8,9]},
     {q:4,months:[10,11,12]}
   ];
-  var html='<div style="padding:14px;max-width:700px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📆 연간 계획</div>';
+  var html='<div style="padding:14px;max-width:700px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📆 연간 계획</div>'
+    +'<table class="rev-tbl"><thead><tr><th style="width:50px">월</th><th>핵심 목적</th><th>비고</th></tr></thead><tbody>';
   quarters.forEach(function(qr){
     var qGoal=(saved['q'+qr.q+'_goal']||'').replace(/"/g,'&quot;');
     var qDesc=(saved['q'+qr.q+'_desc']||'').replace(/"/g,'&quot;');
-    html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-bottom:8px">'
-      +'<div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:8px">'+qr.q+'분기 목표</div>'
-      +'<textarea class="fi" style="min-height:60px;font-size:12px;line-height:1.7;font-family:inherit;margin-bottom:6px" placeholder="'+qr.q+'분기 목표를 입력하세요" data-fk="q'+qr.q+'_goal" onblur="saveBlogPlanField(this)">'+qGoal+'</textarea>'
-      +'<div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:4px">설명</div>'
-      +'<textarea class="fi" style="min-height:60px;font-size:12px;line-height:1.7;font-family:inherit" placeholder="'+qr.q+'분기 설명을 입력하세요" data-fk="q'+qr.q+'_desc" onblur="saveBlogPlanField(this)">'+qDesc+'</textarea>'
-      +'</div>';
-    html+='<table class="rev-tbl" style="margin-bottom:16px"><thead><tr><th style="width:50px">월</th><th>핵심 목적</th><th style="width:80px">비고</th></tr></thead><tbody>';
+    // Quarter goal row
+    html+='<tr style="background:#f0fdf4">'
+      +'<td colspan="3" style="padding:8px 10px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<span style="font-size:12px;font-weight:700;color:#16a34a;white-space:nowrap">'+qr.q+'분기 목표</span>'
+      +'<input class="fi" style="font-size:12px;border:1px solid #86efac;background:#fff;flex:1;padding:4px 8px" placeholder="'+qr.q+'분기 목표 입력" value="'+qGoal+'" data-fk="q'+qr.q+'_goal" onblur="saveBlogPlanField(this)">'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:12px;font-weight:700;color:var(--txt3);white-space:nowrap">설명</span>'
+      +'<input class="fi" style="font-size:12px;border:1px solid #e2e8f0;background:#fff;flex:1;padding:4px 8px" placeholder="설명 입력" value="'+qDesc+'" data-fk="q'+qr.q+'_desc" onblur="saveBlogPlanField(this)">'
+      +'</div></td></tr>';
+    // Month rows
     qr.months.forEach(function(m){
       var val=(saved['y_'+m]||'').replace(/"/g,'&quot;');
       var note=(saved['yn_'+m]||'').replace(/"/g,'&quot;');
-      html+='<tr><td style="font-weight:700;text-align:center;background:#dcfce7">'+m+'월</td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val+'" placeholder="'+m+'월 핵심 목적" data-fk="y_'+m+'" onblur="saveBlogPlanField(this)"></td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+note+'" placeholder="비고" data-fk="yn_'+m+'" onblur="saveBlogPlanField(this)"></td></tr>';
+      html+='<tr><td style="font-weight:700;text-align:center;background:#dcfce7;width:50px">'+m+'월</td>'
+        +'<td style="width:50%"><input class="fi" style="font-size:12px;border:none;background:transparent;width:100%" value="'+val+'" placeholder="핵심 목적" data-fk="y_'+m+'" onblur="saveBlogPlanField(this)"></td>'
+        +'<td style="width:50%"><input class="fi" style="font-size:12px;border:none;background:transparent;width:100%" value="'+note+'" placeholder="비고" data-fk="yn_'+m+'" onblur="saveBlogPlanField(this)"></td></tr>';
     });
-    html+='</tbody></table>';
   });
-  html+='</div>';
+  html+='</tbody></table></div>';
   el.innerHTML=html;
 }
 function renderMkBlogPlanWeekly(el,saved){
