@@ -304,13 +304,20 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="page-top"><h2>📝 블로그</h2></div>
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
     <button class="rev-tab active" id="mkblog-tab-strategy" onclick="switchMkBlogTab('strategy')">📋 운영안</button>
-    <button class="rev-tab" id="mkblog-tab-routine" onclick="switchMkBlogTab('routine')">⏰ 루틴</button>
+    <button class="rev-tab" id="mkblog-tab-routine" onclick="switchMkBlogTab('routine')">✍️ 하루 글쓰기 루틴</button>
     <button class="rev-tab" id="mkblog-tab-plan" onclick="switchMkBlogTab('plan')">📅 플랜</button>
   </div>
   <div class="cp">
     <div id="mkblog-panel-strategy"><div id="mkblog-strategy-area"></div></div>
     <div id="mkblog-panel-routine" style="display:none"><div id="mkblog-routine-area"></div></div>
-    <div id="mkblog-panel-plan" style="display:none"><div id="mkblog-plan-area"></div></div>
+    <div id="mkblog-panel-plan" style="display:none">
+      <div style="background:var(--surface2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
+        <button class="rev-tab active" id="mkbp-tab-yearly" onclick="switchMkBlogPlanTab('yearly')">📆 연간 계획</button>
+        <button class="rev-tab" id="mkbp-tab-weekly" onclick="switchMkBlogPlanTab('weekly')">📅 주간 루틴</button>
+        <button class="rev-tab" id="mkbp-tab-monthly" onclick="switchMkBlogPlanTab('monthly')">📊 월간 루틴</button>
+      </div>
+      <div id="mkblog-plan-area"></div>
+    </div>
   </div>
 </div>
 <div class="view" id="view-mk-kakao"><div class="page-top"><h2>💬 카톡 채널</h2></div><div class="cp" id="mk-kakao-area"></div></div>
@@ -859,87 +866,166 @@ function renderMkBlogRoutine(){
   var el=$('mkblog-routine-area');if(!el)return;
   loadMkBlogConfig().then(function(){
     var cfg=window._mkBlogConfig||{};
-    var dailyTitle=cfg.routineTitle||'📝 매일 10분 기록';
-    var memo1=cfg.routineMemo1||'';var memo2=cfg.routineMemo2||'';var memo3=cfg.routineMemo3||'';
-    el.innerHTML='<div style="max-width:700px">'
-      // Daily title (editable)
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
-      +'<input class="fi" id="routine-title" style="font-size:18px;font-weight:800;color:var(--navy);border:none;background:transparent;flex:1" value="'+dailyTitle+'" onblur="saveMkBlogRoutineField(\'routineTitle\',this.value)">'
-      +'<span style="font-size:10px;color:var(--txt3)">클릭해서 수정</span></div>'
-      // Memo box 1
-      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">1. 오늘 아이들이 어려워 하는 것</div>'
-      +'<textarea class="fi" style="min-height:100px;font-size:12px;line-height:1.7;font-family:inherit;resize:vertical" placeholder="오늘 수업에서 아이들이 어려워한 부분을 메모하세요..." onblur="saveMkBlogRoutineField(\'routineMemo1\',this.value)">'+memo1+'</textarea></div>'
-      // Memo box 2
-      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">2. 학부모에게 설명해 주고 싶은 것</div>'
-      +'<textarea class="fi" style="min-height:100px;font-size:12px;line-height:1.7;font-family:inherit;resize:vertical" placeholder="오늘 학부모에게 전달하고 싶은 내용을 메모하세요..." onblur="saveMkBlogRoutineField(\'routineMemo2\',this.value)">'+memo2+'</textarea></div>'
-      // Memo box 3
-      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">3. 우리 학원 관리 방식</div>'
-      +'<textarea class="fi" style="min-height:100px;font-size:12px;line-height:1.7;font-family:inherit;resize:vertical" placeholder="우리 학원만의 관리 방식이나 차별점을 메모하세요..." onblur="saveMkBlogRoutineField(\'routineMemo3\',this.value)">'+memo3+'</textarea></div>'
-      +'<div style="text-align:center"><button class="btn btn-navy btn-sm" onclick="generateBlogFromRoutine()">🤖 오늘의 기록으로 블로그 초안 생성</button></div>'
-      +'</div>';
+    var todayStr=todayISO();
+    var checks=(cfg.routineChecks||{});
+    var lastDate=cfg.routineCheckDate||'';
+    // 날짜 바뀌면 체크 리셋
+    if(lastDate!==todayStr){checks={};if(!window._mkBlogConfig)window._mkBlogConfig={};window._mkBlogConfig.routineChecks={};window._mkBlogConfig.routineCheckDate=todayStr;db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});}
+    var defaultSteps=[
+      {min:'5분',title:'글감 기록',desc:'오늘 수업에서 학부모에게 설명해 주고 싶은 장면 기록'},
+      {min:'10분',title:'제목 만들기',desc:'학부모가 검색할 만한 질문형 제목으로 바꾸기'},
+      {min:'15분',title:'본문 초안 작성',desc:'문제 → 원인 → 해결책 순서로 작성'},
+      {min:'5분',title:'학원 연결',desc:'우리 학원에서는 어떻게 관리하는지 3~4문장 추가'},
+      {min:'5분',title:'마무리',desc:'상담 안내, 다음 글 예고, 카톡 채널 안내 추가'}
+    ];
+    var savedSteps=cfg.routineSteps||defaultSteps;
+    var totalMin=savedSteps.reduce(function(a,s){return a+parseInt(s.min||0);},0);
+    var doneCnt=Object.values(checks).filter(Boolean).length;
+    var pct=Math.round(doneCnt/savedSteps.length*100);
+    var html='<div style="max-width:700px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+      +'<div><div style="font-size:18px;font-weight:800;color:var(--navy)">✍️ 하루 글쓰기 루틴</div>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">총 '+totalMin+'분 · '+todayStr+'</div></div>'
+      +'<button class="btn btn-outline btn-xs" onclick="toggleMkBlogRoutineEdit()">✏️ 수정</button></div>'
+      // Progress bar
+      +'<div style="background:#e2e8f0;border-radius:10px;height:8px;margin-bottom:14px"><div style="background:var(--mint);height:8px;border-radius:10px;width:'+pct+'%;transition:width .3s"></div></div>'
+      +'<div style="font-size:11px;color:var(--txt3);text-align:right;margin-top:-10px;margin-bottom:14px">'+doneCnt+'/'+savedSteps.length+' 완료</div>'
+      // Steps table (view mode)
+      +'<div id="mkbr-view">'
+      +'<table class="rev-tbl" style="width:100%">'
+      +'<thead><tr><th style="width:36px"></th><th style="width:55px">시간</th><th style="width:120px">내용</th><th>비고</th></tr></thead><tbody>';
+    savedSteps.forEach(function(s,i){
+      var ck=checks['s'+i]?true:false;
+      html+='<tr style="'+(ck?'opacity:.5;text-decoration:line-through':'')+'">'
+        +'<td style="text-align:center"><input type="checkbox" '+(ck?'checked':'')+' style="width:16px;height:16px" onchange="saveMkBlogRoutineCheck('+i+',this.checked)"></td>'
+        +'<td style="font-weight:700;color:var(--blue);text-align:center">'+s.min+'</td>'
+        +'<td style="font-weight:600">'+s.title+'</td>'
+        +'<td style="font-size:11px;color:var(--txt2)">'+s.desc+'</td></tr>';
+    });
+    html+='</tbody></table></div>'
+      // Edit mode
+      +'<div id="mkbr-edit" style="display:none">'
+      +'<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">각 항목을 수정하세요</div>'
+      +'<table class="rev-tbl"><thead><tr><th>시간</th><th>내용</th><th>비고</th></tr></thead><tbody>';
+    savedSteps.forEach(function(s,i){
+      html+='<tr>'
+        +'<td><input class="fi" style="font-size:11px;width:50px" id="mkbr-min-'+i+'" value="'+s.min+'"></td>'
+        +'<td><input class="fi" style="font-size:11px" id="mkbr-title-'+i+'" value="'+s.title+'"></td>'
+        +'<td><input class="fi" style="font-size:11px" id="mkbr-desc-'+i+'" value="'+s.desc+'"></td></tr>';
+    });
+    html+='</tbody></table>'
+      +'<div style="display:flex;gap:6px;margin-top:10px">'
+      +'<button class="btn btn-green btn-sm" onclick="saveMkBlogRoutineSteps('+savedSteps.length+')">💾 저장</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="toggleMkBlogRoutineEdit()">취소</button>'
+      +'</div></div></div>';
+    el.innerHTML=html;
   });
 }
-function saveMkBlogRoutineField(key,val){
-  if(!window._mkBlogConfig)window._mkBlogConfig={};
-  window._mkBlogConfig[key]=val;
-  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});
+function toggleMkBlogRoutineEdit(){
+  var view=$('mkbr-view');var edit=$('mkbr-edit');
+  if(!view||!edit)return;
+  var show=edit.style.display==='none';
+  view.style.display=show?'none':'';edit.style.display=show?'':'none';
 }
-function generateBlogFromRoutine(){
-  var m1=$('mkblog-routine-area')?.querySelector('textarea:nth-of-type(1)')?.value||'';
-  var m2=$('mkblog-routine-area')?.querySelector('textarea:nth-of-type(2)')?.value||'';
-  var m3=$('mkblog-routine-area')?.querySelector('textarea:nth-of-type(3)')?.value||'';
-  if(!m1&&!m2&&!m3){toast('⚠️ 메모를 먼저 입력해주세요');return;}
-  window._blogState=window._blogState||{};
-  window._blogState.type='case';
-  var input='[오늘 아이들이 어려워 한 것]\n'+m1+'\n\n[학부모에게 설명하고 싶은 것]\n'+m2+'\n\n[우리 학원 관리 방식]\n'+m3;
-  if($('blog-custom-input'))$('blog-custom-input').value=input;
-  goto('mkplan');
-  setTimeout(function(){switchMpTab('blog-manage');},300);
+function saveMkBlogRoutineCheck(idx,checked){
+  if(!window._mkBlogConfig)window._mkBlogConfig={};
+  if(!window._mkBlogConfig.routineChecks)window._mkBlogConfig.routineChecks={};
+  window._mkBlogConfig.routineChecks['s'+idx]=checked;
+  window._mkBlogConfig.routineCheckDate=todayISO();
+  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){
+    renderMkBlogRoutine();
+  }).catch(function(){});
+}
+function saveMkBlogRoutineSteps(cnt){
+  if(!window._mkBlogConfig)window._mkBlogConfig={};
+  var steps=[];
+  for(var i=0;i<cnt;i++){
+    steps.push({
+      min:document.getElementById('mkbr-min-'+i)?.value||'5분',
+      title:document.getElementById('mkbr-title-'+i)?.value||'',
+      desc:document.getElementById('mkbr-desc-'+i)?.value||''
+    });
+  }
+  window._mkBlogConfig.routineSteps=steps;
+  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){
+    toast('💾 저장됨');renderMkBlogRoutine();
+  }).catch(function(){toast('⚠️ 저장 실패');});
+}
+function switchMkBlogPlanTab(tab){
+  ['yearly','weekly','monthly'].forEach(function(t){
+    var btn=$('mkbp-tab-'+t);if(btn)btn.classList.toggle('active',t===tab);
+  });
+  window._mkBlogPlanTab=tab;
+  renderMkBlogPlan();
 }
 function renderMkBlogPlan(){
   var el=$('mkblog-plan-area');if(!el)return;
-  var today=new Date();
-  var curYear=today.getFullYear();var curMonth=today.getMonth()+1;
+  var tab=window._mkBlogPlanTab||'yearly';
   loadMpPlans().then(function(){
     var saved=(window._mpPlans||{}).blog||{};
-    // Build year/month selector
-    var yearOpts='';for(var y=curYear-1;y<=curYear+2;y++)yearOpts+='<option value="'+y+'" '+(y===curYear?'selected':'')+'>'+y+'년</option>';
-    var moOpts='';for(var m=1;m<=12;m++)moOpts+='<option value="'+m+'" '+(m===curMonth?'selected':'')+'>'+m+'월</option>';
-    var html='<div style="max-width:700px">'
-      // Yearly plan
-      +'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px;margin-bottom:12px">'
-      +'<div style="font-size:14px;font-weight:700;color:#16a34a;margin-bottom:8px">📆 연간 계획</div>'
-      +'<table class="rev-tbl"><thead><tr><th style="width:50px">월</th><th>주요 콘텐츠/이벤트</th><th>비고</th></tr></thead><tbody>';
-    for(var m=1;m<=12;m++){
-      var val=saved['y_'+m]||'';var note=saved['yn_'+m]||'';
-      html+='<tr><td style="font-weight:700;text-align:center;background:#dcfce7">'+m+'월</td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val.replace(/"/g,'&quot;')+'" placeholder="'+m+'월 콘텐츠" onblur="saveMpField(\'blog\',\'y_'+m+'\',this.value)"></td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+note.replace(/"/g,'&quot;')+'" placeholder="비고" onblur="saveMpField(\'blog\',\'yn_'+m+'\',this.value)"></td></tr>';
-    }
-    html+='</tbody></table></div>'
-      // Weekly routine
-      +'<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:14px;margin-bottom:12px">'
-      +'<div style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:8px">📅 주간 루틴</div>'
-      +'<table class="rev-tbl"><thead><tr><th style="width:50px">요일</th><th>업무 내용</th></tr></thead><tbody>';
-    ['월','화','수','목','금'].forEach(function(d){
-      var val=saved['w_'+d]||'';
-      html+='<tr><td style="font-weight:700;text-align:center;background:#dbeafe">'+d+'</td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val.replace(/"/g,'&quot;')+'" placeholder="'+d+'요일 업무" onblur="saveMpField(\'blog\',\'w_'+d+'\',this.value)"></td></tr>';
-    });
-    html+='</tbody></table></div>'
-      // Monthly plan with year/month selector
-      +'<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:14px;margin-bottom:12px">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-      +'<div style="font-size:14px;font-weight:700;color:#92400e">📊 월간 루틴</div>'
-      +'<select id="mkbp-year" class="fi" style="width:80px;font-size:12px" onchange="renderMkBlogMonthPlan()">'+yearOpts+'</select>'
-      +'<select id="mkbp-month" class="fi" style="width:60px;font-size:12px" onchange="renderMkBlogMonthPlan()">'+moOpts+'</select>'
-      +'</div><div id="mkbp-month-content"></div></div></div>';
-    el.innerHTML=html;
-    renderMkBlogMonthPlan();
+    if(tab==='yearly')renderMkBlogPlanYearly(el,saved);
+    else if(tab==='weekly')renderMkBlogPlanWeekly(el,saved);
+    else renderMkBlogPlanMonthly(el,saved);
   });
+}
+function renderMkBlogPlanYearly(el,saved){
+  var quarters=[
+    {q:1,months:[1,2,3]},
+    {q:2,months:[4,5,6]},
+    {q:3,months:[7,8,9]},
+    {q:4,months:[10,11,12]}
+  ];
+  var html='<div style="padding:14px;max-width:700px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📆 연간 계획</div>';
+  quarters.forEach(function(qr){
+    var qGoal=(saved['q'+qr.q+'_goal']||'').replace(/"/g,'&quot;');
+    var qDesc=(saved['q'+qr.q+'_desc']||'').replace(/"/g,'&quot;');
+    html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-bottom:8px">'
+      +'<div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:8px">'+qr.q+'분기 목표</div>'
+      +'<textarea class="fi" style="min-height:60px;font-size:12px;line-height:1.7;font-family:inherit;margin-bottom:6px" placeholder="'+qr.q+'분기 목표를 입력하세요" data-fk="q'+qr.q+'_goal" onblur="saveBlogPlanField(this)">'+qGoal+'</textarea>'
+      +'<div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:4px">설명</div>'
+      +'<textarea class="fi" style="min-height:60px;font-size:12px;line-height:1.7;font-family:inherit" placeholder="'+qr.q+'분기 설명을 입력하세요" data-fk="q'+qr.q+'_desc" onblur="saveBlogPlanField(this)">'+qDesc+'</textarea>'
+      +'</div>';
+    html+='<table class="rev-tbl" style="margin-bottom:16px"><thead><tr><th style="width:50px">월</th><th>핵심 목적</th><th style="width:80px">비고</th></tr></thead><tbody>';
+    qr.months.forEach(function(m){
+      var val=(saved['y_'+m]||'').replace(/"/g,'&quot;');
+      var note=(saved['yn_'+m]||'').replace(/"/g,'&quot;');
+      html+='<tr><td style="font-weight:700;text-align:center;background:#dcfce7">'+m+'월</td>'
+        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val+'" placeholder="'+m+'월 핵심 목적" data-fk="y_'+m+'" onblur="saveBlogPlanField(this)"></td>'
+        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+note+'" placeholder="비고" data-fk="yn_'+m+'" onblur="saveBlogPlanField(this)"></td></tr>';
+    });
+    html+='</tbody></table>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+function renderMkBlogPlanWeekly(el,saved){
+  var rows='';
+  ['월','화','수','목','금'].forEach(function(d){
+    var task=(saved['wt_'+d]||'').replace(/"/g,'&quot;');
+    var cont=(saved['wc_'+d]||'').replace(/"/g,'&quot;');
+    rows+='<tr><td style="font-weight:700;text-align:center;background:#dbeafe">'+d+'</td>'
+      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+task+'" placeholder="작업" data-fk="wt_'+d+'" onblur="saveBlogPlanField(this)"></td>'
+      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+cont+'" placeholder="내용" data-fk="wc_'+d+'" onblur="saveBlogPlanField(this)"></td></tr>';
+  });
+  el.innerHTML='<div style="padding:14px;max-width:700px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:12px">📅 주간 루틴</div>'
+    +'<table class="rev-tbl"><thead><tr><th style="width:50px">요일</th><th>작업</th><th>내용</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function saveBlogPlanField(el){
+  var fk=el.dataset.fk;var val=el.value;
+  saveMpField('blog',fk,val);
+}
+function renderMkBlogPlanMonthly(el,saved){
+  var today=new Date();var curYear=today.getFullYear();var curMonth=today.getMonth()+1;
+  var yearOpts='';for(var y=curYear-1;y<=curYear+2;y++)yearOpts+='<option value="'+y+'" '+(y===curYear?'selected':'')+'>'+y+'년</option>';
+  var moOpts='';for(var m=1;m<=12;m++)moOpts+='<option value="'+m+'" '+(m===curMonth?'selected':'')+'>'+m+'월</option>';
+  var html='<div style="padding:14px;max-width:700px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy)">📊 월간 루틴</div>'
+    +'<select id="mkbp-year" class="fi" style="width:80px;font-size:12px" onchange="renderMkBlogMonthPlan()">'+yearOpts+'</select>'
+    +'<select id="mkbp-month" class="fi" style="width:60px;font-size:12px" onchange="renderMkBlogMonthPlan()">'+moOpts+'</select>'
+    +'</div><div id="mkbp-month-content"></div></div>';
+  el.innerHTML=html;
+  renderMkBlogMonthPlan();
 }
 function renderMkBlogMonthPlan(){
   var yEl=$('mkbp-year');var mEl=$('mkbp-month');
@@ -949,14 +1035,23 @@ function renderMkBlogMonthPlan(){
   var saved=(window._mpPlans||{});
   var data=saved[key]||{};
   var content=$('mkbp-month-content');if(!content)return;
-  var html='<table class="rev-tbl"><thead><tr><th style="width:60px">주차</th><th>계획 내용</th></tr></thead><tbody>';
+  var html='<table class="rev-tbl"><thead><tr><th style="width:60px">주차</th><th>글의 목적</th><th>글의 역할</th></tr></thead><tbody>';
   ['1주차','2주차','3주차','4주차'].forEach(function(w,i){
-    var val=data['w'+(i+1)]||'';
+    var purpose=(data['p'+(i+1)]||'').replace(/"/g,'&quot;');
+    var role=(data['r'+(i+1)]||'').replace(/"/g,'&quot;');
     html+='<tr><td style="font-weight:700;text-align:center;background:#fef3c7">'+w+'</td>'
-      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val.replace(/"/g,'&quot;')+'" placeholder="'+w+' 계획" onblur="saveMkBlogMonthField(\''+key+'\','+(i+1)+',this.value)"></td></tr>';
+      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+purpose+'" placeholder="글의 목적" data-key="'+key+'" data-week="'+(i+1)+'" data-col="p" onblur="saveMkBlogMonthCell(this)"></td>'
+      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+role+'" placeholder="글의 역할" data-key="'+key+'" data-week="'+(i+1)+'" data-col="r" onblur="saveMkBlogMonthCell(this)"></td></tr>';
   });
   html+='</tbody></table>';
   content.innerHTML=html;
+}
+function saveMkBlogMonthCell(el){
+  var key=el.dataset.key;var week=el.dataset.week;var col=el.dataset.col;var val=el.value;
+  if(!window._mpPlans)window._mpPlans={};
+  if(!window._mpPlans[key])window._mpPlans[key]={};
+  window._mpPlans[key][col+week]=val;
+  db.collection('config').doc('mpPlans').set(window._mpPlans).catch(function(){});
 }
 function saveMkBlogMonthField(key,week,val){
   if(!window._mpPlans)window._mpPlans={};
@@ -1076,7 +1171,7 @@ function renderBlogPlan(){
     ['월','화','수','목','금'].forEach(function(d){
       var val=saved['w_'+d]||'';
       html+='<tr><td style="font-weight:700;text-align:center;background:#dbeafe">'+d+'</td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val.replace(/"/g,'&quot;')+'" placeholder="'+d+'요일 업무" onblur="saveMpField(\'blog\',\'w_'+d+'\',this.value)"></td></tr>';
+      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val.replace(/"/g,'&quot;')+'" placeholder="'+d+'요일 업무" data-fk="w_'+d+'" onblur="saveBlogPlanField(this)"></td></tr>';
     });
     html+='</tbody></table></div>';
     // Monthly
@@ -1096,8 +1191,8 @@ function renderBlogPlan(){
     for(var m=1;m<=12;m++){
       var val=saved['y_'+m]||'';var note=saved['yn_'+m]||'';
       html+='<tr><td style="font-weight:700;text-align:center;background:#dcfce7">'+m+'월</td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val.replace(/"/g,'&quot;')+'" placeholder="'+m+'월 콘텐츠" onblur="saveMpField(\'blog\',\'y_'+m+'\',this.value)"></td>'
-        +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+note.replace(/"/g,'&quot;')+'" placeholder="비고" onblur="saveMpField(\'blog\',\'yn_'+m+'\',this.value)"></td></tr>';
+      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+val.replace(/"/g,'&quot;')+'" placeholder="'+m+'월 콘텐츠" data-fk="y_'+m+'" onblur="saveBlogPlanField(this)"></td>'
+      +'<td><input class="fi" style="font-size:12px;border:none;background:transparent" value="'+note.replace(/"/g,'&quot;')+'" placeholder="비고" data-fk="yn_'+m+'" onblur="saveBlogPlanField(this)"></td></tr>';
     }
     html+='</tbody></table></div>';
     html+='<div style="text-align:center;margin-top:12px"><button class="btn btn-navy btn-sm" onclick="switchMpTab(\'blog-manage\');goto(\'mkplan\')">🤖 AI 블로그 글 자동 생성</button></div>';
