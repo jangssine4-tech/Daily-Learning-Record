@@ -808,8 +808,7 @@ function renderMkChannelPage(ch,areaId){
   var html='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">'+info.icon+' '+info.name+' 플랜 & 루틴</div>';
   var sections=[
     {id:'weekly',title:'📅 주간 루틴',bg:'#eff6ff',border:'#93c5fd',color:'var(--blue)'},
-    {id:'monthly',title:'📊 월간 계획',bg:'#fefce8',border:'#fde68a',color:'#92400e'},
-    {id:'yearly',title:'📆 연간 계획',bg:'#f0fdf4',border:'#86efac',color:'#16a34a'}
+    {id:'monthly',title:'📊 월간 계획',bg:'#fefce8',border:'#fde68a',color:'#92400e'}
   ];
   sections.forEach(function(sec){
     if(sec.id==='weekly'){
@@ -2549,7 +2548,7 @@ function renderPfReport(sId){
       +'<span>태도: '+(r.attitude||'-')+'</span>'
       +'<span>숙제: '+hwT+'</span></div>'
       +'<div style="font-size:13px;color:var(--txt);line-height:1.6">'+r.comment+'</div>'
-      +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📢 '+r.memo+'</div>':'')
+      +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);white-space:pre-wrap">📢 '+r.memo.replace(/\n/g,'<br>')+'</div>':'')
       +'<div class="pf-report-detail" style="display:none"></div>'
       +'</div>';
   }).join('');
@@ -2578,7 +2577,7 @@ function togglePfReportDetail(el,rId){
   if(_c.b)items.push(['코멘트(교재)',_c.b]);
   if(r.memo)items.push(['전달 사항',r.memo]);
   det.innerHTML='<div style="margin-top:8px;padding-top:8px;border-top:2px solid var(--blue);font-size:11px">'
-    +items.map(function(it){return'<div style="display:flex;padding:3px 0;border-bottom:1px solid var(--border)"><span style="min-width:90px;font-weight:600;color:var(--navy)">'+it[0]+'</span><span style="color:var(--txt)">'+it[1]+'</span></div>';}).join('')
+    +items.map(function(it){return'<div style="display:flex;padding:3px 0;border-bottom:1px solid var(--border)"><span style="min-width:90px;font-weight:600;color:var(--navy)">'+it[0]+'</span><span style="color:var(--txt);white-space:pre-wrap;flex:1">'+String(it[1]).replace(/\n/g,'<br>')+'</span></div>';}).join('')
     +'</div>';
   det.style.display='block';el.style.borderColor='var(--blue)';
 }
@@ -2590,7 +2589,7 @@ function printPfReport(sId){
   var rows=list.map(function(r){
     var _hw2=splitHw(r.homework||'');var hwT2='';if(_hw2.video||_hw2.book){var hp2=[];if(_hw2.video)hp2.push('영상 '+_hw2.video);if(_hw2.book)hp2.push('교재 '+_hw2.book);hwT2=hp2.join('/');}else hwT2=r.homework||'-';
     var dictT2='';if(r.dictation){var dm2=r.dictation.match(/^(\d+)\/(\d+)/);if(dm2){var p2=parseInt(dm2[2])>0?Math.round(parseInt(dm2[1])/parseInt(dm2[2])*100):0;dictT2=p2+'점('+dm2[1]+'/'+dm2[2]+')';}else dictT2=r.dictation;}
-    return '<tr><td>'+r.date+'</td><td>'+(r.teacherTablet||r.teacher||'-')+'</td><td>'+(r.level||'-')+'</td><td>'+(r.progress||'-')+'</td><td>'+(dictT2||'-')+'</td><td>'+(r.attitude||'-')+'</td><td>'+hwT2+'</td><td>'+r.comment+'</td></tr>';
+    return '<tr><td>'+r.date+'</td><td>'+(r.teacherTablet||r.teacher||'-')+'</td><td>'+(r.level||'-')+'</td><td>'+(r.progress||'-')+'</td><td>'+(dictT2||'-')+'</td><td>'+(r.attitude||'-')+'</td><td>'+hwT2+'</td><td style="white-space:pre-wrap">'+(r.comment||'').replace(/\n/g,'<br>')+'</td></tr>';
   }).join('');
   var existing=document.getElementById('print-area');if(existing)existing.remove();
   var pd=document.createElement('div');pd.id='print-area';pd.style.display='none';
@@ -3043,7 +3042,7 @@ function renderCommentView(){
       +'<span>숙제: '+hwText+'</span>'
       +'</div>'
       +'<div style="font-size:13px;color:var(--txt);line-height:1.6">'+r.comment+'</div>'
-      +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📢 '+r.memo+'</div>':'')
+      +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);white-space:pre-wrap">📢 '+r.memo.replace(/\n/g,'<br>')+'</div>':'')
       +'</div>';
   }).join('');
   html+='<div style="text-align:center;margin-top:12px;display:flex;gap:8px;justify-content:center"><button class="btn btn-outline btn-sm" onclick="renderHistory()">← 전체 기록으로 돌아가기</button><button class="btn btn-navy btn-sm" onclick="printCommentView()">🖨 인쇄</button></div>';
@@ -3164,13 +3163,13 @@ function _doSaveReportAsImage(r){
   if(r.comment){
     commentHTML='<div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bbf7d0">'
       +'<span style="font-size:12px;font-weight:700;color:#166534">💬 선생님 코멘트</span>'
-      +'<div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6">'+r.comment.replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'')+'</div></div>';
+      +'<div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6;white-space:pre-wrap">'+r.comment.replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'').replace(/\n/g,'<br>')+'</div></div>';
   }
   var memoHTML='';
   if(r.memo){
     memoHTML='<div style="background:#eff6ff;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bfdbfe">'
       +'<span style="font-size:12px;font-weight:700;color:#1e40af">📢 전달 사항</span>'
-      +'<div style="font-size:13px;color:#1e3a8a;margin-top:4px;line-height:1.6">'+r.memo+'</div></div>';
+      +'<div style="font-size:13px;color:#1e3a8a;margin-top:4px;line-height:1.6;white-space:pre-wrap">'+r.memo.replace(/\n/g,'<br>')+'</div></div>';
   }
   var lvBadge=r.level?'<span style="background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">'+r.level+'</span>':'';
   var prBadge=r.progress?'<span style="background:rgba(96,165,250,0.3);border-radius:20px;padding:3px 10px;font-size:11px">'+r.progress+'</span>':'';
