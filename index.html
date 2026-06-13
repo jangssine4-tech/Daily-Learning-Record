@@ -308,6 +308,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab active" id="mkblog-tab-strategy" onclick="switchMkBlogTab('strategy')">📋 운영안</button>
     <button class="rev-tab" id="mkblog-tab-routine" onclick="switchMkBlogTab('routine')">✍️ 하루 글쓰기 루틴</button>
     <button class="rev-tab" id="mkblog-tab-plan" onclick="switchMkBlogTab('plan')">📅 플랜</button>
+    <button class="rev-tab" id="mkblog-tab-roles" onclick="switchMkBlogTab('roles')">📊 목적별 역할</button>
   </div>
   <div class="cp">
     <div id="mkblog-panel-strategy"><div id="mkblog-strategy-area"></div></div>
@@ -320,6 +321,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
       </div>
       <div id="mkblog-plan-area"></div>
     </div>
+    <div id="mkblog-panel-roles" style="display:none"><div id="mkblog-roles-area"></div></div>
   </div>
 </div>
 <div class="view" id="view-mk-kakao"><div class="page-top"><h2>💬 카톡 채널</h2></div><div class="cp" id="mk-kakao-area"></div></div>
@@ -764,13 +766,14 @@ function showJarvisAlert(){
   }catch(e){}
 }
 function switchMkBlogTab(tab){
-  ['strategy','routine','plan'].forEach(function(t){
+  ['strategy','routine','plan','roles'].forEach(function(t){
     var btn=$('mkblog-tab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('mkblog-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
   });
   if(tab==='strategy')renderMkBlogStrategy();
   else if(tab==='routine')renderMkBlogRoutine();
   else if(tab==='plan')renderMkBlogPlan();
+  else if(tab==='roles')renderMkBlogRoles();
 }
 function renderMkTodayPage(){
   var el=$('mk-today-area');if(!el)return;
@@ -1093,6 +1096,52 @@ function saveMkBlogMonthField(key,week,val){
   if(!window._mpPlans[key])window._mpPlans[key]={};
   window._mpPlans[key]['w'+week]=val;
   db.collection('config').doc('mpPlans').set(window._mpPlans).catch(function(){});
+}
+function renderMkBlogRoles(){
+  var el=$('mkblog-roles-area');if(!el)return;
+  loadMkBlogConfig().then(function(){
+    var cfg=window._mkBlogConfig||{};
+    var roles=cfg.blogRoles||[
+      {cat:'정보 제공',purpose:'학부모에게 유용한 정보 전달',role:'검색 유입 + 신뢰 축적',ex:'초등 영어 읽기 단계별 가이드'},
+      {cat:'문제 공감',purpose:'학부모 고민에 공감',role:'관심 유도 + 체류 시간 확보',ex:'아이가 영어를 싫어할 때 부모가 할 수 있는 것'},
+      {cat:'관계 유지',purpose:'기존 학부모와 유대 강화',role:'이탈 방지 + 소개 유도',ex:'이번 달 우리 반 아이들의 성장 기록'},
+      {cat:'신뢰 형성',purpose:'전문성과 관리력 어필',role:'상담 전환 준비',ex:'영어 학원 선택 시 꼭 확인해야 할 3가지'},
+      {cat:'사례 중심',purpose:'실제 학생 변화 스토리',role:'Before→After 증명',ex:'6개월 만에 파닉스 완성한 초3 학생 이야기'},
+      {cat:'해결책 제시',purpose:'학부모 고민에 대한 해답',role:'실행 가능한 솔루션 제공',ex:'매일 10분 영어 습관 만드는 방법'},
+      {cat:'홍보 전환',purpose:'상담/등록으로 연결',role:'CTA(행동 유도) 삽입',ex:'여름방학 집중반 모집 안내'},
+      {cat:'성과 증명',purpose:'학원 성과를 수치로 제시',role:'객관적 근거로 설득',ex:'우리 학원 학생 영어 성적 평균 15점 향상'}
+    ];
+    var html='<div style="padding:14px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:12px">📊 블로그 글의 목적별 역할</div>'
+      +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="min-width:80px;width:80px">분류</th><th style="min-width:160px;width:160px">목적</th><th style="min-width:160px;width:160px">역할</th><th style="min-width:200px;width:200px">예시</th></tr></thead><tbody>';
+    roles.forEach(function(r,i){
+      var cat=(r.cat||'').replace(/"/g,'&quot;');
+      var purpose=(r.purpose||'').replace(/"/g,'&quot;');
+      var role=(r.role||'').replace(/"/g,'&quot;');
+      var ex=(r.ex||'').replace(/"/g,'&quot;');
+      html+='<tr>'
+        +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" oninput="autoResize(this)" onblur="saveBlogRole('+i+',\'cat\',this.value)">'+cat+'</textarea></td>'
+        +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" oninput="autoResize(this)" onblur="saveBlogRole('+i+',\'purpose\',this.value)">'+purpose+'</textarea></td>'
+        +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" oninput="autoResize(this)" onblur="saveBlogRole('+i+',\'role\',this.value)">'+role+'</textarea></td>'
+        +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" oninput="autoResize(this)" onblur="saveBlogRole('+i+',\'ex\',this.value)">'+ex+'</textarea></td></tr>';
+    });
+    html+='</tbody></table></div>';
+    el.innerHTML=html;
+    _initBlogPlanAutoResize(el);
+  });
+}
+function saveBlogRole(idx,field,val){
+  if(!window._mkBlogConfig)window._mkBlogConfig={};
+  if(!window._mkBlogConfig.blogRoles){
+    window._mkBlogConfig.blogRoles=[
+      {cat:'정보 제공',purpose:'',role:'',ex:''},{cat:'문제 공감',purpose:'',role:'',ex:''},
+      {cat:'관계 유지',purpose:'',role:'',ex:''},{cat:'신뢰 형성',purpose:'',role:'',ex:''},
+      {cat:'사례 중심',purpose:'',role:'',ex:''},{cat:'해결책 제시',purpose:'',role:'',ex:''},
+      {cat:'홍보 전환',purpose:'',role:'',ex:''},{cat:'성과 증명',purpose:'',role:'',ex:''}
+    ];
+  }
+  if(!window._mkBlogConfig.blogRoles[idx])window._mkBlogConfig.blogRoles[idx]={};
+  window._mkBlogConfig.blogRoles[idx][field]=val;
+  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});
 }
 async function loadMkBlogConfig(){
   if(window._mkBlogConfig)return;
