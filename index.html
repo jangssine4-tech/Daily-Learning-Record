@@ -306,14 +306,13 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="page-top"><h2>📝 블로그</h2></div>
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
     <button class="rev-tab active" id="mkblog-tab-strategy" onclick="switchMkBlogTab('strategy')">📋 운영안</button>
-    <button class="rev-tab" id="mkblog-tab-routine" onclick="switchMkBlogTab('routine')">✍️ 하루 글쓰기 루틴</button>
     <button class="rev-tab" id="mkblog-tab-plan" onclick="switchMkBlogTab('plan')">📅 플랜</button>
   </div>
   <div class="cp">
     <div id="mkblog-panel-strategy"><div id="mkblog-strategy-area"></div></div>
-    <div id="mkblog-panel-routine" style="display:none"><div id="mkblog-routine-area"></div></div>
     <div id="mkblog-panel-plan" style="display:none">
       <div style="background:var(--surface2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;position:sticky;top:0;z-index:10">
+        <button class="rev-tab" id="mkbp-tab-daily" onclick="switchMkBlogPlanTab('daily')">✍️ 하루 루틴</button>
         <button class="rev-tab" id="mkbp-tab-weekly" onclick="switchMkBlogPlanTab('weekly')">📅 주간 루틴</button>
         <button class="rev-tab active" id="mkbp-tab-monthly" onclick="switchMkBlogPlanTab('monthly')">📊 월간 계획</button>
         <button class="rev-tab" id="mkbp-tab-yearly" onclick="switchMkBlogPlanTab('yearly')">📆 연간 계획</button>
@@ -765,12 +764,11 @@ function showJarvisAlert(){
   }catch(e){}
 }
 function switchMkBlogTab(tab){
-  ['strategy','routine','plan'].forEach(function(t){
+  ['strategy','plan'].forEach(function(t){
     var btn=$('mkblog-tab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('mkblog-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
   });
   if(tab==='strategy')renderMkBlogStrategy();
-  else if(tab==='routine')renderMkBlogRoutine();
   else if(tab==='plan')renderMkBlogPlan();
 }
 function renderMkTodayPage(){
@@ -871,8 +869,8 @@ function saveMkBlogStrategy(){
   window._mkBlogConfig.strategy=txt.value;
   db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){toast('💾 저장됨');renderMkBlogStrategy();}).catch(function(){toast('⚠️ 저장 실패');});
 }
-function renderMkBlogRoutine(){
-  var el=$('mkblog-routine-area');if(!el)return;
+function renderMkBlogRoutine(targetEl){
+  var el=targetEl||$('mkblog-plan-area');if(!el)return;
   loadMkBlogConfig().then(function(){
     var cfg=window._mkBlogConfig||{};
     var todayStr=todayISO();
@@ -919,7 +917,7 @@ function renderMkBlogRoutine(){
 
       // Checklist header
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--navy)">✍️ 하루 글쓰기 루틴 · 총 '+totalMin+'분 · '+todayStr+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy)">✍️ 하루 루틴 · 총 '+totalMin+'분 · '+todayStr+'</div>'
       +'<button class="btn btn-outline btn-xs" onclick="toggleMkBlogRoutineEdit()">✏️ 수정</button></div>'
       +'<div style="background:#e2e8f0;border-radius:10px;height:6px;margin-bottom:10px"><div style="background:var(--mint);height:6px;border-radius:10px;width:'+pct+'%;transition:width .3s"></div></div>'
       +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">'+doneCnt+'/'+savedSteps.length+' 완료</div>'
@@ -966,7 +964,7 @@ function saveMkBlogRoutineField(key,val){
   db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});
 }
 function switchMkBlogPlanTab(tab){
-  ['yearly','weekly','monthly','roles'].forEach(function(t){
+  ['daily','yearly','weekly','monthly','roles'].forEach(function(t){
     var btn=$('mkbp-tab-'+t);if(btn)btn.classList.toggle('active',t===tab);
   });
   window._mkBlogPlanTab=tab;
@@ -975,11 +973,12 @@ function switchMkBlogPlanTab(tab){
 function renderMkBlogPlan(){
   var el=$('mkblog-plan-area');if(!el)return;
   var tab=window._mkBlogPlanTab||'monthly';
+  if(tab==='daily'){renderMkBlogRoutine(el);return;}
+  if(tab==='roles'){renderMkBlogRoles();return;}
   loadMpPlans().then(function(){
     var saved=(window._mpPlans||{}).blog||{};
     if(tab==='yearly')renderMkBlogPlanYearly(el,saved);
     else if(tab==='weekly')renderMkBlogPlanWeekly(el,saved);
-    else if(tab==='roles')renderMkBlogRoles();
     else renderMkBlogPlanMonthly(el,saved);
   });
 }
@@ -1289,7 +1288,7 @@ function renderBlogRoutine(){
     +'<tr><td style="font-weight:700;color:#b45309">금</td><td>학생 사례</td><td>전환</td></tr>'
     +'</tbody></table></div>'
     +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">'
-    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:10px">⏰ 하루 글쓰기 루틴</div>'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:10px">⏰ 하루 루틴</div>'
     +'<div style="font-size:12px;line-height:2">'
     +'<div style="padding:6px 0;border-bottom:1px solid var(--border)">① 학생 사례 1개 기록</div>'
     +'<div style="padding:6px 0;border-bottom:1px solid var(--border)">② 학부모 질문 1개 기록</div>'
