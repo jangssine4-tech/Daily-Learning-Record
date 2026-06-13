@@ -1040,31 +1040,43 @@ function _initBlogPlanAutoResize(el){
   setTimeout(function(){
     el.querySelectorAll('textarea').forEach(function(ta){if(ta.value)autoResize(ta);});
   },30);
-  var VER='v5';
+  var VER='v6';
   if(localStorage.getItem('bpColVer')!==VER){localStorage.removeItem('bpColW');localStorage.setItem('bpColVer',VER);}
   var saved=JSON.parse(localStorage.getItem('bpColW')||'{}');
-  el.querySelectorAll('th[data-col-id]').forEach(function(th){
-    var id=th.dataset.colId;
-    if(saved[id])th.style.width=saved[id];
-    var ro=new ResizeObserver(function(entries){
-      for(var entry of entries){
-        var w=Math.round(entry.contentRect.width)+'px';
-        var s=JSON.parse(localStorage.getItem('bpColW')||'{}');
-        s[id]=w;localStorage.setItem('bpColW',JSON.stringify(s));
-        _syncBlogTblW(th);
-      }
+  el.querySelectorAll('.blogplan-tbl').forEach(function(tbl){
+    var colMap={};
+    var ths=tbl.querySelectorAll('thead th[data-col-id]');
+    // 1) Initialize tracked widths from saved or CSS default
+    ths.forEach(function(th){
+      var id=th.dataset.colId;
+      var w=saved[id]?parseInt(saved[id]):parseInt(th.style.width)||100;
+      colMap[id]=w;
+      th.style.width=w+'px';
     });
-    ro.observe(th);
+    // 2) Set table width = sum of tracked widths
+    var totalW=0;for(var k in colMap)totalW+=colMap[k];
+    tbl.style.width=totalW+'px';
+    // 3) Observe each th for resize
+    ths.forEach(function(th){
+      var id=th.dataset.colId;
+      var ro=new ResizeObserver(function(entries){
+        var newW=Math.round(entries[0].contentRect.width);
+        if(newW===colMap[id])return; // no change
+        var delta=newW-colMap[id];
+        colMap[id]=newW;
+        // Update table width by delta
+        var curTblW=parseInt(tbl.style.width)||0;
+        tbl.style.width=(curTblW+delta)+'px';
+        // Save
+        var s=JSON.parse(localStorage.getItem('bpColW')||'{}');
+        s[id]=newW+'px';localStorage.setItem('bpColW',JSON.stringify(s));
+      });
+      ro.observe(th);
+    });
   });
-  // Set initial table width = sum of columns
-  el.querySelectorAll('.blogplan-tbl').forEach(function(tbl){_syncBlogTblWForTable(tbl);});
 }
-function _syncBlogTblW(th){var t=th.closest('table');if(t)_syncBlogTblWForTable(t);}
-function _syncBlogTblWForTable(tbl){
-  var total=0;
-  tbl.querySelectorAll('thead th').forEach(function(h){total+=h.getBoundingClientRect().width;});
-  tbl.style.width=Math.round(total)+'px';
-}
+function _syncBlogTblW(){}
+function _syncBlogTblWForTable(){}
 function saveBlogPlanField(el){
   var fk=el.dataset.fk;var val=el.value;
   saveMpField('blog',fk,val);
