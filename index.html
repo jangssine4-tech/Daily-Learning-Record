@@ -78,8 +78,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .tbl tbody tr:hover{background:var(--surface2)}
 .rev-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .rev-tbl th{background:var(--navy);color:#fff;padding:8px 10px;white-space:nowrap;text-align:center}
-.blogplan-tbl{table-layout:fixed;min-width:600px}
-.blogplan-wrap{overflow-x:auto}
+.blogplan-tbl{table-layout:fixed}
 
 .rev-tbl td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:center}
 .rev-tbl tbody tr:hover{background:var(--surface2)}
@@ -990,7 +989,7 @@ function renderMkBlogPlanYearly(el,saved){
     {q:4,months:[10,11,12]}
   ];
   var html='<div style="padding:14px;max-width:800px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📆 연간 계획</div>'
-    +'<div class="blogplan-wrap"><table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:72px">월</th><th style="width:84px;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-goal">핵심 목적</th><th style="width:126px;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-type">강화할 글 유형</th><th style="width:318px;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-mode">주간 운영 방식</th></tr></thead><tbody>';
+    +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:12%">월</th><th style="width:14%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-goal">핵심 목적</th><th style="width:21%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-type">강화할 글 유형</th><th style="width:53%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-mode">주간 운영 방식</th></tr></thead><tbody>';
   quarters.forEach(function(qr){
     var qGoal=(saved['q'+qr.q+'_goal']||'').replace(/"/g,'&quot;');
     var qDesc=(saved['q'+qr.q+'_desc']||'').replace(/"/g,'&quot;');
@@ -1016,7 +1015,7 @@ function renderMkBlogPlanYearly(el,saved){
         +'<td style="width:65%"><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" placeholder="주간 운영 방식" data-fk="ym_'+m+'" oninput="autoResize(this)" onblur="saveBlogPlanField(this)">'+opMode+'</textarea></td></tr>';
     });
   });
-  html+='</tbody></table></div></div>';
+  html+='</tbody></table></div>';
   el.innerHTML=html;
   _initBlogPlanAutoResize(el);
 }
@@ -1031,7 +1030,7 @@ function renderMkBlogPlanWeekly(el,saved){
       +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" placeholder="내용" data-fk="wc_'+d+'" oninput="autoResize(this)" onblur="saveBlogPlanField(this)">'+cont+'</textarea></td></tr>';
   });
   el.innerHTML='<div style="padding:14px;max-width:700px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:12px">📅 주간 루틴</div>'
-    +'<div class="blogplan-wrap"><table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:60px">요일</th><th style="width:198px">작업</th><th style="width:342px;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="week-content">내용</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:10%">요일</th><th style="width:33%">작업</th><th style="width:57%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="week-content">내용</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   _initBlogPlanAutoResize(el);
 }
 function _initBlogPlanAutoResize(el){
@@ -1047,9 +1046,12 @@ function _restoreColWidths(el){
     if(saved[id])th.style.width=saved[id];
     var ro=new ResizeObserver(function(entries){
       for(var entry of entries){
-        var w=th.getBoundingClientRect().width+'px';
+        var table=th.closest('table');
+        var tableWidth=table?table.getBoundingClientRect().width:0;
+        var thWidth=th.getBoundingClientRect().width;
+        var pct=tableWidth>0?((thWidth/tableWidth)*100).toFixed(2)+'%':thWidth+'px';
         var s=JSON.parse(localStorage.getItem('blogPlanColWidths')||'{}');
-        s[id]=w;
+        s[id]=pct;
         localStorage.setItem('blogPlanColWidths',JSON.stringify(s));
       }
     });
@@ -1083,7 +1085,7 @@ function renderMkBlogMonthPlan(){
   var content=$('mkbp-month-content');if(!content)return;
   var purposeOptions1=['','정보 제공','문제 공감','관계 유지','신뢰 형성','사례 중심'];
   var purposeOptions2=['','해결책 제시','사례 중심','신뢰 형성','홍보 전환','성과 증명'];
-  var html='<div class="blogplan-wrap"><table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:72px">주차</th><th style="width:84px;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-p">첫 번째 글의 목적</th><th style="width:126px;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-r">두 번째 글의 목적</th><th style="width:318px;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-intent">핵심 의도</th></tr></thead><tbody>';
+  var html='<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:12%">주차</th><th style="width:14%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-p">첫 번째 글의 목적</th><th style="width:21%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-r">두 번째 글의 목적</th><th style="width:53%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-intent">핵심 의도</th></tr></thead><tbody>';
   ['1주차','2주차','3주차','4주차'].forEach(function(w,i){
     var purpose=(data['p'+(i+1)]||'');
     var role=(data['r'+(i+1)]||'');
@@ -1095,7 +1097,7 @@ function renderMkBlogMonthPlan(){
       +'<td style="width:21%"><select class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center" data-key="'+key+'" data-week="'+(i+1)+'" data-col="r" onchange="saveMkBlogMonthCell(this)">'+roleOpts+'</select></td>'
       +'<td style="width:65%"><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" placeholder="핵심 의도" data-key="'+key+'" data-week="'+(i+1)+'" data-col="intent" oninput="autoResize(this)" onblur="saveMkBlogMonthCell(this)">'+intent+'</textarea></td></tr>';
   });
-  html+='</tbody></table></div>';
+  html+='</tbody></table>';
   content.innerHTML=html;
   _initBlogPlanAutoResize(content);
 }
