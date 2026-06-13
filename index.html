@@ -1055,7 +1055,7 @@ function _initBlogPlanAutoResize(el){
       });
       var totalW=0;for(var k in colMap)totalW+=colMap[k];
       tbl.style.width=totalW+'px';
-      var saveTimer=null;
+      // ResizeObserver: only for real-time table width sync (no saving)
       ths.forEach(function(th){
         var id=th.dataset.colId;
         var ro=new ResizeObserver(function(entries){
@@ -1067,18 +1067,28 @@ function _initBlogPlanAutoResize(el){
           colMap[id]=newW;
           var curTblW=parseInt(tbl.style.width)||0;
           tbl.style.width=(curTblW+delta)+'px';
-          clearTimeout(saveTimer);
-          saveTimer=setTimeout(function(){
-            if(!window._mkBlogConfig)window._mkBlogConfig={};
-            if(!window._mkBlogConfig.colWidths)window._mkBlogConfig.colWidths={};
-            for(var k in colMap)window._mkBlogConfig.colWidths[k]=colMap[k];
-            db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});
-          },800);
         });
         ro.observe(th);
       });
+      // Save button
+      var btnWrap=document.createElement('div');
+      btnWrap.style.cssText='text-align:right;margin-top:6px;margin-bottom:10px';
+      btnWrap.innerHTML='<button class="btn btn-outline btn-xs" onclick="saveBlogColWidths()" style="font-size:10px">💾 열 너비 저장</button>';
+      tbl.parentNode.insertBefore(btnWrap,tbl.nextSibling);
     });
   });
+}
+function saveBlogColWidths(){
+  if(!window._mkBlogConfig)window._mkBlogConfig={};
+  if(!window._mkBlogConfig.colWidths)window._mkBlogConfig.colWidths={};
+  document.querySelectorAll('.blogplan-tbl thead th[data-col-id]').forEach(function(th){
+    if(!th.offsetParent)return;
+    var w=Math.round(th.getBoundingClientRect().width);
+    if(w>0)window._mkBlogConfig.colWidths[th.dataset.colId]=w;
+  });
+  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){
+    toast('💾 열 너비 저장됨');
+  }).catch(function(){toast('⚠️ 저장 실패');});
 }
 function saveBlogPlanField(el){
   var fk=el.dataset.fk;var val=el.value;
