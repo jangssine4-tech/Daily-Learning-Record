@@ -987,7 +987,7 @@ function renderMkBlogPlanYearly(el,saved){
     {q:3,months:[7,8,9]},
     {q:4,months:[10,11,12]}
   ];
-  var html='<div style="padding:14px;max-width:1000px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📆 연간 계획</div>'
+  var html='<div style="padding:14px;max-width:800px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📆 연간 계획</div>'
     +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:50px">월</th><th style="width:14%;padding:0"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">핵심 목적</div></th><th style="width:21%;padding:0"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">강화할 글 유형</div></th><th style="width:65%">주간 운영 방식</th></tr></thead><tbody>';
   quarters.forEach(function(qr){
     var qGoal=(saved['q'+qr.q+'_goal']||'').replace(/"/g,'&quot;');
@@ -1028,7 +1028,7 @@ function renderMkBlogPlanWeekly(el,saved){
       +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" placeholder="작업" data-fk="wt_'+d+'" oninput="autoResize(this)" onblur="saveBlogPlanField(this)">'+task+'</textarea></td>'
       +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" placeholder="내용" data-fk="wc_'+d+'" oninput="autoResize(this)" onblur="saveBlogPlanField(this)">'+cont+'</textarea></td></tr>';
   });
-  el.innerHTML='<div style="padding:14px;max-width:1000px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:12px">📅 주간 루틴</div>'
+  el.innerHTML='<div style="padding:14px;max-width:700px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:12px">📅 주간 루틴</div>'
     +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:50px">요일</th><th style="width:43%">작업</th><th style="width:57%">내용</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   _initBlogPlanAutoResize(el);
 }
@@ -1036,6 +1036,31 @@ function _initBlogPlanAutoResize(el){
   setTimeout(function(){
     el.querySelectorAll('textarea').forEach(function(ta){if(ta.value)autoResize(ta);});
   },30);
+  _restoreColWidths(el);
+}
+function _restoreColWidths(el){
+  var saved=JSON.parse(localStorage.getItem('blogPlanColWidths')||'{}');
+  el.querySelectorAll('th[data-col-id]').forEach(function(th){
+    var id=th.dataset.colId;
+    if(saved[id]){
+      var div=th.querySelector('div');
+      if(div)div.style.width=saved[id];
+      else th.style.width=saved[id];
+    }
+    var resizable=th.querySelector('div[style*="resize:horizontal"]');
+    if(resizable){
+      // Save width on resize using ResizeObserver
+      var ro=new ResizeObserver(function(entries){
+        for(var entry of entries){
+          var w=entry.contentRect.width+'px';
+          var s=JSON.parse(localStorage.getItem('blogPlanColWidths')||'{}');
+          s[id]=w;
+          localStorage.setItem('blogPlanColWidths',JSON.stringify(s));
+        }
+      });
+      ro.observe(resizable);
+    }
+  });
 }
 function saveBlogPlanField(el){
   var fk=el.dataset.fk;var val=el.value;
@@ -1045,7 +1070,7 @@ function renderMkBlogPlanMonthly(el,saved){
   var today=new Date();var curYear=today.getFullYear();var curMonth=today.getMonth()+1;
   var yearOpts='';for(var y=curYear-1;y<=curYear+2;y++)yearOpts+='<option value="'+y+'" '+(y===curYear?'selected':'')+'>'+y+'년</option>';
   var moOpts='';for(var m=1;m<=12;m++)moOpts+='<option value="'+m+'" '+(m===curMonth?'selected':'')+'>'+m+'월</option>';
-  var html='<div style="padding:14px;max-width:1000px">'
+  var html='<div style="padding:14px;max-width:700px">'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
     +'<div style="font-size:14px;font-weight:800;color:var(--navy)">📊 월간 루틴</div>'
     +'<select id="mkbp-year" class="fi" style="width:80px;font-size:12px" onchange="renderMkBlogMonthPlan()">'+yearOpts+'</select>'
