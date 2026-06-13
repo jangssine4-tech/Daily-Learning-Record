@@ -78,7 +78,6 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .tbl tbody tr:hover{background:var(--surface2)}
 .rev-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .rev-tbl th{background:var(--navy);color:#fff;padding:8px 10px;white-space:nowrap;text-align:center}
-.blogplan-tbl{table-layout:fixed}
 
 .rev-tbl td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:center}
 .rev-tbl tbody tr:hover{background:var(--surface2)}
@@ -1044,20 +1043,18 @@ function _restoreColWidths(el){
   el.querySelectorAll('th[data-col-id]').forEach(function(th){
     var id=th.dataset.colId;
     if(saved[id]){
-      th.style.width=saved[id];
       var div=th.querySelector('div');
-      if(div){div.style.width='';div.style.minWidth='';}
+      if(div)div.style.width=saved[id];
+      else th.style.width=saved[id];
     }
     var resizable=th.querySelector('div[style*="resize:horizontal"]');
     if(resizable){
+      // Save width on resize using ResizeObserver
       var ro=new ResizeObserver(function(entries){
         for(var entry of entries){
-          var table=th.closest('table');
-          if(!table)continue;
-          var newThWidth=entry.contentRect.width+'px';
-          th.style.width=newThWidth;
+          var w=entry.contentRect.width+'px';
           var s=JSON.parse(localStorage.getItem('blogPlanColWidths')||'{}');
-          s[id]=newThWidth;
+          s[id]=w;
           localStorage.setItem('blogPlanColWidths',JSON.stringify(s));
         }
       });
