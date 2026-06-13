@@ -954,6 +954,36 @@ function renderMkBlogRoutine(targetEl){
     },50);
   });
 }
+function toggleMkBlogRoutineEdit(){
+  var view=$('mkbr-view');var edit=$('mkbr-edit');
+  if(!view||!edit)return;
+  var show=edit.style.display==='none';
+  view.style.display=show?'none':'';edit.style.display=show?'':'none';
+}
+function saveMkBlogRoutineCheck(idx,checked){
+  if(!window._mkBlogConfig)window._mkBlogConfig={};
+  if(!window._mkBlogConfig.routineChecks)window._mkBlogConfig.routineChecks={};
+  window._mkBlogConfig.routineChecks['s'+idx]=checked;
+  window._mkBlogConfig.routineCheckDate=todayISO();
+  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){
+    renderMkBlogRoutine($('mkblog-plan-area'));
+  }).catch(function(){});
+}
+function saveMkBlogRoutineSteps(cnt){
+  if(!window._mkBlogConfig)window._mkBlogConfig={};
+  var steps=[];
+  for(var i=0;i<cnt;i++){
+    steps.push({
+      min:document.getElementById('mkbr-min-'+i)?.value||'5분',
+      title:document.getElementById('mkbr-title-'+i)?.value||'',
+      desc:document.getElementById('mkbr-desc-'+i)?.value||''
+    });
+  }
+  window._mkBlogConfig.routineSteps=steps;
+  db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).then(function(){
+    toast('💾 저장됨');renderMkBlogRoutine($('mkblog-plan-area'));
+  }).catch(function(){toast('⚠️ 저장 실패');});
+}
 function autoResize(el){
   el.style.height='auto';
   el.style.height=(el.scrollHeight)+'px';
