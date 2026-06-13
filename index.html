@@ -1040,38 +1040,43 @@ function _initBlogPlanAutoResize(el){
   setTimeout(function(){
     el.querySelectorAll('textarea').forEach(function(ta){if(ta.value)autoResize(ta);});
   },30);
-  var VER='v7';
-  if(localStorage.getItem('bpColVer')!==VER){localStorage.removeItem('bpColW');localStorage.setItem('bpColVer',VER);}
-  var saved=JSON.parse(localStorage.getItem('bpColW')||'{}');
-  el.querySelectorAll('.blogplan-tbl').forEach(function(tbl){
-    var colMap={};
-    var ths=tbl.querySelectorAll('thead th[data-col-id]');
-    ths.forEach(function(th){
-      var id=th.dataset.colId;
-      var minW=parseInt(th.style.minWidth)||60;
-      var defaultW=parseInt(th.style.width)||100;
-      var w=saved[id]?Math.max(parseInt(saved[id]),minW):defaultW;
-      colMap[id]=w;
-      th.style.width=w+'px';
-    });
-    var totalW=0;for(var k in colMap)totalW+=colMap[k];
-    tbl.style.width=totalW+'px';
-    ths.forEach(function(th){
-      var id=th.dataset.colId;
-      var minW=parseInt(th.style.minWidth)||60;
-      var ro=new ResizeObserver(function(entries){
-        // Skip when hidden (navigating away makes display:none → width 0)
-        if(!th.offsetParent)return;
-        var newW=Math.max(Math.round(entries[0].contentRect.width),minW);
-        if(newW===colMap[id])return;
-        var delta=newW-colMap[id];
-        colMap[id]=newW;
-        var curTblW=parseInt(tbl.style.width)||0;
-        tbl.style.width=(curTblW+delta)+'px';
-        var s=JSON.parse(localStorage.getItem('bpColW')||'{}');
-        s[id]=newW+'px';localStorage.setItem('bpColW',JSON.stringify(s));
+  loadMkBlogConfig().then(function(){
+    var savedCols=(window._mkBlogConfig||{}).colWidths||{};
+    el.querySelectorAll('.blogplan-tbl').forEach(function(tbl){
+      var colMap={};
+      var ths=tbl.querySelectorAll('thead th[data-col-id]');
+      ths.forEach(function(th){
+        var id=th.dataset.colId;
+        var defaultW=parseInt(th.style.width)||100;
+        var minW=parseInt(th.style.minWidth)||60;
+        var w=savedCols[id]?Math.max(parseInt(savedCols[id]),minW):defaultW;
+        colMap[id]=w;
+        th.style.width=w+'px';
       });
-      ro.observe(th);
+      var totalW=0;for(var k in colMap)totalW+=colMap[k];
+      tbl.style.width=totalW+'px';
+      var saveTimer=null;
+      ths.forEach(function(th){
+        var id=th.dataset.colId;
+        var ro=new ResizeObserver(function(entries){
+          if(!th.offsetParent)return;
+          var minW=parseInt(th.style.minWidth)||60;
+          var newW=Math.max(Math.round(entries[0].contentRect.width),minW);
+          if(newW===colMap[id])return;
+          var delta=newW-colMap[id];
+          colMap[id]=newW;
+          var curTblW=parseInt(tbl.style.width)||0;
+          tbl.style.width=(curTblW+delta)+'px';
+          clearTimeout(saveTimer);
+          saveTimer=setTimeout(function(){
+            if(!window._mkBlogConfig)window._mkBlogConfig={};
+            if(!window._mkBlogConfig.colWidths)window._mkBlogConfig.colWidths={};
+            for(var k in colMap)window._mkBlogConfig.colWidths[k]=colMap[k];
+            db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});
+          },800);
+        });
+        ro.observe(th);
+      });
     });
   });
 }
