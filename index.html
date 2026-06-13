@@ -308,7 +308,6 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab active" id="mkblog-tab-strategy" onclick="switchMkBlogTab('strategy')">📋 운영안</button>
     <button class="rev-tab" id="mkblog-tab-routine" onclick="switchMkBlogTab('routine')">✍️ 하루 글쓰기 루틴</button>
     <button class="rev-tab" id="mkblog-tab-plan" onclick="switchMkBlogTab('plan')">📅 플랜</button>
-    <button class="rev-tab" id="mkblog-tab-roles" onclick="switchMkBlogTab('roles')">📊 목적별 역할</button>
   </div>
   <div class="cp">
     <div id="mkblog-panel-strategy"><div id="mkblog-strategy-area"></div></div>
@@ -316,12 +315,12 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div id="mkblog-panel-plan" style="display:none">
       <div style="background:var(--surface2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;position:sticky;top:0;z-index:10">
         <button class="rev-tab" id="mkbp-tab-weekly" onclick="switchMkBlogPlanTab('weekly')">📅 주간 루틴</button>
-        <button class="rev-tab active" id="mkbp-tab-monthly" onclick="switchMkBlogPlanTab('monthly')">📊 월간 루틴</button>
+        <button class="rev-tab active" id="mkbp-tab-monthly" onclick="switchMkBlogPlanTab('monthly')">📊 월간 계획</button>
         <button class="rev-tab" id="mkbp-tab-yearly" onclick="switchMkBlogPlanTab('yearly')">📆 연간 계획</button>
+        <button class="rev-tab" id="mkbp-tab-roles" onclick="switchMkBlogPlanTab('roles')">📊 목적별 역할</button>
       </div>
       <div id="mkblog-plan-area"></div>
     </div>
-    <div id="mkblog-panel-roles" style="display:none"><div id="mkblog-roles-area"></div></div>
   </div>
 </div>
 <div class="view" id="view-mk-kakao"><div class="page-top"><h2>💬 카톡 채널</h2></div><div class="cp" id="mk-kakao-area"></div></div>
@@ -766,14 +765,13 @@ function showJarvisAlert(){
   }catch(e){}
 }
 function switchMkBlogTab(tab){
-  ['strategy','routine','plan','roles'].forEach(function(t){
+  ['strategy','routine','plan'].forEach(function(t){
     var btn=$('mkblog-tab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('mkblog-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
   });
   if(tab==='strategy')renderMkBlogStrategy();
   else if(tab==='routine')renderMkBlogRoutine();
   else if(tab==='plan')renderMkBlogPlan();
-  else if(tab==='roles')renderMkBlogRoles();
 }
 function renderMkTodayPage(){
   var el=$('mk-today-area');if(!el)return;
@@ -968,7 +966,7 @@ function saveMkBlogRoutineField(key,val){
   db.collection('config').doc('mkBlogConfig').set(window._mkBlogConfig,{merge:true}).catch(function(){});
 }
 function switchMkBlogPlanTab(tab){
-  ['yearly','weekly','monthly'].forEach(function(t){
+  ['yearly','weekly','monthly','roles'].forEach(function(t){
     var btn=$('mkbp-tab-'+t);if(btn)btn.classList.toggle('active',t===tab);
   });
   window._mkBlogPlanTab=tab;
@@ -981,6 +979,7 @@ function renderMkBlogPlan(){
     var saved=(window._mpPlans||{}).blog||{};
     if(tab==='yearly')renderMkBlogPlanYearly(el,saved);
     else if(tab==='weekly')renderMkBlogPlanWeekly(el,saved);
+    else if(tab==='roles')renderMkBlogRoles();
     else renderMkBlogPlanMonthly(el,saved);
   });
 }
@@ -1098,14 +1097,27 @@ function renderMkBlogPlanMonthly(el,saved){
   var today=new Date();var curYear=today.getFullYear();var curMonth=today.getMonth()+1;
   var yearOpts='';for(var y=curYear-1;y<=curYear+2;y++)yearOpts+='<option value="'+y+'" '+(y===curYear?'selected':'')+'>'+y+'년</option>';
   var moOpts='';for(var m=1;m<=12;m++)moOpts+='<option value="'+m+'" '+(m===curMonth?'selected':'')+'>'+m+'월</option>';
+  var monthMemo=(saved['monthMemo_'+curYear+'_'+curMonth]||'').replace(/"/g,'&quot;');
   var html='<div style="padding:14px">'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
-    +'<div style="font-size:14px;font-weight:800;color:var(--navy)">📊 월간 루틴</div>'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy)">📊 월간 계획</div>'
     +'<select id="mkbp-year" class="fi" style="width:80px;font-size:12px" onchange="renderMkBlogMonthPlan()">'+yearOpts+'</select>'
     +'<select id="mkbp-month" class="fi" style="width:60px;font-size:12px" onchange="renderMkBlogMonthPlan()">'+moOpts+'</select>'
-    +'</div><div id="mkbp-month-content"></div></div>';
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px">'
+    +'<span style="font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap">월간 블로그 운영 계획</span>'
+    +'<textarea class="fi" id="mkbp-month-memo" style="font-size:12px;border:none;background:transparent;flex:1;resize:none;overflow:hidden;min-height:32px" rows="1" placeholder="이번 달 블로그 운영 방향을 메모하세요..." oninput="autoResize(this)" onblur="saveMkBlogMonthMemo()">'+monthMemo+'</textarea>'
+    +'</div>'
+    +'<div id="mkbp-month-content"></div></div>';
   el.innerHTML=html;
+  var memoTa=$('mkbp-month-memo');if(memoTa&&memoTa.value)autoResize(memoTa);
   renderMkBlogMonthPlan();
+}
+function saveMkBlogMonthMemo(){
+  var yEl=$('mkbp-year');var mEl=$('mkbp-month');var memo=$('mkbp-month-memo');
+  if(!yEl||!mEl||!memo)return;
+  var key='monthMemo_'+yEl.value+'_'+mEl.value;
+  saveMpField('blog',key,memo.value);
 }
 function renderMkBlogMonthPlan(){
   var yEl=$('mkbp-year');var mEl=$('mkbp-month');
@@ -1114,6 +1126,14 @@ function renderMkBlogMonthPlan(){
   var key='blog_monthly_'+y+'_'+m;
   var saved=(window._mpPlans||{});
   var data=saved[key]||{};
+  var blogSaved=(saved.blog||{});
+  // Update memo
+  var memoTa=$('mkbp-month-memo');
+  if(memoTa){
+    var memoVal=(blogSaved['monthMemo_'+y+'_'+m]||'');
+    memoTa.value=memoVal;
+    autoResize(memoTa);
+  }
   var content=$('mkbp-month-content');if(!content)return;
   var purposeOptions1=['','정보 제공','문제 공감','관계 유지','신뢰 형성','사례 중심'];
   var purposeOptions2=['','해결책 제시','사례 중심','신뢰 형성','홍보 전환','성과 증명'];
@@ -1147,7 +1167,7 @@ function saveMkBlogMonthField(key,week,val){
   db.collection('config').doc('mpPlans').set(window._mpPlans).catch(function(){});
 }
 function renderMkBlogRoles(){
-  var el=$('mkblog-roles-area');if(!el)return;
+  var el=$('mkblog-plan-area');if(!el)return;
   loadMkBlogConfig().then(function(){
     var cfg=window._mkBlogConfig||{};
     var roles=cfg.blogRoles||[
