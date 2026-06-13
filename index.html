@@ -989,7 +989,7 @@ function renderMkBlogPlanYearly(el,saved){
     {q:4,months:[10,11,12]}
   ];
   var html='<div style="padding:14px;max-width:800px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📆 연간 계획</div>'
-    +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:12%">월</th><th style="width:14%;padding:0" data-col-id="year-goal"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">핵심 목적</div></th><th style="width:21%;padding:0" data-col-id="year-type"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">강화할 글 유형</div></th><th style="width:53%;padding:0" data-col-id="year-mode"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">주간 운영 방식</div></th></tr></thead><tbody>';
+    +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:12%">월</th><th style="width:14%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-goal">핵심 목적</th><th style="width:21%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-type">강화할 글 유형</th><th style="width:53%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="year-mode">주간 운영 방식</th></tr></thead><tbody>';
   quarters.forEach(function(qr){
     var qGoal=(saved['q'+qr.q+'_goal']||'').replace(/"/g,'&quot;');
     var qDesc=(saved['q'+qr.q+'_desc']||'').replace(/"/g,'&quot;');
@@ -1030,7 +1030,7 @@ function renderMkBlogPlanWeekly(el,saved){
       +'<td><textarea class="fi" style="font-size:12px;border:none;background:transparent;width:100%;text-align:center;resize:none;overflow:hidden;min-height:32px" rows="1" placeholder="내용" data-fk="wc_'+d+'" oninput="autoResize(this)" onblur="saveBlogPlanField(this)">'+cont+'</textarea></td></tr>';
   });
   el.innerHTML='<div style="padding:14px;max-width:700px"><div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:12px">📅 주간 루틴</div>'
-    +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:10%">요일</th><th style="width:33%">작업</th><th style="width:57%;padding:0" data-col-id="week-content"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">내용</div></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    +'<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:10%">요일</th><th style="width:33%">작업</th><th style="width:57%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="week-content">내용</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   _initBlogPlanAutoResize(el);
 }
 function _initBlogPlanAutoResize(el){
@@ -1043,27 +1043,19 @@ function _restoreColWidths(el){
   var saved=JSON.parse(localStorage.getItem('blogPlanColWidths')||'{}');
   el.querySelectorAll('th[data-col-id]').forEach(function(th){
     var id=th.dataset.colId;
-    if(saved[id]){
-      th.style.width=saved[id];
-      var div=th.querySelector('div');
-      if(div){div.style.width='100%';div.style.minWidth='0';div.style.boxSizing='border-box';}
-    }
-    var resizable=th.querySelector('div[style*="resize:horizontal"]');
-    if(resizable){
-      var ro=new ResizeObserver(function(entries){
-        for(var entry of entries){
-          var table=th.closest('table');
-          var tableWidth=table?table.getBoundingClientRect().width:0;
-          var thWidth=th.getBoundingClientRect().width;
-          var pct=tableWidth>0?((thWidth/tableWidth)*100).toFixed(2)+'%':thWidth+'px';
-          th.style.width=pct;
-          var s=JSON.parse(localStorage.getItem('blogPlanColWidths')||'{}');
-          s[id]=pct;
-          localStorage.setItem('blogPlanColWidths',JSON.stringify(s));
-        }
-      });
-      ro.observe(resizable);
-    }
+    if(saved[id])th.style.width=saved[id];
+    var ro=new ResizeObserver(function(entries){
+      for(var entry of entries){
+        var table=th.closest('table');
+        var tableWidth=table?table.getBoundingClientRect().width:0;
+        var thWidth=th.getBoundingClientRect().width;
+        var pct=tableWidth>0?((thWidth/tableWidth)*100).toFixed(2)+'%':thWidth+'px';
+        var s=JSON.parse(localStorage.getItem('blogPlanColWidths')||'{}');
+        s[id]=pct;
+        localStorage.setItem('blogPlanColWidths',JSON.stringify(s));
+      }
+    });
+    ro.observe(th);
   });
 }
 function saveBlogPlanField(el){
@@ -1093,7 +1085,7 @@ function renderMkBlogMonthPlan(){
   var content=$('mkbp-month-content');if(!content)return;
   var purposeOptions1=['','정보 제공','문제 공감','관계 유지','신뢰 형성','사례 중심'];
   var purposeOptions2=['','해결책 제시','사례 중심','신뢰 형성','홍보 전환','성과 증명'];
-  var html='<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:12%">주차</th><th style="width:14%;padding:0" data-col-id="month-p"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">첫 번째 글의 목적</div></th><th style="width:21%;padding:0" data-col-id="month-r"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">두 번째 글의 목적</div></th><th style="width:53%;padding:0" data-col-id="month-intent"><div style="resize:horizontal;overflow:auto;min-width:50px;padding:8px 4px">핵심 의도</div></th></tr></thead><tbody>';
+  var html='<table class="rev-tbl blogplan-tbl"><thead><tr><th style="width:12%">주차</th><th style="width:14%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-p">첫 번째 글의 목적</th><th style="width:21%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-r">두 번째 글의 목적</th><th style="width:53%;resize:horizontal;overflow:auto;min-width:50px;display:table-cell;box-sizing:border-box" data-col-id="month-intent">핵심 의도</th></tr></thead><tbody>';
   ['1주차','2주차','3주차','4주차'].forEach(function(w,i){
     var purpose=(data['p'+(i+1)]||'');
     var role=(data['r'+(i+1)]||'');
