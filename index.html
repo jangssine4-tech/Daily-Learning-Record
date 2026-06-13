@@ -1040,34 +1040,34 @@ function _initBlogPlanAutoResize(el){
   setTimeout(function(){
     el.querySelectorAll('textarea').forEach(function(ta){if(ta.value)autoResize(ta);});
   },30);
-  var VER='v6';
+  var VER='v7';
   if(localStorage.getItem('bpColVer')!==VER){localStorage.removeItem('bpColW');localStorage.setItem('bpColVer',VER);}
   var saved=JSON.parse(localStorage.getItem('bpColW')||'{}');
   el.querySelectorAll('.blogplan-tbl').forEach(function(tbl){
     var colMap={};
     var ths=tbl.querySelectorAll('thead th[data-col-id]');
-    // 1) Initialize tracked widths from saved or CSS default
     ths.forEach(function(th){
       var id=th.dataset.colId;
-      var w=saved[id]?parseInt(saved[id]):parseInt(th.style.width)||100;
+      var minW=parseInt(th.style.minWidth)||60;
+      var defaultW=parseInt(th.style.width)||100;
+      var w=saved[id]?Math.max(parseInt(saved[id]),minW):defaultW;
       colMap[id]=w;
       th.style.width=w+'px';
     });
-    // 2) Set table width = sum of tracked widths
     var totalW=0;for(var k in colMap)totalW+=colMap[k];
     tbl.style.width=totalW+'px';
-    // 3) Observe each th for resize
     ths.forEach(function(th){
       var id=th.dataset.colId;
+      var minW=parseInt(th.style.minWidth)||60;
       var ro=new ResizeObserver(function(entries){
-        var newW=Math.round(entries[0].contentRect.width);
-        if(newW===colMap[id])return; // no change
+        // Skip when hidden (navigating away makes display:none → width 0)
+        if(!th.offsetParent)return;
+        var newW=Math.max(Math.round(entries[0].contentRect.width),minW);
+        if(newW===colMap[id])return;
         var delta=newW-colMap[id];
         colMap[id]=newW;
-        // Update table width by delta
         var curTblW=parseInt(tbl.style.width)||0;
         tbl.style.width=(curTblW+delta)+'px';
-        // Save
         var s=JSON.parse(localStorage.getItem('bpColW')||'{}');
         s[id]=newW+'px';localStorage.setItem('bpColW',JSON.stringify(s));
       });
@@ -1075,8 +1075,6 @@ function _initBlogPlanAutoResize(el){
     });
   });
 }
-function _syncBlogTblW(){}
-function _syncBlogTblWForTable(){}
 function saveBlogPlanField(el){
   var fk=el.dataset.fk;var val=el.value;
   saveMpField('blog',fk,val);
