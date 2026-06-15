@@ -4784,10 +4784,17 @@ function renderMemoPage(){
   var el=$('memo-list');if(!el)return;
   var sel=$('memo-student');
   if(sel){
+    var curVal=sel.value;
     var active=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
-    sel.innerHTML='<option value="">학생 선택</option>'+active.map(function(s){return'<option value="'+s.id+'">'+s.name+'</option>';}).join('');
+    sel.innerHTML='<option value="">전체 학생</option>'+active.map(function(s){return'<option value="'+s.id+'">'+s.name+'</option>';}).join('');
+    if(curVal)sel.value=curVal;
+    sel.onchange=function(){renderMemoPage();};
   }
-  var memos=window._studentMemos||[];
+  var filterSid=sel?sel.value:'';
+  var memos=(window._studentMemos||[]).filter(function(m){
+    if(!filterSid)return true;
+    return m.studentId===filterSid;
+  });
   var pins=memos.filter(function(m){return(m.memoType||'action')==='pin'&&!m.done;});
   var actions=memos.filter(function(m){return(m.memoType||'action')==='action'&&!m.done;});
   var completed=memos.filter(function(m){return m.done;});
