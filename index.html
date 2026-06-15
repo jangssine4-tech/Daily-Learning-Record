@@ -2251,7 +2251,9 @@ function renderSchedule(){
       if(blk!=='시간미설정'&&sortedBlks.length>1)html+='<div style="font-size:11px;color:var(--txt3);padding:6px 12px 2px;font-weight:600">'+blk+'</div>';
       html+='<div class="student-cards">';
       blocks[blk].students.forEach(function(s){
-        var rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr;});
+        var rep;
+        if(s._isMakeup){rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.makeupId===s._makeupId;});}
+        else{rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.makeupId;});}
         var done=rep&&!rep.absent&&!rep.earlyLeave;
         var absent=rep&&rep.absent;
         var early=rep&&rep.earlyLeave;
@@ -2294,10 +2296,11 @@ function renderSchedule(){
           +'</div>';
         html+='<div class="s-card-sub">'+getStudentLevel(s)+'</div>';
         html+='<div class="s-card-btns">';
-        html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'present\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
-        html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'absent\')"><span style="font-size:17px;font-weight:700">✕</span></button>';
-        html+='<button class="att-btn early-btn'+(early?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'early\')" title="조퇴/학습 마무리 못함"><span style="font-size:15px;font-weight:700">▲</span></button>';
-        if(done||absent||early)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\')" title="일지 작성">📝</button>';
+        var _mkId=s._isMakeup?s._makeupId:'';
+        html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'present\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
+        html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'absent\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✕</span></button>';
+        html+='<button class="att-btn early-btn'+(early?' active':'')+'" onclick="markAttendance(\''+s.id+'\',\'early\',\''+_mkId+'\')" title="조퇴/학습 마무리 못함"><span style="font-size:15px;font-weight:700">▲</span></button>';
+        if(done||absent||early)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\',\''+_mkId+'\')" title="일지 작성">📝</button>';
         html+='</div></div>';
       });
       html+='</div>';
@@ -2307,11 +2310,13 @@ function renderSchedule(){
   $('schedule-list').innerHTML=html;
 }
 
-async function markAttendance(studentId, action){
+async function markAttendance(studentId, action, makeupId){
   // action: 'present', 'absent', 'early'
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
   var todayStr=_scheduleDate||todayISO();
-  var existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr;});
+  var existing;
+  if(makeupId){existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr&&r.makeupId===makeupId;});}
+  else{existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr&&!r.makeupId;});}
   var isAbsent=action==='absent';
   var isEarly=action==='early';
   var isPresent=action==='present';
@@ -2351,6 +2356,7 @@ async function markAttendance(studentId, action){
   } else {
     var cls2=classes.find(function(c){return c.id===s.classId;});
     var data={studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:isAbsent,earlyLeave:isEarly||false,absentReason:isEarly?'조퇴':'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s)),evalItems:{},praise:[],createdAt:new Date().toISOString()};
+    if(makeupId)data.makeupId=makeupId;
     var newR=await db.collection('reports').add(data);
     reports.push({id:newR.id,...data});
     if(isAbsent||isEarly) createAutoMakeup();
@@ -2888,17 +2894,20 @@ function updateDictationValue(){
 }
 function splitHw(val){var r={video:'',book:''};if(!val)return r;if(val.indexOf('영상:')>=0){var m=val.match(/영상:([^,]+)/);if(m)r.video=m[1].trim();}if(val.indexOf('교재:')>=0){var m2=val.match(/교재:([^,]+)/);if(m2)r.book=m2[1].trim();}if(!r.video&&!r.book){if(val==='완료'){r.video='제출';r.book='완료';}else if(val==='미제출'){r.video='미제출';r.book='미완료';}}return r;}
 function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m2=c.match(/\[교재\]\s*([\s\S]*?)$/);if(m2)b=m2[1].trim();var m1=c.match(/\[태블릿\]\s*([\s\S]*?)(?=\s*\[교재\]|$)/);if(m1)t=m1[1].trim();if(!m1&&!m2)t=c;return{t:t,b:b};}
-function startReport(studentId){
+function startReport(studentId,makeupId){
   window._currentEvalModule='';window._evalState={};window._saveImageAfter=false;_lastLoadedReportTs='';
+  window._currentMakeupId=makeupId||'';
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
-  var rep=reports.find(function(r){return r.studentId===studentId&&r.date===todayISO();});
+  var rep;
+  if(makeupId){rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&r.makeupId===makeupId;});}
+  else{rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&!r.makeupId;});}
   $('r-student-id').value=studentId;
-  $('write-student-info').textContent=s.name+' · '+getStudentLevel(s)+' · '+(s.grade||'');
-  $('r-date').value=todayISO();
+  $('write-student-info').textContent=s.name+' · '+getStudentLevel(s)+' · '+(s.grade||'')+(makeupId?' · 🔴 보강':'');
+  $('r-date').value=_scheduleDate||todayISO();
   var lvSel=$('r-level');
   if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===getStudentLevel(s)?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(getStudentLevel(s),rep?.progress||'');}updateDictationDropdown(getStudentLevel(s),rep?.dictation||'');
   // Check for temp saved data
-  var tempKey='tempReport_'+studentId+'_'+todayISO();
+  var tempKey='tempReport_'+studentId+'_'+((_scheduleDate||todayISO()))+(makeupId?'_mk'+makeupId:'');
   var tempData=null;
   try{var raw=localStorage.getItem(tempKey);if(raw)tempData=JSON.parse(raw);}catch(e){}
   var ind=$('temp-save-indicator');
@@ -2944,7 +2953,7 @@ function startReport(studentId){
 }
 function tempSaveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
-  var tempKey='tempReport_'+sId+'_'+$('r-date').value;
+  var tempKey='tempReport_'+sId+'_'+$('r-date').value+(window._currentMakeupId?'_mk'+window._currentMakeupId:'');
   combineHw();
   var data={level:$('r-level').value,progress:$('r-progress').value,teacherTablet:$('r-teacher-tablet').value,teacherBook:$('r-teacher-book').value,reviewYN:$('r-review-yn').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',dictation:$('r-dictation').value||'',evalModule:window._currentEvalModule||'',evalState:window._evalState||{},savedAt:new Date().toISOString()};
   localStorage.setItem(tempKey,JSON.stringify(data));
@@ -3102,7 +3111,10 @@ async function saveReport(){
   var formDate=$('r-date').value;
   combineHw();
   // ── Field-level merge: read latest from Firestore (via onSnapshot-updated array) ──
-  var existing=reports.find(function(r){return r.studentId===sId&&r.date===formDate;});
+  var existing;
+  var _mkId=window._currentMakeupId||'';
+  if(_mkId){existing=reports.find(function(r){return r.studentId===sId&&r.date===formDate&&r.makeupId===_mkId;});}
+  else{existing=reports.find(function(r){return r.studentId===sId&&r.date===formDate&&!r.makeupId;});}
   var prev=existing||{};
   // For comment: merge tablet/book independently
   var formTablet=$('r-comment-tablet').value;
@@ -3144,6 +3156,7 @@ async function saveReport(){
     makeupContent:pick($('r-makeup-content').value,prev.makeupContent),
     updatedAt:new Date().toISOString()
   };
+  if(_mkId)data.makeupId=_mkId;
   var savedId='';
   if(existing){await db.collection('reports').doc(existing.id).update(data);var i2=reports.findIndex(function(r){return r.id===existing.id;});reports[i2]={...existing,...data};savedId=existing.id;}
   else{var nr=await db.collection('reports').add({...data,createdAt:new Date().toISOString()});reports.unshift({id:nr.id,...data});savedId=nr.id;}
@@ -3178,7 +3191,7 @@ async function saveReport(){
   }
   window._evalState={};_lastLoadedReportTs=data.updatedAt;
   // Clear temp data after successful DB save
-  var tempKey='tempReport_'+sId+'_'+data.date;localStorage.removeItem(tempKey);
+  var tempKey='tempReport_'+sId+'_'+data.date+(_mkId?'_mk'+_mkId:'');localStorage.removeItem(tempKey);
   var ind=$('temp-save-indicator');if(ind)ind.style.display='none';
   loading(false);toast('✅ 일지 저장됨 (DB 반영 완료)');
   if(window._saveImageAfter){window._saveImageAfter=false;saveCacheDebounced();saveReportAsImage(savedId);return;}
