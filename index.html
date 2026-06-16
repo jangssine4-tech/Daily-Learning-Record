@@ -1687,17 +1687,25 @@ var _scheduleDate=null; // null = today
 function toggleObserve(sId,isJoy){
   if(!window._cardBadges)window._cardBadges={};
   var key='obs_'+sId;
-  if(window._cardBadges[key])delete window._cardBadges[key];
-  else window._cardBadges[key]=true;
-  db.collection('config').doc('cardBadges').set(window._cardBadges).catch(function(){});
+  if(window._cardBadges[key]){
+    delete window._cardBadges[key];
+    db.collection('config').doc('cardBadges').update(Object.fromEntries([[key,firebase.firestore.FieldValue.delete()]])).catch(function(){});
+  } else {
+    window._cardBadges[key]=true;
+    db.collection('config').doc('cardBadges').set(Object.fromEntries([[key,true]]),{merge:true}).catch(function(){});
+  }
   renderSchedule();
 }
 function toggleCardTag(key,el){
   if(!window._cardBadges)window._cardBadges={};
   var cur=window._cardBadges[key];
-  if(cur)delete window._cardBadges[key];
-  else window._cardBadges[key]=true;
-  db.collection('config').doc('cardBadges').set(window._cardBadges).catch(function(){});
+  if(cur){
+    delete window._cardBadges[key];
+    db.collection('config').doc('cardBadges').update(Object.fromEntries([[key,firebase.firestore.FieldValue.delete()]])).catch(function(){});
+  } else {
+    window._cardBadges[key]=true;
+    db.collection('config').doc('cardBadges').set(Object.fromEntries([[key,true]]),{merge:true}).catch(function(){});
+  }
   var colors=key.startsWith('tbl_')?['#3b82f6','#fff','#eff6ff','#1e40af']:['#7c3aed','#fff','#f3e8ff','#6b21a8'];
   if(!cur){el.style.background=colors[0];el.style.color=colors[1];}
   else{el.style.background=colors[2];el.style.color=colors[3];}
