@@ -1205,13 +1205,13 @@ function saveMkBlogMonthCell(el){
   if(!window._mpPlans)window._mpPlans={};
   if(!window._mpPlans[key])window._mpPlans[key]={};
   window._mpPlans[key][col+week]=val;
-  db.collection('config').doc('mpPlans').set(window._mpPlans).catch(function(){});
+  db.collection('config').doc('mpPlans').set(window._mpPlans,{merge:true}).catch(function(){});
 }
 function saveMkBlogMonthField(key,week,val){
   if(!window._mpPlans)window._mpPlans={};
   if(!window._mpPlans[key])window._mpPlans[key]={};
   window._mpPlans[key]['w'+week]=val;
-  db.collection('config').doc('mpPlans').set(window._mpPlans).catch(function(){});
+  db.collection('config').doc('mpPlans').set(window._mpPlans,{merge:true}).catch(function(){});
 }
 function renderMkBlogRoles(){
   var el=$('mkblog-plan-area');if(!el)return;
@@ -5345,6 +5345,24 @@ async function saveMkPromo(yr){
 }
 
 // ═══ 마케팅 플랜 & 루틴 ═══
+async function loadMpPlans(){
+  if(window._mpPlans)return;
+  try{var d=await db.collection('config').doc('mpPlans').get();window._mpPlans=d.exists?d.data():{};}catch(e){window._mpPlans={};}
+}
+function saveMpField(ch,field,val){
+  if(!window._mpPlans)window._mpPlans={};
+  if(!window._mpPlans[ch])window._mpPlans[ch]={};
+  window._mpPlans[ch][field]=val;
+  var update={};update[ch+'.'+field]=val;
+  db.collection('config').doc('mpPlans').set(window._mpPlans,{merge:true}).catch(function(){});
+}
+function colorMkLabel(t){
+  if(!t)return'';
+  return t.replace(/\[(인스타|블로그|당근|카톡|네이버)\]/g,function(m,ch){
+    var c={인스타:'#e1306c',블로그:'#03c75a',당근:'#ff6f0f',카톡:'#fee500',네이버:'#03c75a'};
+    return'<span style="background:'+(c[ch]||'#888')+';color:#fff;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:700">'+ch+'</span>';
+  });
+}
 function saveMpCheck(dateKey,itemKey,checked){
   db.collection('mkPlanCheck').doc(dateKey).set({[itemKey]:checked},{merge:true}).catch(function(){});
 }
