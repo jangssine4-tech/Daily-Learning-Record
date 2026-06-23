@@ -279,7 +279,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="field"><div class="fl">선생님 코멘트 (태블릿)</div><textarea class="fi" id="r-comment-tablet" rows="2" placeholder="태블릿 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">칭찬 포인트</div><textarea class="fi" id="r-memo" rows="2"></textarea></div>
-    <div class="field" style="background:var(--surface2);border-radius:var(--r);padding:10px 12px"><div style="display:flex;align-items:center;gap:16px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-makeup-check" onchange="$('r-makeup-content-wrap').style.display=this.checked?'block':'none'"> 보강 필요</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-parent-contact"> 학부모 연락 필요</label></div><div id="r-makeup-content-wrap" style="display:none"><textarea class="fi" id="r-makeup-content" rows="2" placeholder="보강 사유 및 내용 (보강 계획표 메모에 연동됩니다)"></textarea></div></div>
+    <div class="field" style="background:var(--surface2);border-radius:var(--r);padding:10px 12px"><div style="display:flex;align-items:center;gap:16px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-makeup-check" onchange="$('r-makeup-content-wrap').style.display=this.checked?'block':'none'"> 보강 필요</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-parent-contact" onchange="onParentContactChange(this)"> 학부모 연락 필요</label></div><div id="r-makeup-content-wrap" style="display:none"><textarea class="fi" id="r-makeup-content" rows="2" placeholder="보강 사유 및 내용 (보강 계획표 메모에 연동됩니다)"></textarea></div></div>
     <div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap"><button class="btn btn-outline" style="flex:1;min-width:80px" onclick="tempSaveReport()">📋 임시 저장</button><button class="btn btn-green" style="flex:1;min-width:80px" onclick="saveReport()">💾 저장</button><button class="btn btn-navy" style="flex:1;min-width:80px" onclick="saveReportAndImage()">📷 저장 + 이미지</button><button class="btn btn-outline" style="min-width:50px;color:var(--txt3)" onclick="goto('schedule')">취소</button></div>
     <div id="temp-save-indicator" style="display:none;text-align:center;margin-top:6px;font-size:11px;color:var(--blue)">📋 임시 저장된 데이터가 있습니다</div>
   </div></div>
@@ -964,6 +964,20 @@ function renderMkBlogRoutine(targetEl){
       });
     },50);
   });
+}
+function onParentContactChange(cb){
+  if(!cb.checked)return;
+  var sId=window._currentReportStudentId||'';
+  var s=students.find(function(x){return x.id===sId;});
+  var dateVal=_scheduleDate||todayISO();
+  openConsultModal();
+  setTimeout(function(){
+    if($('con-student')&&sId)$('con-student').value=sId;
+    if($('con-date'))$('con-date').value=dateVal;
+    if($('con-teacher')&&currentUser)$('con-teacher').value=currentUser.name||'';
+    if($('con-type'))$('con-type').value='관리 연락';
+    if(s&&$('con-modal-title'))$('con-modal-title').textContent=s.name+' — 상담 기록';
+  },50);
 }
 function toggleMkBlogRoutineEdit(){
   var view=$('mkbr-view');var edit=$('mkbr-edit');
@@ -3019,6 +3033,7 @@ function updateDictationValue(){
 function splitHw(val){var r={video:'',book:''};if(!val)return r;if(val.indexOf('영상:')>=0){var m=val.match(/영상:([^,]+)/);if(m)r.video=m[1].trim();}if(val.indexOf('교재:')>=0){var m2=val.match(/교재:([^,]+)/);if(m2)r.book=m2[1].trim();}if(!r.video&&!r.book){if(val==='완료'){r.video='제출';r.book='완료';}else if(val==='미제출'){r.video='미제출';r.book='미완료';}}return r;}
 function _splitComment(c){var t='',b='';if(!c)return{t:'',b:''};var m2=c.match(/\[교재\]\s*([\s\S]*?)$/);if(m2)b=m2[1].trim();var m1=c.match(/\[태블릿\]\s*([\s\S]*?)(?=\s*\[교재\]|$)/);if(m1)t=m1[1].trim();if(!m1&&!m2)t=c;return{t:t,b:b};}
 function startReport(studentId,makeupId){
+  window._currentReportStudentId=studentId;
   window._currentEvalModule='';window._evalState={};window._saveImageAfter=false;_lastLoadedReportTs='';
   window._currentMakeupId=makeupId||'';
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
