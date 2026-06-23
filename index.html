@@ -300,10 +300,9 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <div class="view" id="view-homework"><div class="page-top"><h2>숙제 관리</h2></div><div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto"><button class="rev-tab active" id="hwtab-check" onclick="switchHwTab('check')">✅ 숙제 체크</button><button class="rev-tab" id="hwtab-preview" onclick="switchHwTab('preview')">📨 발송 미리보기</button><button class="rev-tab" id="hwtab-log" onclick="switchHwTab('log')">📋 발송 기록</button><button class="rev-tab" id="hwtab-stats" onclick="switchHwTab('stats')">📊 누적 현황</button></div><div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hw-date" onchange="renderHwCheck()"></select><button class="btn btn-green btn-sm" id="hw-assign-btn" onclick="openHwAssignModal()">+ 숙제 등록</button></div><div id="hw-panel-check" class="cp"><div id="hw-check-area"></div></div><div id="hw-panel-preview" style="display:none" class="cp"><div id="hw-preview-area"></div></div><div id="hw-panel-log" style="display:none" class="cp"><div id="hw-log-area"></div></div><div id="hw-panel-stats" style="display:none" class="cp"><div id="hw-stats-area"></div></div></div>
 <div class="view" id="view-msgboard"><div class="page-top"><h2>📨 발송 관리</h2><p>숙제 상태 기반 학부모 메시지 관리</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto"><button class="rev-tab active" id="msgtab-preview" onclick="switchMsgTab('preview')">📋 미리보기</button><button class="rev-tab" id="msgtab-history" onclick="switchMsgTab('history')">📊 발송 이력</button></div><div class="toolbar"><select class="fi" id="msg-date" style="width:auto;font-size:12px" onchange="renderMsgPreview()"></select></div><div id="msg-preview-panel" class="cp"><div id="msg-preview-area"></div></div><div id="msg-history-panel" style="display:none" class="cp"><div id="msg-history-area"></div></div></div>
 <div class="view" id="view-dashboard">
-  <div class="page-top"><h2>📋 오늘의 업무</h2></div>
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
-    <button class="rev-tab active" id="dtab-crm" onclick="switchDashTab('crm')">👥 학부모 소통 상담 학생 관리</button>
-    <button class="rev-tab" id="dtab-mk" onclick="switchDashTab('mk')">📣 마케팅 홍보</button>
+    <button class="rev-tab active" id="dtab-crm" onclick="switchDashTab('crm')">👥 학부모 소통 · 상담 · 학생 관리</button>
+    <button class="rev-tab" id="dtab-mk" onclick="switchDashTab('mk')">📣 마케팅 · 홍보</button>
   </div>
   <div id="dash-panel-crm" class="cp"><div id="dashboard-area"></div></div>
   <div id="dash-panel-mk" style="display:none" class="cp"><div id="dashboard-mk-area"></div></div>
@@ -2254,7 +2253,14 @@ function renderCrmDailyInto(targetId){
     }
     return t;
   });
-  tasks.sort(function(a,b){return a.priority-b.priority;});
+  // Sort: priority first, then by creation date desc
+  tasks.sort(function(a,b){
+    if(a.priority!==b.priority)return a.priority-b.priority;
+    return(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'');
+  });
+
+  // Assign createdAt (today for auto-generated)
+  tasks.forEach(function(t){if(!t.createdAt)t.createdAt=todayStr;});
 
   // Summary
   var urgent=tasks.filter(function(t){return t.priority===1;}).length;
@@ -2262,35 +2268,48 @@ function renderCrmDailyInto(targetId){
   var crm=tasks.filter(function(t){return t.priority===3;}).length;
 
   var html='<div style="margin-bottom:14px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px">📋 오늘의 업무</div>'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">'+todayStr+' · 자동 분류된 업무 '+tasks.length+'건</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">'+todayStr+' · 자동 분류 '+tasks.length+'건</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<div style="background:#fef2f2;border-radius:10px;padding:8px 14px;text-align:center"><div style="font-size:20px;font-weight:800;color:#dc2626">'+urgent+'</div><div style="font-size:10px;color:var(--txt3)">긴급</div></div>'
-    +'<div style="background:#fefce8;border-radius:10px;padding:8px 14px;text-align:center"><div style="font-size:20px;font-weight:800;color:#b45309">'+manage+'</div><div style="font-size:10px;color:var(--txt3)">학습 관리</div></div>'
-    +'<div style="background:#f0fdf4;border-radius:10px;padding:8px 14px;text-align:center"><div style="font-size:20px;font-weight:800;color:#16a34a">'+crm+'</div><div style="font-size:10px;color:var(--txt3)">CRM</div></div>'
+    +'<div style="background:#fef2f2;border-radius:10px;padding:6px 12px;text-align:center"><div style="font-size:18px;font-weight:800;color:#dc2626">'+urgent+'</div><div style="font-size:10px;color:var(--txt3)">긴급</div></div>'
+    +'<div style="background:#fefce8;border-radius:10px;padding:6px 12px;text-align:center"><div style="font-size:18px;font-weight:800;color:#b45309">'+manage+'</div><div style="font-size:10px;color:var(--txt3)">학습 관리</div></div>'
+    +'<div style="background:#f0fdf4;border-radius:10px;padding:6px 12px;text-align:center"><div style="font-size:18px;font-weight:800;color:#16a34a">'+crm+'</div><div style="font-size:10px;color:var(--txt3)">CRM</div></div>'
     +'</div>';
 
   if(!tasks.length){
     html+='<div class="empty"><div class="ei">✅</div><div class="et">오늘 처리할 업무가 없습니다</div></div>';
   } else {
-    var curCat='';
-    tasks.forEach(function(t,ti){
-      if(t.cat!==curCat){curCat=t.cat;html+='<div style="font-size:13px;font-weight:700;color:var(--navy);margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid var(--border)">'+curCat+'</div>';}
+    var curCat='';var rowOpen=false;var ti=0;
+    tasks.forEach(function(t){
+      if(t.cat!==curCat){
+        if(rowOpen){html+='</div>';rowOpen=false;}
+        curCat=t.cat;
+        html+='<div style="font-size:12px;font-weight:700;color:var(--navy);margin:12px 0 6px;padding-bottom:3px;border-bottom:2px solid var(--border)">'+curCat+'</div>'
+             +'<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+        rowOpen=true;
+      }
       var msg=getCrmMessage(t.type,t.name);
-      html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-        +'<div><div style="font-size:14px;font-weight:700;color:var(--navy)">'+t.name+'</div>'
-        +'<div style="font-size:11px;color:var(--txt2);margin-top:2px"><span class="badge bg-gray" style="font-size:9px">'+t.type+'</span> '+t.reason+'</div>'
-        +'<div style="font-size:12px;color:var(--blue);margin-top:4px">👉 '+t.action+'</div></div>'
-        +'<div style="display:flex;gap:3px;flex-shrink:0">'
-        +(t.phone?'<button class="btn btn-outline btn-xs" style="font-size:9px" onclick="event.stopPropagation();navigator.clipboard.writeText(\''+t.phone+'\');toast(\'📞 번호 복사: '+t.phone+'\')">📞</button>':'')
-        +(msg?'<button class="btn btn-outline btn-xs" style="font-size:9px;color:var(--gold)" onclick="event.stopPropagation();var d=document.getElementById(\'crm-msg-'+ti+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'">💬</button>':'')
-        +'<button class="btn btn-green btn-xs" style="font-size:9px" onclick="completeCrmTask(\''+t.id+'\')">✓완료</button>'
-        +'<button class="btn btn-outline btn-xs" style="font-size:9px" onclick="delayCrmTask(\''+t.id+'\')">3일 뒤</button>'
+      var priColor=t.priority===1?'#dc2626':t.priority===2?'#b45309':'#16a34a';
+      var priBg=t.priority===1?'#fef2f2':t.priority===2?'#fefce8':'#f0fdf4';
+      html+='<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid '+priColor+';border-radius:10px;padding:10px 12px;flex:0 0 calc(50% - 4px);box-sizing:border-box;min-width:200px">'
+        +'<div style="font-size:9px;color:var(--txt3);margin-bottom:3px">📅 '+t.createdAt+'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;gap:4px">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+t.name+'</div>'
+        +'<span style="background:'+priBg+';color:'+priColor+';font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;white-space:nowrap">'+t.type.split(',')[0]+'</span>'
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--txt2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+t.reason+'">'+t.reason+'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'
+        +'<div style="font-size:10px;color:var(--blue)">👉 '+t.action+'</div>'
+        +'<div style="display:flex;gap:3px">'
+        +(t.phone?'<button class="btn btn-outline btn-xs" style="font-size:9px;padding:2px 5px" onclick="event.stopPropagation();navigator.clipboard.writeText(\''+t.phone+'\');toast(\'📞 복사\')">📞</button>':'')
+        +(msg?'<button class="btn btn-outline btn-xs" style="font-size:9px;padding:2px 5px;color:var(--gold)" onclick="event.stopPropagation();var d=document.getElementById(\'crm-msg-'+ti+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'">💬</button>':'')
+        +'<button class="btn btn-green btn-xs" style="font-size:9px;padding:2px 5px" onclick="completeCrmTask(\''+t.id+'\')">✓</button>'
+        +'<button class="btn btn-outline btn-xs" style="font-size:9px;padding:2px 5px" onclick="delayCrmTask(\''+t.id+'\')">연기</button>'
         +'</div></div>'
-        +(msg?'<div id="crm-msg-'+ti+'" style="display:none;margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px"><div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:4px">💬 추천 메시지 <span style="font-weight:400;color:var(--txt3)">(직접 수정 가능)</span></div><textarea style="width:100%;font-size:12px;line-height:1.7;border:1px solid #e2e8f0;border-radius:6px;padding:8px;resize:vertical;min-height:100px;font-family:inherit" id="crm-txt-'+ti+'" onchange="saveCrmTemplate(\''+t.type.replace(/'/g,"\\'")+'\',this.value)">'+msg+'</textarea><div style="display:flex;gap:4px;margin-top:6px"><button class="btn btn-navy btn-xs" style="font-size:10px" onclick="event.stopPropagation();navigator.clipboard.writeText(document.getElementById(\'crm-txt-'+ti+'\').value);toast(\'📋 메시지 복사됨\')">📋 복사</button><button class="btn btn-outline btn-xs" style="font-size:10px" onclick="event.stopPropagation();document.getElementById(\'crm-txt-'+ti+'\').value=getCrmMessage(\''+t.type.replace(/'/g,"\\'")+'\',\''+t.name.replace(/'/g,"\\'")+'\',true);saveCrmTemplate(\''+t.type.replace(/'/g,"\\'")+'\',\'\');toast(\'↩️ 기본 메시지로 복원\')">↩️ 기본으로</button></div></div>':'')
+        +(msg?'<div id="crm-msg-'+ti+'" style="display:none;margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px"><div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:4px">💬 추천 메시지</div><textarea style="width:100%;font-size:11px;line-height:1.6;border:1px solid #e2e8f0;border-radius:6px;padding:6px;resize:vertical;min-height:80px;font-family:inherit" id="crm-txt-'+ti+'">'+msg+'</textarea><button class="btn btn-navy btn-xs" style="font-size:10px;margin-top:4px" onclick="event.stopPropagation();navigator.clipboard.writeText(document.getElementById(\'crm-txt-'+ti+'\').value);toast(\'📋 복사됨\')">📋 복사</button></div>':'')
         +'</div>';
+      ti++;
     });
+    if(rowOpen)html+='</div>';
   }
   html+='</div>';
   el.innerHTML=html;
