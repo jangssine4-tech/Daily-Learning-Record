@@ -1759,10 +1759,19 @@ function goto(view){
   }
   else if(view==='classes')renderClasses();
   else if(view==='makeup'){if(!makeups.length&&currentUser)loadMakeups().then(renderMakeupCalendar);else renderMakeupCalendar();}
-  else if(view==='consult'){if(!consultations.length&&currentUser)loadConsultations().then(renderConsults);else renderConsults();}
+  else if(view==='consult'){
+    // 학부모 소통 진입: 상담 기록만 보이도록
+    var nt=$('ctab-new');if(nt)nt.style.display='none';
+    var ht=$('ctab-history');if(ht)ht.style.display='';
+    if(!consultations.length&&currentUser)loadConsultations().then(function(){renderConsults();switchConsultTab('history');});
+    else{renderConsults();switchConsultTab('history');}
+  }
   else if(view==='crm'){
+    // 상담·CRM 진입: 신규 상담만 보이도록
     var vEl2=$('view-consult');if(vEl2)vEl2.classList.add('active');
     var bEl2=$('snav-crm');if(bEl2)bEl2.classList.add('active');
+    var ht2=$('ctab-history');if(ht2)ht2.style.display='none';
+    var nt2=$('ctab-new');if(nt2)nt2.style.display='';
     if(!consultations.length&&currentUser)loadConsultations().then(function(){renderConsults();switchConsultTab('new');});
     else{renderConsults();switchConsultTab('new');}
   }
