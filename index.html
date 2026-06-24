@@ -3563,10 +3563,17 @@ function renderCommentView(){
       +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);white-space:pre-wrap">📢 '+r.memo.replace(/\n/g,'<br>')+'</div>':'')
       +'</div>';
   }).join('');
-  html+='<div style="text-align:center;margin-top:12px;display:flex;gap:8px;justify-content:center"><button class="btn btn-outline btn-sm" onclick="renderHistory()">← 전체 기록으로 돌아가기</button><button class="btn btn-navy btn-sm" onclick="printCommentView()">🖨 인쇄</button></div>';
+  html+='<div style="text-align:center;margin-top:12px;display:flex;gap:8px;justify-content:center"><button class="btn btn-outline btn-sm" onclick="renderHistory()">← 전체 기록으로 돌아가기</button><select class="fi" id="print-orientation" style="width:auto;font-size:12px;padding:5px 10px"><option value="portrait">세로 (A4)</option><option value="landscape">가로 (A4)</option></select><button class="btn btn-navy btn-sm" onclick="printCommentView()">🖨 인쇄</button></div>';
   $('history-scroll-wrap').innerHTML=html;
 }
 function printCommentView(){
+  var orientation=($('print-orientation')&&$('print-orientation').value)||'portrait';
+  // Inject a temporary @page style for orientation
+  var styleId='print-orientation-style';
+  var existing_s=document.getElementById(styleId);if(existing_s)existing_s.remove();
+  var st=document.createElement('style');st.id=styleId;
+  st.textContent='@media print{@page{size:A4 '+orientation+';margin:12mm}}';
+  document.head.appendChild(st);
   var sId=$('h-student').value;
   var s=students.find(function(x){return x.id===sId;});
   var list=reports.filter(function(r){return r.studentId===sId&&r.comment;}).sort(function(a,b){return b.date>a.date?1:-1;});
@@ -3584,7 +3591,7 @@ function printCommentView(){
     +'<div class="print-date">출력일: '+todayISO()+'</div>'
     +'<table><thead><tr><th>날짜</th><th>교사</th><th>단계</th><th>진도</th><th>점수</th><th>태도</th><th>숙제</th><th>코멘트</th><th>전달사항</th></tr></thead><tbody>'+rows+'</tbody></table>';
   document.body.appendChild(printDiv);
-  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
+  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();var ps=document.getElementById('print-orientation-style');if(ps)ps.remove();},500);},200);
 }
 function updateBulkDeleteBtn(){var n=document.querySelectorAll('.h-row-check:checked').length;var btn=$('h-bulk-delete-btn');if(btn)btn.textContent='🗑 선택 삭제'+(n?' ('+n+'건)':'');}
 function toggleSelectAllReports(){var checks=document.querySelectorAll('.h-row-check');var allC=[...checks].every(function(c){return c.checked;});checks.forEach(function(c2){c2.checked=!allC;});var allCb=$('h-check-all');if(allCb)allCb.checked=!allC;updateBulkDeleteBtn();}
