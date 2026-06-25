@@ -4764,9 +4764,10 @@ function saveInvoiceImage(studentId, expectedAmt, yr, mo){
   var moStr=mo+'월';
   var dueStr='~'+mo+'월 5일까지';
   var defaultGreeting='안녕하세요, 잉글리시아이위드멘토링입니다 😊\n'+moStr+' 교육비 안내드립니다.\n\n항상 아이의 영어 실력이 한 단계씩\n성장할 수 있도록 꼼꼼하게 지도하겠습니다.\n\n편하신 방법으로 기간 내 납부 부탁드립니다.\n궁금하신 점은 언제든 편하게 문의 주세요.\n\n감사합니다 🙂';
-  var savedGreeting=localStorage.getItem('invoiceGreeting_'+yr+'_'+mo);
-  var greeting=savedGreeting||defaultGreeting;
-  // Show edit modal
+  // Load from Firestore (cached in window), fallback to localStorage then default
+  var savedGreeting=(window._invoiceGreetings&&window._invoiceGreetings[yr+'_'+mo])
+    ||localStorage.getItem('invoiceGreeting_'+yr+'_'+mo)
+    ||defaultGreeting;
   var overlay=document.createElement('div');
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
@@ -4776,15 +4777,30 @@ function saveInvoiceImage(studentId, expectedAmt, yr, mo){
     +'<div><strong>단계:</strong> '+getStudentLevel(s)+'</div>'
     +'<div><strong>교육비:</strong> '+expectedAmt.toLocaleString()+'원</div>'
     +'<div><strong>납부 기한:</strong> '+dueStr+'</div></div>'
-    +'<div class="field"><div class="fl">인사말 (매월 수정 가능)</div><textarea class="fi" id="inv-greeting" rows="8" style="font-size:12px;line-height:1.6">'+greeting+'</textarea></div>'
+    +'<div class="field"><div class="fl">인사말 <span style="font-size:10px;color:var(--txt3)">— 수정 후 저장 시 이번 달 전체에 자동 적용</span></div><textarea class="fi" id="inv-greeting" rows="8" style="font-size:12px;line-height:1.6">'+savedGreeting+'</textarea></div>'
     +'<div style="height:8px"></div>'
     +'<button class="btn btn-green btn-block" onclick="_generateInvoice(\''+studentId+'\','+expectedAmt+','+yr+','+mo+',this.closest(\'.mo\'))">📄 청구서 이미지 저장</button>'
     +'<div style="height:6px"></div><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button></div>';
   document.body.appendChild(overlay);
+  // Pre-load from Firestore in background
+  if(!window._invoiceGreetings){
+    db.collection('config').doc('invoiceGreetings').get().then(function(d){
+      window._invoiceGreetings=d.exists?d.data():{};
+      var key=yr+'_'+mo;
+      var fs=window._invoiceGreetings[key];
+      if(fs&&$('inv-greeting'))$('inv-greeting').value=fs;
+    }).catch(function(){window._invoiceGreetings={};});
+  }
 }
 function _generateInvoice(studentId,expectedAmt,yr,mo,overlay){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
   var greeting=$('inv-greeting').value;
+  // Save to Firestore (shared across all devices) and localStorage (fallback)
+  if(!window._invoiceGreetings)window._invoiceGreetings={};
+  var key=yr+'_'+mo;
+  window._invoiceGreetings[key]=greeting;
+  var update={};update[key]=greeting;
+  db.collection('config').doc('invoiceGreetings').set(update,{merge:true}).catch(function(){});
   localStorage.setItem('invoiceGreeting_'+yr+'_'+mo,greeting);
   if(overlay)overlay.remove();
   toast('📄 청구서 생성 중...');
