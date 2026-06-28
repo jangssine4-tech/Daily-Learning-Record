@@ -2263,17 +2263,22 @@ function renderCrmDailyInto(targetId){
     if(isLast)tasks.push({id:'lvup_'+s.id,priority:2,cat:'🟡 학습 관리',type:'레벨업 상담',name:s.name,reason:lv+' 마지막 진도 완료 ('+lastProg+')',action:'다음 단계 안내 상담',phone:s.phoneMom||''});
   });
 
-  // 22. 수행/지필 평가 일정 알림 (평가일 3일 전 ~ 당일)
+  // 22. 수행/지필 평가 — 시험 후 단계별 알림
   activeS.forEach(function(s){
     var sReps=reports.filter(function(r){return r.studentId===s.id&&r.examDate;}).sort(function(a,b){return b.date>a.date?1:-1;});
     if(!sReps.length)return;
     var examDateStr=sReps[0].examDate;
     var examDate=new Date(examDateStr);
-    var daysUntil=Math.floor((examDate-today)/86400000);
-    if(daysUntil>=0&&daysUntil<=3){
-      var label=daysUntil===0?'오늘 평가':daysUntil+'일 후 평가 ('+examDateStr+')';
-      tasks.push({id:'exam_'+s.id,priority:daysUntil===0?1:2,cat:daysUntil===0?'🔴 긴급':'🟡 학습 관리',type:'수행/지필 평가',name:s.name,reason:label,action:'평가 준비 상태 학부모 안내',phone:s.phoneMom||''});
-    }
+    var daysSince=Math.floor((today-examDate)/86400000);
+    // 당일~1일 후: 간단 보고
+    if(daysSince>=0&&daysSince<=1)
+      tasks.push({id:'exam_day_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 당일 보고',name:s.name,reason:'평가 당일 — 안심 메시지 발송 권장',action:'학부모 간단 보고 전송',phone:s.phoneMom||''});
+    // 3일 후 ±1일: 1차 상담
+    if(daysSince>=2&&daysSince<=4)
+      tasks.push({id:'exam_1st_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 후 1차 상담',name:s.name,reason:'평가 후 3일 — 결과 확인 전 간단 피드백',action:'오답 유형 확인 후 1차 피드백',phone:s.phoneMom||''});
+    // 7일 후 ±1일: 2차 상담
+    if(daysSince>=6&&daysSince<=8)
+      tasks.push({id:'exam_2nd_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 후 2차 상담',name:s.name,reason:'평가 후 7일 — 정식 피드백 + 다음 시험 계획',action:'점수·오답·다음 관리 계획 상담',phone:s.phoneMom||''});
   });
 
   // 상담 완료 처리된 학생 카드 숨김
@@ -2495,7 +2500,9 @@ function getCrmMessage(type,name,forceDefault){
     '테스트 점수 하락':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 최근 복습 테스트 결과를 공유드립니다.\n\n이전보다 조금 어려워하는 부분이 있어, 학원에서 해당 부분을 중심으로 보충 지도하고 있습니다.\n가정에서는 하루 5분 정도 배운 문장을 소리 내어 읽어보는 것만으로도 큰 도움이 됩니다~^^',
     '연락 예정일':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생 관련하여 안내드릴 내용이 있어 연락드립니다.\n편하신 시간에 통화 가능하시면 말씀해 주세요~^^',
     '상담 후속':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n지난 상담 때 말씀드린 {이름} 학생 관련 후속 사항 안내드립니다.\n궁금하신 점 있으시면 편하게 말씀해 주세요~^^',
-    '수행/지필 평가':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n{이름} 학생의 수행/지필 평가가 곧 예정되어 있습니다.\n평가 준비를 위해 관련 내용을 집중적으로 복습하고 있으니\n가정에서도 함께 확인해 주시면 도움이 될 것 같습니다.\n\n궁금하신 점은 언제든 편하게 문의 주세요 🙂',
+    '시험 당일 보고':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n오늘 지필평가를 마쳤습니다.\n아이가 시험을 본 직후 느낀 점과 수업 중 준비했던 부분을 함께 확인하고 있습니다.\n결과가 나오면 점수만 보는 것이 아니라, 어떤 유형에서 강점과 약점이 있었는지 분석해서 안내드리겠습니다.\n다음 주에 개별적으로 연락드리겠습니다 🙂',
+      '시험 후 1차 상담':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n시험을 마쳤고, 아이의 체감 난이도와 주요 출제 유형을 확인했습니다.\n결과와 오답 내용을 확인한 뒤 이번 주 안으로 개별적으로 안내드리겠습니다.\n궁금하신 점은 언제든 편하게 문의 주세요 🙂',
+      '시험 후 2차 상담':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n이번 시험 결과를 바탕으로 잘된 부분과 보완할 부분을 정리해 드리려고 합니다.\n\n1. 잘한 부분: (직접 입력)\n2. 아쉬운 부분: (직접 입력)\n3. 다음 시험까지의 관리 계획: (직접 입력)\n\n짧게 통화나 상담 가능하실까요?\n감사합니다 🙂',
             '월간 정기 상담':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n이번 달 학습 상황을 간단히 공유드리고, 앞으로의 학습 방향을 함께 점검드리기 위해 정기 상담을 진행하려고 합니다.\n최근 수업 참여도, 과제 수행, 단어 테스트 흐름을 중심으로 말씀드릴 예정입니다.\n가능하신 시간대를 알려주시면 맞춰서 연락드리겠습니다.\n\n감사합니다 🙂',
       '분기 상담':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n이번 분기 학습 성장과 앞으로의 방향에 대해 함께 이야기 나누고 싶습니다.\n그동안의 흐름을 정리해 드리고, 다음 단계 목표를 함께 잡아보면 좋을 것 같습니다.\n편하신 시간에 상담 일정 잡아드릴까요?\n\n감사합니다 🙂',
       '시험 전 상담':'어머님, 안녕하세요~^^\n잉글리시아이위드멘토링입니다.\n\n시험이 다가오고 있어 대비 전략과 현재 준비 상황을 공유드리려 합니다.\n취약한 부분과 집중해야 할 영역을 짚어드리고, 가정에서 함께 확인할 수 있는 방법도 안내드리겠습니다.\n\n감사합니다 🙂',
