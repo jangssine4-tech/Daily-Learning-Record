@@ -1865,22 +1865,8 @@ var _scheduleDate=null; // null = today
 function goToMemo(studentId){
   goto('memo');
   setTimeout(function(){
-    var el=$('memo-student-filter');
-    if(!el){
-      // inject filter select if not present
-      var memoList=$('memo-list');
-      if(memoList&&memoList.parentNode){
-        var filterDiv=document.createElement('div');
-        filterDiv.style='margin-bottom:10px';
-        filterDiv.innerHTML='<select class="fi" id="memo-student-filter" style="font-size:12px" onchange="renderMemoPage()"><option value="">전체 학생</option>'
-          +students.filter(function(s){return s.status!=='퇴원';}).map(function(s){return'<option value="'+s.id+'">'+s.name+'</option>';}).join('')+'</select>';
-        memoList.parentNode.insertBefore(filterDiv,memoList);
-        el=$('memo-student-filter');
-      }
-    }
+    var el=$('memo-student');
     if(el){el.value=studentId;renderMemoPage();}
-    // Scroll to first matching memo card
-    setTimeout(function(){var first=document.querySelector('.memo-card');if(first)first.scrollIntoView({behavior:'smooth',block:'center'});},150);
   },300);
 }
 function toggleObserve(sId,isJoy){
@@ -5405,9 +5391,6 @@ function renderMemoPage(){
     sel.onchange=function(){renderMemoPage();};
   }
   var filterSid=sel?sel.value:'';
-  // Also check injected filter from goToMemo
-  var filterSel2=$('memo-student-filter');
-  if(filterSel2&&filterSel2.value)filterSid=filterSel2.value;
   var memos=(window._studentMemos||[]).filter(function(m){
     if(!filterSid)return true;
     return m.studentId===filterSid;
