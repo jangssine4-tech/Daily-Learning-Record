@@ -268,7 +268,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="cp" style="max-width:560px"><div class="card" style="padding:16px">
     <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
     <input type="hidden" id="r-student-id">
-    <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">수행/지필 평가</div><input type="date" class="fi" id="r-exam-date"></div></div>
+    <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">수행/지필 평가</div><div style="display:flex;gap:4px"><input type="date" class="fi" id="r-exam-date" style="flex:1"><select class="fi" id="r-exam-type" style="width:auto;font-size:11px;padding:6px 4px"><option value="">종류</option><option value="수행">수행</option><option value="중간">중간</option><option value="기말">기말</option><option value="모의고사">모의고사</option><option value="Tosel 정기">Tosel 정기</option><option value="Tosel Voca">Tosel Voca 올림피아드</option><option value="PFC">PFC</option></select></div></div></div>
     <div class="field"><div class="fl">태블릿 점검 교사</div><select class="fi" id="r-teacher-tablet"></select></div>
     <div class="r2"><div class="field"><div class="fl">단계</div><select class="fi" id="r-level" onchange="onReportLevelChange()"><option value="">선택</option></select></div><div class="field"><div class="fl">진도</div><div style="display:flex;gap:4px"><select class="fi" id="r-progress" style="flex:1" onchange="highlightProgress(this)"><option value="">선택</option></select><select class="fi" id="r-review-yn" style="width:85px;font-size:11px;padding:6px 4px"><option value="">Review</option><option value="Review">✔ Review</option></select></div></div></div>
     <div class="r2"><div class="field"><div class="fl">교재 준비</div><select class="fi" id="r-review-items"><option value="">-</option><option value="준비">준비</option><option value="미준비">미준비</option></select></div><div class="field"><div class="fl">교재 숙제</div><select class="fi" id="r-hw-book" onchange="combineHw()"><option value="">-</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div></div>
@@ -2268,17 +2268,15 @@ function renderCrmDailyInto(targetId){
     var sReps=reports.filter(function(r){return r.studentId===s.id&&r.examDate;}).sort(function(a,b){return b.date>a.date?1:-1;});
     if(!sReps.length)return;
     var examDateStr=sReps[0].examDate;
+    var examType=sReps[0].examType?'['+sReps[0].examType+'] ':'';
     var examDate=new Date(examDateStr);
     var daysSince=Math.floor((today-examDate)/86400000);
-    // 당일~1일 후: 간단 보고
-    if(daysSince>=0&&daysSince<=1)
-      tasks.push({id:'exam_day_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 당일 보고',name:s.name,reason:'평가 당일 — 안심 메시지 발송 권장',action:'학부모 간단 보고 전송',phone:s.phoneMom||''});
     // 3일 후 ±1일: 1차 상담
     if(daysSince>=2&&daysSince<=4)
-      tasks.push({id:'exam_1st_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 후 1차 상담',name:s.name,reason:'평가 후 3일 — 결과 확인 전 간단 피드백',action:'오답 유형 확인 후 1차 피드백',phone:s.phoneMom||''});
+      tasks.push({id:'exam_1st_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 후 1차 상담',name:s.name,reason:examType+'평가 후 3일 — 결과 확인 전 간단 피드백',action:'오답 유형 확인 후 1차 피드백',phone:s.phoneMom||''});
     // 7일 후 ±1일: 2차 상담
     if(daysSince>=6&&daysSince<=8)
-      tasks.push({id:'exam_2nd_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 후 2차 상담',name:s.name,reason:'평가 후 7일 — 정식 피드백 + 다음 시험 계획',action:'점수·오답·다음 관리 계획 상담',phone:s.phoneMom||''});
+      tasks.push({id:'exam_2nd_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 후 2차 상담',name:s.name,reason:examType+'평가 후 7일 — 정식 피드백 + 다음 시험 계획',action:'점수·오답·다음 관리 계획 상담',phone:s.phoneMom||''});
   });
 
   // 상담 완료 처리된 학생 카드 숨김
@@ -3423,7 +3421,7 @@ function startReport(studentId,makeupId){
   }
   if(!tempData||!useTempData) {
     if(ind)ind.style.display='none';
-    if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';_setAttitudeFields(rep.attitude||'');$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';var _hw1=splitHw(rep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw1.video;if($('r-hw-book'))$('r-hw-book').value=_hw1.book;$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-parent-contact'))$('r-parent-contact').checked=rep.parentContact||false;if($('r-exam-date'))$('r-exam-date').value=rep.examDate||'';if(rep.dictation){var _dm2=rep.dictation.match(/^(\d+)\/(\d+)/);if(_dm2){if($('r-dictation-correct'))$('r-dictation-correct').value=_dm2[1];if($('r-dictation-total'))$('r-dictation-total').value=_dm2[2];}$('r-dictation').value=rep.dictation;}else{if($('r-dictation-correct'))$('r-dictation-correct').value='';if($('r-dictation-total'))$('r-dictation-total').value='';$('r-dictation').value='';}}
+    if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';_setAttitudeFields(rep.attitude||'');$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';var _hw1=splitHw(rep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw1.video;if($('r-hw-book'))$('r-hw-book').value=_hw1.book;$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-parent-contact'))$('r-parent-contact').checked=rep.parentContact||false;if($('r-exam-date'))$('r-exam-date').value=rep.examDate||'';if($('r-exam-type'))$('r-exam-type').value=rep.examType||'';if(rep.dictation){var _dm2=rep.dictation.match(/^(\d+)\/(\d+)/);if(_dm2){if($('r-dictation-correct'))$('r-dictation-correct').value=_dm2[1];if($('r-dictation-total'))$('r-dictation-total').value=_dm2[2];}$('r-dictation').value=rep.dictation;}else{if($('r-dictation-correct'))$('r-dictation-correct').value='';if($('r-dictation-total'))$('r-dictation-total').value='';$('r-dictation').value='';}}
     else{_lastLoadedReportTs='';['r-review-yn','r-review','r-attitude-level','r-hw','r-hw-video','r-hw-book','r-dictation-correct','r-dictation-total'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-attitude').style.display='none';$('r-attitude').value='';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';if($('r-parent-contact'))$('r-parent-contact').checked=false;}
     var levelModule=getEvalModuleForLevel(getStudentLevel(s));
     if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
@@ -3447,7 +3445,7 @@ function tempSaveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
   var tempKey='tempReport_'+sId+'_'+$('r-date').value+(window._currentMakeupId?'_mk'+window._currentMakeupId:'');
   combineHw();
-  var data={level:$('r-level').value,progress:$('r-progress').value,teacherTablet:$('r-teacher-tablet').value,teacherBook:$('r-teacher-book').value,reviewYN:$('r-review-yn').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,examDate:$('r-exam-date')?.value||'',needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',parentContact:$('r-parent-contact')?.checked||false,dictation:$('r-dictation').value||'',evalModule:window._currentEvalModule||'',evalState:window._evalState||{},savedAt:new Date().toISOString()};
+  var data={level:$('r-level').value,progress:$('r-progress').value,teacherTablet:$('r-teacher-tablet').value,teacherBook:$('r-teacher-book').value,reviewYN:$('r-review-yn').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,examDate:$('r-exam-date')?.value||'',examType:$('r-exam-type')?.value||'',needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',parentContact:$('r-parent-contact')?.checked||false,dictation:$('r-dictation').value||'',evalModule:window._currentEvalModule||'',evalState:window._evalState||{},savedAt:new Date().toISOString()};
   localStorage.setItem(tempKey,JSON.stringify(data));
   var ind=$('temp-save-indicator');if(ind)ind.style.display='block';
   toast('📋 임시 저장 완료 (DB에는 저장되지 않음)');
@@ -3644,7 +3642,7 @@ async function saveReport(){
     evalItems:mergedEval,
     praise:prev.praise||[],
     absent:false,
-    examDate:$('r-exam-date')?.value||'',needsMakeup:$('r-makeup-check').checked||false,
+    examDate:$('r-exam-date')?.value||'',examType:$('r-exam-type')?.value||'',needsMakeup:$('r-makeup-check').checked||false,
     makeupContent:pick($('r-makeup-content').value,prev.makeupContent),
     updatedAt:new Date().toISOString()
   };
@@ -6060,7 +6058,15 @@ function renderStaffArea(){
     var hourlyRate=u.hourlyRate||15000;
     var workDays=u['workDays_'+yr+'_'+mo]||[];
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-    var totalPay=Math.round(totalHours*hourlyRate);
+    var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
+    var juhuEnabled=u.juhuEnabled||false;
+    // 주휴수당: 주 15시간 이상 시 = (주당근무시간/40) × 8시간 × 시급 × 주수
+    var juhuPay=0;
+    if(juhuEnabled&&weeklyHours>=15){
+      var weeks=totalHours/weeklyHours;
+      juhuPay=Math.round((weeklyHours/40)*8*hourlyRate*weeks);
+    }
+    var totalPay=Math.round(totalHours*hourlyRate)+juhuPay;
     var tax33=Math.round(totalPay*0.033);
     var net=totalPay-tax33;
     var staffDays=u.staffDays||[];
@@ -6081,12 +6087,13 @@ function renderStaffArea(){
       +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;font-size:12px">'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">근무시간</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+totalHours+'h</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">시급</div><div style="font-weight:700;font-size:14px">'+hourlyRate.toLocaleString()+'</div></div>'
+      +(juhuEnabled?'<div style="background:#f0fdf4;border:1px solid #86efac;padding:8px;border-radius:6px;text-align:center"><div style="color:#16a34a;font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:#16a34a">'+juhuPay.toLocaleString()+'</div></div>':'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:var(--txt3)">미적용</div></div>')
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">총 급여</div><div style="font-weight:700;font-size:14px;color:var(--mint)">'+totalPay.toLocaleString()+'</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">원천세(3.3%)</div><div style="font-weight:700;font-size:14px;color:var(--red)">'+tax33.toLocaleString()+'</div></div>'
-      +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">차감수령액</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+net.toLocaleString()+'</div></div>'
       +'</div>'
       +'<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openPayrollModal(\''+u.id+'\','+yr+','+mo+')">📝 근무 시간표</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
+      +'<button class="btn btn-xs '+(juhuEnabled?'btn-green':'btn-outline')+'" onclick="toggleJuhu(\''+u.id+'\','+!juhuEnabled+')" title="주휴수당: 주 15시간 이상 근무 시 지급">'+(juhuEnabled?'✅ 주휴수당 ON':'주휴수당 OFF')+'</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">✏️ 편집</button>'
       +'<button class="btn btn-red btn-xs" onclick="deleteStaffUser(\''+u.id+'\',\''+u.name+'\')">🗑 삭제</button></div></div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt3)">등록된 교사가 없습니다.</div>';
@@ -6132,6 +6139,13 @@ function saveStaffDayHours(userId,day,val){
   u.staffHoursPerDay=h;
   db.collection('users').doc(userId).update({staffHoursPerDay:h});
   saveCacheDebounced();
+}
+function toggleJuhu(userId,enabled){
+  var idx=users.findIndex(function(u){return u.id===userId;});
+  if(idx<0)return;
+  users[idx].juhuEnabled=enabled;
+  db.collection('users').doc(userId).update({juhuEnabled:enabled}).catch(function(){});
+  renderStaffArea();
 }
 function openHourlyRateModal(userId){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
