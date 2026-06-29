@@ -1862,6 +1862,27 @@ function goto(view){
 
 // ══ SCHEDULE ══
 var _scheduleDate=null; // null = today
+function goToMemo(studentId){
+  goto('memo');
+  setTimeout(function(){
+    var el=$('memo-student-filter');
+    if(!el){
+      // inject filter select if not present
+      var memoList=$('memo-list');
+      if(memoList&&memoList.parentNode){
+        var filterDiv=document.createElement('div');
+        filterDiv.style='margin-bottom:10px';
+        filterDiv.innerHTML='<select class="fi" id="memo-student-filter" style="font-size:12px" onchange="renderMemoPage()"><option value="">전체 학생</option>'
+          +students.filter(function(s){return s.status!=='퇴원';}).map(function(s){return'<option value="'+s.id+'">'+s.name+'</option>';}).join('')+'</select>';
+        memoList.parentNode.insertBefore(filterDiv,memoList);
+        el=$('memo-student-filter');
+      }
+    }
+    if(el){el.value=studentId;renderMemoPage();}
+    // Scroll to first matching memo card
+    setTimeout(function(){var first=document.querySelector('.memo-card');if(first)first.scrollIntoView({behavior:'smooth',block:'center'});},150);
+  },300);
+}
 function toggleObserve(sId,isJoy){
   if(!window._cardBadges)window._cardBadges={};
   var key='obs_'+sId;
@@ -2782,6 +2803,7 @@ function renderSchedule(){
           +'<span style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')">관찰</span>'
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #60a5fa;background:'+(isTablet?'#3b82f6;color:#fff':'#eff6ff;color:#1e40af')+'" onclick="event.stopPropagation();toggleCardTag(\'tbl_'+s.id+'\',this)">T</span>'
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #a78bfa;background:'+(isBook?'#7c3aed;color:#fff':'#f3e8ff;color:#6b21a8')+'" onclick="event.stopPropagation();toggleCardTag(\'bk_'+s.id+'\',this)">B</span>'
+          +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #94a3b8;background:#f1f5f9;color:#475569" title="메모 작성" onclick="event.stopPropagation();goToMemo(\''+s.id+'\')">M</span>'
           +'</div>';
         html+='<div class="s-card-sub">'+getStudentLevel(s)+'</div>';
         html+='<div class="s-card-btns">';
@@ -5383,6 +5405,9 @@ function renderMemoPage(){
     sel.onchange=function(){renderMemoPage();};
   }
   var filterSid=sel?sel.value:'';
+  // Also check injected filter from goToMemo
+  var filterSel2=$('memo-student-filter');
+  if(filterSel2&&filterSel2.value)filterSid=filterSel2.value;
   var memos=(window._studentMemos||[]).filter(function(m){
     if(!filterSid)return true;
     return m.studentId===filterSid;
