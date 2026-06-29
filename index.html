@@ -282,7 +282,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">칭찬 포인트</div><textarea class="fi" id="r-memo" rows="2"></textarea></div>
     <div class="field" style="background:var(--surface2);border-radius:var(--r);padding:10px 12px"><div style="display:flex;align-items:center;gap:16px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-makeup-check" onchange="$('r-makeup-content-wrap').style.display=this.checked?'block':'none'"> 보강 필요</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-parent-contact" onchange="onParentContactChange(this)"> 학부모 연락 필요</label></div><div id="r-makeup-content-wrap" style="display:none"><textarea class="fi" id="r-makeup-content" rows="2" placeholder="보강 사유 및 내용 (보강 계획표 메모에 연동됩니다)"></textarea></div></div>
-    <div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap"><button class="btn btn-outline" style="flex:1;min-width:80px" onclick="tempSaveReport()">📋 임시 저장</button><button class="btn btn-green" style="flex:1;min-width:80px" onclick="saveReport()">💾 저장</button><button class="btn btn-navy" style="flex:1;min-width:80px" onclick="saveReportAndImage()">📷 저장 + 이미지</button><button class="btn btn-outline" style="min-width:50px;color:var(--txt3)" onclick="goto('schedule')">취소</button></div>
+    <div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap"><button class="btn btn-outline" style="flex:1;min-width:80px" onclick="tempSaveReport()">📋 임시 저장</button><button class="btn btn-green" style="flex:1;min-width:80px" onclick="saveReport()">💾 저장</button><button class="btn btn-navy" style="flex:1;min-width:80px" onclick="saveReportAndImage()">📷 저장 + 이미지</button><button class="btn btn-outline" style="min-width:50px;color:var(--txt3)" onclick="goto('schedule');setTimeout(function(){scrollToScheduleStudent(window._lastSavedStudentId||window._currentReportStudentId);},800)">← 시간표</button></div>
     <div id="temp-save-indicator" style="display:none;text-align:center;margin-top:6px;font-size:11px;color:var(--blue)">📋 임시 저장된 데이터가 있습니다</div>
   </div></div>
 </div>
@@ -1862,6 +1862,27 @@ function goto(view){
 
 // ══ SCHEDULE ══
 var _scheduleDate=null; // null = today
+function scrollToScheduleStudent(studentId){
+  if(!studentId)return;
+  var target=document.querySelector('[data-student-id="'+studentId+'"]');
+  if(!target){
+    // renderSchedule may still be running — retry once more
+    setTimeout(function(){
+      var t2=document.querySelector('[data-student-id="'+studentId+'"]');
+      if(!t2)return;
+      var card2=t2.closest('.s-block')||t2.parentElement;
+      card2.scrollIntoView({behavior:'smooth',block:'center'});
+      card2.style.transition='box-shadow 0.4s';card2.style.boxShadow='0 0 0 3px var(--mint)';
+      setTimeout(function(){card2.style.boxShadow='';},1800);
+    },600);
+    return;
+  }
+  var card=target.closest('.s-block')||target.parentElement;
+  card.scrollIntoView({behavior:'smooth',block:'center'});
+  card.style.transition='box-shadow 0.4s';
+  card.style.boxShadow='0 0 0 3px var(--mint)';
+  setTimeout(function(){card.style.boxShadow='';},1800);
+}
 function goToMemo(studentId){
   goto('memo');
   setTimeout(function(){
@@ -2783,7 +2804,7 @@ function renderSchedule(){
         });
         var isTablet=(window._cardBadges||{})['tbl_'+s.id];
         var isBook=(window._cardBadges||{})['bk_'+s.id];
-        html+='<div class="s-card-name">'+s.name
+        html+='<div class="s-card-name" data-student-id="'+s.id+'">'+s.name
           +(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')
           +(dispTime?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+dispTime+'</span>':'')
           +'<span style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')">관찰</span>'
@@ -3694,6 +3715,9 @@ async function saveReport(){
   loading(false);toast('✅ 일지 저장됨 (DB 반영 완료)');
   if(window._saveImageAfter){window._saveImageAfter=false;saveCacheDebounced();saveReportAsImage(savedId);return;}
   saveCacheDebounced();renderScheduleThrottled();
+  toast('✅ 저장됨');
+  // Store last saved student ID for scroll-to on schedule return
+  window._lastSavedStudentId=sId;
   }catch(err){loading(false);toast('❌ 저장 실패: '+err.message);console.error('saveReport error:',err);}
 }
 async function saveReportAndImage(){window._saveImageAfter=true;await saveReport();}
