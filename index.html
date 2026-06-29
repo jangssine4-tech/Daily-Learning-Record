@@ -6046,6 +6046,24 @@ function getMkDailyTasks(){var cfg=window._mkConfig||_MK_DEFAULT_CONFIG;return (
 function getMkMonthlyCriteria(){var cfg=window._mkConfig||_MK_DEFAULT_CONFIG;return (cfg.monthlyCriteria||'').split('\n').filter(function(t){return t.trim();});}
 
 // ══ STAFF ══
+function calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo){
+  if(!juhuEnabled||weeklyHours<15)return 0;
+  var weeklyJuhu=Math.round((weeklyHours/40)*8*hourlyRate);
+  // Find weeks with absences: group workDays by Mon-Sun week
+  var absentWeeks=new Set();
+  workDays.forEach(function(wd){
+    if(wd.type!=='absent')return;
+    // Get Monday of this day's week
+    var dt=new Date(yr||2026,mo?mo-1:0,wd.day);
+    var dow=dt.getDay(); // 0=Sun
+    var mondayOffset=dow===0?-6:1-dow;
+    var monday=new Date(dt);monday.setDate(dt.getDate()+mondayOffset);
+    absentWeeks.add(monday.toISOString().substring(0,10));
+  });
+  var absentCount=absentWeeks.size;
+  var validWeeks=Math.max(0,4.3-absentCount);
+  return Math.round(weeklyJuhu*validWeeks);
+}
 function renderStaffArea(){
   var el=$('staff-area');if(!el)return;
   var yr=parseInt($('rev-year')?.value)||new Date().getFullYear();
@@ -6061,11 +6079,7 @@ function renderStaffArea(){
     var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
     var juhuEnabled=u.juhuEnabled||false;
     // 주휴수당: 주 15시간 이상 시 = (주당근무시간/40) × 8시간 × 시급 × 주수
-    var juhuPay=0;
-    if(juhuEnabled&&weeklyHours>=15){
-      var weeks=totalHours/weeklyHours;
-      juhuPay=Math.round((weeklyHours/40)*8*hourlyRate*weeks);
-    }
+    var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
     var totalPay=Math.round(totalHours*hourlyRate)+juhuPay;
     var tax33=Math.round(totalPay*0.033);
     var net=totalPay-tax33;
@@ -6167,15 +6181,13 @@ function openPayrollModal(userId,yr,mo){
   var staffHours=u.staffHoursPerDay||{};
   var daysInMo=new Date(yr,mo,0).getDate();
   var dayNames=['일','월','화','수','목','금','토'];
-  var dayMap={'일':0,'월':1,'화':2,'수':3,'목':4,'금':5,'토':6};
-  // Auto-fill from staffDays only if never manually saved
   var wasSaved=u[key+'_saved']||false;
   if(!workDays.length&&staffDays.length&&!wasSaved){
     for(var d=1;d<=daysInMo;d++){
       var dt=new Date(yr,mo-1,d);var dow=dt.getDay();
       var dowName=dayNames[dow];
       if(staffDays.includes(dowName)){
-        workDays.push({day:d,hours:staffHours[dowName]||0});
+        workDays.push({day:d,hours:staffHours[dowName]||0,type:'normal'});
       }
     }
   }
@@ -6189,20 +6201,27 @@ function openPayrollModal(userId,yr,mo){
     var isStaffDay=staffDays.includes(dowName2);
     var existing=workDays.find(function(w){return w.day===d2;});
     var hrs=existing?existing.hours:(isStaffDay?(staffHours[dowName2]||0):0);
+    var dtype=existing?existing.type:'normal';
     var bg=isStaffDay?'background:#f0fdf4':'';
-    rows+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);'+bg+'">'
+    if(dtype==='holiday')bg='background:#eff6ff';
+    if(dtype==='absent')bg='background:#fef2f2';
+    rows+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);'+bg+'">'
       +'<span style="font-size:12px;font-weight:600;min-width:22px;color:var(--navy)">'+dowName2+'</span>'
       +'<span style="font-size:12px;min-width:70px">'+mo+'월 '+d2+'일</span>'
-      +'<input type="number" class="fi payroll-hrs" data-day="'+d2+'" value="'+hrs+'" step="0.5" min="0" max="24" style="width:70px;font-size:12px;padding:4px 8px;text-align:center">'
-      +'<span style="font-size:11px;color:var(--txt3)">시간</span></div>';
+      +'<input type="number" class="fi payroll-hrs" data-day="'+d2+'" data-type="'+(dtype)+'" value="'+hrs+'" step="0.5" min="0" max="24" style="width:60px;font-size:12px;padding:4px 6px;text-align:center">'
+      +'<span style="font-size:11px;color:var(--txt3)">h</span>'
+      +'<button class="btn btn-xs '+(dtype==='holiday'?'btn-navy':'btn-outline')+'" style="font-size:9px;padding:2px 5px" onclick="setPayrollDayType(this,\'holiday\')">공휴일</button>'
+      +'<button class="btn btn-xs '+(dtype==='absent'?'btn-red':'btn-outline')+'" style="font-size:9px;padding:2px 5px" onclick="setPayrollDayType(this,\'absent\')">결근</button>'
+      +'</div>';
   }
   var overlay=document.createElement('div');
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
   overlay.innerHTML='<div class="ms" style="max-height:85dvh;overflow-y:auto"><div class="mh"></div>'
     +'<div class="mt">📝 '+yr+'년 '+mo+'월 근무 시간표</div>'
-    +'<div style="margin-bottom:6px;font-size:13px;font-weight:600;color:var(--navy)">'+u.name+'</div>'
-    +'<div style="margin-bottom:10px;font-size:11px;color:var(--txt3)">시급: '+(hourlyRate).toLocaleString()+'원 · 근무 요일: '+(staffDays.length?staffDays.join(', '):'미설정')+'</div>'
+    +'<div style="margin-bottom:4px;font-size:13px;font-weight:600;color:var(--navy)">'+u.name+'</div>'
+    +'<div style="margin-bottom:6px;font-size:11px;color:var(--txt3)">시급: '+hourlyRate.toLocaleString()+'원 · 근무 요일: '+(staffDays.length?staffDays.join(', '):'미설정')+'</div>'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:8px">💡 공휴일: 주휴수당 개근 인정 · 결근: 해당 주 주휴수당 미지급</div>'
     +'<div>'+rows+'</div>'
     +'<div style="height:12px"></div>'
     +'<div style="display:flex;gap:6px">'
@@ -6213,9 +6232,25 @@ function openPayrollModal(userId,yr,mo){
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button></div>';
   document.body.appendChild(overlay);
 }
+function setPayrollDayType(btn,type){
+  var row=btn.closest('div[style]');
+  var inp=row.querySelector('.payroll-hrs');
+  var curType=inp.dataset.type;
+  var newType=curType===type?'normal':type;
+  inp.dataset.type=newType;
+  // Update button styles
+  var btns=row.querySelectorAll('button');
+  btns.forEach(function(b){
+    if(b.textContent==='공휴일')b.className='btn btn-xs '+(newType==='holiday'?'btn-navy':'btn-outline')+' '+'font-size:9px;padding:2px 5px';
+    if(b.textContent==='결근')b.className='btn btn-xs '+(newType==='absent'?'btn-red':'btn-outline');
+  });
+  var bgMap={holiday:'#eff6ff',absent:'#fef2f2',normal:''};
+  // Keep staff day tint for normal
+  row.style.background=bgMap[newType]||'';
+}
 async function savePayroll(userId,yr,mo,overlay){
   var inputs=[...document.querySelectorAll('.payroll-hrs')];
-  var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0};});
+  var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0,type:inp.dataset.type||'normal'};});
   var key='workDays_'+yr+'_'+mo;
   var update={};update[key]=workDays;update[key+'_saved']=true;update.updatedAt=new Date().toISOString();
   await db.collection('users').doc(userId).update(update);
@@ -6226,12 +6261,16 @@ async function savePayroll(userId,yr,mo,overlay){
 }
 function savePayrollImage(userId,yr,mo,overlay){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
-  // Save first
   var inputs=[...document.querySelectorAll('.payroll-hrs')];
   var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0};}).filter(function(d){return d.hours>0;});
   var hourlyRate=u.hourlyRate||15000;
   var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-  var totalPay=Math.round(totalHours*hourlyRate);
+  // 주휴수당 계산
+  var juhuEnabled=u.juhuEnabled||false;
+  var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
+  var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
+  var basePay=Math.round(totalHours*hourlyRate);
+  var totalPay=basePay+juhuPay;
   var tax33=Math.round(totalPay*0.033);
   var net=totalPay-tax33;
   var dayNames=['일','월','화','수','목','금','토'];
@@ -6260,6 +6299,8 @@ function savePayrollImage(userId,yr,mo,overlay){
     +'<tr style="background:#e8e8e8"><td style="padding:5px 8px;border:1px solid #ccc;font-size:12px;text-align:center;font-weight:700" colspan="2">시간당 급여</td><td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;text-align:center;font-weight:800;color:#16a34a">'+hourlyRate.toLocaleString()+'</td><td style="padding:5px 8px;border:1px solid #ccc" colspan="4"></td></tr>'
     +'</tbody></table>'
     +'<div style="border-top:2px solid #333;padding-top:8px;font-size:13px">'
+    +'<div style="display:flex;justify-content:space-between;padding:4px 0"><span>기본 급여 ('+totalHours+'h × '+hourlyRate.toLocaleString()+')</span><span>₩'+basePay.toLocaleString()+'</span></div>'
+    +(juhuEnabled&&juhuPay>0?'<div style="display:flex;justify-content:space-between;padding:4px 0"><span>주휴수당</span><span style="color:#16a34a">₩'+juhuPay.toLocaleString()+'</span></div>':'')
     +'<div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:700"><span>총 급여</span><span style="color:#16a34a">₩'+totalPay.toLocaleString()+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:700"><span>원천세 (3.3%)</span><span style="color:#dc2626">₩'+tax33.toLocaleString()+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:2px solid #333;margin-top:4px;font-size:16px;font-weight:800"><span>차감 수령액</span><span style="color:#0b2c5c">₩'+net.toLocaleString()+'</span></div>'
