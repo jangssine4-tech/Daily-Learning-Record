@@ -1351,7 +1351,40 @@ async function loadMkBlogConfig(){
   if(window._mkBlogConfig)return;
   try{var d=await db.collection('config').doc('mkBlogConfig').get();window._mkBlogConfig=d.exists?d.data():{};}catch(e){window._mkBlogConfig={};}
 }
-function renderMeetingPage(){switchMeetingTab('monthly');}
+function renderMeetingPage(){
+  // Pre-load all data then show monthly tab
+  var promises=[];
+  if(window._meetingGuide===undefined){
+    promises.push(
+      db.collection('config').doc('meetingGuide').get().then(function(d){
+        window._meetingGuide=d.exists?(d.data().content||''):'';
+      }).catch(function(){window._meetingGuide='';})
+    );
+  }
+  if(!window._meetingCalLoaded){
+    window._meetingCalLoaded=true;
+    var now2=new Date();
+    var key2='meetingCal_'+now2.getFullYear()+'_'+(now2.getMonth()+1);
+    promises.push(
+      db.collection('config').doc('meetingCalendar').get().then(function(d){
+        window._meetingCalData=d.exists?d.data():{};
+      }).catch(function(){window._meetingCalData={};})
+    );
+  }
+  if(!window._meetingAnnualLoaded){
+    window._meetingAnnualLoaded=true;
+    promises.push(
+      db.collection('config').doc('meetingAnnual').get().then(function(d){
+        window._meetingAnnualData=d.exists?d.data():{};
+      }).catch(function(){window._meetingAnnualData={};})
+    );
+  }
+  if(promises.length){
+    Promise.all(promises).then(function(){switchMeetingTab('monthly');});
+  } else {
+    switchMeetingTab('monthly');
+  }
+}
 function switchMeetingTab(tab){
   ['monthly','annual','guide','detail'].forEach(function(t){
     var btn=$('mtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
@@ -1475,13 +1508,6 @@ function renderMeetingAnnual(el){
     }).join('')
     +'</div></div>';
   el.innerHTML=html;
-  // Load from Firestore
-  if(!window._meetingAnnualLoaded){
-    window._meetingAnnualLoaded=true;
-    db.collection('config').doc('meetingAnnual').get().then(function(d){
-      if(d.exists){window._meetingAnnualData=d.data();renderMeetingAnnual($('meeting-page-area'));}
-    });
-  }
 }
 
 function saveMeetingAnnual(key,mo,val){
@@ -1493,14 +1519,6 @@ function saveMeetingAnnual(key,mo,val){
 }
 
 function renderMeetingGuide(el){
-  if(!window._meetingGuide){
-    db.collection('config').doc('meetingGuide').get().then(function(d){
-      window._meetingGuide=d.exists?(d.data().content||''):'';
-      renderMeetingGuide($('meeting-page-area'));
-    }).catch(function(){window._meetingGuide='';});
-    el.innerHTML='<div style="padding:14px;color:var(--txt3)">로딩 중...</div>';
-    return;
-  }
   var v=(window._meetingGuide||'').replace(/"/g,'&quot;');
   el.innerHTML='<div style="padding:14px;max-width:700px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
