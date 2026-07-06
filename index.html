@@ -1352,37 +1352,29 @@ async function loadMkBlogConfig(){
   try{var d=await db.collection('config').doc('mkBlogConfig').get();window._mkBlogConfig=d.exists?d.data():{};}catch(e){window._mkBlogConfig={};}
 }
 function renderMeetingPage(){
-  // Pre-load all data then show monthly tab
-  var promises=[];
+  // Render immediately with cached data, load Firestore in background
+  switchMeetingTab('monthly');
+  // Background loads (non-blocking)
   if(window._meetingGuide===undefined){
-    promises.push(
-      db.collection('config').doc('meetingGuide').get().then(function(d){
-        window._meetingGuide=d.exists?(d.data().content||''):'';
-      }).catch(function(){window._meetingGuide='';})
-    );
+    window._meetingGuide='';
+    db.collection('config').doc('meetingGuide').get().then(function(d){
+      window._meetingGuide=d.exists?(d.data().content||''):'';
+    }).catch(function(){window._meetingGuide='';});
   }
   if(!window._meetingCalLoaded){
     window._meetingCalLoaded=true;
-    var now2=new Date();
-    var key2='meetingCal_'+now2.getFullYear()+'_'+(now2.getMonth()+1);
-    promises.push(
-      db.collection('config').doc('meetingCalendar').get().then(function(d){
-        window._meetingCalData=d.exists?d.data():{};
-      }).catch(function(){window._meetingCalData={};})
-    );
+    window._meetingCalData=window._meetingCalData||{};
+    db.collection('config').doc('meetingCalendar').get().then(function(d){
+      if(d.exists)window._meetingCalData=d.data();
+      switchMeetingTab('monthly'); // re-render with loaded data
+    }).catch(function(){});
   }
   if(!window._meetingAnnualLoaded){
     window._meetingAnnualLoaded=true;
-    promises.push(
-      db.collection('config').doc('meetingAnnual').get().then(function(d){
-        window._meetingAnnualData=d.exists?d.data():{};
-      }).catch(function(){window._meetingAnnualData={};})
-    );
-  }
-  if(promises.length){
-    Promise.all(promises).then(function(){switchMeetingTab('monthly');});
-  } else {
-    switchMeetingTab('monthly');
+    window._meetingAnnualData=window._meetingAnnualData||{};
+    db.collection('config').doc('meetingAnnual').get().then(function(d){
+      if(d.exists)window._meetingAnnualData=d.data();
+    }).catch(function(){});
   }
 }
 function switchMeetingTab(tab){
@@ -1402,40 +1394,45 @@ function renderMeetingMonthly(el){
   var mo=parseInt(window._meetingMonthMo||now.getMonth()+1);
   var key='meetingCal_'+yr+'_'+mo;
   var calData=window._meetingCalData||{};
+  var monthData=calData[key]||{};
   var firstDay=new Date(yr,mo-1,1).getDay();
-  var daysInMo=new Date(yr,mo,0).getDate();
-  var dayNames=['일','월','화','수','목','금','토'];
-  var activeNames=(students||[]).filter(function(s){return s.status!=='퇴원';}).map(function(s){return s.name;});
-
-  var html='<div style="padding:14px;max-width:700px">'
-    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+  var lastDate=new Date(yr,mo,0).getDate();
+  var todayStr=todayISO();
+  var dayLabels=['주','월','화','수','목','금','토','일'];
+  var html='<div style="padding:14px;max-width:800px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
     +'<button class="btn btn-outline btn-xs" onclick="changeMeetingMonth(-1)">◀</button>'
     +'<span style="font-size:15px;font-weight:700;color:var(--navy)">'+yr+'년 '+mo+'월 간담회 계획</span>'
     +'<button class="btn btn-outline btn-xs" onclick="changeMeetingMonth(1)">▶</button></div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
-    +dayNames.map(function(d,i){return'<th style="padding:6px;background:var(--surface2);border:1px solid var(--border);color:'+(i===0?'#dc2626':i===6?'#2563eb':'var(--navy)')+'">'+d+'</th>';}).join('')
-    +'</tr></thead><tbody>';
-
-  var day=1;var cells=[];
-  for(var i=0;i<firstDay;i++)cells.push(null);
-  for(var d=1;d<=daysInMo;d++)cells.push(d);
-  while(cells.length%7)cells.push(null);
-
-  for(var r=0;r<cells.length;r+=7){
-    html+='<tr>';
+    +'<div style="display:grid;grid-template-columns:44px repeat(7,1fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:560px">';
+  dayLabels.forEach(function(l){
+    var isSun=l==='일',isSat=l==='토';
+    html+='<div style="background:var(--surface2);font-size:11px;font-weight:700;color:'+(isSun?'var(--red)':isSat?'var(--blue)':'var(--txt2)')+';padding:7px 4px;text-align:center;border-bottom:1px solid var(--border);border-right:1px solid var(--border)">'+l+'</div>';
+  });
+  var startWday=firstDay===0?6:firstDay-1;
+  var date=1,weekNum=1;
+  while(date<=lastDate){
+    html+='<div style="background:var(--surface2);font-size:11px;font-weight:700;color:var(--txt2);padding:7px 4px;text-align:center;border-bottom:1px solid var(--border);border-right:1px solid var(--border)">'+weekNum+'주</div>';
     for(var col=0;col<7;col++){
-      var dd=cells[r+col];
-      var isToday=dd&&yr===now.getFullYear()&&mo===now.getMonth()+1&&dd===now.getDate();
-      var entries=dd?(calData[key]&&calData[key][dd]||[]):[];
-      html+='<td style="border:1px solid var(--border);vertical-align:top;min-height:60px;padding:4px;cursor:'+(dd?'pointer':'default')+';background:'+(isToday?'#eff6ff':col===0?'#fff5f5':col===6?'#eff6ff':'var(--bg)')+'"'
-        +(dd?' onclick="openMeetingDayModal('+yr+','+mo+','+dd+')"':'')+'>'
-        +(dd?'<div style="font-weight:700;font-size:11px;color:'+(isToday?'var(--blue)':col===0?'#dc2626':col===6?'#2563eb':'var(--txt)')+'">'+dd+'</div>':'')
-        +entries.map(function(e){return'<div style="font-size:9px;background:#dcfce7;color:#166534;border-radius:3px;padding:1px 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e+'</div>';}).join('')
-        +'</td>';
+      var cellDate=null;
+      if(weekNum===1&&col<startWday)cellDate=null;
+      else{cellDate=date;if(cellDate<=lastDate)date++;else cellDate=null;}
+      var isSun2=col===6,isSat2=col===5;
+      var chips='',dateLbl='';
+      if(cellDate){
+        var dateStr=yr+'-'+String(mo).padStart(2,'0')+'-'+String(cellDate).padStart(2,'0');
+        var isToday=dateStr===todayStr;
+        dateLbl='<div style="font-size:10px;font-weight:700;margin-bottom:3px;color:'+(isSun2?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" >'+cellDate+'</div>';
+        var entries=monthData[String(cellDate)]||monthData[cellDate]||[];
+        if(!Array.isArray(entries))entries=Object.values(entries);
+        entries.forEach(function(e){chips+='<div style="font-size:9px;background:#dbeafe;color:#1e40af;border-radius:3px;padding:1px 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e+'</div>';});
+      }
+      html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px;cursor:'+(cellDate?'pointer':'default')+'" '+(cellDate?'onclick="openMeetingDayModal('+yr+','+mo+','+cellDate+')"':'')+'>'+dateLbl+chips+'</div>';
+      if(col<6&&date>lastDate){for(var rr=col+1;rr<7;rr++)html+='<div style="background:var(--surface);border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-height:65px"></div>';break;}
     }
-    html+='</tr>';
+    weekNum++;if(date>lastDate)break;
   }
-  html+='</tbody></table></div>';
+  html+='</div></div>';
   el.innerHTML=html;
 }
 
