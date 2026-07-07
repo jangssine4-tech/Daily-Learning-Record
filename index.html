@@ -2107,8 +2107,8 @@ function renderWriteFlowPanel(studentId){
   panel.style.display='';
 
   var today=new Date();
-  var twoWeeks=new Date(today);twoWeeks.setDate(twoWeeks.getDate()-14);
-  var sReps=reports.filter(function(r){return r.studentId===studentId&&!r.makeupId&&new Date(r.date)>=twoWeeks;}).sort(function(a,b){return a.date>b.date?-1:1;});
+  var fourWeeks=new Date(today);fourWeeks.setDate(fourWeeks.getDate()-28);
+  var sReps=reports.filter(function(r){return r.studentId===studentId&&!r.makeupId&&new Date(r.date)>=fourWeeks;}).sort(function(a,b){return a.date>b.date?-1:1;});
 
   var attMap={'매우 우수':3,'우수':2.5,'산만함':1.5,'수업 방해':1,'참여도가 매우 높음':3,'기본적인 참여도를 보임':2,'집중 유지에 도움이 필요한 모습':1};
   function parseScore(v){var m=String(v||'').match(/(\d+)/);return m?parseInt(m[1]):null;}
@@ -2131,7 +2131,7 @@ function renderWriteFlowPanel(studentId){
     quizTrend=diff>5?'📈 상승':diff<-5?'📉 하락':'➡ 유지';
   }
 
-  var html='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 '+s.name+' · 최근 2주</div>';
+  var html='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 '+s.name+' · 최근 4주</div>';
 
   // Status badge
   var risk=(absent>=2?1:0)+(hwFail>=2?1:0)+(retestCount>=2?1:0)+(attBad>=2?1:0);
@@ -2156,15 +2156,21 @@ function renderWriteFlowPanel(studentId){
 
   // Recent 5 lessons
   if(sReps.length){
-    html+='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">최근 수업</div>';
-    sReps.slice(0,5).forEach(function(r){
-      var attIcon=r.absent?'🔴':r.attitude&&r.attitude.includes('매우')? '⭐':r.attitude&&r.attitude.includes('우수')?'✅':r.attitude&&(r.attitude.includes('산만')||r.attitude.includes('방해'))?'⚠️':'';
-      var hwIcon=(r.homework||'').includes('미')?'❌':(r.homework?'✅':'');
-      var prog=r.progress?r.progress.substring(0,10):'';
-      html+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;padding:4px 0;border-bottom:1px solid var(--border)">'
-        +'<span style="color:var(--txt3);min-width:38px">'+r.date.substring(5)+'</span>'
-        +'<span style="flex:1;color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.absent?'결석':prog)+'</span>'
-        +'<span>'+attIcon+hwIcon+'</span>'
+    html+='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">최근 수업 흐름</div>'
+      +'<div style="display:grid;grid-template-columns:36px 48px 52px 36px 44px;gap:2px;font-size:9px;font-weight:700;color:var(--txt3);padding-bottom:3px;border-bottom:2px solid var(--border);margin-bottom:3px"><span>날짜</span><span>복습테스트</span><span>수업태도</span><span>Quiz</span><span>받아쓰기</span></div>';
+    sReps.slice(0,8).forEach(function(r){
+      var testLabel=r.absent?'-':(r.reviewTest||'-');
+      var testColor=r.absent?'var(--txt3)':r.reviewTest==='매우잘함'||r.reviewTest==='잘함'?'#16a34a':r.reviewTest==='부진'?'#dc2626':'var(--txt)';
+      var attLabel=r.absent?'결석':r.attitude?r.attitude.substring(0,4):'-';
+      var attColor=r.absent?'#dc2626':r.attitude&&(r.attitude.includes('산만')||r.attitude.includes('방해'))?'#dc2626':r.attitude&&(r.attitude.includes('매우')||r.attitude.includes('우수'))?'#16a34a':'var(--txt)';
+      var quizLabel=r.dailyQuiz||'-';
+      var dictLabel=r.dictation||'-';
+      html+='<div style="display:grid;grid-template-columns:36px 48px 52px 36px 44px;gap:2px;font-size:9px;padding:3px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="color:var(--txt3)">'+r.date.substring(5)+'</span>'
+        +'<span style="color:'+testColor+'">'+testLabel+'</span>'
+        +'<span style="color:'+attColor+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+attLabel+'</span>'
+        +'<span style="color:var(--txt)">'+quizLabel+'</span>'
+        +'<span style="color:var(--txt)">'+dictLabel+'</span>'
         +'</div>';
     });
   } else {
