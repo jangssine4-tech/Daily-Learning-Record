@@ -324,6 +324,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex">
     <button class="rev-tab active" id="sptab-courses" onclick="switchSpecialTab('courses')">📚 주요 강좌</button>
     <button class="rev-tab" id="sptab-target" onclick="switchSpecialTab('target')">🎯 특강 대상</button>
+    <button class="rev-tab" id="sptab-promo" onclick="switchSpecialTab('promo')">📣 홍보 일정</button>
   </div>
   <div class="cp" id="special-area"></div>
 </div>
@@ -2657,7 +2658,23 @@ function renderCrmDailyInto(targetId){
       tasks.push({id:'exam_2nd_'+s.id,priority:2,cat:'🟡 학습 관리',type:'시험 후 2차 상담',name:s.name,reason:examType+'평가 후 7일 — 정식 피드백 + 다음 시험 계획',action:'점수·오답·다음 관리 계획 상담',phone:s.phoneMom||''});
   });
 
-  // 상담 완료 처리된 학생 카드 숨김
+  // 22+. 특강 홍보 일정 자동 알림 (오늘 or 내일 게시 예정)
+  if(typeof _PROMO_SCHEDULE!=='undefined'){
+    var tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
+    var tmStr=tomorrow.toISOString().substring(0,10);
+    _PROMO_SCHEDULE.forEach(function(s){
+      if(s.date===todayStr)
+        tasks.push({id:'promo_'+s.date,priority:2,cat:'🟡 학습 관리',type:'📣 특강 홍보 ('+s.d+')',name:'홍보 일정',reason:s.title+' · '+s.channel,action:s.type});
+      else if(s.date===tmStr)
+        tasks.push({id:'promo_tmr_'+s.date,priority:3,cat:'🟢 CRM',type:'📣 내일 홍보 예정',name:'내일 홍보',reason:'[D+1] '+s.title,action:'콘텐츠 준비 확인'});
+    });
+    _EXEC_TABLE.forEach(function(t){
+      if(t.prepDate===todayStr)
+        tasks.push({id:'exec_prep_'+t.priority,priority:2,cat:'🟡 학습 관리',type:'✅ 제작 ('+t.channel+')',name:t.task,reason:t.content+' 제작 예정일',action:'오늘 제작 시작'});
+      else if(t.postDate===todayStr)
+        tasks.push({id:'exec_post_'+t.priority,priority:2,cat:'🟡 학습 관리',type:'📤 게시 ('+t.channel+')',name:t.task,reason:t.content+' 게시 예정일',action:'오늘 게시하기'});
+    });
+  }
   var completedStudentIds={};
   (consultations||[]).forEach(function(c){
     if(c.consultStatus==='상담 완료'&&c.date===todayStr)completedStudentIds[c.studentId]=true;
@@ -7054,12 +7071,137 @@ function saveTaxDocs(){
 // ══ SPECIAL CLASS ══
 var _specialPrograms=['Phonics 기초','Phonics 속성','TOSEL 정기 시험','TOSEL VOCA','문법 강화반','구문 독해(기초)','구문 독해(기본)'];
 function switchSpecialTab(tab){
-  ['courses','target'].forEach(function(t){
+  ['courses','target','promo'].forEach(function(t){
     var btn=$('sptab-'+t);if(btn)btn.classList.toggle('active',t===tab);
   });
   window._specialTab=tab;
   if(tab==='courses')renderSpecialPage();
   else if(tab==='target')renderSpecialTarget();
+  else if(tab==='promo')renderSpecialPromo();
+}
+
+// ── 2026 여름 특강 홍보 일정 데이터 ──
+var _PROMO_SCHEDULE=[
+  {date:'2026-07-09',d:'D-18',purpose:'1차 공개',message:'여름방학 오전 영어 특강이 시작됩니다',title:'2026 여름방학 EARLY BIRD PROJECT 안내',channel:'카카오톡, 학원 공지',type:'1차 카톡 안내문'},
+  {date:'2026-07-10',d:'D-17',purpose:'공감 형성',message:'방학이 시작되면 아이들의 아침이 조금씩 늦어집니다',title:'방학만 되면 늦어지는 아이들의 아침',channel:'인스타그램, 블로그',type:'공감형 게시글'},
+  {date:'2026-07-12',d:'D-15',purpose:'지역 유입',message:'여름방학, 아이들 오전 시간 어떻게 보내시나요?',title:'여름방학, 아이들 오전 시간 어떻게 보내시나요?',channel:'당근',type:'지역 공감형 게시글'},
+  {date:'2026-07-13',d:'D-14',purpose:'콘셉트 각인',message:'아침을 바꾸면 방학이 달라집니다',title:'EARLY BIRD PROJECT 콘셉트 공개',channel:'인스타그램',type:'카드뉴스 1차'},
+  {date:'2026-07-15',d:'D-12',purpose:'프로그램 안내',message:'아이에게 필요한 영어를 과정별로 선택합니다',title:'우리 아이에게 맞는 여름방학 영어 과정은?',channel:'카카오톡, 블로그',type:'프로그램 선택 안내'},
+  {date:'2026-07-17',d:'D-10',purpose:'신뢰 형성',message:'무리하게 시키기보다 필요한 부분을 꼼꼼히 채웁니다',title:'파닉스부터 구문독해까지, 단계별로 살펴봅니다',channel:'인스타그램, 학원 공지',type:'관리 방식 소개'},
+  {date:'2026-07-19',d:'D-8',purpose:'주말 노출',message:'방학 오전 2시간, 영어 자신감을 깨우는 시간',title:'방학 오전 2시간, 영어 자신감을 깨우는 시간',channel:'당근, 인스타그램',type:'짧은 홍보글, 릴스'},
+  {date:'2026-07-20',d:'D-7',purpose:'신청 전환',message:'개강 1주 전, 아이에게 맞는 과정 상담을 시작합니다',title:'여름방학 특강 신청 및 상담 안내',channel:'카카오톡, 문자',type:'신청 안내문'},
+  {date:'2026-07-22',d:'D-5',purpose:'선택 유도',message:'파닉스·문법·독해·TOSEL 중 필요한 과정을 확인해 주세요',title:'과정별 추천 대상 안내',channel:'카카오톡',type:'프로그램 선택형 카톡'},
+  {date:'2026-07-24',d:'D-3',purpose:'최종 안내',message:'7월 27일 개강, EARLY BIRD PROJECT 최종 안내',title:'7월 27일 개강, EARLY BIRD PROJECT 최종 안내',channel:'문자, 카카오톡',type:'최종 안내문'},
+  {date:'2026-07-25',d:'D-2',purpose:'주말 리마인드',message:'월요일부터 방학 오전 루틴이 시작됩니다',title:'월요일 오전 10시, 영어 루틴이 시작됩니다',channel:'인스타 스토리, 카톡',type:'리마인드 콘텐츠'},
+  {date:'2026-07-26',d:'D-1',purpose:'개강 전 안내',message:'내일부터 시작됩니다. 편안히 시작할 수 있도록 안내드립니다',title:'내일 개강 안내',channel:'카카오톡',type:'개강 전 안내'},
+  {date:'2026-07-27',d:'D-Day',purpose:'개강',message:'아이들의 방학 아침이 영어 성장 시간으로 시작됩니다',title:'EARLY BIRD PROJECT 개강했습니다',channel:'인스타그램, 학원 공지',type:'현장 스케치'}
+];
+var _EXEC_TABLE=[
+  {priority:1,task:'1차 모집 안내 발송',content:'카카오톡 모집 안내문',channel:'카카오톡',prepDate:'2026-07-09',postDate:'2026-07-09'},
+  {priority:2,task:'전단지 최종 확인',content:'인쇄용 전단지',channel:'오프라인',prepDate:'2026-07-09',postDate:'2026-07-10'},
+  {priority:3,task:'공감형 인스타 게시글 제작',content:'방학 아침 공감 콘텐츠',channel:'인스타그램',prepDate:'2026-07-09',postDate:'2026-07-10'},
+  {priority:4,task:'당근 게시글 등록',content:'지역 학부모 공감형 홍보글',channel:'당근',prepDate:'2026-07-10',postDate:'2026-07-12'},
+  {priority:5,task:'카드뉴스 제작',content:'EARLY BIRD PROJECT 카드뉴스 8장',channel:'인스타그램',prepDate:'2026-07-11',postDate:'2026-07-13'},
+  {priority:6,task:'프로그램 선택 안내 제작',content:'과정별 추천 대상 안내문',channel:'카카오톡, 블로그',prepDate:'2026-07-13',postDate:'2026-07-15'},
+  {priority:7,task:'학원 관리 방식 콘텐츠 제작',content:'단계별 영어 관리 소개',channel:'인스타그램, 블로그',prepDate:'2026-07-15',postDate:'2026-07-17'},
+  {priority:8,task:'릴스 또는 짧은 영상 제작',content:'방학 아침 루틴 릴스',channel:'인스타그램',prepDate:'2026-07-17',postDate:'2026-07-19'},
+  {priority:9,task:'신청 안내 문자 발송',content:'짧은 신청 안내 문자',channel:'문자',prepDate:'2026-07-19',postDate:'2026-07-20'},
+  {priority:10,task:'과정별 상담 유도 카톡 발송',content:'프로그램 선택형 카톡',channel:'카카오톡',prepDate:'2026-07-21',postDate:'2026-07-22'},
+  {priority:11,task:'최종 신청 안내 발송',content:'D-3 최종 안내문',channel:'문자, 카카오톡',prepDate:'2026-07-23',postDate:'2026-07-24'},
+  {priority:12,task:'개강 전 준비 안내 발송',content:'준비물 및 첫날 안내',channel:'카카오톡',prepDate:'2026-07-25',postDate:'2026-07-26'},
+  {priority:13,task:'개강 당일 현장 콘텐츠 촬영',content:'수업 준비 및 교실 스케치',channel:'인스타그램',prepDate:'2026-07-27',postDate:'2026-07-27'},
+  {priority:14,task:'1주차 학습 모습 공유',content:'특강 진행 후기',channel:'카카오톡, 인스타그램',prepDate:'2026-07-30',postDate:'2026-07-31'},
+  {priority:15,task:'특강 종료 후 결과 공유',content:'성장 리포트, 후기 콘텐츠',channel:'카카오톡, 블로그',prepDate:'2026-08-14',postDate:'2026-08-17'}
+];
+
+function renderSpecialPromo(){
+  var el=$('special-area');if(!el)return;
+  var todayStr=todayISO();
+  var today=new Date(todayStr);
+  var weekLater=new Date(today);weekLater.setDate(weekLater.getDate()+7);
+
+  // Today's tasks
+  var todayTasks=_PROMO_SCHEDULE.filter(function(s){return s.date===todayStr;});
+  var weekTasks=_PROMO_SCHEDULE.filter(function(s){return s.date>todayStr&&s.date<=weekLater.toISOString().substring(0,10);});
+  var execToday=_EXEC_TABLE.filter(function(t){return t.prepDate===todayStr||t.postDate===todayStr;});
+  var execWeek=_EXEC_TABLE.filter(function(t){return(t.prepDate>todayStr&&t.prepDate<=weekLater.toISOString().substring(0,10))||(t.postDate>todayStr&&t.postDate<=weekLater.toISOString().substring(0,10));});
+
+  var html='<div style="padding:14px">';
+
+  // Today section
+  html+='<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:10px">📅 오늘 ('+todayStr+')</div>';
+  if(todayTasks.length||execToday.length){
+    todayTasks.forEach(function(t){html+=_promoCard(t,'#fef2f2','#dc2626');});
+    execToday.forEach(function(t){html+=_execCard(t,'#fff7ed','#b45309');});
+  } else {
+    html+='<div style="color:var(--txt3);font-size:12px;padding:8px 0;margin-bottom:10px">오늘 예정된 홍보 일정이 없습니다</div>';
+  }
+
+  // This week section
+  html+='<div style="font-size:15px;font-weight:800;color:var(--navy);margin:16px 0 10px">📆 이번 주 (7일 이내)</div>';
+  if(weekTasks.length||execWeek.length){
+    weekTasks.forEach(function(t){html+=_promoCard(t,'#eff6ff','#2563eb');});
+    execWeek.forEach(function(t){html+=_execCard(t,'#f0fdf4','#16a34a');});
+  } else {
+    html+='<div style="color:var(--txt3);font-size:12px;padding:8px 0;margin-bottom:10px">이번 주 예정된 홍보 일정이 없습니다</div>';
+  }
+
+  // Full schedule table
+  html+='<div style="font-size:15px;font-weight:800;color:var(--navy);margin:16px 0 10px">📋 전체 홍보 일정표</div>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:700px"><thead><tr>'
+    +'<th>날짜</th><th style="width:60px">D-day</th><th style="width:90px">목적</th><th>핵심 메시지</th><th>채널</th><th>콘텐츠 형태</th>'
+    +'</tr></thead><tbody>';
+  _PROMO_SCHEDULE.forEach(function(s){
+    var isPast=s.date<todayStr;var isToday=s.date===todayStr;
+    var bg=isToday?'background:#fef9c3':isPast?'opacity:0.5':'';
+    html+='<tr style="'+bg+'">'
+      +'<td style="font-weight:700">'+(isToday?'👉 ':'')+s.date.substring(5).replace('-','/')+'</td>'
+      +'<td style="text-align:center;font-weight:700;color:'+(s.d==='D-Day'?'#dc2626':'var(--txt)')+'">'+s.d+'</td>'
+      +'<td><span style="font-size:10px;background:#e0e7ff;color:#3730a3;padding:2px 6px;border-radius:6px">'+s.purpose+'</span></td>'
+      +'<td style="font-size:11px">'+s.message+'</td>'
+      +'<td style="font-size:11px;color:var(--txt3)">'+s.channel+'</td>'
+      +'<td style="font-size:11px">'+s.type+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div>';
+
+  // Exec table
+  html+='<div style="font-size:15px;font-weight:800;color:var(--navy);margin:20px 0 10px">✅ 마케팅 실행표</div>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:650px"><thead><tr>'
+    +'<th style="width:40px">#</th><th>할 일</th><th>채널</th><th style="width:90px">제작 예정일</th><th style="width:90px">게시 예정일</th>'
+    +'</tr></thead><tbody>';
+  _EXEC_TABLE.forEach(function(t){
+    var prepPast=t.prepDate<todayStr;var postPast=t.postDate<todayStr;
+    var isToday=t.prepDate===todayStr||t.postDate===todayStr;
+    var bg=isToday?'background:#fef9c3':postPast?'opacity:0.5':'';
+    html+='<tr style="'+bg+'">'
+      +'<td style="text-align:center;font-weight:700">'+t.priority+'</td>'
+      +'<td><b style="font-size:12px">'+(isToday?'👉 ':'')+t.task+'</b><br><span style="font-size:10px;color:var(--txt3)">'+t.content+'</span></td>'
+      +'<td style="font-size:11px">'+t.channel+'</td>'
+      +'<td style="font-size:11px;color:'+(prepPast?'var(--txt3)':'var(--txt)')+'">'+t.prepDate.substring(5).replace('-','/')+'</td>'
+      +'<td style="font-size:11px;color:'+(postPast?'var(--txt3)':t.postDate===todayStr?'#dc2626':'var(--txt)')+'">'+t.postDate.substring(5).replace('-','/')+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+function _promoCard(t,bg,color){
+  return'<div style="background:'+bg+';border-left:4px solid '+color+';border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
+    +'<span style="font-size:11px;font-weight:700;color:'+color+'">📣 홍보</span>'
+    +'<span style="font-size:12px;font-weight:700">'+t.title+'</span>'
+    +'<span style="font-size:10px;color:var(--txt3);margin-left:auto">'+t.d+' · '+t.channel+'</span></div>'
+    +'<div style="font-size:11px;color:var(--txt2)">'+t.message+'</div>'
+    +'</div>';
+}
+function _execCard(t,bg,color){
+  return'<div style="background:'+bg+';border-left:4px solid '+color+';border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
+    +'<span style="font-size:11px;font-weight:700;color:'+color+'">✅ 실행</span>'
+    +'<span style="font-size:12px;font-weight:700">#'+t.priority+' '+t.task+'</span>'
+    +'<span style="font-size:10px;color:var(--txt3);margin-left:auto">'+t.channel+'</span></div>'
+    +'<div style="font-size:11px;color:var(--txt2)">'+t.content+'</div>'
+    +'</div>';
 }
 
 function renderSpecialNotice(){
