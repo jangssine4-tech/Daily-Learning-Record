@@ -7068,12 +7068,9 @@ function renderSpecialTarget(){
   var savedSeason=window._specialSeason||'여름';
   var key='specialTarget_'+savedYr+'_'+savedSeason;
   if(!window._specialData)window._specialData={};
-
   var rows=window._specialData[key]||[];
-  if(!rows.length)rows=[{program:'',grade:'',level:'',note:''}];
-
+  if(!rows.length)rows=[{program:'',studentId:'',name:'',enrolled:true,level:'',mockScore:'',note:''}];
   var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===savedYr?' selected':'')+'>'+y+'년</option>';
-
   var html='<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">'
     +'<select class="fi" style="width:100px" onchange="window._specialYr=parseInt(this.value);renderSpecialTarget()">'+yrOpts+'</select>'
     +'<select class="fi" style="width:90px" onchange="window._specialSeason=this.value;renderSpecialTarget()">'
@@ -7083,22 +7080,84 @@ function renderSpecialTarget(){
     +'<button class="btn btn-outline btn-sm" onclick="addSpecialTargetRow()">+ 행 추가</button>'
     +'<button class="btn btn-green btn-sm" onclick="saveSpecialData()">💾 저장</button>'
     +'</div>'
-    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:600px"><thead><tr>'
-    +'<th style="width:180px">프로그램</th><th style="width:120px">대상 학년</th><th style="width:150px">현재 레벨</th><th>특이 사항</th><th style="width:50px"></th>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:750px"><thead><tr>'
+    +'<th style="width:160px">프로그램</th>'
+    +'<th style="width:90px">재원 여부</th>'
+    +'<th style="width:150px">이름</th>'
+    +'<th style="width:130px">현재 레벨</th>'
+    +'<th style="width:110px">모의고사 점수</th>'
+    +'<th>특이 사항</th>'
+    +'<th style="width:50px"></th>'
     +'</tr></thead><tbody>';
-
   rows.forEach(function(row,i){
     var progOpts='<option value="">선택</option>'+_specialPrograms.map(function(p){return'<option value="'+p+'"'+(row.program===p?' selected':'')+'>'+p+'</option>';}).join('');
+    var isEnrolled=row.enrolled!==false;
+    // Auto level from student record
+    var autoLevel='';
+    if(row.studentId){var stu=students.find(function(s){return s.id===row.studentId;});if(stu)autoLevel=getStudentLevel(stu)||stu.level||'';}
+    var lvVal=row.level||autoLevel;
     html+='<tr>'
       +'<td><select class="fi" style="font-size:12px" onchange="updateSpecialTargetRow('+i+',\'program\',this.value)">'+progOpts+'</select></td>'
-      +'<td><input class="fi" style="font-size:12px" value="'+(row.grade||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'grade\',this.value)" placeholder="예: 초3~초5"></td>'
-      +'<td><input class="fi" style="font-size:12px" value="'+(row.level||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'level\',this.value)" placeholder="예: Joy 2A 이상"></td>'
-      +'<td><input class="fi" style="font-size:12px" value="'+(row.note||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'note\',this.value)" placeholder="특이 사항 메모"></td>'
+      +'<td style="text-align:center">'
+        +'<label style="display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:11px">'
+        +'<input type="checkbox" '+(isEnrolled?'checked':'')+' onchange="toggleSpecialTargetEnrolled('+i+',this.checked)"> 재원생'
+        +'</label></td>'
+      +'<td>';
+    if(isEnrolled){
+      // Student picker button
+      var displayName=row.name||'(선택)';
+      html+='<button class="btn btn-outline btn-xs" style="font-size:11px;width:100%;text-align:left" onclick="openSpecialStudentPicker('+i+')">👤 '+displayName+'</button>';
+    } else {
+      // Free text input
+      html+='<input class="fi" style="font-size:12px" value="'+(row.name||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'name\',this.value)" placeholder="이름 직접 입력">';
+    }
+    html+='</td>'
+      +'<td><input class="fi" style="font-size:12px" value="'+lvVal.replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'level\',this.value)" placeholder="자동 입력 또는 수정"></td>'
+      +'<td><input class="fi" style="font-size:12px;text-align:right" value="'+(row.mockScore||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'mockScore\',this.value)" placeholder="예: 85점"></td>'
+      +'<td><input class="fi" style="font-size:12px" value="'+(row.note||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'note\',this.value)" placeholder="특이 사항"></td>'
       +'<td style="text-align:center"><button class="btn btn-outline btn-xs" style="color:#dc2626;font-size:10px" onclick="deleteSpecialTargetRow('+i+')">🗑</button></td>'
       +'</tr>';
   });
   html+='</tbody></table></div>';
   el.innerHTML=html;
+}
+function toggleSpecialTargetEnrolled(idx,checked){
+  updateSpecialTargetRow(idx,'enrolled',checked);
+  updateSpecialTargetRow(idx,'studentId','');
+  updateSpecialTargetRow(idx,'name','');
+  updateSpecialTargetRow(idx,'level','');
+  renderSpecialTarget();
+}
+function openSpecialStudentPicker(idx){
+  var key='specialTarget_'+window._specialYr+'_'+window._specialSeason;
+  var row=(window._specialData[key]||[])[idx]||{};
+  var activeStudents=(students||[]).filter(function(s){return s.status!=='퇴원';});
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms"><div class="mh"></div>'
+    +'<div class="mt">👤 학생 선택</div>'
+    +'<div style="max-height:350px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px">'
+    +activeStudents.map(function(s){
+      var lv=getStudentLevel(s)||s.level||'';
+      var checked=row.studentId===s.id;
+      return'<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px">'
+        +'<input type="radio" name="sp-student-pick" value="'+s.id+'" data-name="'+s.name+'" data-level="'+lv+'" '+(checked?'checked':'')+'>'
+        +s.name+'<span style="font-size:11px;color:var(--txt3)">'+lv+'</span></label>';
+    }).join('')
+    +'</div>'
+    +'<div style="height:10px"></div>'
+    +'<button class="btn btn-green btn-block" onclick="confirmSpecialStudentPick('+idx+',this.closest(\'.mo\'))">선택</button></div>';
+  document.body.appendChild(overlay);
+}
+function confirmSpecialStudentPick(idx,overlay){
+  var checked=overlay.querySelector('input[name=sp-student-pick]:checked');
+  if(!checked){overlay.remove();return;}
+  updateSpecialTargetRow(idx,'studentId',checked.value);
+  updateSpecialTargetRow(idx,'name',checked.dataset.name);
+  updateSpecialTargetRow(idx,'level',checked.dataset.level);
+  overlay.remove();
+  renderSpecialTarget();
 }
 function updateSpecialTargetRow(idx,field,val){
   var key='specialTarget_'+window._specialYr+'_'+window._specialSeason;
@@ -7109,7 +7168,7 @@ function updateSpecialTargetRow(idx,field,val){
 function addSpecialTargetRow(){
   var key='specialTarget_'+window._specialYr+'_'+window._specialSeason;
   if(!window._specialData[key])window._specialData[key]=[];
-  window._specialData[key].push({program:'',grade:'',level:'',note:''});
+  window._specialData[key].push({program:'',studentId:'',name:'',enrolled:true,level:'',mockScore:'',note:''});
   renderSpecialTarget();
 }
 function deleteSpecialTargetRow(idx){
