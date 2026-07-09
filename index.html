@@ -6608,11 +6608,29 @@ function printFreelancerLedger(){
     +'<div>작성일: <span style="border-bottom:1px solid #333;display:inline-block;width:100px">&nbsp;</span></div>'
     +'</div></div>';
 
+  // Show preview modal
+  var tableHTML=cardHTML.replace('id="print-area"','id="freelancer-print-content"');
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms" style="max-width:900px;width:95%;max-height:90dvh;overflow-y:auto">'
+    +'<div class="mh"></div>'
+    +'<div class="mt">📋 '+moStr+' 프리랜서 용역 대장 미리 보기</div>'
+    +'<div style="background:#fff;border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:14px">'+tableHTML+'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn btn-navy" style="flex:1" onclick="_doPrintFreelancer()">🖨 인쇄</button>'
+    +'<button class="btn btn-outline" style="flex:1" onclick="this.closest(\'.mo\').remove()">닫기</button>'
+    +'</div></div>';
+  document.body.appendChild(overlay);
+}
+function _doPrintFreelancer(){
+  var content=document.getElementById('freelancer-print-content');
+  if(!content)return;
   var existing=document.getElementById('print-area');if(existing)existing.remove();
-  var div=document.createElement('div');
-  div.innerHTML=cardHTML;
-  document.body.appendChild(div.firstChild);
-  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
+  var pa=document.createElement('div');
+  pa.id='print-area';pa.innerHTML=content.innerHTML;
+  document.body.appendChild(pa);
+  setTimeout(function(){window.print();setTimeout(function(){pa.remove();},500);},200);
 }
 async function deleteStaffUser(userId,name){
   if(!confirm(name+' 강사를 강사 페이지에서 삭제합니다.\n관리자 페이지에는 영향이 없습니다.\n(해당 월에 근무 데이터가 있으면 그 월에는 계속 표시됩니다)\n삭제하시겠습니까?'))return;
