@@ -6543,7 +6543,74 @@ function renderStaffArea(){
   freelancerHTML+='<tr style="background:var(--surface2);font-weight:700"><td colspan="4" style="text-align:center">합계</td><td style="text-align:center;color:var(--red)">'+totalFee.toLocaleString()+'</td><td style="text-align:center">'+totalBizTax.toLocaleString()+'</td><td style="text-align:center">'+totalResTax.toLocaleString()+'</td><td style="text-align:center;color:var(--navy)">'+totalNet.toLocaleString()+'</td><td></td></tr></tbody></table>';
   el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h4 style="margin:0">💰 '+moStr+' 급여 명세서</h4><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 강사 등록</button></div>'
     +'<div class="expense-section">'+payrollHTML+'</div>'
-    +'<div class="expense-section"><h4>📋 '+moStr+' 프리랜서 용역 대장</h4><div style="overflow-x:auto">'+freelancerHTML+'</div></div>';
+    +'<div class="expense-section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h4 style="margin:0">📋 '+moStr+' 프리랜서 용역 대장</h4><button class="btn btn-outline btn-sm" onclick="printFreelancerLedger('+yr+','+mo+')">🖨 인쇄</button></div><div style="overflow-x:auto">'+freelancerHTML+'</div></div>';
+}
+function printFreelancerLedger(yr,mo){
+  var moStr=yr+'년 '+mo+'월';
+  var nextMo=mo+1;var nextYr=yr;if(nextMo>12){nextMo=1;nextYr++;}
+  var payDateStr=nextYr+'.'+String(nextMo).padStart(2,'0')+'.10';
+  var teacherList=users.filter(function(u){if(u.role!=='teacher')return false;if(!u.staffDeleted)return true;var wd=u['workDays_'+yr+'_'+mo]||[];return wd.length>0;});
+  var rows='';var totalFee=0,totalBiz=0,totalRes=0,totalNet=0;
+  teacherList.forEach(function(u,idx){
+    var workDays=u['workDays_'+yr+'_'+mo]||[];
+    var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
+    var hourlyRate=u.hourlyRate||15000;
+    var juhuEnabled=u.juhuEnabled||false;
+    var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
+    var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
+    var fee=Math.round(totalHours*hourlyRate)+juhuPay;
+    var biz=Math.round(fee*0.03);
+    var res=Math.round(biz*0.1);
+    var net=fee-biz-res;
+    totalFee+=fee;totalBiz+=biz;totalRes+=res;totalNet+=net;
+    rows+='<tr>'
+      +'<td style="text-align:center;border:1px solid #ccc;padding:6px 8px">'+(idx+1)+'</td>'
+      +'<td style="text-align:center;border:1px solid #ccc;padding:6px 8px;font-weight:600">'+u.name+'</td>'
+      +'<td style="text-align:center;border:1px solid #ccc;padding:6px 8px;font-size:11px">'+(u.ssn||'-')+'</td>'
+      +'<td style="border:1px solid #ccc;padding:6px 8px;font-size:11px">'+(u.address||'-')+'</td>'
+      +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px">'+fee.toLocaleString()+'</td>'
+      +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px">'+biz.toLocaleString()+'</td>'
+      +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px">'+res.toLocaleString()+'</td>'
+      +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px;font-weight:700">'+net.toLocaleString()+'</td>'
+      +'<td style="text-align:center;border:1px solid #ccc;padding:6px 8px">'+payDateStr+'</td>'
+      +'<td style="border:1px solid #ccc;padding:6px 8px;min-width:60px"></td>'
+      +'</tr>';
+  });
+  rows+='<tr style="background:#f0f0f0;font-weight:700">'
+    +'<td colspan="4" style="text-align:center;border:1px solid #ccc;padding:6px 8px">합 계</td>'
+    +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px">'+totalFee.toLocaleString()+'</td>'
+    +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px">'+totalBiz.toLocaleString()+'</td>'
+    +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px">'+totalRes.toLocaleString()+'</td>'
+    +'<td style="text-align:right;border:1px solid #ccc;padding:6px 8px">'+totalNet.toLocaleString()+'</td>'
+    +'<td colspan="2" style="border:1px solid #ccc"></td></tr>';
+
+  var cardHTML='<div id="print-area" style="width:100%;font-family:-apple-system,AppleGothic,sans-serif;padding:20px;background:#fff">'
+    +'<div style="text-align:center;font-size:20px;font-weight:800;margin-bottom:4px">프리랜서 용역 대장</div>'
+    +'<div style="text-align:center;font-size:13px;color:#555;margin-bottom:16px">'+moStr+' · 잉글리시아이위드멘토링 영수학원</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#333;color:#fff">'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:36px">번호</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:70px">성명</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:120px">주민등록번호</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px">주소</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:80px">용역비</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:80px">사업소득세(3%)</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:70px">주민세(10%)</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:80px">차감수령액</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:80px">지급날짜</th>'
+    +'<th style="border:1px solid #ccc;padding:7px 4px;width:60px">서명</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+    +'<div style="margin-top:30px;display:flex;justify-content:flex-end;gap:40px;font-size:13px">'
+    +'<div>원장 확인: <span style="border-bottom:1px solid #333;display:inline-block;width:100px">&nbsp;</span></div>'
+    +'<div>작성일: <span style="border-bottom:1px solid #333;display:inline-block;width:100px">&nbsp;</span></div>'
+    +'</div></div>';
+
+  var existing=document.getElementById('print-area');if(existing)existing.remove();
+  var div=document.createElement('div');
+  div.innerHTML=cardHTML;
+  document.body.appendChild(div.firstChild);
+  setTimeout(function(){window.print();setTimeout(function(){var pa=document.getElementById('print-area');if(pa)pa.remove();},500);},200);
 }
 async function deleteStaffUser(userId,name){
   if(!confirm(name+' 강사를 강사 페이지에서 삭제합니다.\n관리자 페이지에는 영향이 없습니다.\n(해당 월에 근무 데이터가 있으면 그 월에는 계속 표시됩니다)\n삭제하시겠습니까?'))return;
