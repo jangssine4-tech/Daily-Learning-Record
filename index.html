@@ -6695,15 +6695,20 @@ function openHourlyRateModal(userId){
 }
 function saveHourlyRate(userId,overlay){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
-  var from=$('rate-from').value; // e.g. '2026-07'
+  var from=$('rate-from').value;
   var val=parseInt($('rate-val').value)||15000;
   if(!from){toast('적용 월을 선택하세요');return;}
   var history=(u.hourlyRateHistory||[]).filter(function(h){return h.from!==from;});
+  // 최초 변경 시: 기존 시급을 '2000-01'부터 이력으로 추가 (소급 방지)
+  if(!u.hourlyRateHistory||!u.hourlyRateHistory.length){
+    var origRate=u.hourlyRate||15000;
+    if(origRate!==val)history.unshift({from:'2000-01',rate:origRate});
+  }
   history.push({from:from,rate:val});
-  var update={hourlyRateHistory:history,hourlyRate:val}; // keep hourlyRate for compatibility
+  var update={hourlyRateHistory:history}; // hourlyRate 필드 갱신 안 함
   db.collection('users').doc(userId).update(update).then(function(){
     var idx=users.findIndex(function(x){return x.id===userId;});
-    if(idx>=0){users[idx].hourlyRateHistory=history;users[idx].hourlyRate=val;}
+    if(idx>=0){users[idx].hourlyRateHistory=history;}
     if(overlay)overlay.remove();
     renderStaffArea();saveCacheDebounced();
     toast('✅ '+from+'부터 시급 '+val.toLocaleString()+'원 적용');
