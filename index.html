@@ -6763,7 +6763,7 @@ async function savePayroll(userId,yr,mo,overlay){
 function savePayrollImage(userId,yr,mo,overlay){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
   var inputs=[...document.querySelectorAll('.payroll-hrs')];
-  var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0};}).filter(function(d){return d.hours>0;});
+  var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0,type:inp.dataset.type||'normal'};}).filter(function(d){return d.hours>0||d.type==='holiday'||d.type==='absent'});
   var hourlyRate=u.hourlyRate||15000;
   var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
   // 주휴수당 계산
@@ -6819,20 +6819,35 @@ function savePayrollImage(userId,yr,mo,overlay){
 }
 function _renderPayrollImg(cardHTML,name,yr,mo){
   var container=document.createElement('div');
-  container.style.cssText='position:fixed;top:-9999px;left:-9999px;z-index:-1';
+  container.style.cssText='position:absolute;top:0;left:0;width:500px;z-index:-9999;visibility:hidden';
   container.innerHTML=cardHTML;
   document.body.appendChild(container);
   var card=container.querySelector('#payroll-img');
   setTimeout(function(){
-    html2canvas(card,{scale:2,useCORS:true,backgroundColor:'#fff',logging:false}).then(function(canvas){
-      document.body.removeChild(container);
+    html2canvas(card,{
+      scale:2,
+      useCORS:true,
+      backgroundColor:'#ffffff',
+      logging:false,
+      width:card.offsetWidth||460,
+      height:card.offsetHeight||600,
+      windowWidth:document.documentElement.offsetWidth,
+      windowHeight:document.documentElement.offsetHeight
+    }).then(function(canvas){
+      try{document.body.removeChild(container);}catch(e){}
       var link=document.createElement('a');
       link.download='근무시간표_'+name+'_'+yr+'년'+mo+'월.png';
       link.href=canvas.toDataURL('image/png');
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       toast('✅ 이미지 저장 완료! 카톡으로 전송하세요 📤');
-    }).catch(function(err){document.body.removeChild(container);toast('❌ 이미지 생성 실패');});
-  },300);
+    }).catch(function(err){
+      try{document.body.removeChild(container);}catch(e2){}
+      toast('❌ 이미지 생성 실패: '+err.message);
+      console.error('html2canvas error:',err);
+    });
+  },500);
 }
 
 // ══ EXPENSE ══
