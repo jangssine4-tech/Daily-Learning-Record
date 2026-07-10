@@ -6818,9 +6818,15 @@ function savePayrollImage(userId,yr,mo,overlay){
   } else {_renderPayrollImg(cardHTML,u.name,yr,mo);}
 }
 function _renderPayrollImg(cardHTML,name,yr,mo){
+  // Create a temp visible container outside modal
   var container=document.createElement('div');
-  container.style.cssText='position:absolute;top:0;left:0;width:500px;z-index:-9999;visibility:hidden';
+  container.style.cssText='position:fixed;top:0;left:0;width:500px;background:#fff;z-index:1;padding:0;margin:0;overflow:visible';
   container.innerHTML=cardHTML;
+  // Hide all other views temporarily
+  var allMo=[...document.querySelectorAll('.mo')];
+  var allViews=[...document.querySelectorAll('.view.active')];
+  allMo.forEach(function(m){m.style.visibility='hidden';});
+  allViews.forEach(function(v){v.style.visibility='hidden';});
   document.body.appendChild(container);
   var card=container.querySelector('#payroll-img');
   setTimeout(function(){
@@ -6828,13 +6834,11 @@ function _renderPayrollImg(cardHTML,name,yr,mo){
       scale:2,
       useCORS:true,
       backgroundColor:'#ffffff',
-      logging:false,
-      width:card.offsetWidth||460,
-      height:card.offsetHeight||600,
-      windowWidth:document.documentElement.offsetWidth,
-      windowHeight:document.documentElement.offsetHeight
+      logging:false
     }).then(function(canvas){
-      try{document.body.removeChild(container);}catch(e){}
+      document.body.removeChild(container);
+      allMo.forEach(function(m){m.style.visibility='';});
+      allViews.forEach(function(v){v.style.visibility='';});
       var link=document.createElement('a');
       link.download='근무시간표_'+name+'_'+yr+'년'+mo+'월.png';
       link.href=canvas.toDataURL('image/png');
@@ -6843,11 +6847,12 @@ function _renderPayrollImg(cardHTML,name,yr,mo){
       document.body.removeChild(link);
       toast('✅ 이미지 저장 완료! 카톡으로 전송하세요 📤');
     }).catch(function(err){
-      try{document.body.removeChild(container);}catch(e2){}
+      document.body.removeChild(container);
+      allMo.forEach(function(m){m.style.visibility='';});
+      allViews.forEach(function(v){v.style.visibility='';});
       toast('❌ 이미지 생성 실패: '+err.message);
-      console.error('html2canvas error:',err);
     });
-  },500);
+  },400);
 }
 
 // ══ EXPENSE ══
