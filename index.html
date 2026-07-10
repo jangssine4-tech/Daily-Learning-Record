@@ -6556,7 +6556,7 @@ function printFreelancerLedger(){
   teacherList.forEach(function(u,idx){
     var workDays=u['workDays_'+yr+'_'+mo]||[];
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-    var hourlyRate=u.hourlyRate||15000;
+    var hourlyRate=getHourlyRate(u,yr,mo);
     var juhuEnabled=u.juhuEnabled||false;
     var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
     var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
@@ -6662,16 +6662,51 @@ function toggleJuhu(userId,enabled){
   db.collection('users').doc(userId).update({juhuEnabled:enabled}).catch(function(){});
   renderStaffArea();
 }
+function getHourlyRate(u,yr,mo){
+  // hourlyRateHistory: [{from:'2026-07',rate:17000}, ...]
+  // Find the most recent rate that applies to the given yr/mo
+  var history=u.hourlyRateHistory||[];
+  var moKey=yr+'-'+String(mo).padStart(2,'0');
+  var applicable=history.filter(function(h){return h.from<=moKey;}).sort(function(a,b){return b.from>a.from?1:-1;});
+  if(applicable.length)return applicable[0].rate;
+  return u.hourlyRate||15000; // fallback to legacy field
+}
 function openHourlyRateModal(userId){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
-  var rate=u.hourlyRate||15000;
-  var newRate=prompt(u.name+' 시급 설정 (현재: '+rate.toLocaleString()+'원)',rate);
-  if(newRate===null)return;
-  var val=parseInt(newRate)||15000;
-  db.collection('users').doc(userId).update({hourlyRate:val}).then(function(){
+  var now=new Date();
+  var curYr=now.getFullYear(),curMo=now.getMonth()+1;
+  var curRate=getHourlyRate(u,curYr,curMo);
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  // Build history display
+  var history=(u.hourlyRateHistory||[]).slice().sort(function(a,b){return b.from>a.from?1:-1;});
+  var histHTML=history.length?history.map(function(h){return'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)"><span>'+h.from+'부터</span><span style="font-weight:700">'+h.rate.toLocaleString()+'원</span></div>';}).join(''):'<div style="font-size:12px;color:var(--txt3)">이력 없음</div>';
+  overlay.innerHTML='<div class="ms"><div class="mh"></div><div class="mt">⏱ '+u.name+' 시급 설정</div>'
+    +'<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:6px">현재 시급</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--navy)">'+curRate.toLocaleString()+'원</div></div>'
+    +'<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:6px">시급 변경</div>'
+    +'<div class="r2"><div class="field"><div class="fl">적용 시작 월</div><input type="month" class="fi" id="rate-from" value="'+curYr+'-'+String(curMo).padStart(2,'0')+'"></div>'
+    +'<div class="field"><div class="fl">새 시급 (원)</div><input type="number" class="fi" id="rate-val" value="'+curRate+'" step="500" min="9000"></div></div>'
+    +'<button class="btn btn-green btn-block" onclick="saveHourlyRate(\''+userId+'\',this.closest(\'.mo\'))">💾 저장</button></div>'
+    +'<div><div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:6px">적용 이력</div>'+histHTML+'</div>'
+    +'<div style="height:8px"></div><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button></div>';
+  document.body.appendChild(overlay);
+}
+function saveHourlyRate(userId,overlay){
+  var u=users.find(function(x){return x.id===userId;});if(!u)return;
+  var from=$('rate-from').value; // e.g. '2026-07'
+  var val=parseInt($('rate-val').value)||15000;
+  if(!from){toast('적용 월을 선택하세요');return;}
+  var history=(u.hourlyRateHistory||[]).filter(function(h){return h.from!==from;});
+  history.push({from:from,rate:val});
+  var update={hourlyRateHistory:history,hourlyRate:val}; // keep hourlyRate for compatibility
+  db.collection('users').doc(userId).update(update).then(function(){
     var idx=users.findIndex(function(x){return x.id===userId;});
-    if(idx>=0)users[idx].hourlyRate=val;
-    renderStaffArea();saveCacheDebounced();toast('✅ 시급 설정: '+val.toLocaleString()+'원');
+    if(idx>=0){users[idx].hourlyRateHistory=history;users[idx].hourlyRate=val;}
+    if(overlay)overlay.remove();
+    renderStaffArea();saveCacheDebounced();
+    toast('✅ '+from+'부터 시급 '+val.toLocaleString()+'원 적용');
   });
 }
 function openPayrollModal(userId,yr,mo){
@@ -6767,7 +6802,7 @@ function savePayrollImage(userId,yr,mo,overlay){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
   var inputs=[...document.querySelectorAll('.payroll-hrs')];
   var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0,type:inp.dataset.type||'normal'};}).filter(function(d){return d.hours>0||d.type==='holiday'||d.type==='absent'});
-  var hourlyRate=u.hourlyRate||15000;
+  var hourlyRate=getHourlyRate(u,yr,mo);
   var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
   // 주휴수당 계산
   var juhuEnabled=u.juhuEnabled||false;
