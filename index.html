@@ -6487,7 +6487,7 @@ function renderStaffArea(){
   var payDateStr=nextYr+'.'+String(nextMo).padStart(2,'0')+'.10';
   var teacherList=users.filter(function(u){if(u.role!=='teacher')return false;if(!u.staffDeleted)return true;var wd=u['workDays_'+yr+'_'+mo]||[];return wd.length>0;});
   var payrollHTML=teacherList.length?teacherList.map(function(u,idx){
-    var hourlyRate=u.hourlyRate||15000;
+    var hourlyRate=getHourlyRate(u,yr,mo);
     var workDays=u['workDays_'+yr+'_'+mo]||[];
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
     var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
@@ -6529,7 +6529,7 @@ function renderStaffArea(){
   var freelancerHTML='<table class="rev-tbl" style="font-size:12px"><thead><tr><th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">주민번호</th><th style="text-align:center">주소</th><th style="text-align:center">용역비</th><th style="text-align:center">사업소득세(3%)</th><th style="text-align:center">주민세</th><th style="text-align:center">차감수령액</th><th style="text-align:center">지급날짜</th></tr></thead><tbody>';
   var totalFee=0,totalBizTax=0,totalResTax=0,totalNet=0;
   teacherList.forEach(function(u,idx){
-    var hourlyRate=u.hourlyRate||15000;
+    var hourlyRate=getHourlyRate(u,yr,mo);
     var workDays=u['workDays_'+yr+'_'+mo]||[];
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
     var fee=Math.round(totalHours*hourlyRate);
@@ -6732,7 +6732,7 @@ function openPayrollModal(userId,yr,mo){
       }
     }
   }
-  var hourlyRate=u.hourlyRate||15000;
+  var hourlyRate=getHourlyRate(u,yr,mo);
   var rows='';
   for(var d2=1;d2<=daysInMo;d2++){
     var dt2=new Date(yr,mo-1,d2);
