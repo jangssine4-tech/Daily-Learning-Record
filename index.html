@@ -324,6 +324,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex">
     <button class="rev-tab active" id="sptab-courses" onclick="switchSpecialTab('courses')">📚 주요 강좌</button>
     <button class="rev-tab" id="sptab-target" onclick="switchSpecialTab('target')">🎯 특강 대상</button>
+    <button class="rev-tab" id="sptab-plan" onclick="switchSpecialTab('plan')">📋 특강 계획</button>
     <button class="rev-tab" id="sptab-promo" onclick="switchSpecialTab('promo')">📣 홍보 일정</button>
   </div>
   <div class="cp" id="special-area"></div>
@@ -7224,13 +7225,137 @@ function saveTaxDocs(){
 // ══ SPECIAL CLASS ══
 var _specialPrograms=['Phonics 기초','Phonics 속성','TOSEL 정기 시험','TOSEL VOCA','문법 강화반','구문 독해(기초)','구문 독해(기본)'];
 function switchSpecialTab(tab){
-  ['courses','target','promo'].forEach(function(t){
+  ['courses','target','plan','promo'].forEach(function(t){
     var btn=$('sptab-'+t);if(btn)btn.classList.toggle('active',t===tab);
   });
   window._specialTab=tab;
   if(tab==='courses')renderSpecialPage();
   else if(tab==='target')renderSpecialTarget();
+  else if(tab==='plan')renderSpecialPlan();
   else if(tab==='promo')renderSpecialPromo();
+}
+
+function renderSpecialPlan(){
+  var el=$('special-area');if(!el)return;
+  var now=new Date();
+  var savedYr=window._specialYr||now.getFullYear();
+  var savedSeason=window._specialSeason||'여름';
+  var planKey='specialPlan_'+savedYr+'_'+savedSeason;
+  if(!window._specialData)window._specialData={};
+  // plan data: {timeSlots:['10:00','11:00',...], grid:{'10:00':{'월':['김민준','이서연'],'화':[]},...}}
+  var plan=window._specialData[planKey]||{timeSlots:[],grid:{}};
+  var timeSlots=plan.timeSlots||[];
+  var grid=plan.grid||{};
+  var days=['월','화','수','목','금'];
+  var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===savedYr?' selected':'')+'>'+y+'년</option>';
+  var html='<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
+    +'<select class="fi" style="width:100px" onchange="window._specialYr=parseInt(this.value);renderSpecialPlan()">'+yrOpts+'</select>'
+    +'<select class="fi" style="width:90px" onchange="window._specialSeason=this.value;renderSpecialPlan()">'
+    +'<option value="여름"'+(savedSeason==='여름'?' selected':'')+'>여름</option>'
+    +'<option value="겨울"'+(savedSeason==='겨울'?' selected':'')+'>겨울</option>'
+    +'</select>'
+    +'<button class="btn btn-outline btn-sm" onclick="addSpecialPlanTime()">+ 시간 추가</button>'
+    +'<button class="btn btn-green btn-sm" onclick="saveSpecialData()">💾 저장</button>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr>'
+    +'<th style="padding:8px 6px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:80px">시간</th>';
+  days.forEach(function(d){html+='<th style="padding:8px 6px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:120px">'+d+'</th>';});
+  html+='<th style="padding:8px 6px;background:var(--navy);color:#fff;border:1px solid var(--border);width:40px"></th></tr></thead><tbody>';
+  if(!timeSlots.length){
+    html+='<tr><td colspan="'+(days.length+2)+'" style="text-align:center;padding:20px;color:var(--txt3);border:1px solid var(--border)">+ 시간 추가 버튼으로 시간대를 추가하세요</td></tr>';
+  }
+  timeSlots.forEach(function(ts){
+    var mm=ts.match(/(\d{1,2}):(\d{2})/);
+    var endLabel='';
+    if(mm){var eh=parseInt(mm[1]),em=parseInt(mm[2])+50;if(em>=60){eh++;em-=60;}endLabel=ts+'~'+String(eh).padStart(2,'0')+':'+String(em).padStart(2,'0');}
+    else endLabel=ts;
+    html+='<tr><td style="padding:6px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'+endLabel+'</td>';
+    days.forEach(function(d){
+      var cellStudents=(grid[ts]&&grid[ts][d])||[];
+      var chips=cellStudents.map(function(name){
+        return'<div style="display:flex;align-items:center;gap:2px;padding:2px 4px;margin:1px 0;background:#dbeafe;border-radius:4px;white-space:nowrap">'
+          +'<span style="font-size:11px;font-weight:600;color:#1e40af">'+name+'</span>'
+          +'<button style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:10px;padding:0 1px;line-height:1" onclick="removeSpecialPlanStudent(\''+planKey+'\',\''+ts+'\',\''+d+'\',\''+name+'\')">✕</button>'
+          +'</div>';
+      }).join('');
+      html+='<td style="padding:4px;border:1px solid var(--border);vertical-align:top;min-height:60px">'
+        +chips
+        +'<button class="btn btn-outline btn-xs" style="font-size:9px;padding:1px 4px;margin-top:2px;width:100%" onclick="openSpecialPlanPicker(\''+planKey+'\',\''+ts+'\',\''+d+'\')">+ 학생</button>'
+        +'</td>';
+    });
+    html+='<td style="border:1px solid var(--border);text-align:center;vertical-align:middle">'
+      +'<button class="btn btn-outline btn-xs" style="color:#dc2626;font-size:10px" onclick="removeSpecialPlanTime(\''+planKey+'\',\''+ts+'\')">🗑</button>'
+      +'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+function addSpecialPlanTime(){
+  var time=prompt('시간을 입력하세요 (예: 10:00)','10:00');
+  if(!time)return;
+  var planKey='specialPlan_'+window._specialYr+'_'+window._specialSeason;
+  if(!window._specialData)window._specialData={};
+  if(!window._specialData[planKey])window._specialData[planKey]={timeSlots:[],grid:{}};
+  var plan=window._specialData[planKey];
+  if(!plan.timeSlots.includes(time)){
+    plan.timeSlots.push(time);
+    plan.timeSlots.sort();
+  }
+  renderSpecialPlan();
+}
+function removeSpecialPlanTime(planKey,ts){
+  if(!window._specialData||!window._specialData[planKey])return;
+  var plan=window._specialData[planKey];
+  plan.timeSlots=plan.timeSlots.filter(function(t){return t!==ts;});
+  if(plan.grid&&plan.grid[ts])delete plan.grid[ts];
+  saveSpecialData();
+  renderSpecialPlan();
+}
+function openSpecialPlanPicker(planKey,ts,day){
+  var activeStudents=(students||[]).filter(function(s){return s.status!=='퇴원';});
+  var plan=(window._specialData&&window._specialData[planKey])||{};
+  var existing=(plan.grid&&plan.grid[ts]&&plan.grid[ts][day])||[];
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms"><div class="mh"></div>'
+    +'<div class="mt">👤 학생 선택 — '+ts+' '+day+'요일</div>'
+    +'<div style="max-height:350px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px">'
+    +activeStudents.map(function(s){
+      var checked=existing.includes(s.name);
+      var lv=getStudentLevel(s)||s.level||'';
+      return'<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px">'
+        +'<input type="checkbox" value="'+s.name+'" '+(checked?'checked':'')+'>'
+        +s.name+'<span style="font-size:11px;color:var(--txt3)">'+lv+'</span></label>';
+    }).join('')
+    +'</div>'
+    +'<div style="height:10px"></div>'
+    +'<button class="btn btn-green btn-block" onclick="confirmSpecialPlanPick(\''+planKey+'\',\''+ts+'\',\''+day+'\',this.closest(\'.mo\'))">선택 완료</button>'
+    +'<div style="height:6px"></div>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button></div>';
+  document.body.appendChild(overlay);
+}
+function confirmSpecialPlanPick(planKey,ts,day,overlay){
+  var checked=[...overlay.querySelectorAll('input[type=checkbox]:checked')].map(function(cb){return cb.value;});
+  if(!window._specialData)window._specialData={};
+  if(!window._specialData[planKey])window._specialData[planKey]={timeSlots:[],grid:{}};
+  var plan=window._specialData[planKey];
+  if(!plan.grid)plan.grid={};
+  if(!plan.grid[ts])plan.grid[ts]={};
+  plan.grid[ts][day]=checked;
+  overlay.remove();
+  saveSpecialData();
+  renderSpecialPlan();
+}
+function removeSpecialPlanStudent(planKey,ts,day,name){
+  if(!window._specialData||!window._specialData[planKey])return;
+  var plan=window._specialData[planKey];
+  if(plan.grid&&plan.grid[ts]&&plan.grid[ts][day]){
+    plan.grid[ts][day]=plan.grid[ts][day].filter(function(n){return n!==name;});
+  }
+  saveSpecialData();
+  renderSpecialPlan();
 }
 
 // ── 특강 홍보 일정 (Firestore 기반) ──
