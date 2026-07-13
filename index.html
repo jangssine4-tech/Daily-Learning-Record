@@ -7451,122 +7451,55 @@ function renderSpecialTarget(){
   var now=new Date();
   var savedYr=window._specialYr||now.getFullYear();
   var savedSeason=window._specialSeason||'여름';
-  var key='specialTarget_'+savedYr+'_'+savedSeason;
+  var dataKey='specialTargetV2_'+savedYr+'_'+savedSeason;
   if(!window._specialData)window._specialData={};
-  var rows=window._specialData[key]||[];
-  if(!rows.length)rows=[{program:'',studentId:'',name:'',enrolled:true,level:'',mockScore:'',note:''}];
+  var rowData=window._specialData[dataKey]||{};
+  var activeStudents=(students||[]).filter(function(s){return s.status!=='퇴원';}).sort(function(a,b){return(a.grade||'').localeCompare(b.grade||'')||a.name.localeCompare(b.name);});
   var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===savedYr?' selected':'')+'>'+y+'년</option>';
+  var progOpts='<option value="">선택</option>'+_specialPrograms.map(function(p){return'<option value="'+p+'">'+p+'</option>';}).join('');
   var html='<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">'
     +'<select class="fi" style="width:100px" onchange="window._specialYr=parseInt(this.value);renderSpecialTarget()">'+yrOpts+'</select>'
     +'<select class="fi" style="width:90px" onchange="window._specialSeason=this.value;renderSpecialTarget()">'
     +'<option value="여름"'+(savedSeason==='여름'?' selected':'')+'>여름</option>'
     +'<option value="겨울"'+(savedSeason==='겨울'?' selected':'')+'>겨울</option>'
     +'</select>'
-    +'<button class="btn btn-outline btn-sm" onclick="addSpecialTargetRow()">+ 행 추가</button>'
     +'<button class="btn btn-green btn-sm" onclick="saveSpecialData()">💾 저장</button>'
     +'</div>'
-    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:750px"><thead><tr>'
-    +'<th style="width:160px">프로그램</th>'
-    +'<th style="width:90px">재원 여부</th>'
-    +'<th style="width:150px">이름</th>'
-    +'<th style="width:130px">현재 레벨</th>'
-    +'<th style="width:110px">모의고사 점수</th>'
-    +'<th style="width:120px">안내문 발송</th>'
-    +'<th style="width:90px">상담 여부</th>'
-    +'<th>특이 사항</th>'
-    +'<th style="width:50px"></th>'
-    +'</tr></thead><tbody>';
-  rows.forEach(function(row,i){
-    var progOpts='<option value="">선택</option>'+_specialPrograms.map(function(p){return'<option value="'+p+'"'+(row.program===p?' selected':'')+'>'+p+'</option>';}).join('');
-    var isEnrolled=row.enrolled!==false;
-    // Auto level from student record
-    var autoLevel='';
-    if(row.studentId){var stu=students.find(function(s){return s.id===row.studentId;});if(stu)autoLevel=getStudentLevel(stu)||stu.level||'';}
-    var lvVal=row.level||autoLevel;
-    html+='<tr>'
-      +'<td><select class="fi" style="font-size:12px" onchange="updateSpecialTargetRow('+i+',\'program\',this.value)">'+progOpts+'</select></td>'
-      +'<td style="text-align:center">'
-        +'<label style="display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:11px">'
-        +'<input type="checkbox" '+(isEnrolled?'checked':'')+' onchange="toggleSpecialTargetEnrolled('+i+',this.checked)"> 재원생'
-        +'</label></td>'
-      +'<td>';
-    if(isEnrolled){
-      // Student picker button
-      var displayName=row.name||'(선택)';
-      html+='<button class="btn btn-outline btn-xs" style="font-size:11px;width:100%;text-align:left" onclick="openSpecialStudentPicker('+i+')">👤 '+displayName+'</button>';
-    } else {
-      // Free text input
-      html+='<input class="fi" style="font-size:12px" value="'+(row.name||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'name\',this.value)" placeholder="이름 직접 입력">';
-    }
-    html+='</td>'
-      +'<td><input class="fi" style="font-size:12px" value="'+lvVal.replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'level\',this.value)" placeholder="자동 입력 또는 수정"></td>'
-      +'<td><input class="fi" style="font-size:12px;text-align:right" value="'+(row.mockScore||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'mockScore\',this.value)" placeholder="예: 85점"></td>'
-      +'<td style="text-align:center">'
-        +'<input type="checkbox" '+(row.noticeSent?'checked':'')+' onchange="updateSpecialTargetRow('+i+',\'noticeSent\',this.checked);saveSpecialData()" title="발송 완료 체크"></td>'
-      +'<td style="text-align:center"><input type="checkbox" '+(row.counselDone?'checked':'')+' onchange="updateSpecialTargetRow('+i+',\'counselDone\',this.checked);saveSpecialData()" title="상담 완료 체크"></td>'
-      +'<td><input class="fi" style="font-size:12px" value="'+(row.note||'').replace(/"/g,'&quot;')+'" onblur="updateSpecialTargetRow('+i+',\'note\',this.value)" placeholder="특이 사항"></td>'
-      +'<td style="text-align:center"><button class="btn btn-outline btn-xs" style="color:#dc2626;font-size:10px" onclick="deleteSpecialTargetRow('+i+')">🗑</button></td>'
-      +'</tr>';
-  });
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px"><thead><tr>'
+    +'<th style="width:70px">이름</th>'
+    +'<th style="width:120px">현재 레벨</th>'
+    +'<th style="width:100px">모의고사 점수</th>'
+    +'<th style="width:180px">추천 특강 강좌</th>'
+    +'<th style="width:100px">특강 시간</th>'
+      html+='<tr data-skey="'+dataKey+'" data-sid="'+s.id+'">'
+        +'<td style="font-weight:600;text-align:center;font-size:12px">'+s.name+'</td>'
+        +'<td><input class="fi sp-level" style="font-size:11px" value="'+lv.replace(/"/g,"&quot;")+'"></td>'
+        +'<td><input class="fi sp-mock" style="font-size:11px;text-align:right" value="'+(r.mockScore||"").replace(/"/g,"&quot;")+'" placeholder="예: 85점"></td>'
+        +'<td><select class="fi sp-prog" style="font-size:11px">'+pOpts+'</select></td>'
+        +'<td><input class="fi sp-time" style="font-size:11px" value="'+(r.classTime||"").replace(/"/g,"&quot;")+'" placeholder="예: 오전 10시"></td>'
+        +'<td style="text-align:center"><input type="checkbox" class="sp-notice" '+(r.noticeSent?"checked":"")+'></td>'
+        +'<td style="text-align:center"><input type="checkbox" class="sp-counsel" '+(r.counselDone?"checked":"")+'></td>'
+        +'<td><input class="fi sp-note" style="font-size:11px" value="'+(r.note||"").replace(/"/g,"&quot;")+'" placeholder="비고"></td>'
+        +'</tr>';
   html+='</tbody></table></div>';
   el.innerHTML=html;
+  // Wire up events via delegation
+  el.querySelectorAll('tr[data-skey]').forEach(function(row){
+    var dk=row.dataset.skey;var sid=row.dataset.sid;
+    function save(field,val){updateSpecialTargetV2(dk,sid,field,val);}
+    var inp=function(cls,field){var el2=row.querySelector('.'+cls);if(el2){el2.addEventListener('change',function(){save(field,this.type==='checkbox'?this.checked:this.value);if(this.type==='checkbox')saveSpecialData();});
+    el2.addEventListener('blur',function(){if(this.type!=='checkbox')save(field,this.value);});}};
+    inp('sp-level','level');inp('sp-mock','mockScore');inp('sp-prog','program');inp('sp-time','classTime');inp('sp-notice','noticeSent');inp('sp-counsel','counselDone');inp('sp-note','note');
+    // Set select value
+    var sel=row.querySelector('.sp-prog');if(sel&&rowData[sid]&&rowData[sid].program)sel.value=rowData[sid].program||'';
+  });
 }
-function toggleSpecialTargetEnrolled(idx,checked){
-  updateSpecialTargetRow(idx,'enrolled',checked);
-  updateSpecialTargetRow(idx,'studentId','');
-  updateSpecialTargetRow(idx,'name','');
-  updateSpecialTargetRow(idx,'level','');
-  renderSpecialTarget();
+function updateSpecialTargetV2(dataKey,studentId,field,val){
+  if(!window._specialData)window._specialData={};
+  if(!window._specialData[dataKey])window._specialData[dataKey]={};
+  if(!window._specialData[dataKey][studentId])window._specialData[dataKey][studentId]={};
+  window._specialData[dataKey][studentId][field]=val;
 }
-function openSpecialStudentPicker(idx){
-  var key='specialTarget_'+window._specialYr+'_'+window._specialSeason;
-  var row=(window._specialData[key]||[])[idx]||{};
-  var activeStudents=(students||[]).filter(function(s){return s.status!=='퇴원';});
-  var overlay=document.createElement('div');
-  overlay.className='mo';overlay.style.display='flex';
-  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
-  overlay.innerHTML='<div class="ms"><div class="mh"></div>'
-    +'<div class="mt">👤 학생 선택</div>'
-    +'<div style="max-height:350px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px">'
-    +activeStudents.map(function(s){
-      var lv=getStudentLevel(s)||s.level||'';
-      var checked=row.studentId===s.id;
-      return'<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px">'
-        +'<input type="radio" name="sp-student-pick" value="'+s.id+'" data-name="'+s.name+'" data-level="'+lv+'" '+(checked?'checked':'')+'>'
-        +s.name+'<span style="font-size:11px;color:var(--txt3)">'+lv+'</span></label>';
-    }).join('')
-    +'</div>'
-    +'<div style="height:10px"></div>'
-    +'<button class="btn btn-green btn-block" onclick="confirmSpecialStudentPick('+idx+',this.closest(\'.mo\'))">선택</button></div>';
-  document.body.appendChild(overlay);
-}
-function confirmSpecialStudentPick(idx,overlay){
-  var checked=overlay.querySelector('input[name=sp-student-pick]:checked');
-  if(!checked){overlay.remove();return;}
-  updateSpecialTargetRow(idx,'studentId',checked.value);
-  updateSpecialTargetRow(idx,'name',checked.dataset.name);
-  updateSpecialTargetRow(idx,'level',checked.dataset.level);
-  overlay.remove();
-  renderSpecialTarget();
-}
-function updateSpecialTargetRow(idx,field,val){
-  var key='specialTarget_'+window._specialYr+'_'+window._specialSeason;
-  if(!window._specialData[key])window._specialData[key]=[];
-  if(!window._specialData[key][idx])window._specialData[key][idx]={};
-  window._specialData[key][idx][field]=val;
-}
-function addSpecialTargetRow(){
-  var key='specialTarget_'+window._specialYr+'_'+window._specialSeason;
-  if(!window._specialData[key])window._specialData[key]=[];
-  window._specialData[key].push({program:'',studentId:'',name:'',enrolled:true,level:'',mockScore:'',note:''});
-  renderSpecialTarget();
-}
-function deleteSpecialTargetRow(idx){
-  var key='specialTarget_'+window._specialYr+'_'+window._specialSeason;
-  if(!window._specialData[key])return;
-  window._specialData[key].splice(idx,1);
-  renderSpecialTarget();
-}['Phonics 기초','Phonics 속성','TOSEL 정기 시험','TOSEL VOCA','문법 강화반','구문 독해(기초)','구문 독해(기본)'];
 function renderSpecialPage(){
   var el=$('special-area');if(!el)return;
   var now=new Date();
