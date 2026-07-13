@@ -7242,11 +7242,42 @@ function renderSpecialPlan(){
   var savedSeason=window._specialSeason||'여름';
   var planKey='specialPlan_'+savedYr+'_'+savedSeason;
   if(!window._specialData)window._specialData={};
-  // plan data: {timeSlots:['10:00','11:00',...], grid:{'10:00':{'월':['김민준','이서연'],'화':[]},...}}
   var plan=window._specialData[planKey]||{timeSlots:[],grid:{}};
-  var timeSlots=plan.timeSlots||[];
-  var grid=plan.grid||{};
   var days=['월','화','수','목','금'];
+
+  // ── 주간 시간표 데이터 (기존 재원생) ──
+  var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var timeSet={};
+  activeStudents.forEach(function(s){
+    if(!s.days||!s.days.length)return;
+    s.days.forEach(function(d){
+      if(!days.includes(d))return;
+      var pData=(s.periods||{})[d];
+      var t=pData&&typeof pData==='object'?pData.time||'':pData||'';
+      if(!t)return;
+      var mm=t.match(/(\d{1,2}):(\d{2})/);
+      if(mm){var blk=String(parseInt(mm[1])).padStart(2,'0')+':'+String(parseInt(mm[2])<30?0:30).padStart(2,'0');timeSet[blk]=true;}
+    });
+  });
+  // Merge with special plan timeSlots
+  (plan.timeSlots||[]).forEach(function(ts){timeSet[ts]=true;});
+  var timeSlots=Object.keys(timeSet).sort();
+
+  // Build weekly grid
+  var weekGrid={};
+  timeSlots.forEach(function(ts){weekGrid[ts]={};days.forEach(function(d){weekGrid[ts][d]=[];});});
+  activeStudents.forEach(function(s){
+    if(!s.days||!s.days.length)return;
+    s.days.forEach(function(d){
+      if(!days.includes(d))return;
+      var pData=(s.periods||{})[d];
+      var t=pData&&typeof pData==='object'?pData.time||'':pData||'';
+      if(!t)return;
+      var mm=t.match(/(\d{1,2}):(\d{2})/);
+      if(mm){var blk=String(parseInt(mm[1])).padStart(2,'0')+':'+String(parseInt(mm[2])<30?0:30).padStart(2,'0');if(weekGrid[blk]&&weekGrid[blk][d])weekGrid[blk][d].push(s.name);}
+    });
+  });
+
   var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===savedYr?' selected':'')+'>'+y+'년</option>';
   var html='<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
     +'<select class="fi" style="width:100px" onchange="window._specialYr=parseInt(this.value);renderSpecialPlan()">'+yrOpts+'</select>'
@@ -7256,36 +7287,43 @@ function renderSpecialPlan(){
     +'</select>'
     +'<button class="btn btn-outline btn-sm" onclick="addSpecialPlanTime()">+ 시간 추가</button>'
     +'<button class="btn btn-green btn-sm" onclick="saveSpecialData()">💾 저장</button>'
+    +'<span style="font-size:11px;color:var(--txt3);margin-left:4px">🔵 재원생 · 🟡 특강 추가</span>'
     +'</div>'
-    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
     +'<thead><tr>'
     +'<th style="padding:8px 6px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:80px">시간</th>';
-  days.forEach(function(d){html+='<th style="padding:8px 6px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:120px">'+d+'</th>';});
+  days.forEach(function(d){html+='<th style="padding:8px 6px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:130px">'+d+'</th>';});
   html+='<th style="padding:8px 6px;background:var(--navy);color:#fff;border:1px solid var(--border);width:40px"></th></tr></thead><tbody>';
+
   if(!timeSlots.length){
-    html+='<tr><td colspan="'+(days.length+2)+'" style="text-align:center;padding:20px;color:var(--txt3);border:1px solid var(--border)">+ 시간 추가 버튼으로 시간대를 추가하세요</td></tr>';
+    html+='<tr><td colspan="'+(days.length+2)+'" style="text-align:center;padding:20px;color:var(--txt3);border:1px solid var(--border)">시간 설정된 학생이 없습니다. + 시간 추가 버튼을 눌러 시간대를 추가하세요.</td></tr>';
   }
   timeSlots.forEach(function(ts){
     var mm=ts.match(/(\d{1,2}):(\d{2})/);
-    var endLabel='';
+    var endLabel=ts;
     if(mm){var eh=parseInt(mm[1]),em=parseInt(mm[2])+50;if(em>=60){eh++;em-=60;}endLabel=ts+'~'+String(eh).padStart(2,'0')+':'+String(em).padStart(2,'0');}
-    else endLabel=ts;
+    var isSpecialOnly=!(timeSet[ts]&&weekGrid[ts]&&Object.values(weekGrid[ts]).some(function(a){return a.length;}));
     html+='<tr><td style="padding:6px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'+endLabel+'</td>';
     days.forEach(function(d){
-      var cellStudents=(grid[ts]&&grid[ts][d])||[];
-      var chips=cellStudents.map(function(name){
-        return'<div style="display:flex;align-items:center;gap:2px;padding:2px 4px;margin:1px 0;background:#dbeafe;border-radius:4px;white-space:nowrap">'
-          +'<span style="font-size:11px;font-weight:600;color:#1e40af">'+name+'</span>'
+      var regular=weekGrid[ts]&&weekGrid[ts][d]||[];
+      var special=(plan.grid&&plan.grid[ts]&&plan.grid[ts][d])||[];
+      var regularChips=regular.map(function(name){
+        return'<div style="padding:2px 4px;margin:1px 0;background:#dbeafe;border-radius:4px;white-space:nowrap;font-size:11px">'
+          +'<span style="font-weight:600;color:#1e40af">'+name+'</span></div>';
+      }).join('');
+      var specialChips=special.filter(function(name){return!regular.includes(name);}).map(function(name){
+        return'<div style="display:flex;align-items:center;gap:2px;padding:2px 4px;margin:1px 0;background:#fef9c3;border-radius:4px;white-space:nowrap">'
+          +'<span style="font-size:11px;font-weight:600;color:#854d0e">'+name+'</span>'
           +'<button style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:10px;padding:0 1px;line-height:1" onclick="removeSpecialPlanStudent(\''+planKey+'\',\''+ts+'\',\''+d+'\',\''+name+'\')">✕</button>'
           +'</div>';
       }).join('');
-      html+='<td style="padding:4px;border:1px solid var(--border);vertical-align:top;min-height:60px">'
-        +chips
-        +'<button class="btn btn-outline btn-xs" style="font-size:9px;padding:1px 4px;margin-top:2px;width:100%" onclick="openSpecialPlanPicker(\''+planKey+'\',\''+ts+'\',\''+d+'\')">+ 학생</button>'
+      html+='<td style="padding:3px;border:1px solid var(--border);vertical-align:top">'
+        +regularChips+specialChips
+        +'<button class="btn btn-outline btn-xs" style="font-size:9px;padding:1px 4px;margin-top:2px;width:100%" onclick="openSpecialPlanPicker(\''+planKey+'\',\''+ts+'\',\''+d+'\')">+ 특강 추가</button>'
         +'</td>';
     });
     html+='<td style="border:1px solid var(--border);text-align:center;vertical-align:middle">'
-      +'<button class="btn btn-outline btn-xs" style="color:#dc2626;font-size:10px" onclick="removeSpecialPlanTime(\''+planKey+'\',\''+ts+'\')">🗑</button>'
+      +(isSpecialOnly?'<button class="btn btn-outline btn-xs" style="color:#dc2626;font-size:10px" onclick="removeSpecialPlanTime(\''+planKey+'\',\''+ts+'\')">🗑</button>':'')
       +'</td></tr>';
   });
   html+='</tbody></table></div>';
@@ -7579,7 +7617,7 @@ function renderSpecialTarget(){
   var dataKey='specialTargetV2_'+savedYr+'_'+savedSeason;
   if(!window._specialData)window._specialData={};
   var rowData=window._specialData[dataKey]||{};
-  var activeStudents=(students||[]).filter(function(s){return s.status!=='퇴원';}).sort(function(a,b){return(a.grade||'').localeCompare(b.grade||'')||a.name.localeCompare(b.name);});
+  var activeStudents=(students||[]).filter(function(s){return s.status!=='퇴원';}).sort(function(a,b){return(b.grade||'').localeCompare(a.grade||'')||b.name.localeCompare(a.name);});
   var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===savedYr?' selected':'')+'>'+y+'년</option>';
   var html='<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">'
     +'<select class="fi" style="width:100px" onchange="window._specialYr=parseInt(this.value);renderSpecialTarget()">'+yrOpts+'</select>'
