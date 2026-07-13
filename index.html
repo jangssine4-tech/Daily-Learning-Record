@@ -7330,8 +7330,28 @@ function renderSpecialPlan(){
   el.innerHTML=html;
 }
 function addSpecialPlanTime(){
-  var time=prompt('시간을 입력하세요 (예: 10:00)','10:00');
-  if(!time)return;
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms"><div class="mh"></div><div class="mt">⏰ 시간 추가</div>'
+    +'<div class="r2"><div class="field"><div class="fl">오전/오후</div><select class="fi" id="sp-ampm"><option value="AM">오전</option><option value="PM">오후</option></select></div>'
+    +'<div class="field"><div class="fl">시</div><select class="fi" id="sp-hour">'
+    +[1,2,3,4,5,6,7,8,9,10,11,12].map(function(h){return'<option value="'+h+'"'+(h===10?' selected':'')+'>'+h+'시</option>';}).join('')
+    +'</select></div></div>'
+    +'<div class="field"><div class="fl">분</div><select class="fi" id="sp-min"><option value="00">00분</option><option value="30">30분</option></select></div>'
+    +'<button class="btn btn-green btn-block" onclick="_confirmAddPlanTime(this.closest(\'.mo\'))">추가</button>'
+    +'<div style="height:6px"></div>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button></div>';
+  document.body.appendChild(overlay);
+}
+function _confirmAddPlanTime(overlay){
+  var ampm=$('sp-ampm').value;
+  var h=parseInt($('sp-hour').value);
+  var m=$('sp-min').value;
+  if(ampm==='PM'&&h!==12)h+=12;
+  if(ampm==='AM'&&h===12)h=0;
+  var time=String(h).padStart(2,'0')+':'+m;
+  overlay.remove();
   var planKey='specialPlan_'+window._specialYr+'_'+window._specialSeason;
   if(!window._specialData)window._specialData={};
   if(!window._specialData[planKey])window._specialData[planKey]={timeSlots:[],grid:{}};
