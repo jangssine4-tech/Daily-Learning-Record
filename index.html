@@ -231,7 +231,6 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="sb-logo"><span>english<em>eye</em></span></div>
   <div class="sb-sec">오늘의 업무</div>
   <div class="sb-item" id="snav-dashboard" onclick="goto('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>오늘의 업무</div>
-  <div class="sb-item" id="snav-crm-conditions" onclick="goto('crm-conditions')" style="padding-left:28px;font-size:11px;opacity:0.85"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>자동 분류 조건</div>
   <div class="sb-sec">수업 관리</div>
   <div class="sb-item" id="snav-schedule" onclick="goto('schedule')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>오늘의 시간표</div>
   <div class="sb-item" id="snav-write" onclick="goto('write')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>학습 일지 작성</div>
@@ -311,12 +310,17 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <div class="view" id="view-homework"><div class="page-top"><h2>숙제 관리</h2></div><div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto"><button class="rev-tab active" id="hwtab-check" onclick="switchHwTab('check')">✅ 숙제 체크</button><button class="rev-tab" id="hwtab-preview" onclick="switchHwTab('preview')">📨 발송 미리보기</button><button class="rev-tab" id="hwtab-log" onclick="switchHwTab('log')">📋 발송 기록</button><button class="rev-tab" id="hwtab-stats" onclick="switchHwTab('stats')">📊 누적 현황</button></div><div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hw-date" onchange="renderHwCheck()"></select><button class="btn btn-green btn-sm" id="hw-assign-btn" onclick="openHwAssignModal()">+ 숙제 등록</button></div><div id="hw-panel-check" class="cp"><div id="hw-check-area"></div></div><div id="hw-panel-preview" style="display:none" class="cp"><div id="hw-preview-area"></div></div><div id="hw-panel-log" style="display:none" class="cp"><div id="hw-log-area"></div></div><div id="hw-panel-stats" style="display:none" class="cp"><div id="hw-stats-area"></div></div></div>
 <div class="view" id="view-msgboard"><div class="page-top"><h2>📨 발송 관리</h2><p>숙제 상태 기반 학부모 메시지 관리</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto"><button class="rev-tab active" id="msgtab-preview" onclick="switchMsgTab('preview')">📋 미리보기</button><button class="rev-tab" id="msgtab-history" onclick="switchMsgTab('history')">📊 발송 이력</button></div><div class="toolbar"><select class="fi" id="msg-date" style="width:auto;font-size:12px" onchange="renderMsgPreview()"></select></div><div id="msg-preview-panel" class="cp"><div id="msg-preview-area"></div></div><div id="msg-history-panel" style="display:none" class="cp"><div id="msg-history-area"></div></div></div>
 <div class="view" id="view-crm-conditions"><div class="page-top"><h2>⚙️ 자동 분류 조건</h2></div><div class="cp" id="crm-conditions-area"></div></div>
+<div class="view" id="view-dashboard">
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
-    <button class="rev-tab active" id="dtab-crm" onclick="switchDashTab('crm')">👥 상담</button>
+    <button class="rev-tab active" id="dtab-board" onclick="switchDashTab('board')">📋 대시보드</button>
+    <button class="rev-tab" id="dtab-crm" onclick="switchDashTab('crm')">👥 상담</button>
     <button class="rev-tab" id="dtab-mk" onclick="switchDashTab('mk')">📣 마케팅 · 홍보</button>
+    <button class="rev-tab" id="dtab-conditions" onclick="switchDashTab('conditions')">⚙️ 자동 분류 조건</button>
   </div>
+  <div id="dash-panel-board" style="display:none" class="cp"><div id="dashboard-board-area"></div></div>
   <div id="dash-panel-crm" class="cp"><div id="dashboard-area"></div></div>
   <div id="dash-panel-mk" style="display:none" class="cp"><div id="dashboard-mk-area"></div></div>
+  <div id="dash-panel-conditions" style="display:none" class="cp"><div id="crm-conditions-area"></div></div>
 </div>
 <div class="view" id="view-special"><div class="page-top"><h2>⭐ 특강</h2></div>
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex">
@@ -2368,16 +2372,16 @@ function renderWeeklyTimetable(){
 var _scheduleNotesRendered=false;
 // ══ CRM 오늘의 업무 자동 생성 ══
 function switchDashTab(tab){
-  ['crm','mk'].forEach(function(t){
+  ['board','crm','mk','conditions'].forEach(function(t){
     var btn=$('dtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('dash-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
   });
-  if(tab==='crm')renderCrmDailyInto('dashboard-area');
+  if(tab==='board')renderDashBoard();
+  else if(tab==='crm')renderCrmDailyInto('dashboard-area');
   else if(tab==='mk'){loadMpPlans().then(function(){renderMkTodayPage('dashboard-mk-area');});}
+  else if(tab==='conditions'){loadCrmConditions().then(function(){_renderCrmConditionsUI($('crm-conditions-area'));});}
 }
-function renderDashboard(){
-  switchDashTab('crm');
-}
+function renderDashboard(){switchDashTab('board');}
 function renderCrmDaily(){
   renderCrmDailyInto('crm-daily-area');
 }
@@ -7769,6 +7773,76 @@ function deleteSpecialRow(idx){
 }
 function saveSpecialData(){
   db.collection('config').doc('specialClass').set(window._specialData,{merge:true}).then(function(){toast('💾 저장됨');}).catch(function(){toast('❌ 저장 실패');});
+}
+
+// ── 대시보드 체크리스트 ──
+var _dashBoard=null;
+function _getDashBoardKey(){
+  var now=new Date();var yr=now.getFullYear(),mo=now.getMonth()+1,day=now.getDate();
+  var startOfYear=new Date(yr,0,1);
+  var wk=Math.ceil(((now-startOfYear)/86400000+startOfYear.getDay()+1)/7);
+  return{month:'board_m_'+yr+'_'+mo,week:'board_w_'+yr+'_'+wk,day:'board_d_'+yr+'_'+String(mo).padStart(2,'0')+'_'+String(day).padStart(2,'0')};
+}
+function loadDashBoard(){
+  if(_dashBoard)return Promise.resolve();
+  return db.collection('config').doc('dashBoard').get().then(function(d){_dashBoard=d.exists?d.data():{};}).catch(function(){_dashBoard={};});
+}
+function saveDashBoard(){db.collection('config').doc('dashBoard').set(_dashBoard,{merge:true}).catch(function(){});}
+function renderDashBoard(){
+  var el=$('dashboard-board-area');if(!el)return;
+  el.innerHTML='<div style="padding:8px;color:var(--txt3)">⏳ 로딩 중...</div>';
+  loadDashBoard().then(function(){_renderDashBoardUI(el);});
+}
+function _renderDashBoardUI(el){
+  var keys=_getDashBoardKey();
+  var sections=[
+    {key:keys.month,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff'},
+    {key:keys.week, label:'📆 이번 주 중점 추진 사항',color:'#7c3aed',bg:'#f5f3ff'},
+    {key:keys.day,  label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4'}
+  ];
+  var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:16px">';
+  sections.forEach(function(sec){
+    var items=_dashBoard[sec.key]||[];
+    var done=items.filter(function(it){return it.checked;}).length;
+    html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">'
+      +'<div style="background:'+sec.bg+';padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
+      +'<div style="font-size:13px;font-weight:800;color:'+sec.color+'">'+sec.label+'</div>'
+      +(items.length?'<div style="font-size:11px;color:var(--txt3)">'+done+' / '+items.length+' 완료</div>':'')
+      +'</div>'
+      +'<div style="padding:10px 14px;background:var(--surface)">'
+      +'<div style="display:flex;gap:6px;margin-bottom:8px">'
+      +'<input class="fi" id="bi-'+sec.key+'" style="flex:1;font-size:12px" placeholder="내용 입력 후 Enter" onkeydown="if(event.key===\'Enter\'){addDashBoardItem(\''+sec.key+'\');event.preventDefault();}">'
+      +'<button class="btn btn-outline btn-xs" onclick="addDashBoardItem(\''+sec.key+'\')">추가</button>'
+      +'</div>'
+      +items.map(function(item,i){
+        return'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+          +'<input type="checkbox" '+(item.checked?'checked':'')+' onchange="toggleDashBoardItem(\''+sec.key+'\','+i+',this.checked)" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+          +'<span style="flex:1;font-size:12px;'+(item.checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item.text+'</span>'
+          +(item.checked?'<span style="font-size:10px;color:#16a34a;font-weight:700">✓ 완료</span>':'')
+          +'<button style="background:none;border:none;cursor:pointer;color:var(--txt3);padding:0 3px" onclick="removeDashBoardItem(\''+sec.key+'\','+i+')">✕</button>'
+          +'</div>';
+      }).join('')
+      +(items.length===0?'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:8px 0">추진 사항을 입력하세요</div>':'')
+      +'</div></div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+function addDashBoardItem(key){
+  var inp=$('bi-'+key);if(!inp||!inp.value.trim())return;
+  if(!_dashBoard[key])_dashBoard[key]=[];
+  _dashBoard[key].push({text:inp.value.trim(),checked:false,createdAt:todayISO()});
+  inp.value='';saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
+}
+function toggleDashBoardItem(key,idx,checked){
+  if(!_dashBoard||!_dashBoard[key])return;
+  _dashBoard[key][idx].checked=checked;
+  saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
+}
+function removeDashBoardItem(key,idx){
+  if(!_dashBoard||!_dashBoard[key])return;
+  _dashBoard[key].splice(idx,1);
+  saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
 }
 
 // ── 자동 분류 조건 ──
