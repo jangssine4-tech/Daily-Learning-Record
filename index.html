@@ -2468,6 +2468,24 @@ function renderCrmDailyInto(targetId){
   var tasks=[];
   var activeS=(students||[]).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
   var doneKeys=(window._crmDoneByDate||{})[todayStr]||{};
+  // Load thresholds from conditions config
+  function cv(id,field,def){var f=getCrmThreshold(id);return(f&&f[field]!==undefined)?f[field]:def;}
+  var th_quit_risk   =cv('quit_risk','threshold',2);
+  var th_hw_fail     =cv('hw_fail','threshold',2);
+  var th_hw_period   =cv('hw_fail','period',30);
+  var th_hw_chronic  =cv('hw_chronic','threshold',3);
+  var th_hw_chperiod =cv('hw_chronic','period',30);
+  var th_att_warn    =cv('attitude_warn','threshold',2);
+  var th_att_bad     =cv('attitude_bad','threshold',1);
+  var th_retest      =cv('retest','threshold',2);
+  var th_book        =cv('book_unprepared','threshold',2);
+  var th_book_period =cv('book_unprepared','period',7);
+  var th_dict_score  =cv('dictation_low','score',70);
+  var th_dict_count  =cv('dictation_low','threshold',2);
+  var th_dict_period =cv('dictation_low','period',4);
+  var th_unpaid      =cv('unpaid','threshold',10);
+  var th_new_adapt   =cv('new_adapt','threshold',14);
+  var th_consult_soon=cv('consult_soon','threshold',7);
 
   // 1. 신규 상담 CRM 자동 분류
   (newConsults||[]).forEach(function(nc){
@@ -2521,7 +2539,7 @@ function renderCrmDailyInto(targetId){
     var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,3);
     if(sReps.length>=3){
       var hwFail=sReps.filter(function(r){var hw=r.homework||'';return hw.includes('미완료')||hw.includes('미제출');}).length;
-      if(hwFail>=2)tasks.push({id:'hw_'+s.id,priority:1,cat:'🟡 학습 관리',type:'숙제 관리',name:s.name,reason:'최근 3회 중 '+hwFail+'회 숙제 미완료',action:'숙제 습관 학부모 안내',phone:s.phoneMom||''});
+      if(hwFail>=th_hw_fail)tasks.push({id:'hw_'+s.id,priority:1,cat:'🟡 학습 관리',type:'숙제 관리',name:s.name,reason:'최근 3회 중 '+hwFail+'회 숙제 미완료',action:'숙제 습관 학부모 안내',phone:s.phoneMom||''});
     }
   });
 
@@ -2544,7 +2562,7 @@ function renderCrmDailyInto(targetId){
     if(c.consultStatus==='상담 예정'){
       var conDate=new Date(c.date);
       var daysUntilCon=Math.floor((conDate-today)/86400000);
-      if(daysUntilCon>=0&&daysUntilCon<=7)
+      if(daysUntilCon>=0&&daysUntilCon<=th_consult_soon)
         tasks.push({id:'con_'+c.id,priority:daysUntilCon===0?1:2,cat:daysUntilCon===0?'🔴 긴급':'🟡 학습 관리',type:'상담 예정',name:c.studentName||'-',reason:c.date+(daysUntilCon===0?' 오늘':' ('+daysUntilCon+'일 후)')+' · '+(c.purpose||c.type||''),action:'상담 준비 확인',phone:''});
     }
   });
@@ -2560,7 +2578,7 @@ function renderCrmDailyInto(targetId){
     if(s.status==='신규'&&s.enrollDate){
       var daysSince=Math.floor((today-new Date(s.enrollDate))/86400000);
       // 등록 후 14일 이내: 적응 관찰
-      if(daysSince>=0&&daysSince<=14)tasks.push({id:'new_'+s.id,priority:3,cat:'🟢 CRM',type:'신규 적응 관찰',name:s.name,reason:'등록 '+daysSince+'일차 — 적응 상태 확인',action:'적응 상태 학부모 공유',phone:s.phoneMom||''});
+      if(daysSince>=0&&daysSince<=th_new_adapt)tasks.push({id:'new_'+s.id,priority:3,cat:'🟢 CRM',type:'신규 적응 관찰',name:s.name,reason:'등록 '+daysSince+'일차 — 적응 상태 확인',action:'적응 상태 학부모 공유',phone:s.phoneMom||''});
       // 등록 2주(14일) 후 ±2일: 1차 상담 알림
       if(daysSince>=12&&daysSince<=16)tasks.push({id:'new2w_'+s.id,priority:2,cat:'🟡 학습 관리',type:'신규 2주 상담',name:s.name,reason:'등록 후 2주 — 1차 학부모 상담 시점',action:'학습 적응 상담 연락',phone:s.phoneMom||''});
       // 등록 4주(28일) 후 ±2일: 2차 상담 알림
@@ -2618,7 +2636,7 @@ function renderCrmDailyInto(targetId){
       if(r.paidDate)return r.paidDate.substring(0,7)===curMoKey;
       return false;
     });
-    if(!paid&&dayOfMonth>=10)tasks.push({id:'pay_'+s.id,priority:2,cat:'🟡 학습 관리',type:'수납 미납',name:s.name,reason:curMo+'월 교육비 미납',action:'수납 확인',phone:s.phoneMom||''});
+    if(!paid&&dayOfMonth>=th_unpaid)tasks.push({id:'pay_'+s.id,priority:2,cat:'🟡 학습 관리',type:'수납 미납',name:s.name,reason:curMo+'월 교육비 미납',action:'수납 확인',phone:s.phoneMom||''});
   });
 
   // 12. 퇴원 위험 종합 감지 (결석+숙제+태도 복합)
@@ -2627,9 +2645,9 @@ function renderCrmDailyInto(targetId){
     var sReps=reports.filter(function(r){return r.studentId===s.id&&new Date(r.date)>=twoWeeks;});
     var risk=0;var reasons=[];
     var absCount=sReps.filter(function(r){return r.absent;}).length;
-    if(absCount>=2){risk+=2;reasons.push('결석 '+absCount+'회');}
+    if(absCount>=th_quit_risk){risk+=2;reasons.push('결석 '+absCount+'회');}
     var hwFail=sReps.filter(function(r){return!r.absent&&(r.homework||'').includes('미');}).length;
-    if(hwFail>=2){risk+=2;reasons.push('숙제 미완료 '+hwFail+'회');}
+    if(hwFail>=th_hw_fail){risk+=2;reasons.push('숙제 미완료 '+hwFail+'회');}
     var attLow=sReps.filter(function(r){return r.attitude==='집중 유지에 도움이 필요한 모습'||r.attitude==='산만함';}).length;
     if(attLow>=2){risk+=1;reasons.push('태도 주의 '+attLow+'회');}
     var lastConsult=(consultations||[]).filter(function(c){return c.studentId===s.id;}).sort(function(a,b){return(b.date||'').localeCompare(a.date||'');});
@@ -2660,14 +2678,14 @@ function renderCrmDailyInto(targetId){
   // 14. 수업 방해 1회 → 당일 긴급 (오늘 작성된 일지 기준)
   activeS.forEach(function(s){
     var todayRep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.absent;});
-    if(todayRep&&todayRep.attitude&&(todayRep.attitude.includes('수업 방해')||todayRep.attitude==='수업 방해'))
+    if(todayRep&&todayRep.attitude&&(todayRep.attitude.includes('수업 방해')||todayRep.attitude==='수업 방해')&&th_att_bad>=1)
       tasks.push({id:'dis_'+s.id,priority:1,cat:'🔴 긴급',type:'수업 방해',name:s.name,reason:'오늘 수업 방해 행동 관찰 ('+todayRep.attitude+')',action:'학부모 당일 연락 필요',phone:s.phoneMom||''});
   });
 
   // 15. 수업 산만 2회 연속 → 관리 연락
   activeS.forEach(function(s){
-    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.attitude;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,2);
-    if(sReps.length>=2){
+    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.attitude;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,th_att_warn);
+    if(sReps.length>=th_att_warn){
       var bothDistract=sReps.every(function(r){return r.attitude&&(r.attitude.includes('산만')||r.attitude.includes('집중'));});
       if(bothDistract)tasks.push({id:'dist_'+s.id,priority:2,cat:'🟡 관리 연락',type:'수업 산만 반복',name:s.name,reason:'최근 2회 연속 산만 ('+sReps.map(function(r){return r.attitude;}).join('→')+')',action:'학부모 학습 태도 안내',phone:s.phoneMom||''});
     }
@@ -2693,24 +2711,26 @@ function renderCrmDailyInto(targetId){
 
   // 18. 교재 미준비 2회 연속 → 관리 연락
   activeS.forEach(function(s){
-    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.reviewItems;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,2);
-    if(sReps.length>=2&&sReps.every(function(r){return r.reviewItems==='미준비';}))
-      tasks.push({id:'book_'+s.id,priority:2,cat:'🟡 관리 연락',type:'교재 미준비 반복',name:s.name,reason:'최근 2회 연속 교재 미준비',action:'교재 준비 안내',phone:s.phoneMom||''});
+    var bookPeriod=new Date(today);bookPeriod.setDate(bookPeriod.getDate()-th_book_period);
+    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.reviewItems&&new Date(r.date)>=bookPeriod;}).sort(function(a,b){return b.date>a.date?1:-1;});
+    var bookFail=sReps.filter(function(r){return r.reviewItems==='미준비';}).length;
+    if(bookFail>=th_book)
+      tasks.push({id:'book_'+s.id,priority:2,cat:'🟡 관리 연락',type:'교재 미준비 반복',name:s.name,reason:'최근 '+th_book_period+'일 '+bookFail+'회 교재 미준비',action:'교재 준비 안내',phone:s.phoneMom||''});
   });
 
   // 19. 숙제 미완료 한 달 3회 이상 → 상담 제안
   activeS.forEach(function(s){
-    var oneMonthAgo=new Date(today);oneMonthAgo.setDate(oneMonthAgo.getDate()-30);
-    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&new Date(r.date)>=oneMonthAgo;});
-    var hwFail=sReps.filter(function(r){return(r.homework||'').includes('미완료')||(r.homework||'').includes('미제출');}).length;
-    if(hwFail>=3)tasks.push({id:'hw3_'+s.id,priority:2,cat:'💬 상담 제안',type:'숙제 장기 미완료',name:s.name,reason:'최근 30일 숙제 미완료 '+hwFail+'회',action:'학습 습관 상담 필요',phone:s.phoneMom||''});
+    var hwChronicAgo=new Date(today);hwChronicAgo.setDate(hwChronicAgo.getDate()-th_hw_chperiod);
+    var sRepsC=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&new Date(r.date)>=hwChronicAgo;});
+    var hwFailC=sRepsC.filter(function(r){return(r.homework||'').includes('미완료')||(r.homework||'').includes('미제출');}).length;
+    if(hwFailC>=th_hw_chronic)tasks.push({id:'hw3_'+s.id,priority:2,cat:'💬 상담 제안',type:'숙제 장기 미완료',name:s.name,reason:'최근 '+th_hw_chperiod+'일 숙제 미완료 '+hwFailC+'회',action:'학습 습관 상담 필요',phone:s.phoneMom||''});
   });
 
   // 20. 단어 재시험 2회 연속 → 관리 연락
   activeS.forEach(function(s){
-    var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.reviewTest;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,2);
-    if(sReps.length>=2&&sReps.every(function(r){return r.reviewTest==='재시험'||r.reviewTest==='부진';}))
-      tasks.push({id:'dict_'+s.id,priority:2,cat:'🟡 관리 연락',type:'단어 재시험 반복',name:s.name,reason:'최근 2회 연속 단어 재시험',action:'단어 학습 방법 안내',phone:s.phoneMom||''});
+    var sRepsR=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.reviewTest;}).sort(function(a,b){return b.date>a.date?1:-1;}).slice(0,th_retest);
+    if(sRepsR.length>=th_retest&&sRepsR.every(function(r){return r.reviewTest==='재시험'||r.reviewTest==='부진';}))
+      tasks.push({id:'dict_'+s.id,priority:2,cat:'🟡 관리 연락',type:'단어 재시험 반복',name:s.name,reason:'최근 '+th_retest+'회 연속 단어 재시험',action:'단어 학습 방법 안내',phone:s.phoneMom||''});
   });
 
   // 21. 레벨업 타이밍 자동 감지
@@ -4812,62 +4832,61 @@ async function addMakeupFromDayManual(dateStr,overlay){
 function switchConsultTab(tab){['history','new','manual'].forEach(function(t){var btn=$('ctab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('consult-panel-'+t);if(pn)pn.style.display=t===tab?'block':'none';});if(tab==='history')renderConsults();else if(tab==='new')renderNewConsults();else if(tab==='manual')renderConsultManual();}
 function renderConsultManual(){
   var el=$('consult-manual-area');if(!el)return;
-  el.innerHTML='<div style="max-width:720px;padding:4px 0">'
-    +'<h3 style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:16px">📚 학부모 소통 운영 매뉴얼</h3>'
-    // Section 1
-    +'<div class="expense-section"><h4>1. 전체 운영 흐름</h4>'
-    +'<div style="background:#f0fdf4;border-radius:10px;padding:14px;font-size:13px;line-height:2;color:var(--txt)">'
-    +'수업 일지 입력 → 앱 자동 판단 → 오늘의 업무 대시보드 표시 → 원장이 연락 → 상담 기록에 완료 저장 → 이력 누적'
-    +'</div></div>'
-    // Section 2
-    +'<div class="expense-section"><h4>2. 자동 연락 대상 생성 규칙</h4>'
-    +'<table class="rev-tbl"><thead><tr><th>항목</th><th>조건</th><th>생성 유형</th></tr></thead><tbody>'
-    +'<tr><td>결석</td><td>당일 결석</td><td>🔴 긴급 연락</td></tr>'
-    +'<tr><td>숙제 미완료</td><td>2회 연속</td><td>🟡 관리 연락</td></tr>'
-    +'<tr><td>숙제 미완료</td><td>한 달 3회 이상</td><td>💬 상담 제안</td></tr>'
-    +'<tr><td>수업 방해</td><td>1회</td><td>🔴 긴급 연락</td></tr>'
-    +'<tr><td>수업 산만</td><td>2회 연속</td><td>🟡 관리 연락</td></tr>'
-    +'<tr><td>단어 재시험</td><td>2회 연속</td><td>🟡 관리 연락</td></tr>'
-    +'<tr><td>단어 점수 향상 (30점↑)</td><td>1회</td><td>⭐ 긍정 연락</td></tr>'
-    +'<tr><td>신규 학생</td><td>등록 14일 이내</td><td>🟢 CRM 관찰</td></tr>'
-    +'<tr><td>보강 필요 체크</td><td>일지에서 체크</td><td>📢 안내 연락</td></tr>'
-    +'<tr><td>학부모 연락 필요 체크</td><td>일지에서 체크</td><td>🔴 즉시 연락</td></tr>'
-    +'</tbody></table></div>'
-    // Section 3
-    +'<div class="expense-section"><h4>3. 연락 유형별 의미와 대응</h4>'
-    +'<table class="rev-tbl"><thead><tr><th>유형</th><th>의미</th><th>예시</th><th>권장 대응</th></tr></thead><tbody>'
-    +'<tr><td><b style="color:#dc2626">긴급 연락</b></td><td>오늘 즉시</td><td>결석, 수업 방해</td><td>전화 또는 카톡 당일</td></tr>'
-    +'<tr><td><b style="color:#d97706">관리 연락</b></td><td>학습 관리</td><td>숙제·단어 반복</td><td>카톡 안내 문자</td></tr>'
-    +'<tr><td><b style="color:#16a34a">긍정 연락</b></td><td>칭찬·성장</td><td>점수 향상, 태도 개선</td><td>칭찬 카톡 메시지</td></tr>'
-    +'<tr><td><b style="color:#7c3aed">상담 제안</b></td><td>깊은 상담</td><td>성적 정체, 퇴원 위험</td><td>대면 또는 전화 상담</td></tr>'
-    +'<tr><td><b style="color:#2563eb">안내 연락</b></td><td>행정·일정</td><td>보강, 수납, 시간표</td><td>문자 또는 카톡</td></tr>'
-    +'</tbody></table></div>'
-    // Section 4
-    +'<div class="expense-section"><h4>4. 우선순위 기준</h4>'
-    +'<table class="rev-tbl"><thead><tr><th>우선순위</th><th>조건</th></tr></thead><tbody>'
-    +'<tr><td><b style="color:#dc2626">긴급</b></td><td>무단 결석, 수업 방해, 퇴원 위험, 학부모 연락 필요 직접 체크</td></tr>'
-    +'<tr><td><b style="color:#d97706">높음</b></td><td>숙제·단어·결석이 2회 이상 반복</td></tr>'
-    +'<tr><td><b style="color:#2563eb">중간</b></td><td>학습 부진, 이해도 부족, 참여도 저하</td></tr>'
-    +'<tr><td><b style="color:#16a34a">낮음</b></td><td>긍정 피드백, 가벼운 안내</td></tr>'
-    +'</tbody></table></div>'
-    // Section 5
-    +'<div class="expense-section"><h4>5. 중복 연락 방지 원칙</h4>'
-    +'<ul style="font-size:13px;line-height:2;color:var(--txt);padding-left:18px">'
-    +'<li>같은 사유로 3일 이내 연락 완료 시 새 업무 생성하지 않음</li>'
-    +'<li>같은 학생에게 오늘 이미 연락 완료 시 추가 연락은 보류</li>'
-    +'<li>여러 문제가 같은 날 발생하면 하나의 상담 기록으로 합산</li>'
-    +'<li>긍정 연락과 주의 연락이 동시 발생 시 주의 중심 + 긍정 내용 함께 포함</li>'
-    +'</ul></div>'
-    // Section 6
-    +'<div class="expense-section"><h4>6. 연락 완료 후 기록 항목</h4>'
-    +'<table class="rev-tbl"><thead><tr><th>항목</th><th>선택값</th></tr></thead><tbody>'
-    +'<tr><td>연락 방식</td><td>문자 / 카톡 / 전화 / 대면</td></tr>'
-    +'<tr><td>연락 결과</td><td>전달 완료 / 답변 받음 / 응답 없음 / 상담 예약</td></tr>'
-    +'<tr><td>학부모 반응</td><td>긍정 / 보통 / 우려 / 불만</td></tr>'
-    +'<tr><td>후속 조치</td><td>없음 / 다음 수업 확인 / 상담 / 보강 / 추가 과제</td></tr>'
-    +'<tr><td>다음 확인일</td><td>날짜 직접 선택</td></tr>'
-    +'</tbody></table>'
-    +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-top:10px;font-size:12px;color:#92400e">💡 연락 완료 후 상담 기록 추가 모달에서 위 항목을 기록하세요. 처리 상태를 <b>상담 완료</b>로 바꾸면 이력에 저장됩니다.</div></div>'
+  loadCrmConditions().then(function(){
+    var c=_crmConditions||_DEFAULT_CRM_CONDITIONS;
+    function getV(id,field,def){
+      for(var cat in c){var f=(c[cat]||[]).find(function(x){return x.id===id;});if(f)return f[field]!==undefined?f[field]:def;}
+      return def;
+    }
+    el.innerHTML='<div style="max-width:720px;padding:4px 0">'
+      +'<h3 style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:16px">📚 학부모 소통 운영 매뉴얼</h3>'
+      +'<div class="expense-section"><h4>1. 전체 운영 흐름</h4>'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:14px;font-size:13px;line-height:2;color:var(--txt)">'
+      +'수업 일지 입력 → 앱 자동 판단 → 오늘의 업무 대시보드 표시 → 원장이 연락 → 상담 기록에 완료 저장 → 이력 누적'
+      +'</div></div>'
+      +'<div class="expense-section"><h4>2. 자동 연락 대상 생성 규칙</h4>'
+      +'<div style="font-size:11px;color:var(--blue);margin-bottom:8px">* 오늘의 업무 &gt; 자동 분류 조건에서 기준값을 변경할 수 있습니다.</div>'
+      +'<table class="rev-tbl"><thead><tr><th>항목</th><th>조건</th><th>생성 유형</th></tr></thead><tbody>'
+      +'<tr><td>결석</td><td>당일 결석</td><td>🔴 긴급</td></tr>'
+      +'<tr><td>수업 방해</td><td>'+getV('attitude_bad','threshold',1)+'회 이상</td><td>🔴 긴급</td></tr>'
+      +'<tr><td>상담 예정</td><td>당일 상담 예정</td><td>🔴 긴급</td></tr>'
+      +'<tr><td>숙제 미완료</td><td>'+getV('hw_fail','period',30)+'일 내 '+getV('hw_fail','threshold',2)+'회 이상</td><td>🟡 학습 관리</td></tr>'
+      +'<tr><td>산만함</td><td>'+getV('attitude_warn','threshold',2)+'회 연속</td><td>🟡 학습 관리</td></tr>'
+      +'<tr><td>재시험/부진</td><td>'+getV('retest','threshold',2)+'회 연속</td><td>🟡 학습 관리</td></tr>'
+      +'<tr><td>교재 미준비</td><td>'+getV('book_unprepared','period',7)+'일 내 '+getV('book_unprepared','threshold',2)+'회 이상</td><td>🟡 학습 관리</td></tr>'
+      +'<tr><td>받아쓰기 저점</td><td>'+getV('dictation_low','period',4)+'주 내 '+getV('dictation_low','score',70)+'점 미만 '+getV('dictation_low','threshold',2)+'회</td><td>🟡 학습 관리</td></tr>'
+      +'<tr><td>수납 미납</td><td>매월 '+getV('unpaid','threshold',10)+'일 이후 미납</td><td>🟡 학습 관리</td></tr>'
+      +'<tr><td>상담 예정 임박</td><td>'+getV('consult_soon','threshold',7)+'일 이내 상담 예정</td><td>🟡 학습 관리</td></tr>'
+      +'<tr><td>신규 학생</td><td>등록 후 '+getV('new_adapt','threshold',14)+'일 이내</td><td>🟢 CRM</td></tr>'
+      +'<tr><td>숙제 미완 누적</td><td>'+getV('hw_chronic','period',30)+'일 내 '+getV('hw_chronic','threshold',3)+'회 이상</td><td>🟢 CRM 상담 제안</td></tr>'
+      +'</tbody></table></div>'
+      +'<div class="expense-section"><h4>3. 연락 유형별 의미와 대응</h4>'
+      +'<table class="rev-tbl"><thead><tr><th>유형</th><th>의미</th><th>예시</th><th>권장 대응</th></tr></thead><tbody>'
+      +'<tr><td><b style="color:#dc2626">긴급</b></td><td>오늘 즉시</td><td>결석, 수업 방해</td><td>전화 또는 카톡 당일</td></tr>'
+      +'<tr><td><b style="color:#d97706">학습 관리</b></td><td>반복 패턴</td><td>숙제·재시험 반복</td><td>카톡 안내 문자</td></tr>'
+      +'<tr><td><b style="color:#16a34a">CRM</b></td><td>관계 관리</td><td>신규 적응, 누적 상담</td><td>따뜻한 확인 연락</td></tr>'
+      +'</tbody></table></div>'
+      +'<div class="expense-section"><h4>4. 우선순위 기준</h4>'
+      +'<table class="rev-tbl"><thead><tr><th>우선순위</th><th>조건</th></tr></thead><tbody>'
+      +'<tr><td><b style="color:#dc2626">긴급</b></td><td>무단 결석, 수업 방해, 상담 예정 당일, 학부모 연락 필요 체크</td></tr>'
+      +'<tr><td><b style="color:#d97706">학습 관리</b></td><td>숙제·재시험·태도·교재·받아쓰기 기준 초과</td></tr>'
+      +'<tr><td><b style="color:#16a34a">CRM</b></td><td>신규 적응, 숙제 누적 상담 제안</td></tr>'
+      +'</tbody></table></div>'
+      +'<div class="expense-section"><h4>5. 중복 연락 방지 원칙</h4>'
+      +'<ul style="font-size:13px;line-height:2;color:var(--txt);padding-left:18px">'
+      +'<li>같은 사유로 3일 이내 연락 완료 시 새 업무 생성하지 않음</li>'
+      +'<li>같은 학생에게 오늘 이미 연락 완료 시 추가 연락은 보류</li>'
+      +'<li>여러 문제가 같은 날 발생하면 하나의 상담 기록으로 합산</li>'
+      +'</ul></div>'
+      +'<div class="expense-section"><h4>6. 연락 완료 후 기록 항목</h4>'
+      +'<table class="rev-tbl"><thead><tr><th>항목</th><th>선택값</th></tr></thead><tbody>'
+      +'<tr><td>연락 방식</td><td>문자 / 카톡 / 전화 / 대면</td></tr>'
+      +'<tr><td>연락 결과</td><td>전달 완료 / 답변 받음 / 응답 없음 / 상담 예약</td></tr>'
+      +'<tr><td>학부모 반응</td><td>긍정 / 보통 / 우려 / 불만</td></tr>'
+      +'<tr><td>후속 조치</td><td>없음 / 다음 수업 확인 / 상담 / 보강 / 추가 과제</td></tr>'
+      +'<tr><td>다음 확인일</td><td>날짜 직접 선택</td></tr>'
+      +'</tbody></table>'
+      +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin-top:10px;font-size:12px;color:#92400e">💡 연락 완료 후 상담 기록 추가 모달에서 위 항목을 기록하세요. 처리 상태를 <b>상담 완료</b>로 바꾸면 이력에 저장됩니다.</div></div>'
     // Section 7
     +'<div class="expense-section"><h4>7. 활용 시나리오</h4>'
     +'<div style="font-size:12px;line-height:1.9;color:var(--txt)">'
@@ -4884,6 +4903,8 @@ function renderConsultManual(){
     +'→ 오늘의 업무에 <b>상담 제안</b> 자동 생성<br>'
     +'→ 전화 상담 후 상담 기록에 학부모 반응·후속 조치 기록</div></div>'
     +'</div>';
+    el.innerHTML+='</div>';
+  });
 }
 function renderWeeklySchedule(){
   var el=$('weekly-schedule-area');if(!el)return;
