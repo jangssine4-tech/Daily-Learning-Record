@@ -778,7 +778,7 @@ function setFormDates(){var t=todayISO();['r-date','con-date','mk-date','exp-dat
 function showJarvisAlert(){
   if(!currentUser||currentUser.role!=='admin')return;
   try{
-    var today=new Date();var todayStr=todayISO();var doneKeys=window._crmDone||{};
+    var today=new Date();var todayStr=todayISO();var doneKeys=(window._crmDoneByDate||{})[todayStr]||{};
     var activeS=(students||[]).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
     // Quick count
     var urgent=0;var manage=0;var crm=0;var riskNames=[];
@@ -2412,7 +2412,7 @@ function renderCrmDailyInto(targetId){
   var today=new Date(todayStr+'T00:00:00');
   var tasks=[];
   var activeS=(students||[]).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
-  var doneKeys=window._crmDone||{};
+  var doneKeys=(window._crmDoneByDate||{})[todayStr]||{};
 
   // 1. 신규 상담 CRM 자동 분류
   (newConsults||[]).forEach(function(nc){
@@ -2969,10 +2969,11 @@ async function loadCrmTemplates(){
   try{var d=await db.collection('config').doc('crmTemplates').get();window._crmTemplates=d.exists?d.data():{};}catch(e){window._crmTemplates={};}
 }
 function completeCrmTask(id){
-  if(!window._crmDone)window._crmDone={};
-  window._crmDone[id]=todayISO();
-  db.collection('crmDone').doc(todayISO()).set(window._crmDone).catch(function(){});
-  // If it's a consultation followup, update fuStatus
+  var dateStr=window._crmTargetDate||todayISO();
+  if(!window._crmDoneByDate)window._crmDoneByDate={};
+  if(!window._crmDoneByDate[dateStr])window._crmDoneByDate[dateStr]={};
+  window._crmDoneByDate[dateStr][id]=todayISO();
+  db.collection('crmDone').doc(dateStr).set(window._crmDoneByDate[dateStr]).catch(function(){});
   if(id.startsWith('fu_')){
     var conId=id.replace('fu_','');
     db.collection('consultations').doc(conId).update({fuStatus:'처리 완료',updatedAt:new Date().toISOString()}).catch(function(){});
@@ -2981,14 +2982,23 @@ function completeCrmTask(id){
   renderCrmDaily();toast('✅ 완료 처리됨');
 }
 function delayCrmTask(id){
-  if(!window._crmDone)window._crmDone={};
+  var dateStr=window._crmTargetDate||todayISO();
+  if(!window._crmDoneByDate)window._crmDoneByDate={};
+  if(!window._crmDoneByDate[dateStr])window._crmDoneByDate[dateStr]={};
   var d3=new Date();d3.setDate(d3.getDate()+3);
-  window._crmDone[id]=d3.toISOString().split('T')[0];
-  db.collection('crmDone').doc(todayISO()).set(window._crmDone).catch(function(){});
+  window._crmDoneByDate[dateStr][id]=d3.toISOString().split('T')[0];
+  db.collection('crmDone').doc(dateStr).set(window._crmDoneByDate[dateStr]).catch(function(){});
   renderCrmDaily();toast('⏰ 3일 뒤 다시 표시');
 }
 async function loadCrmDone(){
-  try{var d=await db.collection('crmDone').doc(todayISO()).get();window._crmDone=d.exists?d.data():{};}catch(e){window._crmDone={};}
+  var dateStr=window._crmTargetDate||todayISO();
+  if(!window._crmDoneByDate)window._crmDoneByDate={};
+  try{
+    var d=await db.collection('crmDone').doc(dateStr).get();
+    window._crmDoneByDate[dateStr]=d.exists?d.data():{};
+    // backward compat: also load today's old format
+    if(dateStr===todayISO()){window._crmDone=window._crmDoneByDate[dateStr];}
+  }catch(e){window._crmDoneByDate[dateStr]={};}
 }
 function renderScheduleNotes(){
   var notesEl=$('schedule-notes-area');
@@ -7984,7 +7994,16 @@ function refreshCrmDate(){
   var day=parseInt($('crm-sel-day')?.value);
   var dateStr=yr+'-'+String(mo).padStart(2,'0')+'-'+String(day).padStart(2,'0');
   window._crmTargetDate=dateStr;
-  renderCrmDailyInto('dashboard-area');
+  // Load done state for this date if not cached
+  if(!window._crmDoneByDate)window._crmDoneByDate={};
+  if(!window._crmDoneByDate[dateStr]){
+    db.collection('crmDone').doc(dateStr).get().then(function(d){
+      window._crmDoneByDate[dateStr]=d.exists?d.data():{};
+      renderCrmDailyInto('dashboard-area');
+    }).catch(function(){window._crmDoneByDate[dateStr]={};renderCrmDailyInto('dashboard-area');});
+  } else {
+    renderCrmDailyInto('dashboard-area');
+  }
 }
 function resetCrmDate(){
   var now=new Date();
@@ -8104,7 +8123,7 @@ function renderAutoTasksSection(dateStr){
 var _DEFAULT_CRM_CONDITIONS={
   urgent:[
     {id:'absent',label:'결석',desc:'오늘 결석 처리된 학생',editable:false},
-    {id:'attitude_bad',label:'수업 태도 지도 중',desc:'최근 일지에 수업 태도 지도 중 1회',editable:false},
+    {id:'attitude_bad',label:'수업 방해',desc:'최근 N회 이상 수업 방해',threshold:1,unit:'회',editable:true},
     {id:'parent_contact',label:'학부모 연락 필요',desc:'일지에 학부모 연락 필요 체크된 경우',editable:false},
     {id:'consult_today',label:'상담 예정 당일',desc:'상담 기록에서 오늘 날짜 상담 예정',editable:false},
     {id:'quit_risk',label:'퇴원 위험',desc:'결석 + 숙제미완 + 태도불량 동시 누적',threshold:2,unit:'회',editable:true},
@@ -8113,8 +8132,8 @@ var _DEFAULT_CRM_CONDITIONS={
   learning:[
     {id:'hw_fail',label:'숙제 미완료',desc:'N일 내 N회 이상',threshold:2,unit:'회',period:30,periodUnit:'일',editable:true},
     {id:'retest',label:'복습 테스트 부진',desc:'최근 N회 연속 부진/재시험',threshold:2,unit:'회',editable:true},
-    {id:'attitude_warn',label:'집중력 향상 중',desc:'최근 N회 연속 집중력 향상 중',threshold:2,unit:'회',editable:true},
-    {id:'book_unprepared',label:'교재 미준비',desc:'최근 N회 연속 미준비',threshold:2,unit:'회',editable:true},
+    {id:'attitude_warn',label:'산만함',desc:'최근 N회 연속 산만함',threshold:2,unit:'회',editable:true},
+    {id:'book_unprepared',label:'교재 미준비',desc:'최근 N일 내 N회 이상 미준비',threshold:2,unit:'회',period:7,periodUnit:'일',editable:true},
     {id:'dictation_low',label:'받아쓰기 저점',desc:'N주 내 N회 이상 저점',threshold:2,unit:'회',period:4,periodUnit:'주',score:70,editable:true},
     {id:'unpaid',label:'수납 미납',desc:'이달 납부 기록 없음 (매월 N일 이후)',threshold:10,unit:'일',editable:true},
     {id:'consult_soon',label:'상담 예정 임박',desc:'N일 이내 상담 예정',threshold:7,unit:'일',editable:true},
@@ -8133,7 +8152,25 @@ var _crmConditions=null;
 function loadCrmConditions(){
   if(_crmConditions)return Promise.resolve();
   return db.collection('config').doc('crmConditions').get().then(function(d){
-    _crmConditions=d.exists?d.data():JSON.parse(JSON.stringify(_DEFAULT_CRM_CONDITIONS));
+    var def=JSON.parse(JSON.stringify(_DEFAULT_CRM_CONDITIONS));
+    if(d.exists){
+      var stored=d.data();
+      // Merge: keep stored threshold/period/score values, but use default labels/editable
+      ['urgent','learning','crm'].forEach(function(cat){
+        if(stored[cat]&&def[cat]){
+          def[cat]=def[cat].map(function(defItem){
+            var storedItem=(stored[cat]||[]).find(function(s){return s.id===defItem.id;});
+            if(storedItem){
+              if(storedItem.threshold!==undefined)defItem.threshold=storedItem.threshold;
+              if(storedItem.period!==undefined)defItem.period=storedItem.period;
+              if(storedItem.score!==undefined)defItem.score=storedItem.score;
+            }
+            return defItem;
+          });
+        }
+      });
+    }
+    _crmConditions=def;
   }).catch(function(){_crmConditions=JSON.parse(JSON.stringify(_DEFAULT_CRM_CONDITIONS));});
 }
 function renderCrmConditions(){
