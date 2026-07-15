@@ -2208,7 +2208,7 @@ function renderWriteFlowPanel(studentId){
     +'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(hwFail>=2?'#dc2626':'var(--navy)')+'">'+hwFail+'</div><div style="font-size:9px;color:var(--txt3)">숙제 미완</div></div>'
     +'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(bookFail>=2?'#dc2626':'var(--navy)')+'">'+bookFail+'</div><div style="font-size:9px;color:var(--txt3)">교재 미준비</div></div>'
     +'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(retestCount>=2?'#dc2626':'var(--navy)')+'">'+retestCount+'</div><div style="font-size:9px;color:var(--txt3)">재시험</div></div>'
-    +(quizAvg!==null?'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center;grid-column:span 2"><div style="font-size:16px;font-weight:800;color:var(--navy)">'+quizAvg+'점 '+quizTrend+'</div><div style="font-size:9px;color:var(--txt3)">Daily Quiz 평균</div></div>':'')
+    
     +'</div>';
 
   // Attitude
@@ -2223,7 +2223,22 @@ function renderWriteFlowPanel(studentId){
     sReps.slice(0,8).forEach(function(r){
       var testLabel=r.absent?'-':(r.reviewTest||'-');
       var testColor=r.absent?'var(--txt3)':r.reviewTest==='매우잘함'||r.reviewTest==='잘함'?'#16a34a':r.reviewTest==='부진'?'#dc2626':'var(--txt)';
-      var attEmoji=r.absent?'결석':r.attitude?r.attitude.includes('매우 우수')?'⭐최우수':r.attitude.includes('양호')?'✅양호':r.attitude.includes('태도 지도')?'🚨지도중':r.attitude.includes('집중력')?'⚠️향상중':r.attitude.substring(0,4):'-';
+      var _attTop='';
+      if(r.absent){_attTop='결석';}
+      else if(r.attitude){
+        var _av=r.attitude;
+        if(_av==='학습 태도 매우 우수'||_av.includes('매우 우수'))_attTop='⭐매우 우수';
+        else if(_av==='학습 태도 양호'||_av.includes('양호'))_attTop='✅양호';
+        else if(_av==='수업 태도 지도 중'||_av.includes('태도 지도'))_attTop='🚨지도 중';
+        else if(_av==='집중력 향상 중'||_av.includes('집중력'))_attTop='⚠️향상 중';
+        // If stored value is a sub-item, find parent level
+        else{
+          var _found=false;
+          for(var _lv in _ATTITUDE_ITEMS){if(_ATTITUDE_ITEMS[_lv].indexOf(_av)>=0){_attTop=_lv.substring(0,6);_found=true;break;}}
+          if(!_found)_attTop=_av.substring(0,6);
+        }
+      } else {_attTop='-';}
+      var attEmoji=_attTop;
       var attColor=r.absent?'#dc2626':r.attitude&&(r.attitude.includes('집중력 향상')||r.attitude.includes('태도 지도'))?'#dc2626':r.attitude&&(r.attitude.includes('매우 우수')||r.attitude.includes('양호'))?'#16a34a':'var(--txt)';
       var quizLabel=r.dailyQuiz||'-';
       var dictLabel='-';if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictLabel=pct+'점('+dm[1]+'/'+dm[2]+')';}else dictLabel=r.dictation;}
@@ -7789,10 +7804,28 @@ function saveSpecialData(){
 // ── 대시보드 체크리스트 ──
 var _dashBoard=null;
 function _getDashBoardKey(){
-  var now=new Date();var yr=now.getFullYear(),mo=now.getMonth()+1,day=now.getDate();
-  var startOfYear=new Date(yr,0,1);
-  var wk=Math.ceil(((now-startOfYear)/86400000+startOfYear.getDay()+1)/7);
-  return{month:'board_m_'+yr+'_'+mo,week:'board_w_'+yr+'_'+wk,day:'board_d_'+yr+'_'+String(mo).padStart(2,'0')+'_'+String(day).padStart(2,'0')};
+  var now=new Date();
+  var yr=now.getFullYear(),mo=now.getMonth()+1,day=now.getDate();
+  var wk=Math.ceil(day/7);
+  return{
+    month:'board_m_'+yr+'_'+mo,
+    week:'board_w_'+yr+'_'+String(mo).padStart(2,'0')+'_'+wk,
+    day:'board_d_'+yr+'_'+String(mo).padStart(2,'0')+'_'+String(day).padStart(2,'0')
+  };
+}
+function _getCurWeekKey(){
+  var now=new Date();
+  var yr=window._boardSelWkYr||now.getFullYear();
+  var mo=window._boardSelWkMo||now.getMonth()+1;
+  var wk=window._boardSelWk||Math.ceil(now.getDate()/7);
+  return'board_w_'+yr+'_'+String(mo).padStart(2,'0')+'_'+wk;
+}
+function _getCurDayKey(){
+  var now=new Date();
+  var yr=window._boardSelDayYr||now.getFullYear();
+  var mo=window._boardSelDayMo||now.getMonth()+1;
+  var day=window._boardSelDay||now.getDate();
+  return'board_d_'+yr+'_'+String(mo).padStart(2,'0')+'_'+String(day).padStart(2,'0');
 }
 function loadDashBoard(){
   if(_dashBoard)return Promise.resolve();
@@ -7806,20 +7839,52 @@ function renderDashBoard(){
 }
 function _renderDashBoardUI(el){
   var now=new Date();
+  // Month selector state
   var selYr=window._boardSelYr||now.getFullYear();
   var selMo=window._boardSelMo||now.getMonth()+1;
   window._boardSelYr=selYr;window._boardSelMo=selMo;
-  // Compute keys with selected month for 이달, but week/day always use today
-  var todayKeys=_getDashBoardKey();
+  // Week selector state
+  var wkYr=window._boardSelWkYr||now.getFullYear();
+  var wkMo=window._boardSelWkMo||now.getMonth()+1;
+  var wk=window._boardSelWk||Math.ceil(now.getDate()/7);
+  window._boardSelWkYr=wkYr;window._boardSelWkMo=wkMo;window._boardSelWk=wk;
+  // Day selector state
+  var dYr=window._boardSelDayYr||now.getFullYear();
+  var dMo=window._boardSelDayMo||now.getMonth()+1;
+  var dDay=window._boardSelDay||now.getDate();
+  window._boardSelDayYr=dYr;window._boardSelDayMo=dMo;window._boardSelDay=dDay;
+
   var monthKey='board_m_'+selYr+'_'+selMo;
-  var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===selYr?' selected':'')+'>'+y+'년</option>';
-  var moOpts='';for(var m=1;m<=12;m++)moOpts+='<option value="'+m+'"'+(m===selMo?' selected':'')+'>'+m+'월</option>';
+  var weekKey=_getCurWeekKey();
+  var dayKey=_getCurDayKey();
+
+  // Build option helpers
+  function yrOpts(cur){var s='';for(var y=2024;y<=2030;y++)s+='<option value="'+y+'"'+(y===cur?' selected':'')+'>'+y+'년</option>';return s;}
+  function moOpts(cur){var s='';for(var m=1;m<=12;m++)s+='<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m+'월</option>';return s;}
+  function wkOpts(cur){var s='';for(var w=1;w<=5;w++)s+='<option value="'+w+'"'+(w===cur?' selected':'')+'>'+w+'째주</option>';return s;}
+  function dayOpts(curMo,curYr,curDay){var dm=new Date(curYr,curMo,0).getDate();var s='';for(var d=1;d<=dm;d++)s+='<option value="'+d+'"'+(d===curDay?' selected':'')+'>'+d+'일</option>';return s;}
+
   var sections=[
-    {key:monthKey,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff',hasSelector:true},
-    {key:todayKeys.week,label:'📆 이번 주 중점 추진 사항',color:'#7c3aed',bg:'#f5f3ff'},
-    {key:todayKeys.day,label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4'}
+    {
+      key:monthKey,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff',
+      selector:'<select class="fi" style="width:80px;font-size:11px;padding:2px 4px" onchange="window._boardSelYr=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
+             +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelMo=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
+    },
+    {
+      key:weekKey,label:'📆 이번 주 중점 추진 사항',color:'#7c3aed',bg:'#f5f3ff',
+      selector:'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelWkMo=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+moOpts(wkMo)+'</select>'
+             +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelWk=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+wkOpts(wk)+'</select>'
+    },
+    {
+      key:dayKey,label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4',
+      selector:'<select class="fi" style="width:80px;font-size:11px;padding:2px 4px" onchange="window._boardSelDayYr=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+yrOpts(dYr)+'</select>'
+             +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelDayMo=parseInt(this.value);window._boardSelDay=1;_renderDashBoardUI($$(\'dashboard-board-area\'))">'+moOpts(dMo)+'</select>'
+             +'<select class="fi" style="width:55px;font-size:11px;padding:2px 4px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+dayOpts(dMo,dYr,dDay)+'</select>'
+    }
   ];
+
   var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:16px">';
+
   // Auto tasks section
   var autoDateStr=window._crmTargetDate||todayISO();
   var autoLabel=autoDateStr===todayISO()?'오늘':''+autoDateStr;
@@ -7829,15 +7894,15 @@ function _renderDashBoardUI(el){
     +'</div>'
     +'<div style="padding:10px 14px;background:var(--surface)">'+renderAutoTasksSection(autoDateStr)+'</div>'
     +'</div>';
+
   sections.forEach(function(sec){
     var items=_dashBoard[sec.key]||[];
     var done=items.filter(function(it){return it.checked;}).length;
     html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">'
-      +'<div style="background:'+sec.bg+';padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-      +'<div style="font-size:13px;font-weight:800;color:'+sec.color+';flex:1">'+sec.label+'</div>'
-      +(sec.hasSelector?'<select class="fi" style="width:80px;font-size:12px;padding:3px 6px" onchange="window._boardSelYr=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+yrOpts+'</select>'
-        +'<select class="fi" style="width:60px;font-size:12px;padding:3px 6px" onchange="window._boardSelMo=parseInt(this.value);_renderDashBoardUI($$(\'dashboard-board-area\'))">'+moOpts+'</select>':'')
-      +(items.length?'<div style="font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료</div>':'')
+      +'<div style="background:'+sec.bg+';padding:8px 14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+      +'<div style="font-size:13px;font-weight:800;color:'+sec.color+';margin-right:4px">'+sec.label+'</div>'
+      +(sec.selector||'')
+      +(items.length?'<div style="font-size:11px;color:var(--txt3);margin-left:auto">'+done+'/'+items.length+' 완료</div>':'')
       +'</div>'
       +'<div style="padding:10px 14px;background:var(--surface)">'
       +'<div style="display:flex;gap:6px;margin-bottom:8px">'
