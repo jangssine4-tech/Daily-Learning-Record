@@ -2182,7 +2182,62 @@ function renderWriteFlowPanel(studentId){
 
   var html='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 '+s.name+' · 최근 4주</div>';
 
-  // Status badge
+  // CRM cards for this student
+  var crmCards=[];
+  try{
+    var todayStr2=todayISO();
+    var doneKeys2=(window._crmDoneByDate||{})[todayStr2]||{};
+    // Collect all tasks and filter for this student
+    var allTasks=[];
+    var tempTarget=window._crmTargetDate;
+    window._crmTargetDate=null; // use today for flow panel
+    // Run a mini version of CRM logic for this student only
+    var thirtyDays=new Date();thirtyDays.setDate(thirtyDays.getDate()-30);
+    var sevenDays=new Date();sevenDays.setDate(sevenDays.getDate()-7);
+    var sReports=reports.filter(function(r){return r.studentId===studentId&&!r.makeupId;}).sort(function(a,b){return b.date>a.date?1:-1;});
+    var recent30=sReports.filter(function(r){return new Date(r.date)>=thirtyDays;});
+    var recent7=sReports.filter(function(r){return new Date(r.date)>=sevenDays;});
+    // Absent today
+    var absentToday=sReports.find(function(r){return r.date===todayStr2&&r.absent;});
+    if(absentToday)crmCards.push({priority:1,cat:'🔴 긴급',type:'결석',reason:'오늘 결석'});
+    // 수업 방해
+    if(sReports[0]&&sReports[0].date===todayStr2&&sReports[0].attitude==='수업 방해')
+      crmCards.push({priority:1,cat:'🔴 긴급',type:'수업 방해',reason:'오늘 수업 방해'});
+    // 숙제 미완
+    var hwFail2=recent30.filter(function(r){return!r.absent&&(r.homework||'').includes('미');}).length;
+    if(hwFail2>=2)crmCards.push({priority:2,cat:'🟡 학습 관리',type:'숙제 미완',reason:'최근 30일 '+hwFail2+'회'});
+    // 산만함
+    var attBad2=recent30.filter(function(r){return!r.absent&&r.attitude&&r.attitude.includes('산만');}).length;
+    if(attBad2>=2)crmCards.push({priority:2,cat:'🟡 학습 관리',type:'산만함',reason:'최근 '+attBad2+'회'});
+    // 교재 미준비
+    var book2=recent7.filter(function(r){return!r.absent&&(r.reviewItems==='미준비'||r.homework==='교재 미준비');}).length;
+    if(book2>=2)crmCards.push({priority:2,cat:'🟡 학습 관리',type:'교재 미준비',reason:'최근 7일 '+book2+'회'});
+    // 재시험
+    var retest2=recent30.filter(function(r){return!r.absent&&(r.reviewTest==='부진'||r.reviewTest==='재시험');}).length;
+    if(retest2>=2)crmCards.push({priority:2,cat:'🟡 학습 관리',type:'재시험/부진',reason:'최근 '+retest2+'회'});
+    // 상담 예정
+    var todayCon=(consults||[]).filter(function(c){return c.studentId===studentId&&c.date===todayStr2&&c.status==='상담 예정';});
+    if(todayCon.length)crmCards.push({priority:1,cat:'🔴 긴급',type:'상담 예정 당일',reason:todayCon[0].purpose||''});
+    // 신규 적응
+    if(s.registeredAt){var regDays=Math.floor((new Date()-new Date(s.registeredAt))/86400000);if(regDays<=14)crmCards.push({priority:3,cat:'🟢 CRM',type:'신규 적응',reason:'등록 후 '+regDays+'일'});}
+    window._crmTargetDate=tempTarget;
+  }catch(e){window._crmTargetDate=null;}
+
+  if(crmCards.length){
+    html+='<div style="margin-bottom:10px">';
+    var catColors={'🔴 긴급':'#dc2626','🟡 학습 관리':'#b45309','🟢 CRM':'#16a34a'};
+    var catBgs={'🔴 긴급':'#fef2f2','🟡 학습 관리':'#fffbeb','🟢 CRM':'#f0fdf4'};
+    crmCards.sort(function(a,b){return a.priority-b.priority;}).forEach(function(card){
+      var col=catColors[card.cat]||'var(--navy)';
+      var bg=catBgs[card.cat]||'var(--surface2)';
+      html+='<div style="background:'+bg+';border-left:3px solid '+col+';border-radius:6px;padding:5px 8px;margin-bottom:4px;display:flex;align-items:center;gap:6px">'
+        +'<div style="flex:1"><span style="font-size:10px;font-weight:700;color:'+col+'">'+card.cat+'</span>'
+        +' <span style="font-size:11px;font-weight:700;color:var(--txt)">'+card.type+'</span>'
+        +(card.reason?'<div style="font-size:10px;color:var(--txt3)">'+card.reason+'</div>':'')
+        +'</div></div>';
+    });
+    html+='</div>';
+  }
   // 받아쓰기 저점 (70점 미만) 횟수
   var dictLow=sReps.filter(function(r){
     if(r.absent||!r.dictation)return false;
