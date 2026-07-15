@@ -7923,6 +7923,10 @@ function getAutoTodayTasks(dateStr){
   var dayNames=['일','월','화','수','목','금','토'];
   var dayName=dayNames[dt.getDay()];
   var yr=dt.getFullYear(),mo=dt.getMonth()+1,day=dt.getDate();
+  var isWeekend=dt.getDay()===0||dt.getDay()===6;
+  var isMonthEnd=new Date(yr,mo,0).getDate()===day;
+  var isMonthFirst=day===1;
+
   // 1. 상담 예정
   if(typeof consults!=='undefined'){
     consults.filter(function(c){return c.date===dateStr&&c.status==='상담 예정';}).forEach(function(c){
@@ -7930,6 +7934,7 @@ function getAutoTodayTasks(dateStr){
       tasks.push({cat:'상담',icon:'💬',label:(s?s.name+' ':'')+'상담 예정',sub:'목적: '+(c.purpose||'')+(c.type?' · '+c.type:'')});
     });
   }
+
   // 2. 간담회 월간 계획
   var calData=window._meetingCalData||{};
   var calKey='meetingCal_'+yr+'_'+mo;
@@ -7937,17 +7942,57 @@ function getAutoTodayTasks(dateStr){
   var dayEntries=calMonth[String(day)]||calMonth[day]||[];
   if(!Array.isArray(dayEntries))dayEntries=Object.values(dayEntries);
   if(dayEntries.length)tasks.push({cat:'간담회',icon:'🤝',label:'간담회 예정',sub:dayEntries.join(', ')});
-  // 3. 블로그 주간 루틴
+
+  // 3. 간담회 연간 계획 — 해당 월에 내용이 있으면 월초에 알림
+  if(isMonthFirst){
+    var annualData=window._meetingAnnualData||{};
+    var annualKey='meetingAnnual_'+yr;
+    var annualMonth=(annualData[annualKey]||{})[mo]||'';
+    if(annualMonth.trim())tasks.push({cat:'간담회 연간',icon:'📆',label:mo+'월 간담회 계획 확인',sub:annualMonth.substring(0,80)});
+  }
+
+  // 4. 오프라인 홍보 일정 — schedule 필드에 날짜가 포함된 경우
+  var offCfg=window._offlinePromoConfig||{};
+  ['flyer','poster','banner','briefing','trial','meeting'].forEach(function(tab){
+    var schedule=(offCfg[tab]||{}).schedule||'';
+    if(schedule&&schedule.includes(String(mo)+'월')&&schedule.includes(String(day)+'일')){
+      var info={flyer:'전단지',poster:'포스터',banner:'배너',briefing:'설명회',trial:'체험 수업',meeting:'간담회'};
+      tasks.push({cat:'오프라인 홍보',icon:'📌',label:'[오프라인] '+info[tab]+' 일정',sub:schedule.substring(0,60)});
+    }
+  });
+
+  // 5. 네이버 플레이스 주간 루틴
+  if(!isWeekend){
+    var naverPlan=(window._mpPlans||{}).naver||{};
+    var naverWeekly=naverPlan['w_'+dayName]||'';
+    if(naverWeekly.trim())tasks.push({cat:'네이버',icon:'🔍',label:'네이버 플레이스 · '+dayName+'요일 루틴',sub:naverWeekly.substring(0,80)});
+  }
+
+  // 6. 블로그 주간 루틴
   var blogPlans=(window._mpPlans||{}).blog||{};
   var blogWeekly=blogPlans['weekly_'+dayName]||'';
   if(blogWeekly.trim())tasks.push({cat:'블로그',icon:'📝',label:'블로그 · '+dayName+'요일 루틴',sub:blogWeekly.substring(0,80)});
-  // 4. SNS 채널 주간 루틴
+
+  // 7. 블로그 월간 계획 — 월초 알림
+  if(isMonthFirst){
+    var blogMonthly=blogPlans['monthly_'+yr+'_'+String(mo).padStart(2,'0')]||blogPlans['monthly_'+yr+'_'+mo]||'';
+    if(blogMonthly.trim())tasks.push({cat:'블로그',icon:'📝',label:mo+'월 블로그 월간 계획 확인',sub:blogMonthly.substring(0,80)});
+  }
+
+  // 8. SNS 채널 주간 루틴
   [{ch:'insta',name:'인스타',icon:'📸'},{ch:'danggeun',name:'당근',icon:'🥕'},{ch:'kakao',name:'카톡 채널',icon:'💬'}].forEach(function(x){
     var chPlan=(window._mpPlans||{})[x.ch]||{};
     var w=chPlan['weekly_'+dayName]||'';
     if(w.trim())tasks.push({cat:x.name,icon:x.icon,label:x.name+' · '+dayName+'요일 루틴',sub:w.substring(0,80)});
   });
-  // 5. 특강 홍보 일정
+
+  // 9. 수납 마감 알림 — 매월 10일
+  if(day===10)tasks.push({cat:'회계',icon:'💰',label:'이달 수납 현황 확인',sub:'미납 학생 확인 및 안내 필요'});
+
+  // 10. 목표 관리 월말 점검
+  if(isMonthEnd)tasks.push({cat:'목표 관리',icon:'🎯',label:mo+'월 목표 달성 현황 점검',sub:'이달 매출·재원생 목표 대비 실적 확인'});
+
+  // 11. 특강 홍보 일정
   if(typeof _PROMO_SCHEDULE!=='undefined'){
     _PROMO_SCHEDULE.filter(function(s){return s.date===dateStr;}).forEach(function(s){
       tasks.push({cat:'특강 홍보',icon:'📣',label:'['+s.d+'] '+s.title,sub:s.channel+' · '+s.type});
@@ -7958,6 +8003,7 @@ function getAutoTodayTasks(dateStr){
       tasks.push({cat:'특강 실행',icon:'✅',label:'['+(t.prepDate===dateStr?'제작':'게시')+'] '+t.task,sub:t.content+' · '+t.channel});
     });
   }
+
   return tasks;
 }
 function renderAutoTasksSection(dateStr){
