@@ -430,6 +430,142 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <div id="modal-goals-edit" style="display:none" class="mo" onclick="if(event.target===this)closeM('goals-edit')"><div class="ms"><div class="mh"></div><div class="mt" id="ge-modal-title">연간 목표 편집</div><div id="ge-fields"></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveGoalTargets()">저장</button><div style="height:6px"></div><button class="btn btn-outline btn-block" onclick="closeM('goals-edit')">취소</button></div></div>
 
 <script>
+var $=function(id){return document.getElementById(id);};
+var db,currentUser=null,students=[],classes=[],reports=[],users=[],periods=[],consultations=[],consults=[],newConsults=[],refItems=[],expenses=[],revenues=[];
+
+// ═══════════════════════════════════════════════════
+// UTILITY & BOOT FUNCTIONS
+// ═══════════════════════════════════════════════════
+function bootProgress(pct, msg) {
+  var fill=document.querySelector('#boot-overlay .boot-fill');
+  var msgEl=document.querySelector('#boot-overlay .boot-msg');
+  if(fill)fill.style.width=pct+'%';
+  if(msgEl)msgEl.textContent=msg||'';
+}
+function hideBootOverlay(){
+  var el=$('boot-overlay');
+  if(el){el.classList.add('hidden');setTimeout(function(){el.style.display='none';},500);}
+}
+function yield_() { return new Promise(function(r) { setTimeout(r, 0); }); }
+function nextFrame(){return new Promise(function(r){requestAnimationFrame(r);});}
+var _saveCacheTimer=null;
+function saveCacheDebounced(){
+  clearTimeout(_saveCacheTimer);
+  _saveCacheTimer=setTimeout(function(){
+    try{
+      var cache={students:students,classes:classes,reports:reports,users:users,periods:periods||[],ts:Date.now()};
+      localStorage.setItem('academy_cache',JSON.stringify(cache));
+    }catch(e){}
+  },2000);
+}
+// ═══════════════════════════════════════════════════
+// CURRICULUM
+// ═══════════════════════════════════════════════════
+function getCURRICULUM() {
+  if(window._CURRICULUM)return window._CURRICULUM;
+  window._CURRICULUM=_buildCurriculum();
+  return window._CURRICULUM;
+}
+function _buildCurriculum() {
+  var c={};
+  var base=[
+    {cat:'Phonics',levels:['PA1','PA2','PA3','PA4','PB1','PB2','PB3','PB4']},
+    {cat:'Joy',levels:['Joy 1A','Joy 1B','Joy 2A','Joy 2B','Joy 3A','Joy 3B','Joy 4A','Joy 4B']},
+    {cat:'GrStar',levels:['GrStar 1A','GrStar 1B','GrStar 2A','GrStar 2B','GrStar 3A','GrStar 3B']},
+    {cat:'GrMaster',levels:['GrMaster 1A','GrMaster 1B','GrMaster 2A','GrMaster 2B']},
+    {cat:'Reading',levels:['RD1A','RD1B','RD2A','RD2B','RD3A','RD3B']},
+    {cat:'수학',levels:['수학 기초','수학 기본','수학 심화']}
+  ];
+  var globalOrder=0;
+  base.forEach(function(g){
+    g.levels.forEach(function(lv){
+      c[lv]={cat:g.cat,order:globalOrder++,level:lv};
+    });
+  });
+  // Merge custom level order
+  var custom=window._levelOrder||{};
+  Object.keys(custom).forEach(function(lv){
+    if(!c[lv])c[lv]={cat:'Custom',order:900+Object.keys(custom).indexOf(lv),level:lv};
+    if(custom[lv].order!==undefined)c[lv].order=custom[lv].order;
+  });
+  return c;
+}
+function getStudentLevel(s){
+  if(!s)return '';
+  return s.currentLevel||s.level||'';
+}
+function getStudentLevelAtMonth(s,yr,mo){
+  return getStudentLevel(s);
+}
+function isHoliday(dateStr){
+  var holidays=window._holidays||{};
+  return!!holidays[dateStr];
+}
+function toast(msg,dur){var t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},dur||2500);}
+function loading(on){$('loading').style.display=on?'flex':'none';}
+function closeM(id){var m=$('mo-'+id);if(m)m.style.display='none';var ov=document.querySelector('.mo');if(ov)ov.remove();}
+// ═══════════════════════════════════════════════════
+// Firebase init
+// ═══════════════════════════════════════════════════
+function getCfg(){try{return JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){return null;}}
+function saveFbConfig(){
+  var cfg={apiKey:$('c-apiKey').value.trim(),authDomain:$('c-authDomain').value.trim(),projectId:$('c-projectId').value.trim(),storageBucket:$('c-storageBucket').value.trim()};
+  if(!cfg.apiKey||!cfg.projectId){toast('⚠️ API Key와 Project ID 필수');return;}
+  localStorage.setItem('fb_cfg',JSON.stringify(cfg));initFb(cfg);
+}
+function initFb(cfg){
+  try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
+  db=firebase.firestore();
+  db.settings({cacheSizeBytes:50*1024*1024});
+  db.enablePersistence({synchronizeTabs:true}).catch(function(){});
+  $('setup-screen').style.display='none';
+  $('login-screen').style.display='flex';
+}
+async function login(){
+  var lid=$('l-id').value.trim(),lpw=$('l-pw').value.trim();
+  if(!lid||!lpw){toast('⚠️ 아이디와 비밀번호를 입력하세요');return;}
+  loading(true);
+  try{
+    var snap=await db.collection('users').where('loginId','==',lid).where('pw','==',lpw).limit(1).get();
+    if(snap.empty){loading(false);toast('❌ 아이디 또는 비밀번호가 틀립니다');return;}
+    var u=snap.docs[0].data();
+    currentUser={...u,docId:snap.docs[0].id};
+    bootProgress(20, '데이터 로딩...');
+    await yield_();
+    await bootApp();
+  }catch(e){toast('❌ 로그인 오류: '+e.message);$('login-screen').style.display='flex';hideBootOverlay();}
+}
+
+// PERFORMANCE FIX: Boot overlay control
+// ═══════════════════════════════════════════════════
+
+async function loadCardBadges(){
+  try{var d=await db.collection('config').doc('cardBadges').get();window._cardBadges=d.exists?d.data():{};}catch(e){window._cardBadges={};}
+}
+function logout(){
+  currentUser=null;
+  $('login-screen').style.display='flex';
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  $('l-pw').value='';
+  toast('👋 로그아웃 되었습니다');
+}
+
+// ══ CRM 오늘의 업무 자동 생성 ══
+function switchDashTab(tab){
+  ['board','crm','mk','conditions'].forEach(function(t){
+    var btn=$('dtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
+    var pn=$('dash-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
+  });
+  if(tab==='board')renderDashBoard();
+  else if(tab==='crm'){initCrmDateSelector();renderCrmDailyInto('dashboard-area');}
+  else if(tab==='mk'){loadMpPlans().then(function(){renderMkTodayPage('dashboard-mk-area');});}
+  else if(tab==='conditions'){loadCrmConditions().then(function(){_renderCrmConditionsUI($('crm-conditions-area'));});}
+}
+function renderDashboard(){switchDashTab('board');}
+function renderCrmDaily(){
+  var target=$('dashboard-area')||$('crm-daily-area');
+  if(target)renderCrmDailyInto(target.id);
+}
 // ═══════════════════════════════════════════════════
 // PERFORMANCE FIX: Boot overlay control
 // ═══════════════════════════════════════════════════
@@ -6876,6 +7012,75 @@ async function testSolapi(){
 }
 
 // ══ APP INIT ══
+// ═══════════════════════════════════════════════════
+// OPTIMIZED BOOT - breaks work into yielding steps
+// ═══════════════════════════════════════════════════
+var _fullyPopulated=false;
+async function bootApp(){
+  try{
+    loading(true);
+    $('login-screen').style.display='none';
+    bootProgress(30,'학생 데이터 로딩...');
+    await yield_();
+    // Try cache first
+    try{
+      var cached=localStorage.getItem('academy_cache');
+      if(cached){
+        var c=JSON.parse(cached);
+        if(c.students)students=c.students;
+        if(c.classes)classes=c.classes;
+        if(c.reports)reports=c.reports;
+        if(c.users)users=c.users;
+        if(c.periods)periods=c.periods;
+      }
+    }catch(e){}
+    bootProgress(40,'Firestore 로딩...');
+    await yield_();
+    await loadStudents();await yield_();
+    bootProgress(50,'수업 데이터...');
+    await loadClasses();await yield_();
+    await loadReports();await yield_();
+    bootProgress(60,'일정 데이터...');
+    await loadUsers();await yield_();
+    try{await loadPeriods();}catch(e){}
+    try{await loadRefItems();}catch(e){}
+    bootProgress(70,'화면 구성...');
+    await yield_();
+    setFormDates();
+    populateMinimal();
+    $('sb-date').textContent=todayISO();
+    bootProgress(80,'렌더링...');
+    await yield_();
+    renderSchedule();
+    applyMenuPerms();
+    goto('dashboard');
+    bootProgress(90,'부가 데이터...');
+    await yield_();
+    // Background loads
+    setTimeout(function(){
+      syncFromFirestore();loadStudentMemos();loadCustomEvalModules();
+      loadLevelOrder();loadTeacherNotes();loadCardBadges();
+      loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);});});
+      db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});
+      startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();
+    }, 1000);
+    // Deferred full load
+    setTimeout(async function(){
+      bootProgress(95,'추가 데이터...');
+      try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes(),loadCardBadges()]);}catch(e){}
+      _fullyPopulated=true;
+      saveCacheDebounced();
+    },3000);
+    bootProgress(100,'완료!');
+    loading(false);
+    hideBootOverlay();
+  }catch(err){
+    console.error('Boot error:',err);
+    loading(false);
+    hideBootOverlay();
+    toast('⚠️ 부팅 오류: '+err.message);
+  }
+}
 function _initApp(){
   bootProgress(5, 'Firebase 확인 중...');
   var cfg=getCfg();
