@@ -7843,51 +7843,39 @@ function renderDashBoard(){
 }
 function _renderDashBoardUI(el){
   var now=new Date();
-  // Month selector state
   var selYr=window._boardSelYr||now.getFullYear();
   var selMo=window._boardSelMo||now.getMonth()+1;
-  window._boardSelYr=selYr;window._boardSelMo=selMo;
-  // Week selector state
-  var wkYr=window._boardSelWkYr||now.getFullYear();
-  var wkMo=window._boardSelWkMo||now.getMonth()+1;
-  var wk=window._boardSelWk||Math.ceil(now.getDate()/7);
-  window._boardSelWkYr=wkYr;window._boardSelWkMo=wkMo;window._boardSelWk=wk;
-  // Day selector state
-  var dYr=window._boardSelDayYr||now.getFullYear();
-  var dMo=window._boardSelDayMo||now.getMonth()+1;
   var dDay=window._boardSelDay||now.getDate();
-  window._boardSelDayYr=dYr;window._boardSelDayMo=dMo;window._boardSelDay=dDay;
+  window._boardSelYr=selYr;window._boardSelMo=selMo;window._boardSelDay=dDay;
+
+  // Auto-compute week from selected day
+  var wk=Math.ceil(dDay/7);
 
   var monthKey='board_m_'+selYr+'_'+selMo;
-  var weekKey=_getCurWeekKey();
-  var dayKey=_getCurDayKey();
+  var weekKey='board_w_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+wk;
+  var dayKey='board_d_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+String(dDay).padStart(2,'0');
 
-  // Build option helpers
   function yrOpts(cur){var s='';for(var y=2024;y<=2030;y++)s+='<option value="'+y+'"'+(y===cur?' selected':'')+'>'+y+'년</option>';return s;}
   function moOpts(cur){var s='';for(var m=1;m<=12;m++)s+='<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m+'월</option>';return s;}
-  function wkOpts(cur){var s='';for(var w=1;w<=5;w++)s+='<option value="'+w+'"'+(w===cur?' selected':'')+'>'+w+'째주</option>';return s;}
   function dayOpts(curMo,curYr,curDay){var dm=new Date(curYr,curMo,0).getDate();var s='';for(var d=1;d<=dm;d++)s+='<option value="'+d+'"'+(d===curDay?' selected':'')+'>'+d+'일</option>';return s;}
+
+  var isToday=(selYr===now.getFullYear()&&selMo===now.getMonth()+1&&dDay===now.getDate());
 
   var sections=[
     {key:monthKey,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff'},
-    {key:weekKey,label:'📆 이번 주 중점 추진 사항',color:'#7c3aed',bg:'#f5f3ff'},
+    {key:weekKey,label:'📆 이번 주 중점 추진 사항',badge:wk+'째주',color:'#7c3aed',bg:'#f5f3ff'},
     {key:dayKey,label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4'}
   ];
 
-  // Week/day keys react to selected month
-  var selMonthWeekKey='board_w_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+wk;
-  var selMonthDayKey='board_d_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+String(dDay).padStart(2,'0');
-  sections[1].key=selMonthWeekKey;
-  sections[2].key=selMonthDayKey;
-
   var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:12px">';
 
-  // Unified selector block
-  html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">'
-    +'<select class="fi" style="width:78px;font-size:11px;padding:2px 4px" onchange="window._boardSelYr=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
-    +'<select class="fi" style="width:58px;font-size:11px;padding:2px 4px" onchange="window._boardSelMo=parseInt(this.value);window._boardSelWk=Math.ceil((new Date()).getDate()/7);window._boardSelDay=(new Date()).getDate();_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
-    +'<select class="fi" style="width:58px;font-size:11px;padding:2px 4px" onchange="window._boardSelWk=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+wkOpts(wk)+'</select>'
-    +'<select class="fi" style="width:52px;font-size:11px;padding:2px 4px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+dayOpts(selMo,selYr,dDay)+'</select>'
+  // CRM-style date selector
+  html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:12px;color:var(--txt3)">날짜</span>'
+    +'<select class="fi" style="width:90px;font-size:12px;padding:3px 6px" onchange="window._boardSelYr=parseInt(this.value);window._boardSelDay=Math.min(window._boardSelDay||1,new Date(parseInt(this.value),window._boardSelMo,0).getDate());_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
+    +'<select class="fi" style="width:70px;font-size:12px;padding:3px 6px" onchange="window._boardSelMo=parseInt(this.value);window._boardSelDay=Math.min(window._boardSelDay||1,new Date(window._boardSelYr,parseInt(this.value),0).getDate());_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
+    +'<select class="fi" style="width:70px;font-size:12px;padding:3px 6px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+dayOpts(selMo,selYr,dDay)+'</select>'
+    +'<button class="btn btn-outline btn-xs" onclick="window._boardSelYr=new Date().getFullYear();window._boardSelMo=new Date().getMonth()+1;window._boardSelDay=new Date().getDate();_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">오늘</button>'
     +'</div>';
 
   sections.forEach(function(sec){
@@ -7901,11 +7889,9 @@ function _renderDashBoardUI(el){
     var autoDone=((_dashBoard['_autoDone_'+sec.key])||{});
     var autoDoneCount=autoItems.filter(function(t){return autoDone[t.label];}).length;
     html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">'
-      // topSelector (above header, for 이달의)
-      +(sec.topSelector?'<div style="background:'+sec.bg+';padding:6px 14px 0">'+sec.topSelector+'</div>':'')
       +'<div style="background:'+sec.bg+';padding:6px 14px 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
       +'<div style="font-size:13px;font-weight:800;color:'+sec.color+';margin-right:4px">'+sec.label+'</div>'
-      +(sec.selector||'')
+      +(sec.badge?'<span style="font-size:11px;color:'+sec.color+';background:white;border:1px solid '+sec.color+';border-radius:10px;padding:1px 7px;opacity:.8">'+sec.badge+'</span>':'')
       +(totalCount?'<div style="font-size:11px;color:var(--txt3);margin-left:auto">'+(done+autoDoneCount)+'/'+totalCount+' 완료</div>':'')
       +'</div>'
       +'<div style="padding:8px 14px;background:var(--surface)">'
