@@ -7869,24 +7869,26 @@ function _renderDashBoardUI(el){
   function dayOpts(curMo,curYr,curDay){var dm=new Date(curYr,curMo,0).getDate();var s='';for(var d=1;d<=dm;d++)s+='<option value="'+d+'"'+(d===curDay?' selected':'')+'>'+d+'일</option>';return s;}
 
   var sections=[
-    {
-      key:monthKey,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff',
-      topSelector:'<div style="display:flex;gap:4px;margin-bottom:6px">'
-        +'<select class="fi" style="width:80px;font-size:11px;padding:2px 4px" onchange="window._boardSelYr=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
-        +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelMo=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
-        +'</div>'
-    },
-    {
-      key:weekKey,label:'📆 이번 주 중점 추진 사항',color:'#7c3aed',bg:'#f5f3ff',
-      selector:'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelWk=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+wkOpts(wk)+'</select>'
-    },
-    {
-      key:dayKey,label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4',
-      selector:'<select class="fi" style="width:55px;font-size:11px;padding:2px 4px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+dayOpts(dMo,dYr,dDay)+'</select>'
-    }
+    {key:monthKey,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff'},
+    {key:weekKey,label:'📆 이번 주 중점 추진 사항',color:'#7c3aed',bg:'#f5f3ff'},
+    {key:dayKey,label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4'}
   ];
 
+  // Week/day keys react to selected month
+  var selMonthWeekKey='board_w_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+wk;
+  var selMonthDayKey='board_d_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+String(dDay).padStart(2,'0');
+  sections[1].key=selMonthWeekKey;
+  sections[2].key=selMonthDayKey;
+
   var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:12px">';
+
+  // Unified selector block
+  html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">'
+    +'<select class="fi" style="width:78px;font-size:11px;padding:2px 4px" onchange="window._boardSelYr=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
+    +'<select class="fi" style="width:58px;font-size:11px;padding:2px 4px" onchange="window._boardSelMo=parseInt(this.value);window._boardSelWk=Math.ceil((new Date()).getDate()/7);window._boardSelDay=(new Date()).getDate();_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
+    +'<select class="fi" style="width:58px;font-size:11px;padding:2px 4px" onchange="window._boardSelWk=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+wkOpts(wk)+'</select>'
+    +'<select class="fi" style="width:52px;font-size:11px;padding:2px 4px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+dayOpts(selMo,selYr,dDay)+'</select>'
+    +'</div>';
 
   sections.forEach(function(sec){
     var items=_dashBoard[sec.key]||[];
