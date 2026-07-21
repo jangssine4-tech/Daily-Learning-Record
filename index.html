@@ -7878,7 +7878,7 @@ function _renderDashBoardUI(el){
   var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:12px">';
 
   // Admin: show teacher checklist summary card
-  if(currentUser&&currentUser.role==='admin'){
+  if(currentUser&&currentUser.role!=='teacher'){
     html+='<div id="board-checklist-overview" style="border:1px solid #fbbf24;border-radius:12px;overflow:hidden">'
       +'<div style="background:#fffbeb;padding:8px 14px;display:flex;align-items:center;justify-content:space-between">'
       +'<div style="font-size:13px;font-weight:800;color:#b45309">📋 교사 체크리스트 현황 — 오늘</div>'
@@ -8752,9 +8752,10 @@ function _renderChecklistUI(el){
   html+='</div>';
   el.innerHTML=html;
   updateChecklistProgress();
-  // Load admin summary if admin
-  if(currentUser&&currentUser.role==='admin'){
-    _loadBoardChecklistSummary();
+  // Load teacher checklist summary for admin/owner
+  var isOwner=currentUser&&(currentUser.role==='admin'||currentUser.role==='owner'||currentUser.role==='원장');
+  if(isOwner||(!currentUser)||(currentUser&&currentUser.role!=='teacher')){
+    setTimeout(function(){_loadBoardChecklistSummary();},100);
   }
 }
 function resetChecklist(){
