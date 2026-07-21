@@ -7871,28 +7871,26 @@ function _renderDashBoardUI(el){
   var sections=[
     {
       key:monthKey,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff',
-      selector:'<select class="fi" style="width:80px;font-size:11px;padding:2px 4px" onchange="window._boardSelYr=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
-             +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelMo=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
+      topSelector:'<div style="display:flex;gap:4px;margin-bottom:6px">'
+        +'<select class="fi" style="width:80px;font-size:11px;padding:2px 4px" onchange="window._boardSelYr=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
+        +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelMo=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
+        +'</div>'
     },
     {
       key:weekKey,label:'📆 이번 주 중점 추진 사항',color:'#7c3aed',bg:'#f5f3ff',
-      selector:'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelWkMo=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(wkMo)+'</select>'
-             +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelWk=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+wkOpts(wk)+'</select>'
+      selector:'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelWk=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+wkOpts(wk)+'</select>'
     },
     {
       key:dayKey,label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4',
-      selector:'<select class="fi" style="width:80px;font-size:11px;padding:2px 4px" onchange="window._boardSelDayYr=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(dYr)+'</select>'
-             +'<select class="fi" style="width:60px;font-size:11px;padding:2px 4px" onchange="window._boardSelDayMo=parseInt(this.value);window._boardSelDay=1;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(dMo)+'</select>'
-             +'<select class="fi" style="width:55px;font-size:11px;padding:2px 4px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+dayOpts(dMo,dYr,dDay)+'</select>'
+      selector:'<select class="fi" style="width:55px;font-size:11px;padding:2px 4px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+dayOpts(dMo,dYr,dDay)+'</select>'
     }
   ];
 
-  var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:16px">';
+  var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:12px">';
 
   sections.forEach(function(sec){
     var items=_dashBoard[sec.key]||[];
     var done=items.filter(function(it){return it.checked;}).length;
-    // For 오늘의 업무: also show auto tasks
     var autoItems=[];
     if(sec.key===dayKey){
       autoItems=getAutoTodayTasks(window._crmTargetDate||todayISO());
@@ -7901,40 +7899,39 @@ function _renderDashBoardUI(el){
     var autoDone=((_dashBoard['_autoDone_'+sec.key])||{});
     var autoDoneCount=autoItems.filter(function(t){return autoDone[t.label];}).length;
     html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">'
-      +'<div style="background:'+sec.bg+';padding:8px 14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+      // topSelector (above header, for 이달의)
+      +(sec.topSelector?'<div style="background:'+sec.bg+';padding:6px 14px 0">'+sec.topSelector+'</div>':'')
+      +'<div style="background:'+sec.bg+';padding:6px 14px 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
       +'<div style="font-size:13px;font-weight:800;color:'+sec.color+';margin-right:4px">'+sec.label+'</div>'
       +(sec.selector||'')
       +(totalCount?'<div style="font-size:11px;color:var(--txt3);margin-left:auto">'+(done+autoDoneCount)+'/'+totalCount+' 완료</div>':'')
       +'</div>'
-      +'<div style="padding:10px 14px;background:var(--surface)">'
-      // Auto tasks (only for 오늘의 업무)
+      +'<div style="padding:8px 14px;background:var(--surface)">'
       +(autoItems.length?
-        '<div style="font-size:10px;color:var(--txt3);font-weight:700;margin-bottom:4px;letter-spacing:.3px">🔔 자동 알림</div>'
+        '<div style="font-size:10px;color:var(--txt3);font-weight:700;margin-bottom:3px;letter-spacing:.3px">🔔 자동 알림</div>'
         +autoItems.map(function(t){
           var checked=!!autoDone[t.label];
-          return'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
-            +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleAutoDoneItem(\''+sec.key+'\',\''+t.label.replace(/'/g,'')+'\',this.checked)" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+          return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">'
+            +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleAutoDoneItem(\''+sec.key+'\',\''+t.label.replace(/'/g,'')+'\',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'
             +'<span style="font-size:11px;'+(checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.icon+' '+t.label+'</span>'
             +(t.sub?'<span style="font-size:10px;color:var(--txt3);margin-left:4px">· '+t.sub.substring(0,30)+'</span>':'')
             +(checked?'<span style="font-size:10px;color:#16a34a;font-weight:700;flex-shrink:0">✓</span>':'')
             +'</div>';
         }).join('')
-        +'<div style="font-size:10px;color:var(--txt3);font-weight:700;margin:8px 0 4px;letter-spacing:.3px">✏️ 직접 추가</div>'
+        +'<div style="font-size:10px;color:var(--txt3);font-weight:700;margin:6px 0 3px;letter-spacing:.3px">✏️ 직접 추가</div>'
       :'')
-      // Manual input
-      +'<div style="display:flex;gap:6px;margin-bottom:8px">'
+      +'<div style="display:flex;gap:6px;margin-bottom:4px">'
       +'<input class="fi" id="bi-'+sec.key+'" style="flex:1;font-size:12px" placeholder="내용 입력 후 Enter" onkeydown="if(event.key===\'Enter\'){addDashBoardItem(\''+sec.key+'\');event.preventDefault();}">'
       +'<button class="btn btn-outline btn-xs" onclick="addDashBoardItem(\''+sec.key+'\')">추가</button>'
       +'</div>'
       +items.map(function(item,i){
-        return'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
-          +'<input type="checkbox" '+(item.checked?'checked':'')+' onchange="toggleDashBoardItem(\''+sec.key+'\','+i+',this.checked)" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">'
+        return'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+          +'<input type="checkbox" '+(item.checked?'checked':'')+' onchange="toggleDashBoardItem(\''+sec.key+'\','+i+',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'
           +'<span style="flex:1;font-size:12px;'+(item.checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item.text+'</span>'
-          +(item.checked?'<span style="font-size:10px;color:#16a34a;font-weight:700">✓ 완료</span>':'')
+          +(item.checked?'<span style="font-size:10px;color:#16a34a;font-weight:700">✓</span>':'')
           +'<button style="background:none;border:none;cursor:pointer;color:var(--txt3);padding:0 3px" onclick="removeDashBoardItem(\''+sec.key+'\','+i+')">✕</button>'
           +'</div>';
       }).join('')
-      +(items.length===0&&autoItems.length===0?'<div style="font-size:12px;color:var(--txt3);text-align:center;padding:8px 0">추진 사항을 입력하세요</div>':'')
       +'</div></div>';
   });
   html+='</div>';
