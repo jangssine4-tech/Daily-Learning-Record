@@ -8620,11 +8620,33 @@ function toggleCheckItem(key,checked){
   var lbl=document.querySelector('[data-ckey="'+key+'"]');
   if(lbl){lbl.style.textDecoration=checked?'line-through':'none';lbl.style.color=checked?'var(--txt3)':'var(--txt)';}
 }
+function editChecklistItem(si,bi,ii,el){
+  var editKey='edit_'+si+'_'+bi+'_'+ii;
+  var cur=el.textContent;
+  var inp=document.createElement('input');
+  inp.value=cur;
+  inp.style.cssText='flex:1;font-size:13px;border:1px solid var(--blue);border-radius:6px;padding:2px 6px;outline:none;width:100%';
+  el.replaceWith(inp);
+  inp.focus();inp.select();
+  function save(){
+    var newVal=inp.value.trim();
+    if(newVal&&newVal!==cur){
+      _checklistCustom[editKey]=newVal;
+      _saveChecklistCustom();
+    }
+    window._checklistLoaded=null;
+    renderChecklist();
+  }
+  inp.addEventListener('blur',save);
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){inp.blur();}
+    if(e.key==='Escape'){inp.value=cur;inp.blur();}
+  });
+}
 function restoreDefaultChecklist(){
-  if(!confirm('삭제된 기본 항목을 모두 복원할까요?'))return;
-  // Remove all del_ keys from _checklistCustom
+  if(!confirm('삭제된 기본 항목을 복원하고 수정된 내용도 원래대로 돌릴까요?'))return;
   Object.keys(_checklistCustom).forEach(function(k){
-    if(k.startsWith('del_'))delete _checklistCustom[k];
+    if(k.startsWith('del_')||k.startsWith('edit_'))delete _checklistCustom[k];
   });
   _saveChecklistCustom();
   window._checklistLoaded=null;
@@ -8706,10 +8728,12 @@ function _renderChecklistUI(el){
         var delKey='del_'+si+'_'+bi+'_'+ii;
         if(_checklistCustom[delKey])return;
         var key='s'+si+'b'+bi+'i'+ii;
+        var editKey='edit_'+si+'_'+bi+'_'+ii;
+        var displayText=_checklistCustom[editKey]||item;
         var checked=!!_checklistState[key];
         html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
           +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleCheckItem(\''+key+'\',this.checked)" style="width:17px;height:17px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">'
-          +'<span data-ckey="'+key+'" style="flex:1;font-size:13px;'+(checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item+'</span>'
+          +'<span data-ckey="'+key+'" id="cltext-'+key+'" style="flex:1;font-size:13px;cursor:text;'+(checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'\" ondblclick="editChecklistItem(\''+si+'\',\''+bi+'\',\''+ii+'\',this)">'+displayText+'</span>'
           +'<button onclick="removeChecklistItem('+si+','+bi+',\'builtin\','+ii+')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:11px;padding:0 3px;flex-shrink:0;opacity:0.4" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4">✕</button>'
           +'</div>';
       });
