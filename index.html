@@ -8599,14 +8599,24 @@ function toggleCheckItem(key,checked){
   var lbl=document.querySelector('[data-ckey="'+key+'"]');
   if(lbl){lbl.style.textDecoration=checked?'line-through':'none';lbl.style.color=checked?'var(--txt3)':'var(--txt)';}
 }
-function addChecklistItem(si,bi){
-  var inp=$('cl-new-'+si+'_'+bi);
-  if(!inp||!inp.value.trim())return;
+function onChecklistSecChange(){
+  var sel=$('cl-add-sec');if(!sel)return;
+  var si=parseInt(sel.value);
+  var subSel=$('cl-add-sub');if(!subSel)return;
+  var sec=_CHECKLIST_ITEMS[si];
+  subSel.innerHTML=sec.subs.map(function(s,bi){
+    return'<option value="'+si+'_'+bi+'">'+(s.sub||'(기본)')+'</option>';
+  }).join('');
+}
+function addChecklistItemGlobal(){
+  var inp=$('cl-add-input');if(!inp||!inp.value.trim())return;
+  var subSel=$('cl-add-sub');if(!subSel)return;
+  var parts=subSel.value.split('_');
+  var si=parseInt(parts[0]),bi=parseInt(parts[1]);
   var k=si+'_'+bi;
   if(!_checklistCustom[k])_checklistCustom[k]=[];
   _checklistCustom[k].push(inp.value.trim());
   inp.value='';
-  _saveChecklistCustom();
   _saveChecklistCustom();
   window._checklistLoaded=null;
   renderChecklist();
@@ -8651,43 +8661,59 @@ function _renderChecklistUI(el){
     +'<button class="btn btn-outline btn-xs" onclick="resetChecklist()">↺ 오늘 초기화</button>'
     +'<span style="font-size:11px;color:var(--txt3);align-self:center">날짜가 바뀌면 자동 초기화</span>'
     +'</div></div>';
+
+  // Checklist items
   _CHECKLIST_ITEMS.forEach(function(sec,si){
     html+='<div style="margin-bottom:18px">'
       +'<div style="font-size:14px;font-weight:800;color:var(--navy);padding:8px 12px;background:#eff6ff;border-radius:10px;margin-bottom:8px">'+sec.section+'</div>';
     sec.subs.forEach(function(sub,bi){
       if(sub.sub){
-        html+='<div style="font-size:12px;font-weight:700;color:var(--txt2);padding:4px 12px;margin-bottom:4px">'+sub.sub+'</div>';
+        html+='<div style="font-size:12px;font-weight:700;color:var(--txt2);padding:4px 12px;margin-bottom:2px">'+sub.sub+'</div>';
       }
       sub.items.forEach(function(item,ii){
         var delKey='del_'+si+'_'+bi+'_'+ii;
         if(_checklistCustom[delKey])return;
         var key='s'+si+'b'+bi+'i'+ii;
         var checked=!!_checklistState[key];
-        html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:8px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
           +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleCheckItem(\''+key+'\',this.checked)" style="width:17px;height:17px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">'
           +'<span data-ckey="'+key+'" style="flex:1;font-size:13px;'+(checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item+'</span>'
-          +'<button onclick="removeChecklistItem('+si+','+bi+',\'builtin\','+ii+')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:11px;padding:0 3px;flex-shrink:0">✕</button>'
+          +'<button onclick="removeChecklistItem('+si+','+bi+',\'builtin\','+ii+')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:11px;padding:0 3px;flex-shrink:0;opacity:0.4" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4">✕</button>'
           +'</div>';
       });
-      // Custom items
+      // Custom items for this subsection
       var custKey=si+'_'+bi;
       (_checklistCustom[custKey]||[]).forEach(function(item,ci){
         var key='s'+si+'b'+bi+'c'+ci;
         var checked=!!_checklistState[key];
-        html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:8px;background:#fefce8" onmouseover="this.style.background=\'#fef9c3\'" onmouseout="this.style.background=\'#fefce8\'">'
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#fefce8" onmouseover="this.style.background=\'#fef9c3\'" onmouseout="this.style.background=\'#fefce8\'">'
           +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleCheckItem(\''+key+'\',this.checked)" style="width:17px;height:17px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">'
           +'<span data-ckey="'+key+'" style="flex:1;font-size:13px;'+(checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item+'</span>'
           +'<button onclick="removeChecklistItem('+si+','+bi+',\'custom\','+ci+')" style="background:none;border:none;cursor:pointer;color:#b45309;font-size:11px;padding:0 3px;flex-shrink:0">✕</button>'
           +'</div>';
       });
-      // Add input
-      html+='<div style="display:flex;gap:6px;padding:4px 12px;">'
-        +'<input class="fi" id="cl-new-'+si+'_'+bi+'" placeholder="항목 추가..." style="flex:1;font-size:12px" onkeydown="if(event.key===\'Enter\'){addChecklistItem('+si+','+bi+');event.preventDefault();}">'
-        +'<button class="btn btn-outline btn-xs" onclick="addChecklistItem('+si+','+bi+')">추가</button>'
-        +'</div>';
     });
     html+='</div>';
   });
+
+  // Single add area at bottom
+  var secOpts=_CHECKLIST_ITEMS.map(function(s,si){return'<option value="'+si+'">'+s.section+'</option>';}).join('');
+  var subOpts=_CHECKLIST_ITEMS[0].subs.map(function(s,bi){return'<option value="0_'+bi+'">'+(s.sub||'(기본)')+'</option>';}).join('');
+  html+='<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--surface2);margin-top:8px">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">➕ 항목 추가</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<select id="cl-add-sec" class="fi" style="flex:1;min-width:140px;font-size:12px" onchange="onChecklistSecChange()">'
+    +secOpts+'</select>'
+    +'<select id="cl-add-sub" class="fi" style="flex:1;min-width:120px;font-size:12px">'
+    +subOpts+'</select>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<input class="fi" id="cl-add-input" style="flex:1;font-size:13px" placeholder="추가할 항목 내용 입력..." onkeydown="if(event.key===\'Enter\'){addChecklistItemGlobal();event.preventDefault();}">'
+    +'<button class="btn btn-green btn-sm" onclick="addChecklistItemGlobal()">추가</button>'
+    +'</div>'
+    +'</div></div>';
+
   html+='</div>';
   el.innerHTML=html;
   updateChecklistProgress();
