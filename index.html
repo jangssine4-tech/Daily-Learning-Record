@@ -8028,7 +8028,7 @@ function _renderDashBoardUI(el){
           +'style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:default">'
           +'<span style="color:var(--txt3);cursor:grab;font-size:14px;flex-shrink:0" title="드래그하여 순서 변경">⠿</span>'
           +'<input type="checkbox" '+(item.checked?'checked':'')+' onchange="toggleDashBoardItem(\''+sec.key+'\','+i+',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'
-          +'<span style="flex:1;font-size:12px;'+(item.checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item.text+'</span>'
+          +'<span ondblclick="editDashBoardItem(\''+sec.key+'\','+i+',this)" style="flex:1;font-size:12px;cursor:text;'+(item.checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item.text+'</span>'
           +(item.checked?'<span style="font-size:10px;color:#16a34a;font-weight:700">✓</span>':'')
           +'<button style="background:none;border:none;cursor:pointer;color:var(--txt3);padding:0 3px" onclick="removeDashBoardItem(\''+sec.key+'\','+i+')">✕</button>'
           +'</div>';
@@ -8068,6 +8068,26 @@ function dashDrop(e){
   items.splice(toIdx,0,moved);
   saveDashBoard();
   _renderDashBoardUI($('dashboard-board-area'));
+}
+function editDashBoardItem(key,idx,el){
+  var cur=el.textContent;
+  var inp=document.createElement('input');
+  inp.value=cur;
+  inp.style.cssText='flex:1;font-size:12px;border:1px solid var(--blue);border-radius:6px;padding:2px 6px;outline:none';
+  el.replaceWith(inp);inp.focus();inp.select();
+  function save(){
+    var v=inp.value.trim();
+    if(v&&v!==cur&&_dashBoard[key]&&_dashBoard[key][idx]){
+      _dashBoard[key][idx].text=v;
+      saveDashBoard();
+    }
+    _renderDashBoardUI($('dashboard-board-area'));
+  }
+  inp.addEventListener('blur',save);
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){inp.blur();}
+    if(e.key==='Escape'){inp.value=cur;inp.blur();}
+  });
 }
 function addDashBoardItem(key){
   var inp=$('bi-'+key);if(!inp||!inp.value.trim())return;
