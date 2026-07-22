@@ -2351,7 +2351,8 @@ function renderWeeklyTimetable(){
       }
     });
   });
-  var timeSlots=Object.keys(timeSet).sort();
+  function tsToMinWT(ts){var p=ts.match(/(\d+):(\d+)/);return p?parseInt(p[1])*60+parseInt(p[2]):0;}
+  var timeSlots=Object.keys(timeSet).sort(function(a,b){return tsToMinWT(a)-tsToMinWT(b);});
   if(!timeSlots.length){area.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:var(--txt3)">시간 설정된 학생이 없습니다</div>';return;}
   // Build grid data: timeSlot → day → [students]
   var grid={};
@@ -7337,7 +7338,9 @@ function renderSpecialPlan(){
   });
   // Merge with special plan timeSlots
   (plan.timeSlots||[]).forEach(function(ts){timeSet[ts]=true;});
-  var timeSlots=Object.keys(timeSet).sort();
+  // Numeric sort (convert HH:MM to minutes for comparison)
+  function tsToMin(ts){var p=ts.match(/(\d+):(\d+)/);return p?parseInt(p[1])*60+parseInt(p[2]):0;}
+  var timeSlots=Object.keys(timeSet).sort(function(a,b){return tsToMin(a)-tsToMin(b);});
 
   // Build weekly grid
   var weekGrid={};
@@ -7763,7 +7766,11 @@ function renderSpecialTarget(){
     +'</tr></thead><tbody>';
   activeStudents.forEach(function(s){
     var r=rowData[s.id]||{};
-    var lv=r.level||(getStudentLevel(s)||s.level||'');
+    // If r.level looks incomplete (no number for Grammar/First), fall back to student data
+    var storedLv=r.level||'';
+    var autoLv=getStudentLevel(s)||s.level||'';
+    var needsNum=/^(Grammar Plus|First Grammar)$/.test(storedLv.trim());
+    var lv=(!storedLv||needsNum)?autoLv:storedLv;
     var grade=s.grade||s.schoolGrade||'';
     html+='<tr data-skey="'+dataKey+'" data-sid="'+s.id+'">'
       +'<td style="font-weight:600;text-align:center;font-size:12px">'+s.name+'</td>'
