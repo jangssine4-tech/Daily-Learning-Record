@@ -317,6 +317,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab active" id="dtab-board" onclick="switchDashTab('board')">📋 대시보드</button>
     <button class="rev-tab" id="dtab-crm" onclick="switchDashTab('crm')">👥 상담</button>
     <button class="rev-tab" id="dtab-mk" onclick="switchDashTab('mk')">📣 마케팅 · 홍보</button>
+    <button class="rev-tab" id="dtab-calendar" onclick="switchDashTab('calendar')">📆 연간 학사일정</button>
     <button class="rev-tab" id="dtab-conditions" onclick="switchDashTab('conditions')">⚙️ 자동 분류 조건</button>
   </div>
   <div id="dash-panel-board" style="display:none" class="cp"><div id="dashboard-board-area"></div></div>
@@ -332,6 +333,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div id="dashboard-area"></div>
   </div>
   <div id="dash-panel-mk" style="display:none" class="cp"><div id="dashboard-mk-area"></div></div>
+  <div id="dash-panel-calendar" style="display:none" class="cp"><div id="dashboard-calendar-area"></div></div>
   <div id="dash-panel-conditions" style="display:none" class="cp"><div id="crm-conditions-area"></div></div>
 </div>
 <div class="view" id="view-special"><div class="page-top"><h2>⭐ 특강</h2></div>
@@ -2448,13 +2450,14 @@ function renderWeeklyTimetable(){
 var _scheduleNotesRendered=false;
 // ══ CRM 오늘의 업무 자동 생성 ══
 function switchDashTab(tab){
-  ['board','crm','mk','conditions'].forEach(function(t){
+  ['board','crm','mk','calendar','conditions'].forEach(function(t){
     var btn=$('dtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('dash-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
   });
   if(tab==='board')renderDashBoard();
   else if(tab==='crm'){initCrmDateSelector();renderCrmDailyInto('dashboard-area');}
   else if(tab==='mk'){loadMpPlans().then(function(){renderMkTodayPage('dashboard-mk-area');});}
+  else if(tab==='calendar'){renderAcademicCalendar();}
   else if(tab==='conditions'){loadCrmConditions().then(function(){_renderCrmConditionsUI($('crm-conditions-area'));});}
 }
 function renderDashboard(){switchDashTab('board');}
@@ -8252,6 +8255,93 @@ function renderAutoTasksSection(dateStr){
   }).join('');
 }
 
+// ── 연간 학사일정 ──
+var _academicCalendar=null;
+function loadAcademicCalendar(cb){
+  if(_academicCalendar){if(cb)cb();return;}
+  db.collection('config').doc('academicCalendar').get().then(function(d){
+    _academicCalendar=d.exists?d.data():{events:[]};
+    if(!_academicCalendar.events)_academicCalendar.events=[];
+    if(cb)cb();
+  }).catch(function(){_academicCalendar={events:[]};if(cb)cb();});
+}
+function saveAcademicCalendar(){
+  db.collection('config').doc('academicCalendar').set(_academicCalendar).catch(function(){toast('❌ 저장 실패');});
+}
+function renderAcademicCalendar(){
+  var el=$('dashboard-calendar-area');if(!el)return;
+  el.innerHTML='<div style="padding:12px;color:var(--txt3)">⏳ 로딩 중...</div>';
+  loadAcademicCalendar(function(){_renderAcademicCalendarUI(el);});
+}
+function _renderAcademicCalendarUI(el){
+  var now=new Date();
+  var yr=window._acalYr||now.getFullYear();
+  window._acalYr=yr;
+  var months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  var catColors={방학:'#fbbf24',특강:'#60a5fa',행사:'#34d399',시험:'#f87171',기타:'#a78bfa'};
+  var cats=Object.keys(catColors);
+  var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';
+  var html='<div style="max-width:900px;padding:14px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">'
+    +'<select class="fi" style="width:90px" onchange="window._acalYr=parseInt(this.value);_renderAcademicCalendarUI($(\'dashboard-calendar-area\'))">'+yrOpts+'</select>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +cats.map(function(cat){return'<span style="font-size:11px;font-weight:700;background:'+catColors[cat]+'22;color:'+catColors[cat]+';padding:2px 8px;border-radius:6px;border:1px solid '+catColors[cat]+'">'+cat+'</span>';}).join('')
+    +'</div>'
+    +'<button class="btn btn-green btn-sm" style="margin-left:auto" onclick="openAcalAddModal()">+ 일정 추가</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">';
+  months.forEach(function(mLabel,mi){
+    var mo=mi+1;
+    var evts=(_academicCalendar.events||[]).filter(function(e){
+      var d=new Date(e.date);return d.getFullYear()===yr&&d.getMonth()+1===mo;
+    }).sort(function(a,b){return a.date>b.date?1:-1;});
+    html+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+      +'<div style="background:var(--navy);color:#fff;font-size:12px;font-weight:700;padding:6px 10px">'+mLabel+'</div>'
+      +'<div style="padding:6px;min-height:60px">'
+      +evts.map(function(e){
+        var d=new Date(e.date);var dayStr=d.getDate()+'일';
+        var col=catColors[e.cat]||'#94a3b8';
+        return'<div style="display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:5px;margin-bottom:2px;background:'+col+'18">'
+          +'<span style="font-size:10px;font-weight:700;color:'+col+';min-width:24px">'+dayStr+'</span>'
+          +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.title+'</span>'
+          +'<button onclick="removeAcalEvent(\''+e.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:10px;padding:0;flex-shrink:0">✕</button>'
+          +'</div>';
+      }).join('')
+      +(evts.length===0?'<div style="font-size:11px;color:var(--txt3);text-align:center;padding:8px 0">-</div>':'')
+      +'</div></div>';
+  });
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+function openAcalAddModal(){
+  var now=new Date();
+  var cats=['방학','특강','행사','시험','기타'];
+  var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms" style="max-width:360px"><div class="mh"></div><div class="mt">📆 학사일정 추가</div>'
+    +'<div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="acal-date" value="'+(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'))+'"></div>'
+    +'<div class="field"><div class="fl">제목</div><input class="fi" id="acal-title" placeholder="예: 여름방학 시작"></div>'
+    +'<div class="field"><div class="fl">구분</div><select class="fi" id="acal-cat">'+cats.map(function(c){return'<option>'+c+'</option>';}).join('')+'</select></div>'
+    +'<div class="field"><div class="fl">메모</div><input class="fi" id="acal-note" placeholder="(선택)"></div>'
+    +'<button class="btn btn-green btn-block" onclick="confirmAcalAdd(this.closest(\'.mo\'))">추가</button>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
+}
+function confirmAcalAdd(overlay){
+  var date=$('acal-date').value;var title=$('acal-title').value.trim();var cat=$('acal-cat').value;var note=$('acal-note').value.trim();
+  if(!date||!title){toast('날짜와 제목을 입력하세요');return;}
+  if(!_academicCalendar)_academicCalendar={events:[]};
+  _academicCalendar.events.push({id:Date.now().toString(36),date:date,title:title,cat:cat,note:note});
+  saveAcademicCalendar();overlay.remove();
+  _renderAcademicCalendarUI($('dashboard-calendar-area'));
+}
+function removeAcalEvent(id){
+  if(!_academicCalendar)return;
+  _academicCalendar.events=(_academicCalendar.events||[]).filter(function(e){return e.id!==id;});
+  saveAcademicCalendar();
+  _renderAcademicCalendarUI($('dashboard-calendar-area'));
+}
 var _DEFAULT_CRM_CONDITIONS={
   urgent:[
     {id:'absent',label:'결석',desc:'오늘 결석 처리된 학생',editable:false},
