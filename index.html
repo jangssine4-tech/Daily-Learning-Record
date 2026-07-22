@@ -232,6 +232,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="sb-sec">오늘의 업무</div>
   <div class="sb-item" id="snav-dashboard" onclick="goto('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>오늘의 업무</div>
   <div class="sb-item" id="snav-checklist" onclick="goto('checklist')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>교사 체크리스트</div>
+  <div class="sb-item" id="snav-meeting" onclick="goto('meeting')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>업무 회의</div>
   <div class="sb-sec">수업 관리</div>
   <div class="sb-item" id="snav-schedule" onclick="goto('schedule')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>오늘의 시간표</div>
   <div class="sb-item" id="snav-write" onclick="goto('write')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>학습 일지 작성</div>
@@ -267,6 +268,10 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <div class="view" id="view-checklist">
   <div class="page-top"><h2>📋 교사 체크리스트</h2></div>
   <div class="cp" id="checklist-area"></div>
+</div>
+<div class="view" id="view-meeting">
+  <div class="page-top"><h2>💼 업무 회의</h2></div>
+  <div class="cp" id="meeting-area"></div>
 </div>
 <div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">📅 오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">📋 주간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">📊 수용 현황</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">📌 전달 사항</button></div><div id="sch-panel-today"><div class="toolbar" style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button></div><div id="schedule-notes-award" style="margin-bottom:0"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="weekly-schedule-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
@@ -2124,6 +2129,7 @@ function goto(view){
   // Only populate selects when navigating away from schedule
   if(view!=='schedule') ensureFullPopulate();
   if(view==='checklist'){renderChecklist();}
+  else if(view==='meeting'){renderMeetingPage();}
   else if(view==='schedule'){loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});renderScheduleNotes();}
   else if(view==='history'){loadReports().then(renderHistory);}
   else if(view==='students'){
@@ -8255,7 +8261,99 @@ function renderAutoTasksSection(dateStr){
   }).join('');
 }
 
-// ── 연간 학사일정 ──
+// ── 업무 회의 ──
+var _meetingData=null;
+function loadMeetingData(cb){
+  if(_meetingData){if(cb)cb();return;}
+  db.collection('config').doc('workMeeting').get().then(function(d){
+    _meetingData=d.exists?d.data():{records:[]};
+    if(!_meetingData.records)_meetingData.records=[];
+    if(cb)cb();
+  }).catch(function(){_meetingData={records:[]};if(cb)cb();});
+}
+function saveMeetingData(){
+  db.collection('config').doc('workMeeting').set(_meetingData).catch(function(){toast('❌ 저장 실패');});
+}
+function renderMeetingPage(){
+  var el=$('meeting-area');if(!el)return;
+  el.innerHTML='<div style="padding:12px;color:var(--txt3)">⏳ 로딩 중...</div>';
+  loadMeetingData(function(){_renderMeetingUI(el);});
+}
+function _renderMeetingUI(el){
+  var records=(_meetingData.records||[]).slice().sort(function(a,b){return b.date>a.date?1:-1;});
+  var html='<div style="max-width:700px">'
+    +'<div style="display:flex;gap:8px;margin-bottom:16px">'
+    +'<button class="btn btn-green btn-sm" onclick="openMeetingModal()">+ 회의록 작성</button>'
+    +'</div>';
+  if(!records.length){
+    html+='<div style="text-align:center;padding:40px;color:var(--txt3)">작성된 회의록이 없습니다</div>';
+  } else {
+    records.forEach(function(r){
+      html+='<div style="border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden">'
+        +'<div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:10px">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--navy)">'+r.title+'</div>'
+        +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+r.date+(r.attendees?' · 참석: '+r.attendees:'')+'</div>'
+        +'</div>'
+        +'<button onclick="deleteMeetingRecord(\''+r.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:12px">🗑</button>'
+        +'</div>'
+        +'<div style="padding:12px 14px">'
+        +(r.agenda?'<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:3px">📋 안건</div><div style="font-size:12px;color:var(--txt);white-space:pre-wrap">'+r.agenda+'</div></div>':'')
+        +(r.content?'<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:3px">📝 회의 내용</div><div style="font-size:12px;color:var(--txt);white-space:pre-wrap">'+r.content+'</div></div>':'')
+        +(r.action?'<div><div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px">✅ 결정 사항 / 액션 아이템</div><div style="font-size:12px;color:var(--txt);white-space:pre-wrap">'+r.action+'</div></div>':'')
+        +'</div></div>';
+    });
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
+function openMeetingModal(id){
+  var r=id?(_meetingData.records||[]).find(function(x){return x.id===id;}):{};
+  var now=new Date();
+  var dateVal=r.date||(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'));
+  var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="ms" style="max-width:500px"><div class="mh"></div><div class="mt">💼 회의록 작성</div>'
+    +'<div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="mt-date" value="'+dateVal+'"></div>'
+    +'<div class="field"><div class="fl">제목</div><input class="fi" id="mt-title" placeholder="예: 7월 4주차 교사 회의" value="'+(r.title||'')+'"></div>'
+    +'<div class="field"><div class="fl">참석자</div><input class="fi" id="mt-attendees" placeholder="예: 이루다, 서연" value="'+(r.attendees||'')+'"></div>'
+    +'<div class="field"><div class="fl">안건</div><textarea class="fi" id="mt-agenda" rows="3" placeholder="회의 안건을 입력하세요">'+(r.agenda||'')+'</textarea></div>'
+    +'<div class="field"><div class="fl">회의 내용</div><textarea class="fi" id="mt-content" rows="4" placeholder="회의 내용을 기록하세요">'+(r.content||'')+'</textarea></div>'
+    +'<div class="field"><div class="fl">결정 사항</div><textarea class="fi" id="mt-action" rows="3" placeholder="결정된 사항 또는 액션 아이템">'+(r.action||'')+'</textarea></div>'
+    +'<button class="btn btn-green btn-block" onclick="saveMeetingRecord(\''+( r.id||'')+'\',this.closest(\'.mo\'))">저장</button>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
+}
+function saveMeetingRecord(id,overlay){
+  var title=$('mt-title').value.trim();
+  if(!title){toast('제목을 입력하세요');return;}
+  var record={
+    id:id||Date.now().toString(36),
+    date:$('mt-date').value,title:title,
+    attendees:$('mt-attendees').value.trim(),
+    agenda:$('mt-agenda').value.trim(),
+    content:$('mt-content').value.trim(),
+    action:$('mt-action').value.trim(),
+    updatedAt:new Date().toISOString()
+  };
+  if(!_meetingData)_meetingData={records:[]};
+  if(id){
+    var idx=_meetingData.records.findIndex(function(r){return r.id===id;});
+    if(idx>=0)_meetingData.records[idx]=record;else _meetingData.records.push(record);
+  } else {
+    _meetingData.records.push(record);
+  }
+  saveMeetingData();overlay.remove();
+  _renderMeetingUI($('meeting-area'));
+  toast('✅ 저장됐습니다');
+}
+function deleteMeetingRecord(id){
+  if(!confirm('이 회의록을 삭제할까요?'))return;
+  _meetingData.records=(_meetingData.records||[]).filter(function(r){return r.id!==id;});
+  saveMeetingData();
+  _renderMeetingUI($('meeting-area'));
+}
 var _academicCalendar=null;
 function loadAcademicCalendar(cb){
   if(_academicCalendar){if(cb)cb();return;}
