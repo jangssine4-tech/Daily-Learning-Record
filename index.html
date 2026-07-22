@@ -7766,20 +7766,12 @@ function renderSpecialTarget(){
     +'</tr></thead><tbody>';
   activeStudents.forEach(function(s){
     var r=rowData[s.id]||{};
-    // If r.level looks incomplete (no number for Grammar/First), auto-fix to student data
-    var storedLv=r.level||'';
-    var autoLv=getStudentLevel(s)||s.level||'';
-    var needsNum=/^(Grammar Plus|First Grammar)$/.test(storedLv.trim());
-    var lv=(!storedLv||needsNum)?autoLv:storedLv;
-    // Auto-correct stored level if incomplete
-    if(needsNum&&autoLv&&autoLv!==storedLv){
-      updateSpecialTargetV2(dataKey,s.id,'level',autoLv);
-    }
+    var lv=getStudentLevel(s)||s.level||'';
     var grade=s.grade||s.schoolGrade||'';
     html+='<tr data-skey="'+dataKey+'" data-sid="'+s.id+'">'
       +'<td style="font-weight:600;text-align:center;font-size:12px">'+s.name+'</td>'
       +'<td style="text-align:center;font-size:11px;color:var(--txt3)">'+grade+'</td>'
-      +'<td><input class="fi sp-level" style="font-size:11px" value="'+lv.replace(/"/g,'&quot;')+'"></td>'
+      +'<td style="font-size:11px;color:var(--txt);padding:4px 6px">'+lv+'</td>'
       +'<td><select class="fi sp-prog" style="font-size:11px"><option value="">선택</option>'+_specialPrograms.map(function(p){return'<option value="'+p+'"'+(r.program===p?' selected':'')+'>'+p+'</option>';}).join('')+'</select></td>'
       +'<td><input class="fi sp-mock" style="font-size:11px;text-align:right" value="'+(r.mockScore||'').replace(/"/g,'&quot;')+'" placeholder="예: 85점"></td>'
       +'<td><input class="fi sp-time" style="font-size:11px" value="'+(r.classTime||'').replace(/"/g,'&quot;')+'" placeholder="예: 오후 2시"></td>'
@@ -7798,7 +7790,7 @@ function renderSpecialTarget(){
       inp.addEventListener('change',function(){sv(field,this.type==='checkbox'?this.checked:this.value);if(this.type==='checkbox')saveSpecialData();});
       inp.addEventListener('blur',function(){if(this.type!=='checkbox')sv(field,this.value);});
     }
-    wire('sp-level','level');wire('sp-mock','mockScore');wire('sp-prog','program');
+    wire('sp-mock','mockScore');wire('sp-prog','program');
     wire('sp-time','classTime');wire('sp-notice','noticeSent');wire('sp-counsel','counselDone');wire('sp-note','note');
 
   });
