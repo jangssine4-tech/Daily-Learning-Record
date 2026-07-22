@@ -7766,11 +7766,15 @@ function renderSpecialTarget(){
     +'</tr></thead><tbody>';
   activeStudents.forEach(function(s){
     var r=rowData[s.id]||{};
-    // If r.level looks incomplete (no number for Grammar/First), fall back to student data
+    // If r.level looks incomplete (no number for Grammar/First), auto-fix to student data
     var storedLv=r.level||'';
     var autoLv=getStudentLevel(s)||s.level||'';
     var needsNum=/^(Grammar Plus|First Grammar)$/.test(storedLv.trim());
     var lv=(!storedLv||needsNum)?autoLv:storedLv;
+    // Auto-correct stored level if incomplete
+    if(needsNum&&autoLv&&autoLv!==storedLv){
+      updateSpecialTargetV2(dataKey,s.id,'level',autoLv);
+    }
     var grade=s.grade||s.schoolGrade||'';
     html+='<tr data-skey="'+dataKey+'" data-sid="'+s.id+'">'
       +'<td style="font-weight:600;text-align:center;font-size:12px">'+s.name+'</td>'
