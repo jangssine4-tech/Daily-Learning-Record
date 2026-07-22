@@ -7969,15 +7969,7 @@ function _renderDashBoardUI(el){
 
   var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:12px">';
 
-  // Admin: show teacher checklist summary card
-  if(currentUser&&currentUser.role!=='teacher'){
-    html+='<div id="board-checklist-overview" style="border:1px solid #fbbf24;border-radius:12px;overflow:hidden">'
-      +'<div style="background:#fffbeb;padding:8px 14px;display:flex;align-items:center;justify-content:space-between">'
-      +'<div style="font-size:13px;font-weight:800;color:#b45309">📋 교사 체크리스트 현황 — 오늘</div>'
-      +'</div>'
-      +'<div style="padding:10px 14px;background:var(--surface)" id="board-cl-summary">⏳ 로딩 중...</div>'
-      +'</div>';
-  }
+
 
   // CRM-style date selector
   html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
@@ -8937,10 +8929,7 @@ function _renderChecklistUI(el){
   html+='</div>';
   el.innerHTML=html;
   updateChecklistProgress();
-  // Initial load of teacher summary (realtime listener will keep it updated)
-  if(currentUser&&currentUser.role!=='teacher'){
-    _loadBoardChecklistSummary();
-  }
+
 }
 function resetChecklist(){
   if(!confirm('오늘 체크리스트를 초기화할까요?'))return;
@@ -9127,40 +9116,6 @@ async function saveRefItem(){loading(true);var type=$('ref-type').value;var data
 async function deleteRefItem(id){var did=id||$('ref-id').value;if(!did||!confirm('삭제?'))return;loading(true);await db.collection('refItems').doc(did).delete();await loadRefItems();renderRefFees();closeM('refitem');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
 
 // ══ ADMIN ══
-function _loadBoardChecklistSummary(){
-  var summaryEl=$('board-cl-summary');if(!summaryEl)return;
-  var teachers=(users||[]).filter(function(u){return!u.adminDeleted&&(u.role==='teacher'||u.role==='강사');});
-  if(!teachers.length){summaryEl.innerHTML='<div style="font-size:12px;color:var(--txt3)">등록된 교사 없음</div>';return;}
-  var total=0;
-  _CHECKLIST_ITEMS.forEach(function(s,si){s.subs.forEach(function(sub,bi){sub.items.forEach(function(item,ii){
-    if(!(_checklistCustom&&_checklistCustom['del_'+si+'_'+bi+'_'+ii]))total++;
-  });});});
-  if(!total)_CHECKLIST_ITEMS.forEach(function(s){s.subs.forEach(function(sub){total+=sub.items.length;});});
-  var html=teachers.map(function(u){
-    var uid=u.docId||u.id||'';
-    var data=(window._clTeacherStates&&window._clTeacherStates[uid])||null;
-    if(!data)return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
-      +'<span style="font-size:12px;font-weight:700;min-width:60px;color:var(--txt)">'+u.name+'</span>'
-      +'<div style="flex:1;background:var(--border);border-radius:99px;height:6px"></div>'
-      +'<span style="font-size:11px;color:var(--txt3);min-width:50px">미시작</span>'
-      +'</div>';
-    var checked=0;
-    _CHECKLIST_ITEMS.forEach(function(sec,si){sec.subs.forEach(function(sub,bi){sub.items.forEach(function(item,ii){
-      if(_checklistCustom&&_checklistCustom['del_'+si+'_'+bi+'_'+ii])return;
-      if(data['s'+si+'b'+bi+'i'+ii])checked++;
-    });});});
-    var pct=total?Math.round(checked/total*100):0;
-    var done=checked>=total&&total>0;
-    var col=done?'#16a34a':pct>=50?'var(--mint)':'#f59e0b';
-    return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
-      +'<span style="font-size:12px;font-weight:700;min-width:60px;color:var(--navy)">'+u.name+'</span>'
-      +'<div style="flex:1;background:var(--border);border-radius:99px;height:6px;overflow:hidden">'
-      +'<div style="width:'+pct+'%;background:'+col+';height:100%;border-radius:99px"></div></div>'
-      +'<span style="font-size:11px;font-weight:700;color:'+col+';min-width:50px;text-align:right">'+checked+'/'+total+(done?' ✅':'')+'</span>'
-      +'</div>';
-  }).join('');
-  summaryEl.innerHTML=html||'<div style="font-size:12px;color:var(--txt3)">데이터 없음</div>';
-}
 function renderChecklistOverview(){
   var el=$('admin-checklist-overview');if(!el)return;
   el.innerHTML='<div style="padding:8px 0;color:var(--txt3);font-size:12px">⏳ 체크리스트 현황 로딩 중...</div>';
