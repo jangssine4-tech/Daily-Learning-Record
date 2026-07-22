@@ -1892,6 +1892,34 @@ async function syncFromFirestore(){
 var _rtListeners=[];
 function startRealtimeListeners(){
   if(!db)return;
+  // Checklist realtime listener (all teachers' today status)
+  try{
+    var clDateStr=todayISO();
+    var clTeachers=(users||[]).filter(function(u){return!u.adminDeleted&&(u.role==='teacher'||u.role==='강사');});
+    clTeachers.forEach(function(u){
+      var uid=u.docId||u.id||'';
+      if(!uid)return;
+      var docId='checklistDone_'+clDateStr+'_'+uid;
+      var unsubCl=db.collection('config').doc(docId).onSnapshot(function(d){
+        // Update cached state for this teacher
+        if(!window._clTeacherStates)window._clTeacherStates={};
+        window._clTeacherStates[uid]=d.exists?d.data():null;
+        // If checklist page is open (this teacher), update UI
+        var cv=document.querySelector('.view.active');
+        if(cv&&cv.id==='view-checklist'){
+          var myUid=currentUser&&(currentUser.docId||currentUser.id)||'';
+          if(myUid===uid){
+            _checklistState=window._clTeacherStates[uid]||{};
+            _renderChecklistUI($('checklist-area'));
+          }
+        }
+        // If dashboard is open, refresh summary
+        var boardEl=$('board-cl-summary');
+        if(boardEl)_loadBoardChecklistSummary();
+      },function(){});
+      _rtListeners.push(unsubCl);
+    });
+  }catch(e){}
   // Reports listener
   var yearStart=new Date().getFullYear()+'-01-01';
   try{
@@ -7995,7 +8023,10 @@ function _renderDashBoardUI(el){
       +'<button class="btn btn-outline btn-xs" onclick="addDashBoardItem(\''+sec.key+'\')">추가</button>'
       +'</div>'
       +items.map(function(item,i){
-        return'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+        return'<div draggable="true" data-drag-key="'+sec.key+'" data-drag-idx="'+i+'" '
+          +'ondragstart="dashDragStart(event)" ondragover="dashDragOver(event)" ondrop="dashDrop(event)" '
+          +'style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:default">'
+          +'<span style="color:var(--txt3);cursor:grab;font-size:14px;flex-shrink:0" title="드래그하여 순서 변경">⠿</span>'
           +'<input type="checkbox" '+(item.checked?'checked':'')+' onchange="toggleDashBoardItem(\''+sec.key+'\','+i+',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'
           +'<span style="flex:1;font-size:12px;'+(item.checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item.text+'</span>'
           +(item.checked?'<span style="font-size:10px;color:#16a34a;font-weight:700">✓</span>':'')
@@ -8012,6 +8043,29 @@ function toggleAutoDoneItem(key,label,checked){
   var doneKey='_autoDone_'+key;
   if(!_dashBoard[doneKey])_dashBoard[doneKey]={};
   _dashBoard[doneKey][label]=checked;
+  saveDashBoard();
+  _renderDashBoardUI($('dashboard-board-area'));
+}
+var _dashDrag={};
+function dashDragStart(e){
+  _dashDrag.key=e.currentTarget.dataset.dragKey;
+  _dashDrag.idx=parseInt(e.currentTarget.dataset.dragIdx);
+  e.dataTransfer.effectAllowed='move';
+}
+function dashDragOver(e){
+  e.preventDefault();e.dataTransfer.dropEffect='move';
+  e.currentTarget.style.borderTop='2px solid var(--mint)';
+}
+function dashDrop(e){
+  e.preventDefault();
+  e.currentTarget.style.borderTop='';
+  var toIdx=parseInt(e.currentTarget.dataset.dragIdx);
+  var key=_dashDrag.key;
+  var fromIdx=_dashDrag.idx;
+  if(!_dashBoard[key]||fromIdx===toIdx)return;
+  var items=_dashBoard[key];
+  var moved=items.splice(fromIdx,1)[0];
+  items.splice(toIdx,0,moved);
   saveDashBoard();
   _renderDashBoardUI($('dashboard-board-area'));
 }
@@ -8863,10 +8917,9 @@ function _renderChecklistUI(el){
   html+='</div>';
   el.innerHTML=html;
   updateChecklistProgress();
-  // Load teacher checklist summary for admin/owner
-  var isOwner=currentUser&&(currentUser.role==='admin'||currentUser.role==='owner'||currentUser.role==='원장');
-  if(isOwner||(!currentUser)||(currentUser&&currentUser.role!=='teacher')){
-    setTimeout(function(){_loadBoardChecklistSummary();},100);
+  // Initial load of teacher summary (realtime listener will keep it updated)
+  if(currentUser&&currentUser.role!=='teacher'){
+    _loadBoardChecklistSummary();
   }
 }
 function resetChecklist(){
@@ -9056,38 +9109,37 @@ async function deleteRefItem(id){var did=id||$('ref-id').value;if(!did||!confirm
 // ══ ADMIN ══
 function _loadBoardChecklistSummary(){
   var summaryEl=$('board-cl-summary');if(!summaryEl)return;
-  var dateStr=todayISO();
-  var teachers=users.filter(function(u){return!u.adminDeleted&&u.role==='teacher';});
+  var teachers=(users||[]).filter(function(u){return!u.adminDeleted&&(u.role==='teacher'||u.role==='강사');});
   if(!teachers.length){summaryEl.innerHTML='<div style="font-size:12px;color:var(--txt3)">등록된 교사 없음</div>';return;}
-  var promises=teachers.map(function(u){
-    var docId='checklistDone_'+dateStr+'_'+(u.id||u.docId||'');
-    return db.collection('config').doc(docId).get().then(function(d){
-      return{teacher:u,data:d.exists?d.data():null};
-    }).catch(function(){return{teacher:u,data:null};});
-  });
-  Promise.all(promises).then(function(results){
-    var total=0;
-    _CHECKLIST_ITEMS.forEach(function(s){s.subs.forEach(function(sub){total+=sub.items.length;});});
-    var html=results.map(function(r){
-      var u=r.teacher,data=r.data;
-      if(!data)return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
-        +'<span style="font-size:13px;font-weight:700;min-width:60px">'+u.name+'</span>'
-        +'<div style="flex:1;background:var(--border);border-radius:99px;height:7px;overflow:hidden"><div style="width:0%;background:var(--border);height:100%"></div></div>'
-        +'<span style="font-size:12px;color:var(--txt3);min-width:50px">미시작</span>'
-        +'</div>';
-      var checked=0;
-      _CHECKLIST_ITEMS.forEach(function(sec,si){sec.subs.forEach(function(sub,bi){sub.items.forEach(function(item,ii){var key='s'+si+'b'+bi+'i'+ii;if(data[key])checked++;});});});
-      var pct=total?Math.round(checked/total*100):0;
-      var done=checked===total&&total>0;
-      var col=done?'#16a34a':pct>=50?'var(--mint)':'#f59e0b';
-      return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
-        +'<span style="font-size:13px;font-weight:700;min-width:60px;color:var(--navy)">'+u.name+'</span>'
-        +'<div style="flex:1;background:var(--border);border-radius:99px;height:7px;overflow:hidden"><div style="width:'+pct+'%;background:'+col+';height:100%"></div></div>'
-        +'<span style="font-size:12px;font-weight:700;color:'+col+';min-width:50px;text-align:right">'+checked+'/'+total+(done?' ✅':'')+'</span>'
-        +'</div>';
-    }).join('');
-    summaryEl.innerHTML=html||'<div style="font-size:12px;color:var(--txt3)">데이터 없음</div>';
-  });
+  var total=0;
+  _CHECKLIST_ITEMS.forEach(function(s,si){s.subs.forEach(function(sub,bi){sub.items.forEach(function(item,ii){
+    if(!(_checklistCustom&&_checklistCustom['del_'+si+'_'+bi+'_'+ii]))total++;
+  });});});
+  if(!total)_CHECKLIST_ITEMS.forEach(function(s){s.subs.forEach(function(sub){total+=sub.items.length;});});
+  var html=teachers.map(function(u){
+    var uid=u.docId||u.id||'';
+    var data=(window._clTeacherStates&&window._clTeacherStates[uid])||null;
+    if(!data)return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
+      +'<span style="font-size:12px;font-weight:700;min-width:60px;color:var(--txt)">'+u.name+'</span>'
+      +'<div style="flex:1;background:var(--border);border-radius:99px;height:6px"></div>'
+      +'<span style="font-size:11px;color:var(--txt3);min-width:50px">미시작</span>'
+      +'</div>';
+    var checked=0;
+    _CHECKLIST_ITEMS.forEach(function(sec,si){sec.subs.forEach(function(sub,bi){sub.items.forEach(function(item,ii){
+      if(_checklistCustom&&_checklistCustom['del_'+si+'_'+bi+'_'+ii])return;
+      if(data['s'+si+'b'+bi+'i'+ii])checked++;
+    });});});
+    var pct=total?Math.round(checked/total*100):0;
+    var done=checked>=total&&total>0;
+    var col=done?'#16a34a':pct>=50?'var(--mint)':'#f59e0b';
+    return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
+      +'<span style="font-size:12px;font-weight:700;min-width:60px;color:var(--navy)">'+u.name+'</span>'
+      +'<div style="flex:1;background:var(--border);border-radius:99px;height:6px;overflow:hidden">'
+      +'<div style="width:'+pct+'%;background:'+col+';height:100%;border-radius:99px"></div></div>'
+      +'<span style="font-size:11px;font-weight:700;color:'+col+';min-width:50px;text-align:right">'+checked+'/'+total+(done?' ✅':'')+'</span>'
+      +'</div>';
+  }).join('');
+  summaryEl.innerHTML=html||'<div style="font-size:12px;color:var(--txt3)">데이터 없음</div>';
 }
 function renderChecklistOverview(){
   var el=$('admin-checklist-overview');if(!el)return;
