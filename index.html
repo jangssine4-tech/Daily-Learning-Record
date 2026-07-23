@@ -8961,23 +8961,18 @@ function _getChecklistDocId(){return _clDocId(todayISO());}
 
 // ── 오래된 체크리스트 자동 삭제 (14일 이상) ──
 function _clDeleteOld(){
-  var uid=currentUser&&currentUser.docId||currentUser&&currentUser.id||'unknown';
-  var cutoff=new Date();cutoff.setDate(cutoff.getDate()-14);
-  var cutoffStr=cutoff.getFullYear()+'-'+String(cutoff.getMonth()+1).padStart(2,'0')+'-'+String(cutoff.getDate()).padStart(2,'0');
-  db.collection('config').where(firebase.firestore.FieldPath.documentId(),'>=','checklistDone_0000')
-    .where(firebase.firestore.FieldPath.documentId(),'<=','checklistDone_9999').get()
-    .then(function(snap){
-      snap.forEach(function(doc){
-        var id=doc.id;
-        if(!id.startsWith('checklistDone_'))return;
-        var parts=id.split('_');
-        if(parts.length<3)return;
-        var dateStr=parts[1];
-        if(dateStr<cutoffStr){
-          db.collection('config').doc(id).delete().catch(function(){});
-        }
-      });
-    }).catch(function(){});
+  try{
+    var uid=currentUser&&currentUser.docId||currentUser&&currentUser.id||'unknown';
+    var cutoff=new Date();
+    var p=function(n){return String(n).padStart(2,'0');};
+    // 지난 14일치 날짜 목록 생성 후 해당 문서만 삭제 시도
+    for(var i=15;i<=60;i++){
+      var d=new Date();d.setDate(d.getDate()-i);
+      var dateStr=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+      var docId='checklistDone_'+dateStr+'_'+uid;
+      db.collection('config').doc(docId).delete().catch(function(){});
+    }
+  }catch(e){}
 }
 
 // ── 데이터 로드 ──
