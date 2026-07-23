@@ -458,7 +458,14 @@ function bootProgress(pct, msg) {
 }
 function hideBootOverlay() {
   var overlay = document.getElementById('boot-overlay');
-  if (overlay) { overlay.classList.add('hidden'); setTimeout(function(){ overlay.style.display='none'; }, 500); }
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+  // display:none after transition completes (500ms > 400ms transition)
+  setTimeout(function(){
+    overlay.style.display = 'none';
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+  }, 500);
 }
 
 // ═══════════════════════════════════════════════════
@@ -610,9 +617,12 @@ function initFb(cfg){
   db=firebase.firestore();
   db.settings({cacheSizeBytes:50*1024*1024});
   db.enablePersistence({synchronizeTabs:true}).catch(function(){});
-  $('setup-screen').style.display='none';
-  $('login-screen').style.display='flex';
-  hideBootOverlay();
+  // Small delay so Firebase finishes internal setup before we proceed
+  setTimeout(function(){
+    $('setup-screen').style.display='none';
+    $('login-screen').style.display='flex';
+    hideBootOverlay();
+  }, 100);
 }
 
 // ═══════════════════════════════════════════════════
