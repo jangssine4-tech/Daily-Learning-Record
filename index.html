@@ -270,8 +270,13 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="cp" id="checklist-area"></div>
 </div>
 <div class="view" id="view-meeting">
-  <div class="page-top"><h2>💼 업무 회의</h2></div>
-  <div class="cp" id="meeting-area"></div>
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;flex-shrink:0">
+    <button class="rev-tab active" id="wmtab-weekly" onclick="switchWMTab('weekly')">📋 주간 운영 회의</button>
+    <button class="rev-tab" id="wmtab-quality" onclick="switchWMTab('quality')">📊 월간 교육 품질</button>
+    <button class="rev-tab" id="wmtab-annual" onclick="switchWMTab('annual')">📅 연간 계획</button>
+    <button class="rev-tab" id="wmtab-guide" onclick="switchWMTab('guide')">📖 운영안</button>
+  </div>
+  <div class="cp" id="meeting-area" style="overflow-y:auto"></div>
 </div>
 <div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">📅 오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">📋 주간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">📊 수용 현황</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">📌 전달 사항</button></div><div id="sch-panel-today"><div class="toolbar" style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button></div><div id="schedule-notes-award" style="margin-bottom:0"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="weekly-schedule-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
@@ -8261,98 +8266,527 @@ function renderAutoTasksSection(dateStr){
   }).join('');
 }
 
-// ── 업무 회의 ──
-var _meetingData=null;
-function loadMeetingData(cb){
-  if(_meetingData){if(cb)cb();return;}
-  db.collection('config').doc('workMeeting').get().then(function(d){
-    _meetingData=d.exists?d.data():{records:[]};
-    if(!_meetingData.records)_meetingData.records=[];
-    if(cb)cb();
-  }).catch(function(){_meetingData={records:[]};if(cb)cb();});
+// ══ 업무 회의 ══════════════════════════════════════════════════════════════
+
+var _wmTab='weekly';
+var _wmData={};
+var _wmLoaded=false;
+
+function switchWMTab(tab){
+  _wmTab=tab;
+  ['weekly','quality','annual','guide'].forEach(function(t){
+    var b=document.getElementById('wmtab-'+t);
+    if(b)b.classList.toggle('active',t===tab);
+  });
+  _renderWMPanel(document.getElementById('meeting-area'));
 }
-function saveMeetingData(){
-  db.collection('config').doc('workMeeting').set(_meetingData).catch(function(){toast('❌ 저장 실패');});
-}
+
 function renderMeetingPage(){
-  var el=$('meeting-area');if(!el)return;
-  el.innerHTML='<div style="padding:12px;color:var(--txt3)">⏳ 로딩 중...</div>';
-  loadMeetingData(function(){_renderMeetingUI(el);});
-}
-function _renderMeetingUI(el){
-  var records=(_meetingData.records||[]).slice().sort(function(a,b){return b.date>a.date?1:-1;});
-  var html='<div style="max-width:700px">'
-    +'<div style="display:flex;gap:8px;margin-bottom:16px">'
-    +'<button class="btn btn-green btn-sm" onclick="openMeetingModal()">+ 회의록 작성</button>'
-    +'</div>';
-  if(!records.length){
-    html+='<div style="text-align:center;padding:40px;color:var(--txt3)">작성된 회의록이 없습니다</div>';
+  var el=document.getElementById('meeting-area');if(!el)return;
+  if(!_wmLoaded){
+    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+    db.collection('config').doc('workMeetingData').get().then(function(d){
+      _wmData=d.exists?d.data():{};
+      _wmLoaded=true;
+      _renderWMPanel(el);
+    }).catch(function(){_wmData={};_wmLoaded=true;_renderWMPanel(el);});
   } else {
-    records.forEach(function(r){
-      html+='<div style="border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden">'
-        +'<div style="background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:10px">'
-        +'<div style="flex:1">'
-        +'<div style="font-size:13px;font-weight:800;color:var(--navy)">'+r.title+'</div>'
-        +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+r.date+(r.attendees?' · 참석: '+r.attendees:'')+'</div>'
-        +'</div>'
-        +'<button onclick="deleteMeetingRecord(\''+r.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:12px">🗑</button>'
-        +'</div>'
-        +'<div style="padding:12px 14px">'
-        +(r.agenda?'<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:3px">📋 안건</div><div style="font-size:12px;color:var(--txt);white-space:pre-wrap">'+r.agenda+'</div></div>':'')
-        +(r.content?'<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:3px">📝 회의 내용</div><div style="font-size:12px;color:var(--txt);white-space:pre-wrap">'+r.content+'</div></div>':'')
-        +(r.action?'<div><div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px">✅ 결정 사항 / 액션 아이템</div><div style="font-size:12px;color:var(--txt);white-space:pre-wrap">'+r.action+'</div></div>':'')
-        +'</div></div>';
-    });
+    _renderWMPanel(el);
   }
+}
+
+function _wmSave(){
+  db.collection('config').doc('workMeetingData').set(_wmData,{merge:true})
+    .catch(function(){toast('❌ 저장 실패');});
+}
+
+function _wmSet(key,val){_wmData[key]=val;_wmSave();}
+
+function _renderWMPanel(el){
+  if(!el)return;
+  if(_wmTab==='weekly')_renderWMWeekly(el);
+  else if(_wmTab==='quality')_renderWMQuality(el);
+  else if(_wmTab==='annual')_renderWMAnnual(el);
+  else if(_wmTab==='guide')_renderWMGuide(el);
+}
+
+// ── 주간 운영 회의 ──────────────────────────────────────────────────────────
+
+function _wmWeekKey(){
+  var dt=new Date();
+  var dow=dt.getDay();
+  var diff=dow===0?-6:1-dow;
+  var mon=new Date(dt);mon.setDate(dt.getDate()+diff);
+  var p=function(n){return String(n).padStart(2,'0');};
+  return 'weekly_'+mon.getFullYear()+'-'+p(mon.getMonth()+1)+'-'+p(mon.getDate());
+}
+
+function _renderWMWeekly(el){
+  var wk=_wmWeekKey();
+  var d=_wmData[wk]||{};
+  var stuRows=d.students||[{name:'',reasons:[],action:'',contact:'',check:''}];
+  var contactRows=d.contacts||[{name:'',type:'문제 예방 연락',manager:'',deadline:''}];
+  var actionRows=d.actions||[{content:'',manager:'',deadline:'',criterion:'',done:false}];
+  var qualArea=d.qualArea||'태블릿 수업';
+  var savedChecks=d.qualChecks||[];
+  var prevActions=_wmPrevActions(wk);
+
+  var QUAL={
+    '태블릿 수업':['학생이 단순히 화면을 넘기고 있지 않은지 확인했는가?','듣고 따라 말하는 활동을 제대로 하고 있는가?','오답이나 어려워하는 부분이 교재 수업과 연결되고 있는가?','교사가 태블릿 활동을 확인하고 피드백하고 있는가?'],
+    '교재 수업':['읽기의 정확도와 유창성을 함께 지도하고 있는가?','의미 단위로 끊어 읽는 기준이 일관적인가?','문법 설명 후 학생이 직접 문장을 만들어 보는가?','학생이 틀린 이유를 이해하고 있는가?'],
+    '숙제 점검':['숙제의 목적을 학생이 알고 있는가?','학생 수준에 비해 양이 많거나 적지 않은가?','제출 여부만 확인하고 내용은 확인하지 않는 경우가 없는가?','다음 수업에서 숙제 결과가 활용되고 있는가?'],
+    '읽기 유창성':['WPM(분당 읽기 단어 수)을 주기적으로 확인하고 있는가?','소리 내어 읽는 시간이 충분히 확보되고 있는가?','실수한 부분을 바로 수정하기보다 끝까지 읽게 하는가?','학생 스스로 읽기 목표를 인식하고 있는가?'],
+    '받아쓰기':['받아쓰기 결과를 다음 수업에 반영하고 있는가?','오답 단어를 재학습하는 루틴이 있는가?','점수가 낮은 학생에게 양을 줄여 성공 경험을 주고 있는가?','받아쓰기 결과를 학부모와 공유하고 있는가?']
+  };
+  var curChecks=QUAL[qualArea]||QUAL['태블릿 수업'];
+  var IND=[
+    {id:'ind_att',label:'출결 (결석·반복 지각)'},
+    {id:'ind_hw',label:'숙제 (미제출·대충 제출)'},
+    {id:'ind_study',label:'학습 (진도·복습·받아쓰기)'},
+    {id:'ind_att2',label:'수업 태도 (참여·집중·방해)'},
+    {id:'ind_makeup',label:'보강 (미실시·일정)'},
+    {id:'ind_report',label:'보고서·학부모 연락'}
+  ];
+  var STATUS=['안정적','관찰 필요','조치 필요'];
+  var REASONS=['숙제 미제출 반복','진도 지연','집중도 저하','퇴원 가능성','자신감 부족','학부모 불만'];
+  var CTYPES=['문제 예방 연락','성장 공유 연락','확인 연락','정기 연락','신입 적응 연락'];
+
+  function sec(num,title,sub,content){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+      +'<div style="width:24px;height:24px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+num+'</div>'
+      +'<div style="font-size:14px;font-weight:700;color:var(--navy)">'+title+'</div>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-left:auto">'+sub+'</div>'
+      +'</div>'+content+'</div>';
+  }
+
+  function indSel(ind){
+    var val=d[ind.id]||'안정적';
+    var col=val==='조치 필요'?'var(--red)':val==='관찰 필요'?'var(--gold)':'var(--mint)';
+    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">'
+      +'<div style="font-size:10px;color:var(--txt3);margin-bottom:4px">'+ind.label+'</div>'
+      +'<select class="fi" style="font-size:11px;padding:3px 6px;border-color:'+col+';color:'+col+';font-weight:700" onchange="wmSetInd(\''+wk+'\',\''+ind.id+'\',this.value)">'
+      +STATUS.map(function(s){return'<option'+(s===val?' selected':'')+'>'+s+'</option>';}).join('')
+      +'</select></div>';
+  }
+
+  function stuRow(s,i){
+    return '<div style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy)">집중 관리 학생 '+(i+1)+'</div>'
+      +(i>0?'<button class="btn btn-red btn-xs" onclick="wmRmStu(\''+wk+'\','+i+')">✕ 삭제</button>':'')
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">학생 이름</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.name||'')+'" placeholder="이름" onblur="wmStuF(\''+wk+'\','+i+',\'name\',this.value)"></div>'
+      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">선정 이유</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:4px">'
+      +REASONS.map(function(r){
+        var on=(s.reasons||[]).indexOf(r)>=0;
+        return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid '+(on?'var(--mint)':'var(--border)')+';background:'+(on?'var(--mint)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+';cursor:pointer" onclick="wmTogReason(\''+wk+'\','+i+',\''+r+'\',this)">'+r+'</span>';
+      }).join('')
+      +'</div></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">수업 조치</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.action||'')+'" placeholder="예) 숙제량 절반으로 줄이고 확인 강화" onblur="wmStuF(\''+wk+'\','+i+',\'action\',this.value)"></div>'
+      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">학부모 연락 내용</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.contact||'')+'" placeholder="예) 수요일까지 상황·지도계획 안내" onblur="wmStuF(\''+wk+'\','+i+',\'contact\',this.value)"></div>'
+      +'</div>'
+      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">다음 주 확인할 변화</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.check||'')+'" placeholder="예) 주 3회 제출 여부" onblur="wmStuF(\''+wk+'\','+i+',\'check\',this.value)"></div>'
+      +'</div>';
+  }
+
+  function contactRow(c,i){
+    return '<tr>'
+      +'<td><input class="fi" style="font-size:11px" value="'+(c.name||'')+'" placeholder="이름" onblur="wmContF(\''+wk+'\','+i+',\'name\',this.value)"></td>'
+      +'<td><select class="fi" style="font-size:11px;padding:4px 6px" onchange="wmContF(\''+wk+'\','+i+',\'type\',this.value)">'
+      +CTYPES.map(function(t){return'<option'+(t===c.type?' selected':'')+'>'+t+'</option>';}).join('')
+      +'</select></td>'
+      +'<td><input class="fi" style="font-size:11px" value="'+(c.manager||'')+'" placeholder="원장/교사명" onblur="wmContF(\''+wk+'\','+i+',\'manager\',this.value)"></td>'
+      +'<td><input class="fi" style="font-size:11px" value="'+(c.deadline||'')+'" placeholder="예) 수요일" onblur="wmContF(\''+wk+'\','+i+',\'deadline\',this.value)"></td>'
+      +'<td style="text-align:center"><button class="btn btn-red btn-xs" onclick="wmRmCont(\''+wk+'\','+i+')">✕</button></td>'
+      +'</tr>';
+  }
+
+  function actionRow(a,i,isPrev){
+    var bg=isPrev?'background:#fef3c7':'';
+    return '<tr style="'+bg+'">'
+      +(isPrev
+        ?'<td style="text-align:center"><input type="checkbox"'+(a.done?' checked':'')+' onchange="wmMarkDone(\''+a._sk+'\','+a._si+',this.checked)" style="width:15px;height:15px"><div style="font-size:9px;color:var(--gold)">이월</div></td>'
+        :'<td style="text-align:center"><input type="checkbox"'+(a.done?' checked':'')+' onchange="wmActDone(\''+wk+'\','+i+',this.checked)" style="width:15px;height:15px"></td>')
+      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.content||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.content||'')+'" placeholder="실행 내용" onblur="wmActF(\''+wk+'\','+i+',\'content\',this.value)">')+'</td>'
+      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.manager||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.manager||'')+'" placeholder="담당자" onblur="wmActF(\''+wk+'\','+i+',\'manager\',this.value)">')+'</td>'
+      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.deadline||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.deadline||'')+'" placeholder="기한" onblur="wmActF(\''+wk+'\','+i+',\'deadline\',this.value)">')+'</td>'
+      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.criterion||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.criterion||'')+'" placeholder="확인 기준" onblur="wmActF(\''+wk+'\','+i+',\'criterion\',this.value)">')+'</td>'
+      +(isPrev?'':'<td style="text-align:center"><button class="btn btn-red btn-xs" onclick="wmRmAct(\''+wk+'\','+i+')">✕</button></td>')
+      +'</tr>';
+  }
+
+  // 날짜 표시
+  var monLabel=wk.replace('weekly_','');
+
+  var html='<div style="max-width:700px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    +'<div style="font-size:12px;color:var(--txt3)">📅 '+monLabel+' 주간 회의</div>'
+    +'</div>';
+
+  // ① 긍정적 변화
+  html+=sec('1','긍정적인 변화 공유','5분',
+    '<div style="font-size:11px;color:var(--txt3);margin-bottom:6px">한 주 동안 좋았던 학생 변화 또는 효과적이었던 수업 방법</div>'
+    +'<textarea class="fi" rows="3" placeholder="예) ○○가 처음으로 스스로 숙제를 완료해 왔음" onblur="wmSetField(\''+wk+'\',\'positive\',this.value)">'+(d.positive||'')+'</textarea>');
+
+  // ② 핵심 운영 지표
+  html+=sec('2','핵심 운영 지표 확인','10분',
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+IND.map(indSel).join('')+'</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px;margin-top:4px">추가 메모</div>'
+    +'<textarea class="fi" rows="2" placeholder="이상이 있거나 조치가 필요한 항목 구체적으로 기록" onblur="wmSetField(\''+wk+'\',\'indMemo\',this.value)">'+(d.indMemo||'')+'</textarea>');
+
+  // ③ 집중 관리 학생
+  html+=sec('3','집중 관리 학생 논의','15분 · 최대 3명',
+    '<div id="wm-stu-rows">'+stuRows.map(stuRow).join('')+'</div>'
+    +(stuRows.length<3?'<button class="btn btn-outline btn-sm" onclick="wmAddStu(\''+wk+'\')">+ 학생 추가 (최대 3명)</button>':'<div style="font-size:11px;color:var(--txt3)">최대 3명 선정</div>'));
+
+  // ④ 수업 품질
+  var areaChips=['태블릿 수업','교재 수업','숙제 점검','읽기 유창성','받아쓰기'].map(function(a){
+    var on=a===qualArea;
+    return '<span style="font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid '+(on?'var(--mint)':'var(--border)')+';background:'+(on?'var(--mint)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+'" onclick="wmSetQArea(\''+wk+'\',\''+a+'\')">'+a+'</span>';
+  }).join('');
+  var checkItems=curChecks.map(function(c){
+    var chk=savedChecks.indexOf(c)>=0;
+    return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+      +'<input type="checkbox"'+(chk?' checked':'')+' onchange="wmTogCheck(\''+wk+'\',\''+c+'\',this.checked)" style="width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:var(--mint)">'
+      +'<span style="font-size:12px;color:var(--txt);line-height:1.5'+(chk?';text-decoration:line-through;color:var(--txt3)':'')+'">'+(c)+'</span></div>';
+  }).join('');
+  html+=sec('4','수업 품질 개선','10분 · 주제 1가지',
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+areaChips+'</div>'
+    +checkItems
+    +'<div style="margin-top:10px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">이번 주 공통 수업 기준 (구체적인 행동으로)</div>'
+    +'<textarea class="fi" rows="2" placeholder="예) 수업 마지막 3분, 모든 학생이 오늘 배운 문법으로 문장 한 개를 직접 말하게 한다" onblur="wmSetField(\''+wk+'\',\'qualStd\',this.value)">'+(d.qualStd||'')+'</textarea></div>');
+
+  // ⑤ 학부모 소통
+  html+=sec('5','학부모 소통 대상 선정','5분',
+    '<div style="overflow-x:auto"><table class="tbl" style="font-size:12px;min-width:500px">'
+    +'<thead><tr><th>학생</th><th>연락 유형</th><th>담당</th><th>기한</th><th></th></tr></thead>'
+    +'<tbody>'+contactRows.map(contactRow).join('')+'</tbody></table></div>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wmAddCont(\''+wk+'\')">+ 행 추가</button>');
+
+  // ⑥ 실행 사항
+  var actionHTML='';
+  if(prevActions.length){
+    actionHTML+='<div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:6px">⚠️ 지난 주 미완료 실행사항</div>';
+  }
+  actionHTML+='<div style="overflow-x:auto"><table class="tbl" style="font-size:12px;min-width:580px">'
+    +'<thead><tr><th style="width:40px">완료</th><th>실행 내용</th><th style="width:70px">담당</th><th style="width:60px">기한</th><th>확인 기준</th><th style="width:36px"></th></tr></thead>'
+    +'<tbody>'
+    +prevActions.map(function(a){return actionRow(a,-1,true);}).join('')
+    +actionRows.map(function(a,i){return actionRow(a,i,false);}).join('')
+    +'</tbody></table></div>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wmAddAct(\''+wk+'\')">+ 행 추가</button>'
+    +'<div style="margin-top:12px;background:#fef3c7;border-radius:8px;padding:10px 12px">'
+    +'<div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:2px">다음 주 회의 첫 순서</div>'
+    +'<div style="font-size:11px;color:#b45309">이번 주 실행 사항의 완료 여부를 다음 주 회의에서 반드시 먼저 확인합니다.</div></div>';
+  html+=sec('6','실행 사항 확정','5분',actionHTML);
+
   html+='</div>';
   el.innerHTML=html;
 }
-function openMeetingModal(id){
-  var r=id?(_meetingData.records||[]).find(function(x){return x.id===id;}):{};
+
+// ── 주간 회의 저장 헬퍼 ────────────────────────────────────────────────────
+
+function wmSetField(wk,field,val){
+  if(!_wmData[wk])_wmData[wk]={};
+  _wmData[wk][field]=val;_wmSave();
+}
+function wmSetInd(wk,field,val){wmSetField(wk,field,val);}
+
+function wmAddStu(wk){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].students)_wmData[wk].students=[{}];
+  if(_wmData[wk].students.length>=3)return;
+  _wmData[wk].students.push({name:'',reasons:[],action:'',contact:'',check:''});
+  _wmSave();_renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmRmStu(wk,idx){
+  if(!_wmData[wk]||!_wmData[wk].students)return;
+  _wmData[wk].students.splice(idx,1);_wmSave();
+  _renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmStuF(wk,idx,field,val){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].students)_wmData[wk].students=[{}];
+  if(!_wmData[wk].students[idx])_wmData[wk].students[idx]={};
+  _wmData[wk].students[idx][field]=val;_wmSave();
+}
+function wmTogReason(wk,idx,reason,el){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].students)_wmData[wk].students=[{}];
+  if(!_wmData[wk].students[idx])_wmData[wk].students[idx]={};
+  if(!_wmData[wk].students[idx].reasons)_wmData[wk].students[idx].reasons=[];
+  var arr=_wmData[wk].students[idx].reasons;
+  var i=arr.indexOf(reason);
+  if(i>=0){arr.splice(i,1);el.style.background='var(--surface)';el.style.color='var(--txt2)';el.style.borderColor='var(--border)';}
+  else{arr.push(reason);el.style.background='var(--mint)';el.style.color='#fff';el.style.borderColor='var(--mint)';}
+  _wmSave();
+}
+function wmSetQArea(wk,area){
+  if(!_wmData[wk])_wmData[wk]={};
+  _wmData[wk].qualArea=area;_wmData[wk].qualChecks=[];
+  _wmSave();_renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmTogCheck(wk,item,checked){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].qualChecks)_wmData[wk].qualChecks=[];
+  var arr=_wmData[wk].qualChecks;var i=arr.indexOf(item);
+  if(checked&&i<0)arr.push(item);if(!checked&&i>=0)arr.splice(i,1);
+  _wmSave();
+}
+function wmAddCont(wk){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].contacts)_wmData[wk].contacts=[];
+  _wmData[wk].contacts.push({name:'',type:'문제 예방 연락',manager:'',deadline:''});
+  _wmSave();_renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmRmCont(wk,idx){
+  if(!_wmData[wk]||!_wmData[wk].contacts)return;
+  _wmData[wk].contacts.splice(idx,1);_wmSave();
+  _renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmContF(wk,idx,field,val){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].contacts)_wmData[wk].contacts=[];
+  if(!_wmData[wk].contacts[idx])_wmData[wk].contacts[idx]={};
+  _wmData[wk].contacts[idx][field]=val;_wmSave();
+}
+function wmAddAct(wk){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].actions)_wmData[wk].actions=[];
+  _wmData[wk].actions.push({content:'',manager:'',deadline:'',criterion:'',done:false});
+  _wmSave();_renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmRmAct(wk,idx){
+  if(!_wmData[wk]||!_wmData[wk].actions)return;
+  _wmData[wk].actions.splice(idx,1);_wmSave();
+  _renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmActF(wk,idx,field,val){
+  if(!_wmData[wk])_wmData[wk]={};
+  if(!_wmData[wk].actions)_wmData[wk].actions=[];
+  if(!_wmData[wk].actions[idx])_wmData[wk].actions[idx]={};
+  _wmData[wk].actions[idx][field]=val;_wmSave();
+}
+function wmActDone(wk,idx,checked){wmActF(wk,idx,'done',checked);}
+function wmMarkDone(sk,si,checked){
+  if(!_wmData[sk]||!_wmData[sk].actions)return;
+  _wmData[sk].actions[si].done=checked;_wmSave();
+}
+function _wmPrevActions(currentWk){
+  var res=[];
+  Object.keys(_wmData).forEach(function(key){
+    if(!key.startsWith('weekly_')||key===currentWk)return;
+    var d=_wmData[key];if(!d||!d.actions)return;
+    d.actions.forEach(function(a,i){
+      if(!a.done&&a.content)res.push(Object.assign({},a,{_sk:key,_si:i}));
+    });
+  });
+  return res.slice(-5);
+}
+
+// ── 월간 교육 품질 ──────────────────────────────────────────────────────────
+
+var MONTHLY_TOPICS={
+  1:'학생별 연간 학습 목표 설정',2:'신입생 적응과 초기 수준 진단',
+  3:'학기 초 숙제·수업 태도 정착',4:'파닉스·읽기 정확도 점검',
+  5:'유창성·WPM·말하기 지도',6:'상반기 진도와 성취도 분석',
+  7:'방학 특강과 취약 영역 보완',8:'2학기 수업 수준 재조정',
+  9:'중등 문법·구문독해 지도',10:'복습시험과 오답 관리',
+  11:'학생별 성장 결과 정리',12:'연간 교육 결과와 교재 평가'
+};
+
+function _renderWMQuality(el){
   var now=new Date();
-  var dateVal=r.date||(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'));
-  var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
-  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
-  overlay.innerHTML='<div class="ms" style="max-width:500px"><div class="mh"></div><div class="mt">💼 회의록 작성</div>'
-    +'<div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="mt-date" value="'+dateVal+'"></div>'
-    +'<div class="field"><div class="fl">제목</div><input class="fi" id="mt-title" placeholder="예: 7월 4주차 교사 회의" value="'+(r.title||'')+'"></div>'
-    +'<div class="field"><div class="fl">참석자</div><input class="fi" id="mt-attendees" placeholder="예: 이루다, 서연" value="'+(r.attendees||'')+'"></div>'
-    +'<div class="field"><div class="fl">안건</div><textarea class="fi" id="mt-agenda" rows="3" placeholder="회의 안건을 입력하세요">'+(r.agenda||'')+'</textarea></div>'
-    +'<div class="field"><div class="fl">회의 내용</div><textarea class="fi" id="mt-content" rows="4" placeholder="회의 내용을 기록하세요">'+(r.content||'')+'</textarea></div>'
-    +'<div class="field"><div class="fl">결정 사항</div><textarea class="fi" id="mt-action" rows="3" placeholder="결정된 사항 또는 액션 아이템">'+(r.action||'')+'</textarea></div>'
-    +'<button class="btn btn-green btn-block" onclick="saveMeetingRecord(\''+( r.id||'')+'\',this.closest(\'.mo\'))">저장</button>'
-    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
-    +'</div>';
-  document.body.appendChild(overlay);
-}
-function saveMeetingRecord(id,overlay){
-  var title=$('mt-title').value.trim();
-  if(!title){toast('제목을 입력하세요');return;}
-  var record={
-    id:id||Date.now().toString(36),
-    date:$('mt-date').value,title:title,
-    attendees:$('mt-attendees').value.trim(),
-    agenda:$('mt-agenda').value.trim(),
-    content:$('mt-content').value.trim(),
-    action:$('mt-action').value.trim(),
-    updatedAt:new Date().toISOString()
-  };
-  if(!_meetingData)_meetingData={records:[]};
-  if(id){
-    var idx=_meetingData.records.findIndex(function(r){return r.id===id;});
-    if(idx>=0)_meetingData.records[idx]=record;else _meetingData.records.push(record);
-  } else {
-    _meetingData.records.push(record);
+  var selMo=parseInt(el.dataset.qmo||(now.getMonth()+1));
+  var selYr=parseInt(el.dataset.qyr||now.getFullYear());
+  var key='quality_'+selYr+'_'+selMo;
+  var d=_wmData[key]||{};
+
+  var moChips='';for(var m=1;m<=12;m++){
+    var on=m===selMo;
+    moChips+='<span style="padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid '+(on?'var(--mint)':'var(--border)')+';background:'+(on?'var(--mint)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+'" onclick="wmSetQMo('+m+','+selYr+')">'+m+'월</span>';
   }
-  saveMeetingData();overlay.remove();
-  _renderMeetingUI($('meeting-area'));
-  toast('✅ 저장됐습니다');
+
+  function qf(label,fkey,ph,rows){
+    var val=d[fkey]||'';
+    return '<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">'+label+'</div>'
+      +(rows?'<textarea class="fi" rows="'+rows+'" placeholder="'+ph+'" onblur="wmQualF(\''+key+'\',\''+fkey+'\',this.value)">'+val+'</textarea>'
+        :'<input class="fi" style="font-size:12px" placeholder="'+ph+'" value="'+val+'" onblur="wmQualF(\''+key+'\',\''+fkey+'\',this.value)">')
+      +'</div>';
+  }
+
+  el.dataset.qmo=selMo;el.dataset.qyr=selYr;
+  el.innerHTML='<div style="max-width:700px">'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'+moChips+'</div>'
+    +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">'+selYr+'년 '+selMo+'월 점검 주제</div>'
+    +'<div style="font-size:13px;color:var(--blue);margin-bottom:14px">'+(MONTHLY_TOPICS[selMo]||'')+'</div>'
+    +qf('잘된 수업 방식 한 가지','good','이번 달 효과가 좋았던 수업 방식',2)
+    +qf('개선할 수업 방식 한 가지','improve','이번 달 개선이 필요하다고 느낀 수업 방식',2)
+    +qf('다음 달 공통 지도 기준','standard','예) Joy 단계에서 be동사와 보어를 함께 끊어 읽는다',2)
+    +qf('교사에게 필요한 자료·교육','teacherNeed','예) 의미 단위 끊어 읽기 기준표 제작')
+    +qf('학부모에게 알릴 교육 정보','parentInfo','예) 이번 달 읽기 유창성 지도 방향 안내문 발송')
+    +'</div></div>';
 }
-function deleteMeetingRecord(id){
-  if(!confirm('이 회의록을 삭제할까요?'))return;
-  _meetingData.records=(_meetingData.records||[]).filter(function(r){return r.id!==id;});
-  saveMeetingData();
-  _renderMeetingUI($('meeting-area'));
+function wmSetQMo(mo,yr){
+  var el=document.getElementById('meeting-area');
+  el.dataset.qmo=mo;el.dataset.qyr=yr;_renderWMQuality(el);
+}
+function wmQualF(key,field,val){
+  if(!_wmData[key])_wmData[key]={};
+  _wmData[key][field]=val;_wmSave();
+}
+
+// ── 연간 계획 ───────────────────────────────────────────────────────────────
+
+function _renderWMAnnual(el){
+  var yr=parseInt(el.dataset.annualYr||new Date().getFullYear());
+  var key='annual_'+yr;
+  var d=_wmData[key]||{};
+  var schedRows=d.schedule||[
+    {timing:'2월',event:'신학기 학부모 설명회',content:'연간 교육 방향, 단계별 목표, 수업 방식',manager:'원장'},
+    {timing:'5월',event:'소규모 학부모 간담회',content:'수업 적응·태블릿 수업·숙제와 보고서 의견',manager:'원장'},
+    {timing:'8~9월',event:'2학기 설명회',content:'상반기 결과·2학기 학습 계획·중등 대비',manager:'원장'},
+    {timing:'11월',event:'다음 연도 준비 간담회',content:'만족도·개선 요구·다음 해 프로그램 의견',manager:'원장'}
+  ];
+
+  var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';
+
+  function gc(label,fkey,ph){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">'+label+'</div>'
+      +'<textarea class="fi" rows="3" style="font-size:12px" placeholder="'+ph+'" onblur="wmAnnualF(\''+key+'\',\''+fkey+'\',this.value)">'+(d[fkey]||'')+'</textarea></div>';
+  }
+
+  var schedHTML='<div style="overflow-x:auto"><table class="tbl" style="font-size:12px;min-width:520px">'
+    +'<thead><tr><th>시기</th><th>일정</th><th>주요 내용</th><th>담당</th><th></th></tr></thead>'
+    +'<tbody>'+schedRows.map(function(r,i){
+      return '<tr>'
+        +'<td><input class="fi" style="font-size:11px" value="'+(r.timing||'')+'" onblur="wmSchedF(\''+key+'\','+i+',\'timing\',this.value)"></td>'
+        +'<td><input class="fi" style="font-size:11px" value="'+(r.event||'')+'" onblur="wmSchedF(\''+key+'\','+i+',\'event\',this.value)"></td>'
+        +'<td><input class="fi" style="font-size:11px" value="'+(r.content||'')+'" onblur="wmSchedF(\''+key+'\','+i+',\'content\',this.value)"></td>'
+        +'<td><input class="fi" style="font-size:11px" value="'+(r.manager||'')+'" onblur="wmSchedF(\''+key+'\','+i+',\'manager\',this.value)"></td>'
+        +'<td style="text-align:center"><button class="btn btn-red btn-xs" onclick="wmRmSched(\''+key+'\','+i+')">✕</button></td>'
+        +'</tr>';
+    }).join('')+'</tbody></table></div>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wmAddSched(\''+key+'\')">+ 일정 추가</button>';
+
+  el.dataset.annualYr=yr;
+  el.innerHTML='<div style="max-width:700px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+    +'<select class="fi" style="width:90px" onchange="wmSetAnnualYr(parseInt(this.value))">'+yrOpts+'</select>'
+    +'</div>'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">핵심 목표</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+    +gc('교육 목표','goalEdu','예) 단계별 읽기·문법 지도 기준 완성')
+    +gc('학생 관리 목표','goalStu','예) 숙제·결석·보강 누락 최소화')
+    +gc('학부모 소통 목표','goalParent','예) 모든 재원생 학부모에게 분기 1회 성장 상담 진행 및 기록')
+    +gc('교사·경영 목표','goalOps','예) 공통 수업 기준 구축 / 반별 정원·재원 유지율 향상')
+    +'</div>'
+    +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">연간 주요 일정</div>'
+    +schedHTML+'</div>'
+    +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">지난 1년 평가</div>'
+    +'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">잘된 것 (계속 유지)</div>'
+    +'<textarea class="fi" rows="2" placeholder="예) 일일 보고서 발송으로 학부모 신뢰 향상" onblur="wmAnnualF(\''+key+'\',\'reviewGood\',this.value)">'+(d.reviewGood||'')+'</textarea></div>'
+    +'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">아쉬웠던 것 (개선 또는 중단)</div>'
+    +'<textarea class="fi" rows="2" placeholder="예) 보강 일정 관리가 체계적이지 않았음" onblur="wmAnnualF(\''+key+'\',\'reviewBad\',this.value)">'+(d.reviewBad||'')+'</textarea></div>'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">새롭게 시작할 것</div>'
+    +'<textarea class="fi" rows="2" placeholder="예) 분기별 학부모 성장 상담 도입" onblur="wmAnnualF(\''+key+'\',\'reviewNew\',this.value)">'+(d.reviewNew||'')+'</textarea></div>'
+    +'</div></div>';
+}
+function wmSetAnnualYr(yr){
+  var el=document.getElementById('meeting-area');
+  el.dataset.annualYr=yr;_renderWMAnnual(el);
+}
+function wmAnnualF(key,field,val){
+  if(!_wmData[key])_wmData[key]={};_wmData[key][field]=val;_wmSave();
+}
+function wmSchedF(key,idx,field,val){
+  if(!_wmData[key])_wmData[key]={};
+  if(!_wmData[key].schedule)_wmData[key].schedule=[];
+  if(!_wmData[key].schedule[idx])_wmData[key].schedule[idx]={};
+  _wmData[key].schedule[idx][field]=val;_wmSave();
+}
+function wmAddSched(key){
+  if(!_wmData[key])_wmData[key]={};
+  if(!_wmData[key].schedule)_wmData[key].schedule=[];
+  _wmData[key].schedule.push({timing:'',event:'',content:'',manager:''});
+  _wmSave();_renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmRmSched(key,idx){
+  if(!_wmData[key]||!_wmData[key].schedule)return;
+  _wmData[key].schedule.splice(idx,1);_wmSave();
+  _renderWMPanel(document.getElementById('meeting-area'));
+}
+
+// ── 운영안 ──────────────────────────────────────────────────────────────────
+
+function _renderWMGuide(el){
+  function gs(title,content){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+      +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border)">'+title+'</div>'
+      +content+'</div>';
+  }
+  function tbl(heads,rows){
+    return '<div style="overflow-x:auto"><table class="tbl" style="font-size:12px">'
+      +'<thead><tr>'+heads.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr></thead>'
+      +'<tbody>'+rows.map(function(r){return'<tr>'+r.map(function(c,i){return'<td'+(i===0?' style="font-weight:600"':'')+'>'+c+'</td>';}).join('')+'</tr>';}).join('')
+      +'</tbody></table></div>';
+  }
+
+  el.innerHTML='<div style="max-width:700px">'
+
+    +gs('회의 운영의 최종 목표',tbl(['운영 목표','회의에서 확인할 핵심 질문'],[
+      ['잘 가르치는 학원','학생이 실제로 무엇을 이해하고 할 수 있게 되었는가?'],
+      ['잘 관리하는 학원','놓치고 있는 학생·숙제·보강·상담은 없는가?'],
+      ['믿음이 가는 학원','교사마다 수업과 관리 기준이 일관적인가?'],
+      ['학부모와 잘 소통하는 학원','학부모가 자녀의 상태와 학원의 지도를 충분히 알고 있는가?'],
+      ['아이들이 좋아하는 학원','아이가 수업에서 성취감과 안정감을 느끼고 있는가?']
+    ]))
+
+    +gs('회의 체계',tbl(['종류','주기','시간','주요 목적'],[
+      ['수업 전후 인계','필요 시 매일','5분 이내','결석·보강·특이사항 전달'],
+      ['주간 운영 회의','매주 1회','50분','학생·수업·학부모·운영 점검'],
+      ['월간 교육 품질 회의','매월 마지막 주','+20분','수업 방식과 평가 기준 개선'],
+      ['학부모 행사 준비 회의','행사 3~4주 전','60분','설명회·간담회 준비'],
+      ['상반기 운영 점검','7월','2시간','연간 목표 중간 점검'],
+      ['연간 목표·계획 회의','12월 또는 1월','3시간','다음 해 목표와 실행 계획 수립']
+    ]))
+
+    +gs('집중 관리 학생 선정 기준',
+      '<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">매주 최대 3명 · 아래 기준으로 선정합니다</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+      +['숙제 미제출이 반복되는 학생','진도가 계속 늦어지는 학생','수업 집중도가 갑자기 떨어진 학생','교사와의 관계가 불편해진 학생','학부모가 불안이나 불만을 표현한 학생','결석 또는 퇴원 가능성이 있는 학생','실력은 있지만 자신감이 부족한 학생','수준보다 수업이 너무 쉽거나 어려운 학생']
+      .map(function(r){return'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px">'+r+'</div>';}).join('')
+      +'</div>')
+
+    +gs('학부모 소통 유형',
+      tbl(['연락 유형','대상'],[
+        ['문제 예방 연락','숙제·태도·성취도가 떨어지기 시작한 학생'],
+        ['성장 공유 연락','눈에 띄게 발전하거나 노력한 학생'],
+        ['확인 연락','상담 후 후속 확인이 필요한 학생'],
+        ['정기 연락','일정 기간 별도 연락이 없었던 학생'],
+        ['신입 적응 연락','등록 후 1주·4주가 지난 학생']
+      ])
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin:10px 0 6px">연락 구조</div>'
+      +['① 최근 긍정적인 모습','② 현재 관찰되는 부분','③ 학원에서 지도하고 있는 방법','④ 가정에서 도와줄 수 있는 간단한 방법','⑤ 다시 확인할 시점']
+      .map(function(r){return'<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);color:var(--txt2)">'+r+'</div>';}).join(''))
+
+    +gs('회의 정착을 위한 5가지 원칙',
+      ['① 보고보다 결정을 많이 한다','② 느낌보다 관찰된 사실을 이야기한다','③ 교사를 탓하기보다 지도 방법을 개선한다','④ 모든 결정에 담당자와 기한을 정한다','⑤ 다음 회의에서 실행 결과를 반드시 확인한다']
+      .map(function(r){return'<div style="background:#eff6ff;border-radius:8px;padding:10px 12px;font-size:13px;color:#1e40af;margin-bottom:6px">'+r+'</div>';}).join(''))
+
+    +'</div>';
 }
 var _academicCalendar=null;
 function loadAcademicCalendar(cb){
