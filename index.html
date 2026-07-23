@@ -8978,17 +8978,17 @@ function _clDeleteOld(){
 // ── 데이터 로드 ──
 function _loadChecklistData(dateStr,cb){
   var docId=_clDocId(dateStr);
-  var cacheKey='_clLoaded_'+docId;
-  if(window[cacheKey]&&cb){cb();return;}
+  var cacheKey='clcache_'+dateStr.replace(/-/g,'');
+  if(window[cacheKey]){_checklistState=window[cacheKey].state||{};_checklistCustom=window[cacheKey].custom||{};if(cb)cb();return;}
   Promise.all([
     db.collection('config').doc('checklistCustom').get(),
     db.collection('config').doc(docId).get()
   ]).then(function(results){
     try{_checklistCustom=results[0].exists?results[0].data():{};}catch(e){_checklistCustom={};}
     try{_checklistState=results[1].exists?results[1].data():{};}catch(e){_checklistState={};}
-    window[cacheKey]=true;
+    window[cacheKey]={state:_checklistState,custom:_checklistCustom};
     if(cb)cb();
-  }).catch(function(){if(cb)cb();});
+  }).catch(function(e){console.warn('checklist load error',e);_checklistState={};_checklistCustom={};if(cb)cb();});
 }
 
 // ── 저장 ──
@@ -9071,7 +9071,7 @@ function updateChecklistProgress(){
   var bar=$('checklist-bar');if(bar)bar.style.width=(total?Math.round(done/total*100):0)+'%';
 }
 function _clInvalidateCache(){
-  Object.keys(window).forEach(function(k){if(k.startsWith('_clLoaded_'))delete window[k];});
+  Object.keys(window).forEach(function(k){if(k.startsWith('clcache_'))delete window[k];});
 }
 
 // ── 진입점 ──
@@ -9079,11 +9079,13 @@ function renderChecklist(){
   var el=$('checklist-area');if(!el)return;
   // 초기 요일 설정
   if(_clDayIdx===null){_clDayIdx=_clTodayIdx(0);}
+  // 범위 방어
+  if(_clDayIdx<0||_clDayIdx>4){_clDayIdx=0;}
   el.innerHTML='<div style="padding:20px;color:var(--txt3);text-align:center">⏳ 로딩 중...</div>';
-  // 오래된 데이터 자동 삭제
-  _clDeleteOld();
+  // 오래된 데이터 자동 삭제 (비동기, 로딩 흐름과 무관)
+  setTimeout(function(){_clDeleteOld();},500);
   var dates=_clWeekDates(_clWeekOffset);
-  var dateStr=dates[_clDayIdx];
+  var dateStr=dates[_clDayIdx]||todayISO();
   _loadChecklistData(dateStr,function(){_renderChecklistUI(el);});
 }
 
