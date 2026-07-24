@@ -329,7 +329,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab" id="dtab-calendar" onclick="switchDashTab('calendar')">📆 연간 학사일정</button>
     <button class="rev-tab" id="dtab-conditions" onclick="switchDashTab('conditions')">⚙️ 자동 분류 조건</button>
   </div>
-  <div id="dash-panel-board" style="display:none" class="cp"><div id="dashboard-board-area"></div></div>
+  <div id="dash-panel-board" style="" class="cp"><div id="dashboard-board-area"></div></div>
   <div id="dash-panel-crm" class="cp">
     <div style="display:flex;align-items:center;gap:8px;padding:8px 0;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--txt3)">날짜</span>
@@ -8625,7 +8625,7 @@ function _renderAcademicCalendarUI(el){
   var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';
   var html='<div style="max-width:900px;padding:14px">'
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">'
-    +'<select class="fi" style="width:90px" onchange="window._acalYr=parseInt(this.value);_renderAcademicCalendarUI($(\'dashboard-calendar-area\'))">'+yrOpts+'</select>'
+    +'<select class="fi" style="width:90px" onchange="window._acalYr=parseInt(this.value);_renderAcademicCalendarUI(document.getElementById(\'dashboard-calendar-area\'))">'+yrOpts+'</select>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
     +cats.map(function(cat){return'<span style="font-size:11px;font-weight:700;background:'+catColors[cat]+'22;color:'+catColors[cat]+';padding:2px 8px;border-radius:6px;border:1px solid '+catColors[cat]+'">'+cat+'</span>';}).join('')
     +'</div>'
@@ -8634,8 +8634,9 @@ function _renderAcademicCalendarUI(el){
     +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">';
   months.forEach(function(mLabel,mi){
     var mo=mi+1;
+    var moStr=yr+'-'+String(mo).padStart(2,'0');
     var evts=(_academicCalendar.events||[]).filter(function(e){
-      var d=new Date(e.date);return d.getFullYear()===yr&&d.getMonth()+1===mo;
+      return e.date&&e.date.startsWith(moStr);
     }).sort(function(a,b){return a.date>b.date?1:-1;});
     html+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
       +'<div style="background:var(--navy);color:#fff;font-size:12px;font-weight:700;padding:6px 10px">'+mLabel+'</div>'
@@ -8676,13 +8677,15 @@ function confirmAcalAdd(overlay){
   if(!_academicCalendar)_academicCalendar={events:[]};
   _academicCalendar.events.push({id:Date.now().toString(36),date:date,title:title,cat:cat,note:note});
   saveAcademicCalendar();overlay.remove();
-  _renderAcademicCalendarUI($('dashboard-calendar-area'));
+  var _calEl=$('dashboard-calendar-area');
+  if(_calEl)_renderAcademicCalendarUI(_calEl);
 }
 function removeAcalEvent(id){
   if(!_academicCalendar)return;
   _academicCalendar.events=(_academicCalendar.events||[]).filter(function(e){return e.id!==id;});
   saveAcademicCalendar();
-  _renderAcademicCalendarUI($('dashboard-calendar-area'));
+  var _calEl2=$('dashboard-calendar-area');
+  if(_calEl2)_renderAcademicCalendarUI(_calEl2);
 }
 var _DEFAULT_CRM_CONDITIONS={
   urgent:[
