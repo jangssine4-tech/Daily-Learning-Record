@@ -8635,17 +8635,32 @@ function _renderAcademicCalendarUI(el){
   months.forEach(function(mLabel,mi){
     var mo=mi+1;
     var moStr=yr+'-'+String(mo).padStart(2,'0');
+    var moStart=moStr+'-01';
+    var moEnd=moStr+'-'+String(new Date(yr,mo,0).getDate()).padStart(2,'0');
     var evts=(_academicCalendar.events||[]).filter(function(e){
-      return e.date&&e.date.startsWith(moStr);
+      if(!e.date)return false;
+      var eEnd=e.endDate||e.date;
+      // 이 달과 기간이 겹치는 일정: 시작일<=월말 AND 종료일>=월초
+      return e.date<=moEnd&&eEnd>=moStart;
     }).sort(function(a,b){return a.date>b.date?1:-1;});
     html+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
       +'<div style="background:var(--navy);color:#fff;font-size:12px;font-weight:700;padding:6px 10px">'+mLabel+'</div>'
       +'<div style="padding:6px;min-height:60px">'
       +evts.map(function(e){
-        var d=new Date(e.date);var dayStr=d.getDate()+'일';
         var col=catColors[e.cat]||'#94a3b8';
+        var dayStr;
+        if(e.endDate&&e.endDate!==e.date){
+          // 기간 일정 - 날짜 범위 표시
+          var sM=parseInt(e.date.slice(5,7)),sD=parseInt(e.date.slice(8,10));
+          var eM=parseInt(e.endDate.slice(5,7)),eD=parseInt(e.endDate.slice(8,10));
+          var sLabel=(sM===mo?sD+'일':sM+'/'+sD);
+          var eLabel=(eM===mo?eD+'일':eM+'/'+eD);
+          dayStr=sLabel+'~'+eLabel;
+        } else {
+          dayStr=parseInt(e.date.slice(8,10))+'일';
+        }
         return'<div style="display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:5px;margin-bottom:2px;background:'+col+'18">'
-          +'<span style="font-size:10px;font-weight:700;color:'+col+';min-width:24px">'+dayStr+'</span>'
+          +'<span style="font-size:10px;font-weight:700;color:'+col+';min-width:32px;flex-shrink:0">'+dayStr+'</span>'
           +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.title+'</span>'
           +'<button onclick="removeAcalEvent(\''+e.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:10px;padding:0;flex-shrink:0">✕</button>'
           +'</div>';
@@ -8658,12 +8673,15 @@ function _renderAcademicCalendarUI(el){
 }
 function openAcalAddModal(){
   var now=new Date();
+  var todayVal=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   var cats=['방학','특강','행사','시험','기타'];
   var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
   overlay.innerHTML='<div class="ms" style="max-width:360px"><div class="mh"></div><div class="mt">📆 학사일정 추가</div>'
-    +'<div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="acal-date" value="'+(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'))+'"></div>'
-    +'<div class="field"><div class="fl">제목</div><input class="fi" id="acal-title" placeholder="예: 여름방학 시작"></div>'
+    +'<div class="field"><div class="fl">시작 날짜</div><input type="date" class="fi" id="acal-date" value="'+todayVal+'" onchange="var e=document.getElementById(\'acal-date-end\');if(e.value&&e.value<this.value)e.value=this.value;"></div>'
+    +'<div class="field"><div class="fl">종료 날짜 <span style="font-size:10px;color:var(--txt3)">(기간 일정일 경우)</span></div>'
+    +'<input type="date" class="fi" id="acal-date-end" placeholder="비워두면 당일 일정"></div>'
+    +'<div class="field"><div class="fl">제목</div><input class="fi" id="acal-title" placeholder="예: 여름방학"></div>'
     +'<div class="field"><div class="fl">구분</div><select class="fi" id="acal-cat">'+cats.map(function(c){return'<option>'+c+'</option>';}).join('')+'</select></div>'
     +'<div class="field"><div class="fl">메모</div><input class="fi" id="acal-note" placeholder="(선택)"></div>'
     +'<button class="btn btn-green btn-block" onclick="confirmAcalAdd(this.closest(\'.mo\'))">추가</button>'
@@ -8672,10 +8690,17 @@ function openAcalAddModal(){
   document.body.appendChild(overlay);
 }
 function confirmAcalAdd(overlay){
-  var date=$('acal-date').value;var title=$('acal-title').value.trim();var cat=$('acal-cat').value;var note=$('acal-note').value.trim();
+  var date=$('acal-date').value;
+  var endDate=$('acal-date-end').value;
+  var title=$('acal-title').value.trim();
+  var cat=$('acal-cat').value;
+  var note=$('acal-note').value.trim();
   if(!date||!title){toast('날짜와 제목을 입력하세요');return;}
+  if(endDate&&endDate<date){toast('종료 날짜는 시작 날짜보다 같거나 늦어야 합니다');return;}
   if(!_academicCalendar)_academicCalendar={events:[]};
-  _academicCalendar.events.push({id:Date.now().toString(36),date:date,title:title,cat:cat,note:note});
+  var evt={id:Date.now().toString(36),date:date,title:title,cat:cat,note:note};
+  if(endDate&&endDate!==date)evt.endDate=endDate;
+  _academicCalendar.events.push(evt);
   saveAcademicCalendar();overlay.remove();
   var _calEl=$('dashboard-calendar-area');
   if(_calEl)_renderAcademicCalendarUI(_calEl);
