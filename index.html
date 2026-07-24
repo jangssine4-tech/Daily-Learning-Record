@@ -7732,196 +7732,371 @@ function saveSpecialData(){
 
 // ── 대시보드 체크리스트 ──
 var _dashBoard=null;
-function _getDashBoardKey(){
-  var now=new Date();
-  var yr=now.getFullYear(),mo=now.getMonth()+1,day=now.getDate();
-  var wk=Math.ceil(day/7);
-  return{
-    month:'board_m_'+yr+'_'+mo,
-    week:'board_w_'+yr+'_'+String(mo).padStart(2,'0')+'_'+wk,
-    day:'board_d_'+yr+'_'+String(mo).padStart(2,'0')+'_'+String(day).padStart(2,'0')
-  };
-}
-function _getCurWeekKey(){
-  var now=new Date();
-  var yr=window._boardSelWkYr||now.getFullYear();
-  var mo=window._boardSelWkMo||now.getMonth()+1;
-  var wk=window._boardSelWk||Math.ceil(now.getDate()/7);
-  return'board_w_'+yr+'_'+String(mo).padStart(2,'0')+'_'+wk;
-}
-function _getCurDayKey(){
-  var now=new Date();
-  var yr=window._boardSelDayYr||now.getFullYear();
-  var mo=window._boardSelDayMo||now.getMonth()+1;
-  var day=window._boardSelDay||now.getDate();
-  return'board_d_'+yr+'_'+String(mo).padStart(2,'0')+'_'+String(day).padStart(2,'0');
-}
+// ═══════════════════════════════════════════════════
+// 새 업무 대시보드 — 4기준 업무 관리 시스템
+// 영역 + 실행 주기 + 우선순위 + 진행 상태
+// ═══════════════════════════════════════════════════
+
+// ── 상수 ──────────────────────────────────────────
+var _DB_AREAS = ['수업·교육','학생 관리','학부모 소통','상담·등록','홍보·마케팅','운영·행정','재무·성과 관리'];
+var _DB_AREA_ICONS = {'수업·교육':'📚','학생 관리':'👦','학부모 소통':'💬','상담·등록':'📋','홍보·마케팅':'📣','운영·행정':'🏫','재무·성과 관리':'💰'};
+var _DB_CYCLES = ['매일','매주','매월','분기·학기','비정기'];
+var _DB_PRIORITIES = ['1순위 (긴급+중요)','2순위 (중요)','3순위 (긴급)','4순위 (일반)'];
+var _DB_STATUSES = ['예정','오늘 할 일','진행 중','대기 중','완료','보류'];
+var _DB_STATUS_COLORS = {'예정':'var(--txt3)','오늘 할 일':'var(--navy)','진행 중':'var(--blue)','대기 중':'var(--gold)','완료':'#16a34a','보류':'var(--red)'};
+var _DB_STATUS_BG = {'예정':'var(--surface2)','오늘 할 일':'#eff6ff','진행 중':'#eff6ff','대기 중':'#fffbeb','완료':'#f0fdf4','보류':'#fef2f2'};
+var _DB_PRIORITY_COLORS = {'1순위 (긴급+중요)':'var(--red)','2순위 (중요)':'var(--blue)','3순위 (긴급)':'var(--gold)','4순위 (일반)':'var(--txt3)'};
+var _DB_PRIORITY_SHORT = {'1순위 (긴급+중요)':'1순위','2순위 (중요)':'2순위','3순위 (긴급)':'3순위','4순위 (일반)':'4순위'};
+
+// ── 상태 관리 ─────────────────────────────────────
+var _dbTasks = null; // Firestore에서 로드한 업무 배열
+var _dbView = 'today'; // today | week | area
+var _dbAreaFilter = '';
+var _dbStatusFilter = '';
+var _dbPriorityFilter = '';
+var _dbShowModal = false;
+var _dbEditId = null;
+
+// ── Firestore CRUD ────────────────────────────────
 function loadDashBoard(){
-  if(_dashBoard)return Promise.resolve();
-  return db.collection('config').doc('dashBoard').get().then(function(d){_dashBoard=d.exists?d.data():{};}).catch(function(){_dashBoard={};});
+  if(_dbTasks)return Promise.resolve();
+  return db.collection('config').doc('dashBoardV2').get().then(function(d){
+    _dbTasks = d.exists ? (d.data().tasks||[]) : [];
+  }).catch(function(){_dbTasks=[];});
 }
-function saveDashBoard(){db.collection('config').doc('dashBoard').set(_dashBoard,{merge:true}).catch(function(){});}
+function saveDashBoard(){
+  db.collection('config').doc('dashBoardV2').set({tasks:_dbTasks},{merge:false}).catch(function(){});
+}
 function renderDashBoard(){
   var el=$('dashboard-board-area');if(!el)return;
-  el.innerHTML='<div style="padding:8px;color:var(--txt3)">⏳ 로딩 중...</div>';
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
   loadDashBoard().then(function(){_renderDashBoardUI(el);});
 }
+
+// ── 뷰 렌더링 ─────────────────────────────────────
 function _renderDashBoardUI(el){
+  if(!el)return;
+  var today=todayISO();
   var now=new Date();
-  var selYr=window._boardSelYr||now.getFullYear();
-  var selMo=window._boardSelMo||now.getMonth()+1;
-  var dDay=window._boardSelDay||now.getDate();
-  window._boardSelYr=selYr;window._boardSelMo=selMo;window._boardSelDay=dDay;
+  var autoTasks=getAutoTodayTasks(today);
 
-  // Auto-compute week from selected day
-  var wk=Math.ceil(dDay/7);
-
-  var monthKey='board_m_'+selYr+'_'+selMo;
-  var weekKey='board_w_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+wk;
-  var dayKey='board_d_'+selYr+'_'+String(selMo).padStart(2,'0')+'_'+String(dDay).padStart(2,'0');
-
-  function yrOpts(cur){var s='';for(var y=2024;y<=2030;y++)s+='<option value="'+y+'"'+(y===cur?' selected':'')+'>'+y+'년</option>';return s;}
-  function moOpts(cur){var s='';for(var m=1;m<=12;m++)s+='<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m+'월</option>';return s;}
-  function dayOpts(curMo,curYr,curDay){var dm=new Date(curYr,curMo,0).getDate();var s='';for(var d=1;d<=dm;d++)s+='<option value="'+d+'"'+(d===curDay?' selected':'')+'>'+d+'일</option>';return s;}
-
-  var isToday=(selYr===now.getFullYear()&&selMo===now.getMonth()+1&&dDay===now.getDate());
-
-  var sections=[
-    {key:monthKey,label:'📅 이달의 중점 추진 사항',color:'var(--navy)',bg:'#eff6ff'},
-    {key:weekKey,label:'📆 이번 주 중점 추진 사항',badge:wk+'째주',color:'#7c3aed',bg:'#f5f3ff'},
-    {key:dayKey,label:'✅ 오늘의 업무',color:'#16a34a',bg:'#f0fdf4'}
+  // 뷰 탭
+  var viewTabs=[
+    {id:'today',label:'✅ 오늘'},
+    {id:'week',label:'📆 이번 주'},
+    {id:'area',label:'🗂 영역별'}
   ];
+  var html='<div style="max-width:720px;padding:12px;display:flex;flex-direction:column;gap:10px">';
 
-  var html='<div style="max-width:640px;padding:14px;display:flex;flex-direction:column;gap:12px">';
-
-
-
-  // CRM-style date selector
-  html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-    +'<span style="font-size:12px;color:var(--txt3)">날짜</span>'
-    +'<select class="fi" style="width:90px;font-size:12px;padding:3px 6px" onchange="window._boardSelYr=parseInt(this.value);window._boardSelDay=Math.min(window._boardSelDay||1,new Date(parseInt(this.value),window._boardSelMo,0).getDate());_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+yrOpts(selYr)+'</select>'
-    +'<select class="fi" style="width:70px;font-size:12px;padding:3px 6px" onchange="window._boardSelMo=parseInt(this.value);window._boardSelDay=Math.min(window._boardSelDay||1,new Date(window._boardSelYr,parseInt(this.value),0).getDate());_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+moOpts(selMo)+'</select>'
-    +'<select class="fi" style="width:70px;font-size:12px;padding:3px 6px" onchange="window._boardSelDay=parseInt(this.value);_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">'+dayOpts(selMo,selYr,dDay)+'</select>'
-    +'<button class="btn btn-outline btn-xs" onclick="window._boardSelYr=new Date().getFullYear();window._boardSelMo=new Date().getMonth()+1;window._boardSelDay=new Date().getDate();_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">오늘</button>'
-    +'</div>';
-
-  sections.forEach(function(sec){
-    var items=_dashBoard[sec.key]||[];
-    var done=items.filter(function(it){return it.checked;}).length;
-    var autoItems=[];
-    if(sec.key===dayKey){
-      autoItems=getAutoTodayTasks(window._crmTargetDate||todayISO());
-    }
-    var totalCount=items.length+autoItems.length;
-    var autoDone=((_dashBoard['_autoDone_'+sec.key])||{});
-    var autoDoneCount=autoItems.filter(function(t){return autoDone[t.label];}).length;
-    html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">'
-      +'<div style="background:'+sec.bg+';padding:6px 14px 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-      +'<div style="font-size:13px;font-weight:800;color:'+sec.color+';margin-right:4px">'+sec.label+'</div>'
-      +(sec.badge?'<span style="font-size:11px;color:'+sec.color+';background:white;border:1px solid '+sec.color+';border-radius:10px;padding:1px 7px;opacity:.8">'+sec.badge+'</span>':'')
-      +(totalCount?'<div style="font-size:11px;color:var(--txt3);margin-left:auto">'+(done+autoDoneCount)+'/'+totalCount+' 완료</div>':'')
-      +'</div>'
-      +'<div style="padding:8px 14px;background:var(--surface)">'
-      +(autoItems.length?
-        '<div style="font-size:10px;color:var(--txt3);font-weight:700;margin-bottom:3px;letter-spacing:.3px">🔔 자동 알림</div>'
-        +autoItems.map(function(t){
-          var checked=!!autoDone[t.label];
-          return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">'
-            +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleAutoDoneItem(\''+sec.key+'\',\''+t.label.replace(/'/g,'')+'\',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'
-            +'<span style="font-size:11px;'+(checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.icon+' '+t.label+'</span>'
-            +(t.sub?'<span style="font-size:10px;color:var(--txt3);margin-left:4px">· '+t.sub.substring(0,30)+'</span>':'')
-            +(checked?'<span style="font-size:10px;color:#16a34a;font-weight:700;flex-shrink:0">✓</span>':'')
-            +'</div>';
-        }).join('')
-        +'<div style="font-size:10px;color:var(--txt3);font-weight:700;margin:6px 0 3px;letter-spacing:.3px">✏️ 직접 추가</div>'
-      :'')
-      +'<div style="display:flex;gap:6px;margin-bottom:4px">'
-      +'<input class="fi" id="bi-'+sec.key+'" style="flex:1;font-size:12px" placeholder="내용 입력 후 Enter" onkeydown="if(event.key===\'Enter\'){addDashBoardItem(\''+sec.key+'\');event.preventDefault();}">'
-      +'<button class="btn btn-outline btn-xs" onclick="addDashBoardItem(\''+sec.key+'\')">추가</button>'
-      +'</div>'
-      +items.map(function(item,i){
-        return'<div draggable="true" data-drag-key="'+sec.key+'" data-drag-idx="'+i+'" '
-          +'ondragstart="dashDragStart(event)" ondragover="dashDragOver(event)" ondrop="dashDrop(event)" '
-          +'style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:default">'
-          +'<span style="color:var(--txt3);cursor:grab;font-size:14px;flex-shrink:0" title="드래그하여 순서 변경">⠿</span>'
-          +'<input type="checkbox" '+(item.checked?'checked':'')+' onchange="toggleDashBoardItem(\''+sec.key+'\','+i+',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">'
-          +'<span ondblclick="editDashBoardItem(\''+sec.key+'\','+i+',this)" style="flex:1;font-size:12px;cursor:text;'+(item.checked?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+item.text+'</span>'
-          +(item.checked?'<span style="font-size:10px;color:#16a34a;font-weight:700">✓</span>':'')
-          +'<button style="background:none;border:none;cursor:pointer;color:var(--txt3);padding:0 3px" onclick="removeDashBoardItem(\''+sec.key+'\','+i+')">✕</button>'
-          +'</div>';
-      }).join('')
-      +'</div></div>';
+  // ── 뷰 전환 탭 ──
+  html+='<div style="display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:3px">';
+  viewTabs.forEach(function(t){
+    var on=_dbView===t.id;
+    html+='<button onclick="_dbSetView(\''+t.id+'\')" style="flex:1;padding:6px 4px;border:none;border-radius:8px;font-size:12px;font-weight:'+(on?'800':'500')+';cursor:pointer;background:'+(on?'var(--navy)':'transparent')+';color:'+(on?'#fff':'var(--txt2)')+';transition:all .15s">'+t.label+'</button>';
   });
+  html+='</div>';
+
+  // ── 필터 바 ──
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+  // 영역 필터
+  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbAreaFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
+  html+='<option value="">전체 영역</option>';
+  _DB_AREAS.forEach(function(a){html+='<option value="'+a+'"'+(_dbAreaFilter===a?' selected':'')+'>'+_DB_AREA_ICONS[a]+' '+a+'</option>';});
+  html+='</select>';
+  // 상태 필터
+  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbStatusFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
+  html+='<option value="">전체 상태</option>';
+  _DB_STATUSES.forEach(function(s){html+='<option value="'+s+'"'+(_dbStatusFilter===s?' selected':'')+'>'+s+'</option>';});
+  html+='</select>';
+  // 우선순위 필터
+  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbPriorityFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
+  html+='<option value="">전체 우선순위</option>';
+  _DB_PRIORITIES.forEach(function(p){html+='<option value="'+p+'"'+(_dbPriorityFilter===p?' selected':'')+'>'+_DB_PRIORITY_SHORT[p]+'</option>';});
+  html+='</select>';
+  html+='<button class="btn btn-navy btn-sm" style="margin-left:auto" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
+  html+='</div>';
+
+  if(_dbView==='today') html+=_renderDbTodayView(autoTasks,today,now);
+  else if(_dbView==='week') html+=_renderDbWeekView(now);
+  else html+=_renderDbAreaView();
+
   html+='</div>';
   el.innerHTML=html;
 }
-function toggleAutoDoneItem(key,label,checked){
-  if(!_dashBoard)_dashBoard={};
-  var doneKey='_autoDone_'+key;
-  if(!_dashBoard[doneKey])_dashBoard[doneKey]={};
-  _dashBoard[doneKey][label]=checked;
-  saveDashBoard();
-  _renderDashBoardUI($('dashboard-board-area'));
-}
-var _dashDrag={};
-function dashDragStart(e){
-  _dashDrag.key=e.currentTarget.dataset.dragKey;
-  _dashDrag.idx=parseInt(e.currentTarget.dataset.dragIdx);
-  e.dataTransfer.effectAllowed='move';
-}
-function dashDragOver(e){
-  e.preventDefault();e.dataTransfer.dropEffect='move';
-  e.currentTarget.style.borderTop='2px solid var(--mint)';
-}
-function dashDrop(e){
-  e.preventDefault();
-  e.currentTarget.style.borderTop='';
-  var toIdx=parseInt(e.currentTarget.dataset.dragIdx);
-  var key=_dashDrag.key;
-  var fromIdx=_dashDrag.idx;
-  if(!_dashBoard[key]||fromIdx===toIdx)return;
-  var items=_dashBoard[key];
-  var moved=items.splice(fromIdx,1)[0];
-  items.splice(toIdx,0,moved);
-  saveDashBoard();
-  _renderDashBoardUI($('dashboard-board-area'));
-}
-function editDashBoardItem(key,idx,el){
-  var cur=el.textContent;
-  var inp=document.createElement('input');
-  inp.value=cur;
-  inp.style.cssText='flex:1;font-size:12px;border:1px solid var(--blue);border-radius:6px;padding:2px 6px;outline:none';
-  el.replaceWith(inp);inp.focus();inp.select();
-  function save(){
-    var v=inp.value.trim();
-    if(v&&v!==cur&&_dashBoard[key]&&_dashBoard[key][idx]){
-      _dashBoard[key][idx].text=v;
-      saveDashBoard();
-    }
-    _renderDashBoardUI($('dashboard-board-area'));
-  }
-  inp.addEventListener('blur',save);
-  inp.addEventListener('keydown',function(e){
-    if(e.key==='Enter'){inp.blur();}
-    if(e.key==='Escape'){inp.value=cur;inp.blur();}
+
+function _dbSetView(v){_dbView=v;_renderDashBoardUI($('dashboard-board-area'));}
+
+// ── 필터 적용 ─────────────────────────────────────
+function _dbFiltered(tasks){
+  return tasks.filter(function(t){
+    if(_dbAreaFilter&&t.area!==_dbAreaFilter)return false;
+    if(_dbStatusFilter&&t.status!==_dbStatusFilter)return false;
+    if(_dbPriorityFilter&&t.priority!==_dbPriorityFilter)return false;
+    return true;
   });
 }
-function addDashBoardItem(key){
-  var inp=$('bi-'+key);if(!inp||!inp.value.trim())return;
-  if(!_dashBoard[key])_dashBoard[key]=[];
-  _dashBoard[key].push({text:inp.value.trim(),checked:false,createdAt:todayISO()});
-  inp.value='';saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
+
+// ── 오늘 뷰 ──────────────────────────────────────
+function _renderDbTodayView(autoTasks,today,now){
+  var html='';
+  // 자동 알림 섹션
+  if(autoTasks.length){
+    html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">';
+    html+='<div style="background:#eff6ff;padding:8px 14px;font-size:13px;font-weight:800;color:var(--navy)">🔔 오늘 자동 알림 <span style="font-size:11px;font-weight:500;color:var(--txt3)">('+autoTasks.length+'건)</span></div>';
+    html+='<div style="padding:8px 14px;background:var(--surface)">';
+    autoTasks.forEach(function(t){
+      var doneMap=(_dbTasks&&_dbTasks._autoDone)||{};
+      var done=!!doneMap[today+'_'+t.label];
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">';
+      html+='<input type="checkbox" '+(done?'checked':'')+' onchange="_dbToggleAutoTask(\''+today+'\',\''+t.label.replace(/'/g,'')+'\',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">';
+      html+='<span style="font-size:12px;'+(done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.icon+' '+t.label+'</span>';
+      if(t.sub)html+='<span style="font-size:10px;color:var(--txt3);margin-left:2px">· '+t.sub.substring(0,30)+'</span>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  }
+
+  // 오늘 업무 — 상태별 묶음
+  var todayTasks=(_dbTasks||[]).filter(function(t){
+    return t.dueDate===today||(t.status==='오늘 할 일'&&t.dueDate>=today);
+  });
+  todayTasks=_dbFiltered(todayTasks);
+  todayTasks.sort(function(a,b){
+    var po={'1순위 (긴급+중요)':0,'2순위 (중요)':1,'3순위 (긴급)':2,'4순위 (일반)':3};
+    return(po[a.priority]||3)-(po[b.priority]||3);
+  });
+
+  var sections=[
+    {status:'오늘 할 일',label:'📌 오늘 반드시'},
+    {status:'진행 중',label:'🔄 진행 중'},
+    {status:'대기 중',label:'⏳ 대기·회신 중'},
+    {status:'예정',label:'📋 예정'},
+    {status:'완료',label:'✅ 완료'},
+    {status:'보류',label:'⏸ 보류'},
+  ];
+  sections.forEach(function(sec){
+    var items=todayTasks.filter(function(t){return t.status===sec.status;});
+    if(!items.length)return;
+    html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:4px">';
+    html+='<div style="background:'+_DB_STATUS_BG[sec.status]+';padding:6px 14px;font-size:12px;font-weight:700;color:'+_DB_STATUS_COLORS[sec.status]+'">'+sec.label+' ('+items.length+')</div>';
+    html+='<div style="padding:6px 14px;background:var(--surface)">';
+    items.forEach(function(t){html+=_dbTaskRow(t);});
+    html+='</div></div>';
+  });
+  if(!todayTasks.length&&!autoTasks.length){
+    html+='<div style="text-align:center;padding:40px;color:var(--txt3);font-size:13px">오늘 업무가 없습니다 🎉<br><span style="font-size:11px">+ 업무 추가 버튼으로 등록하세요</span></div>';
+  }
+  return html;
 }
-function toggleDashBoardItem(key,idx,checked){
-  if(!_dashBoard||!_dashBoard[key])return;
-  _dashBoard[key][idx].checked=checked;
+
+// ── 이번 주 뷰 ───────────────────────────────────
+function _renderDbWeekView(now){
+  var mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
+  var sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  var fmt=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  var monStr=fmt(mon),sunStr=fmt(sun);
+
+  var weekTasks=(_dbTasks||[]).filter(function(t){
+    return t.dueDate>=monStr&&t.dueDate<=sunStr;
+  });
+  weekTasks=_dbFiltered(weekTasks);
+  weekTasks.sort(function(a,b){
+    var po={'1순위 (긴급+중요)':0,'2순위 (중요)':1,'3순위 (긴급)':2,'4순위 (일반)':3};
+    var pd=(po[a.priority]||3)-(po[b.priority]||3);
+    return pd!==0?pd:(a.dueDate>b.dueDate?1:-1);
+  });
+
+  var done=weekTasks.filter(function(t){return t.status==='완료';}).length;
+  var html='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">';
+  html+='<div style="background:#f5f3ff;padding:8px 14px;display:flex;align-items:center;gap:8px">';
+  html+='<span style="font-size:13px;font-weight:800;color:#7c3aed">📆 이번 주 업무</span>';
+  html+='<span style="font-size:11px;color:var(--txt3)">'+monStr.slice(5)+' ~ '+sunStr.slice(5)+'</span>';
+  if(weekTasks.length)html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+weekTasks.length+' 완료</span>';
+  html+='</div>';
+  html+='<div style="padding:6px 14px;background:var(--surface)">';
+  if(weekTasks.length){
+    weekTasks.forEach(function(t){html+=_dbTaskRow(t);});
+  }else{
+    html+='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">이번 주 등록된 업무가 없습니다</div>';
+  }
+  html+='</div></div>';
+  return html;
+}
+
+// ── 영역별 뷰 ────────────────────────────────────
+function _renderDbAreaView(){
+  var areas=_dbAreaFilter?[_dbAreaFilter]:_DB_AREAS;
+  var allTasks=_dbFiltered(_dbTasks||[]);
+  var html='';
+  areas.forEach(function(area){
+    var items=allTasks.filter(function(t){return t.area===area;});
+    var active=items.filter(function(t){return t.status!=='완료'&&t.status!=='보류';});
+    var done=items.filter(function(t){return t.status==='완료';}).length;
+    html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:4px">';
+    html+='<div style="background:var(--surface2);padding:7px 14px;display:flex;align-items:center;gap:6px">';
+    html+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+_DB_AREA_ICONS[area]+' '+area+'</span>';
+    if(items.length)html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료 · 진행 '+active.length+'</span>';
+    html+='<button onclick="openDbTaskModal(null,\''+area+'\')" style="background:none;border:1px solid var(--border);border-radius:6px;font-size:10px;padding:2px 6px;cursor:pointer;color:var(--txt3)">+ 추가</button>';
+    html+='</div>';
+    html+='<div style="padding:6px 14px;background:var(--surface)">';
+    if(active.length){
+      active.sort(function(a,b){var po={'1순위 (긴급+중요)':0,'2순위 (중요)':1,'3순위 (긴급)':2,'4순위 (일반)':3};return(po[a.priority]||3)-(po[b.priority]||3);});
+      active.forEach(function(t){html+=_dbTaskRow(t);});
+    }else{
+      html+='<div style="font-size:11px;color:var(--txt3);padding:6px 0">등록된 업무가 없습니다</div>';
+    }
+    html+='</div></div>';
+  });
+  return html;
+}
+
+// ── 업무 행 렌더링 ────────────────────────────────
+function _dbTaskRow(t){
+  var isDone=t.status==='완료';
+  var pColor=_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)';
+  var pShort=_DB_PRIORITY_SHORT[t.priority]||'';
+  var statusOpts=_DB_STATUSES.map(function(s){
+    return '<option value="'+s+'"'+(t.status===s?' selected':'')+'>'+s+'</option>';
+  }).join('');
+  return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+    +'<span style="font-size:10px;font-weight:700;color:'+pColor+';flex-shrink:0;min-width:28px">'+pShort+'</span>'
+    +'<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+(_DB_AREA_ICONS[t.area]||'')+'</span>'
+    +'<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'" onclick="openDbTaskModal(\''+t.id+'\')" style="cursor:pointer">'+t.name+'</span>'
+    +(t.dueDate?'<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.dueDate.slice(5)+'</span>':'')
+    +'<select style="font-size:10px;border:1px solid var(--border);border-radius:6px;padding:1px 3px;background:var(--surface);color:'+(_DB_STATUS_COLORS[t.status]||'var(--txt)')+';cursor:pointer" onchange="_dbUpdateStatus(\''+t.id+'\',this.value)">'+statusOpts+'</select>'
+    +'<button onclick="openDbTaskModal(\''+t.id+'\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt3);padding:0 2px" title="편집">✏️</button>'
+    +'<button onclick="_dbDeleteTask(\''+t.id+'\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt3);padding:0 2px" title="삭제">✕</button>'
+    +'</div>';
+}
+
+// ── 상태 빠른 변경 ────────────────────────────────
+function _dbUpdateStatus(id,status){
+  if(!_dbTasks)return;
+  var t=_dbTasks.find(function(x){return x.id===id;});
+  if(t){t.status=status;saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));}
+}
+
+// ── 삭제 ─────────────────────────────────────────
+function _dbDeleteTask(id){
+  if(!confirm('이 업무를 삭제할까요?'))return;
+  _dbTasks=(_dbTasks||[]).filter(function(t){return t.id!==id;});
   saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
 }
-function removeDashBoardItem(key,idx){
-  if(!_dashBoard||!_dashBoard[key])return;
-  _dashBoard[key].splice(idx,1);
+
+// ── 자동 알림 체크 ────────────────────────────────
+function _dbToggleAutoTask(date,label,checked){
+  if(!_dbTasks)_dbTasks=[];
+  // _autoDone 항목을 tasks 배열 외부 필드로 저장 (id로 식별)
+  var key='__autoDone';
+  var adObj=_dbTasks.find(function(x){return x.id===key;});
+  if(!adObj){adObj={id:key,_map:{}};_dbTasks.push(adObj);}
+  if(!adObj._map)adObj._map={};
+  adObj._map[date+'_'+label]=checked;
   saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
 }
+
+// ── 업무 추가/편집 모달 ───────────────────────────
+function openDbTaskModal(id,defaultArea){
+  var t=id?(_dbTasks||[]).find(function(x){return x.id===id;}):null;
+  _dbEditId=id||null;
+  var today=todayISO();
+
+  var areaOpts=_DB_AREAS.map(function(a){
+    var sel=(t?t.area===a:a===(defaultArea||''));
+    return '<option value="'+a+'"'+(sel?' selected':'')+'>'+_DB_AREA_ICONS[a]+' '+a+'</option>';
+  }).join('');
+  var cycleOpts=_DB_CYCLES.map(function(c){
+    return '<option value="'+c+'"'+(t&&t.cycle===c?' selected':'')+(c==='비정기'&&!t?' selected':'')+'>'+c+'</option>';
+  }).join('');
+  var priorityOpts=_DB_PRIORITIES.map(function(p){
+    return '<option value="'+p+'"'+(t?t.priority===p:p==='2순위 (중요)'?' selected':'')+'>'+_DB_PRIORITY_SHORT[p]+'</option>';
+  }).join('');
+  var statusOpts=_DB_STATUSES.map(function(s){
+    return '<option value="'+s+'"'+(t?t.status===s:s==='예정'?' selected':'')+'>'+s+'</option>';
+  }).join('');
+
+  var modal=document.createElement('div');
+  modal.id='db-task-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML=
+    '<div style="background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--navy)">'+(id?'✏️ 업무 편집':'+ 업무 추가')+'</div>'
+    +'<button onclick="document.getElementById(\'db-task-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>'
+    +'</div>'
+    // 업무명
+    +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">업무명 *</div>'
+    +'<input class="fi" id="dbt-name" style="font-size:13px" placeholder="업무 내용을 입력하세요" value="'+(t?t.name:'')+'">'
+    +'</div>'
+    // 업무 영역
+    +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">업무 영역 *</div>'
+    +'<select class="fi" id="dbt-area" style="font-size:12px">'+areaOpts+'</select>'
+    +'</div>'
+    // 2열: 주기 + 우선순위
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">실행 주기</div>'
+    +'<select class="fi" id="dbt-cycle" style="font-size:12px">'+cycleOpts+'</select></div>'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">우선순위</div>'
+    +'<select class="fi" id="dbt-priority" style="font-size:12px">'+priorityOpts+'</select></div>'
+    +'</div>'
+    // 2열: 기한 + 상태
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">완료 기한</div>'
+    +'<input class="fi" type="date" id="dbt-due" style="font-size:12px" value="'+(t&&t.dueDate?t.dueDate:today)+'"></div>'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">진행 상태</div>'
+    +'<select class="fi" id="dbt-status" style="font-size:12px">'+statusOpts+'</select></div>'
+    +'</div>'
+    // 메모
+    +'<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">메모</div>'
+    +'<textarea class="fi" id="dbt-memo" rows="2" style="font-size:12px;resize:none" placeholder="추가 메모">'+(t&&t.memo?t.memo:'')+'</textarea>'
+    +'</div>'
+    // 버튼
+    +'<div style="display:flex;gap:8px">'
+    +(id?'<button class="btn btn-red btn-sm" onclick="_dbDeleteTask(\''+id+'\');document.getElementById(\'db-task-modal\').remove()">삭제</button>':'')
+    +'<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="document.getElementById(\'db-task-modal\').remove()">취소</button>'
+    +'<button class="btn btn-navy btn-sm" onclick="_dbSaveTaskModal(\''+id+'\')">저장</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(modal);
+  var nameEl=document.getElementById('dbt-name');
+  if(nameEl)nameEl.focus();
+}
+
+function _dbSaveTaskModal(id){
+  var name=(document.getElementById('dbt-name')||{}).value||'';
+  var area=(document.getElementById('dbt-area')||{}).value||'';
+  var cycle=(document.getElementById('dbt-cycle')||{}).value||'비정기';
+  var priority=(document.getElementById('dbt-priority')||{}).value||'2순위 (중요)';
+  var dueDate=(document.getElementById('dbt-due')||{}).value||todayISO();
+  var status=(document.getElementById('dbt-status')||{}).value||'예정';
+  var memo=(document.getElementById('dbt-memo')||{}).value||'';
+  if(!name.trim()){alert('업무명을 입력하세요');return;}
+  if(!area){alert('업무 영역을 선택하세요');return;}
+  if(!_dbTasks)_dbTasks=[];
+  if(id){
+    var t=_dbTasks.find(function(x){return x.id===id;});
+    if(t){t.name=name;t.area=area;t.cycle=cycle;t.priority=priority;t.dueDate=dueDate;t.status=status;t.memo=memo;}
+  }else{
+    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,cycle:cycle,priority:priority,dueDate:dueDate,status:status,memo:memo,createdAt:todayISO()});
+  }
+  saveDashBoard();
+  var m=document.getElementById('db-task-modal');if(m)m.remove();
+  _renderDashBoardUI($('dashboard-board-area'));
+}
+
+// ── 기존 호환 함수 유지 (다른 탭에서 참조) ──────────
+function _getDashBoardKey(){return{};}
+function _getCurWeekKey(){return '';}
+function _getCurDayKey(){return '';}
+function toggleAutoDoneItem(){}
+function dashDragStart(){}
+function dashDragOver(){}
+function dashDrop(){}
+function addDashBoardItem(){}
+function editDashBoardItem(){}
+function removeDashBoardItem(){}
+function toggleDashBoardItem(){}
+
 
 function initCrmDateSelector(){
   var now=new Date();
@@ -8060,6 +8235,33 @@ function getAutoTodayTasks(dateStr){
       tasks.push({cat:'특강 실행',icon:'✅',label:'['+(t.prepDate===dateStr?'제작':'게시')+'] '+t.task,sub:t.content+' · '+t.channel});
     });
   }
+
+  // 12. 일지 미작성 학생 알림
+  (function(){
+    var dayNames=['일','월','화','수','목','금','토'];
+    var dt2=new Date(dateStr+'T00:00:00');
+    var todayDayName=dayNames[dt2.getDay()];
+    if(dt2.getDay()===0||dt2.getDay()===6)return; // 주말 제외
+    var activeS=(students||[]).filter(function(s){
+      var st=s.status||'재원';
+      if(st!=='재원'&&st!=='신규')return false;
+      if(!s.days||!s.days.length)return false;
+      return s.days.indexOf(todayDayName)!==-1;
+    });
+    if(!activeS.length)return;
+    var written=(reports||[]).filter(function(r){return r.date===dateStr;}).map(function(r){return r.studentId;});
+    var unwritten=activeS.filter(function(s){return written.indexOf(s.id)===-1;});
+    if(!unwritten.length)return;
+    var total=activeS.length;
+    var rate=Math.round((total-unwritten.length)/total*100);
+    tasks.unshift({
+      cat:'일지 관리',
+      icon:'✏️',
+      label:'일지 미작성 학생 '+unwritten.length+'명 (작성률 '+rate+'%)',
+      sub:unwritten.map(function(s){return s.name;}).join(', '),
+      _urgent: true
+    });
+  })();
 
   return tasks;
 }
@@ -9157,6 +9359,32 @@ function _renderChecklistUI(el){
       +'</button>';
   });
   html+='</div>';
+
+  // ② - 1. 오늘/선택일 일지 미작성 학생 알림
+  var selDate0=dates[_clDayIdx];
+  (function(){
+    var dayNames=['일','월','화','수','목','금','토'];
+    var selDayName=dayNames[new Date(selDate0+'T00:00:00').getDay()];
+    // 선택일에 수업 있는 재원 학생
+    var activeS=(students||[]).filter(function(s){
+      var st=s.status||'재원';
+      if(st!=='재원'&&st!=='신규')return false;
+      if(!s.days||!s.days.length)return false;
+      return s.days.indexOf(selDayName)!==-1;
+    });
+    // 그 중 일지 미작성자
+    var written=(reports||[]).filter(function(r){return r.date===selDate0;}).map(function(r){return r.studentId;});
+    var unwritten=activeS.filter(function(s){return written.indexOf(s.id)===-1;});
+    if(!unwritten.length)return;
+    html+='<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:10px 12px;margin-bottom:10px">'
+      +'<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px">✏️ 일지 미작성 학생 ('+unwritten.length+'명)'
+      +'<span style="font-size:10px;font-weight:400;color:#7f1d1d;margin-left:6px">수업 후 작성해 주세요</span></div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:4px">'
+      +unwritten.map(function(s){
+        return '<span onclick="goto(\'write\')" style="background:#fff;border:1px solid #fca5a5;border-radius:16px;padding:3px 10px;font-size:11px;color:#dc2626;cursor:pointer" title="학습 일지 작성으로 이동">'+s.name+'</span>';
+      }).join('')
+      +'</div></div>';
+  })();
 
   // ③ 날짜 표시
   var selDate=dates[_clDayIdx];
