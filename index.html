@@ -8241,7 +8241,7 @@ function getAutoTodayTasks(dateStr){
     var dayNames=['일','월','화','수','목','금','토'];
     var dt2=new Date(dateStr+'T00:00:00');
     var todayDayName=dayNames[dt2.getDay()];
-    if(dt2.getDay()===0||dt2.getDay()===6)return; // 주말 제외
+    if(dt2.getDay()===0||dt2.getDay()===6)return;
     var activeS=(students||[]).filter(function(s){
       var st=s.status||'재원';
       if(st!=='재원'&&st!=='신규')return false;
@@ -8260,6 +8260,70 @@ function getAutoTodayTasks(dateStr){
       label:'일지 미작성 학생 '+unwritten.length+'명 (작성률 '+rate+'%)',
       sub:unwritten.map(function(s){return s.name;}).join(', '),
       _urgent: true
+    });
+  })();
+
+  // 13. 반복 업무 알림 (엑셀 반복 업무 시트 기반)
+  (function(){
+    var d=new Date(dateStr+'T00:00:00');
+    var dow=d.getDay(); // 0=일,1=월,...,6=토
+    var dom=d.getDate();
+    var mon=d.getMonth()+1;
+    var lastDay=new Date(d.getFullYear(),mon,0).getDate();
+    var isLastBizDay=(dom===lastDay||(dom===lastDay-1&&d.getDay()===5));
+
+    // 매주 금요일
+    if(dow===5){
+      tasks.push({cat:'반복 업무',icon:'📋',label:'결석·지각·숙제 미제출 누적 확인',sub:'연락 대상 학생 표시 → 학부모 연락'});
+      tasks.push({cat:'반복 업무',icon:'📚',label:'진도 지연·정체 학생 점검',sub:'보충 계획 입력'});
+    }
+    // 매월 20일
+    if(dom===20){
+      tasks.push({cat:'반복 업무',icon:'📦',label:'교재 재고·미납·퇴원 변동 점검',sub:'다음 달 준비 완료'});
+    }
+    // 매월 말일
+    if(isLastBizDay){
+      tasks.push({cat:'반복 업무',icon:'📊',label:'원생 수·등록률·퇴원 수 월말 점검',sub:'월간 KPI 갱신'});
+    }
+    // 분기 첫날 (3·6·9·12월 1일)
+    if(dom===1&&[3,6,9,12].indexOf(mon)!==-1){
+      tasks.push({cat:'반복 업무',icon:'📝',label:'분기 학습 성취도 평가 준비',sub:'평가·리포트 완료 목표'});
+      tasks.push({cat:'반복 업무',icon:'💬',label:'정기 학부모 상담 대상 선정',sub:'우선 상담 대상 확정'});
+    }
+    // 교재·반 이동 검토 (7·12월 1일)
+    if(dom===1&&[7,12].indexOf(mon)!==-1){
+      tasks.push({cat:'반복 업무',icon:'🔄',label:'교재 단계·반 이동·진급 검토',sub:'다음 학기 편성 확정'});
+    }
+    // 연간 결산 (12월 1일)
+    if(dom===1&&mon===12){
+      tasks.push({cat:'반복 업무',icon:'📅',label:'연간 운영 결산·다음 연도 학사 일정 수립 시작',sub:'다음 연도 계획 확정'});
+    }
+  })();
+
+  // 14. 이달 학사일정 알림 (월 1일에 해당 월 일정 요약 표시)
+  (function(){
+    var d=new Date(dateStr+'T00:00:00');
+    if(d.getDate()!==1)return; // 월 초에만
+    if(typeof _academicCalendar==='undefined'||!_academicCalendar)return;
+    var yr=d.getFullYear(),mon=d.getMonth()+1;
+    var moStr=yr+'-'+String(mon).padStart(2,'0');
+    var moEnd=moStr+'-'+String(new Date(yr,mon,0).getDate()).padStart(2,'0');
+    var evts=(_academicCalendar.events||[]).filter(function(e){
+      if(!e.date)return false;
+      var eEnd=e.endDate||e.date;
+      return e.date<=moEnd&&eEnd>=(moStr+'-01');
+    });
+    if(!evts.length)return;
+    var publicEvts=evts.filter(function(e){return e.public!=='internal';});
+    var internalEvts=evts.filter(function(e){return e.public==='internal';});
+    var summary=evts.slice(0,5).map(function(e){
+      return e.date.slice(8)+'일 '+e.title;
+    }).join(' / ')+(evts.length>5?' 외 '+(evts.length-5)+'건':'');
+    tasks.push({
+      cat:'학사일정',
+      icon:'📆',
+      label:mon+'월 학사일정 '+evts.length+'건 (공개 '+publicEvts.length+' / 내부 '+internalEvts.length+')',
+      sub:summary
     });
   })();
 
@@ -8620,7 +8684,7 @@ function _renderAcademicCalendarUI(el){
   var yr=window._acalYr||now.getFullYear();
   window._acalYr=yr;
   var months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  var catColors={방학:'#fbbf24',특강:'#60a5fa',행사:'#34d399',시험:'#f87171',기타:'#a78bfa'};
+  var catColors={'설명회·간담회':'#3b82f6','외부시험':'#8b5cf6','이벤트':'#10b981','마케팅':'#f59e0b','내부 운영':'#94a3b8','방학·특강':'#22c55e'};
   var cats=Object.keys(catColors);
   var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';
   var html='<div style="max-width:900px;padding:14px">'
@@ -8659,9 +8723,11 @@ function _renderAcademicCalendarUI(el){
         } else {
           dayStr=parseInt(e.date.slice(8,10))+'일';
         }
+        var pubBadge=e.public==='internal'?'<span style="font-size:9px;background:#f1f5f9;color:#94a3b8;border-radius:4px;padding:0 3px;flex-shrink:0">내부</span>':'';
         return'<div style="display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:5px;margin-bottom:2px;background:'+col+'18">'
           +'<span style="font-size:10px;font-weight:700;color:'+col+';min-width:32px;flex-shrink:0">'+dayStr+'</span>'
           +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.title+'</span>'
+          +pubBadge
           +'<button onclick="removeAcalEvent(\''+e.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:10px;padding:0;flex-shrink:0">✕</button>'
           +'</div>';
       }).join('')
@@ -8674,7 +8740,7 @@ function _renderAcademicCalendarUI(el){
 function openAcalAddModal(){
   var now=new Date();
   var todayVal=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  var cats=['방학','특강','행사','시험','기타'];
+  var cats=['설명회·간담회','외부시험','이벤트','마케팅','내부 운영','방학·특강'];
   var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
   overlay.innerHTML='<div class="ms" style="max-width:360px"><div class="mh"></div><div class="mt">📆 학사일정 추가</div>'
@@ -8684,6 +8750,7 @@ function openAcalAddModal(){
     +'<div class="field"><div class="fl">제목</div><input class="fi" id="acal-title" placeholder="예: 여름방학"></div>'
     +'<div class="field"><div class="fl">구분</div><select class="fi" id="acal-cat">'+cats.map(function(c){return'<option>'+c+'</option>';}).join('')+'</select></div>'
     +'<div class="field"><div class="fl">메모</div><input class="fi" id="acal-note" placeholder="(선택)"></div>'
+    +'<div class="field"><div class="fl">공개 여부</div><select class="fi" id="acal-public"><option value="public">공개 (학부모 안내 가능)</option><option value="internal">내부 (직원용)</option></select></div>'
     +'<button class="btn btn-green btn-block" onclick="confirmAcalAdd(this.closest(\'.mo\'))">추가</button>'
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
     +'</div>';
@@ -8698,7 +8765,8 @@ function confirmAcalAdd(overlay){
   if(!date||!title){toast('날짜와 제목을 입력하세요');return;}
   if(endDate&&endDate<date){toast('종료 날짜는 시작 날짜보다 같거나 늦어야 합니다');return;}
   if(!_academicCalendar)_academicCalendar={events:[]};
-  var evt={id:Date.now().toString(36),date:date,title:title,cat:cat,note:note};
+  var pub=($('acal-public')||{}).value||'public';
+  var evt={id:Date.now().toString(36),date:date,title:title,cat:cat,note:note,public:pub};
   if(endDate&&endDate!==date)evt.endDate=endDate;
   _academicCalendar.events.push(evt);
   saveAcademicCalendar();overlay.remove();
