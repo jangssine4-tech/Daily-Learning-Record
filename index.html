@@ -7599,12 +7599,14 @@ function renderSpecialTarget(){
     +'<button class="btn btn-green btn-sm" onclick="saveSpecialData()">💾 저장</button>'
     +'</div>'
     +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:860px"><thead>'
-    +'<tr><th colspan="9" style="padding:4px 8px;background:#f8fafc;border-bottom:1px solid var(--border)">'
+    +'<tr><th colspan="10" style="padding:4px 8px;background:#f8fafc;border-bottom:1px solid var(--border)">'
     +'<div style="display:flex;gap:12px;align-items:center;font-size:11px">'
     +'<label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--txt3)">'
     +'<input type="checkbox" id="sp-notice-all" onchange="toggleAllSpecialCheck(\'sp-notice\',this.checked)"> 안내문 전체 선택</label>'
     +'<label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--txt3)">'
     +'<input type="checkbox" id="sp-counsel-all" onchange="toggleAllSpecialCheck(\'sp-counsel\',this.checked)"> 상담 전체 선택</label>'
+    +'<label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--txt3)">'
+    +'<input type="checkbox" id="sp-join-all" onchange="toggleAllSpecialJoin(this.checked)"> 특강 전체 O</label>'
     +'</div></th></tr>'
     +'<tr style="position:sticky;top:0;z-index:2">'
     +'<th style="width:80px">이름</th>'
@@ -7615,6 +7617,7 @@ function renderSpecialTarget(){
     +'<th style="width:100px">특강 시간</th>'
     +'<th style="width:60px">안내문</th>'
     +'<th style="width:50px">상담</th>'
+    +'<th style="width:60px">특강</th>'
     +'<th>비고</th>'
     +'</tr></thead><tbody>';
   activeStudents.forEach(function(s){
@@ -7630,7 +7633,13 @@ function renderSpecialTarget(){
       +'<td><input class="fi sp-time" style="font-size:11px" value="'+(r.classTime||'').replace(/"/g,'&quot;')+'" placeholder="예: 오후 2시"></td>'
       +'<td style="text-align:center"><input type="checkbox" class="sp-notice" '+(r.noticeSent?'checked':'')+'></td>'
       +'<td style="text-align:center"><input type="checkbox" class="sp-counsel" '+(r.counselDone?'checked':'')+'></td>'
-      +'<td><input class="fi sp-note" style="font-size:11px" value="'+(r.note||'').replace(/"/g,'&quot;')+'" placeholder="비고"></td>'
+      +'<td style="text-align:center">'
+      +'<select class="sp-join" style="font-size:13px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;background:var(--surface);cursor:pointer;color:'+(r.joinStatus==='O'?'#16a34a':r.joinStatus==='X'?'var(--red)':'var(--txt3)')+'">'
+      +'<option value=""'+(r.joinStatus===''||!r.joinStatus?' selected':'')+'>—</option>'
+      +'<option value="O"'+(r.joinStatus==='O'?' selected':'')+'>O</option>'
+      +'<option value="X"'+(r.joinStatus==='X'?' selected':'')+'>X</option>'
+      +'</select></td>'
+      +'<td><input class="fi sp-note"' style="font-size:11px" value="'+(r.note||'').replace(/"/g,'&quot;')+'" placeholder="비고"></td>'
       +'</tr>';
   });
   html+='</tbody></table></div>';
@@ -7640,11 +7649,18 @@ function renderSpecialTarget(){
     function sv(field,val){updateSpecialTargetV2(dk,sid,field,val);}
     function wire(cls,field){
       var inp=row.querySelector('.'+cls);if(!inp)return;
-      inp.addEventListener('change',function(){sv(field,this.type==='checkbox'?this.checked:this.value);if(this.type==='checkbox')saveSpecialData();});
-      inp.addEventListener('blur',function(){if(this.type!=='checkbox')sv(field,this.value);});
+      inp.addEventListener('change',function(){
+        sv(field,this.type==='checkbox'?this.checked:this.value);
+        if(this.type==='checkbox')saveSpecialData();
+        if(cls==='sp-join'){
+          this.style.color=this.value==='O'?'#16a34a':this.value==='X'?'var(--red)':'var(--txt3)';
+          saveSpecialData();
+        }
+      });
+      inp.addEventListener('blur',function(){if(this.type!=='checkbox'&&cls!=='sp-join')sv(field,this.value);});
     }
     wire('sp-mock','mockScore');wire('sp-prog','program');
-    wire('sp-time','classTime');wire('sp-notice','noticeSent');wire('sp-counsel','counselDone');wire('sp-note','note');
+    wire('sp-time','classTime');wire('sp-notice','noticeSent');wire('sp-counsel','counselDone');wire('sp-join','joinStatus');wire('sp-note','note');
 
   });
 }
@@ -7660,6 +7676,14 @@ function toggleAllSpecialCheck(cls,checked){
     updates.push(true);
   });
   if(updates.length)saveSpecialData();
+}
+function toggleAllSpecialJoin(allO){
+  document.querySelectorAll('.sp-join').forEach(function(sel){
+    sel.value=allO?'O':'';
+    sel.style.color=allO?'#16a34a':'var(--txt3)';
+    // 변경 이벤트 발생시켜 저장
+    sel.dispatchEvent(new Event('change'));
+  });
 }
 function updateSpecialTargetV2(dataKey,studentId,field,val){
   if(!window._specialData)window._specialData={};
