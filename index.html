@@ -2211,6 +2211,7 @@ function _wtRemoveCustomSlot(ts){
   var slots=_wtGetCustomSlots().filter(function(s){return s!==ts;});
   _wtSaveCustomSlots(slots);
   renderWeeklyTimetable();
+  _wtSaveSnapshot(); // 시간 삭제 후 스냅샷 저장
 }
 function _confirmAddWeeklyTime(overlay){
   var t=(document.getElementById('wt-add-time')||{}).value;
@@ -2224,6 +2225,132 @@ function _confirmAddWeeklyTime(overlay){
   _wtSaveCustomSlots(slots);
   overlay.remove();
   renderWeeklyTimetable();
+  _wtSaveSnapshot();
+}
+
+// ══════════════════════════════════════════════════════
+// 주간 시간표 월별 스냅샷 관리
+// Firestore: config/weeklyTimetableSnapshots
+// 구조: { "2026-07": { students:[...], customSlots:[...], special:{...} } }
+// ══════════════════════════════════════════════════════
+var _wtSnapshots = null; // 캐시
+
+function _wtMonthKey(yr, mo) {
+  return String(yr) + '-' + String(mo).padStart(2, '0');
+}
+
+function _wtCurrentMonthKey() {
+  var now = new Date();
+  return _wtMonthKey(now.getFullYear(), now.getMonth() + 1);
+}
+
+function _wtIsCurrentMonth() {
+  var now = new Date();
+  return window._wtYr === now.getFullYear() && window._wtMo === (now.getMonth() + 1);
+}
+
+// 스냅샷 불러오기 (캐시 우선)
+function _wtLoadSnapshots() {
+  if (_wtSnapshots) return Promise.resolve();
+  return db.collection('config').doc('weeklyTimetableSnapshots').get()
+    .then(function(d) {
+      _wtSnapshots = d.exists ? (d.data() || {}) : {};
+    })
+    .catch(function() { _wtSnapshots = {}; });
+}
+
+// 현재 달 스냅샷 저장
+function _wtSaveSnapshot() {
+  var key = _wtMonthKey(window._wtYr || new Date().getFullYear(),
+                        window._wtMo || (new Date().getMonth() + 1));
+  if (!_wtSnapshots) _wtSnapshots = {};
+
+  // 현재 학생 데이터 스냅샷
+  var activeStudents = students.filter(function(s) {
+    var st = s.status || '재원'; return st === '재원' || st === '신규';
+  });
+  var studentSnap = activeStudents.map(function(s) {
+    return { id: s.id, name: s.name, days: JSON.parse(JSON.stringify(s.days || [])),
+             periods: JSON.parse(JSON.stringify(s.periods || {})),
+             status: s.status || '재원' };
+  });
+
+  // 특강 데이터
+  var now = new Date();
+  var planKey = 'specialPlan_' + (window._specialYr || now.getFullYear()) +
+                '_' + (window._specialSeason || '여름');
+  var specialSnap = (window._specialData && window._specialData[planKey])
+    ? JSON.parse(JSON.stringify(window._specialData[planKey])) : null;
+
+  _wtSnapshots[key] = {
+    students: studentSnap,
+    customSlots: _wtGetCustomSlots(),
+    special: specialSnap,
+    savedAt: Date.now()
+  };
+
+  db.collection('config').doc('weeklyTimetableSnapshots')
+    .set(_wtSnapshots, { merge: false })
+    .catch(function(e) { console.warn('스냅샷 저장 실패', e); });
+}
+
+// 특정 달 스냅샷에서 그리드 빌드
+function _buildGridFromSnapshot(snap, days) {
+  var timeSet = {};
+  var grid = {};
+  function tsToMin(ts) { var p = ts.match(/(\d+):(\d+)/); return p ? parseInt(p[1]) * 60 + parseInt(p[2]) : 0; }
+
+  (snap.students || []).forEach(function(s) {
+    if (!s.days || !s.days.length) return;
+    s.days.forEach(function(d) {
+      if (days.indexOf(d) === -1) return;
+      var pData = (s.periods || {})[d];
+      var t = pData && typeof pData === 'object' ? pData.time || '' : '';
+      if (!t) return;
+      var mm = t.match(/(\d{1,2}):(\d{2})/);
+      if (mm) {
+        var h = parseInt(mm[1]), min = parseInt(mm[2]);
+        if (h >= 1 && h <= 9) h += 12;
+        var blk = String(h).padStart(2, '0') + ':' + String(min < 30 ? 0 : 30).padStart(2, '0');
+        timeSet[blk] = true;
+        if (!grid[blk]) { grid[blk] = {}; days.forEach(function(dd) { grid[blk][dd] = []; }); }
+        grid[blk][d].push(s);
+      }
+    });
+  });
+
+  // 커스텀 슬롯
+  (snap.customSlots || []).forEach(function(ts) {
+    if (!timeSet[ts]) {
+      timeSet[ts] = true;
+      grid[ts] = {}; days.forEach(function(d) { grid[ts][d] = []; });
+    }
+  });
+
+  // 특강 학생
+  if (snap.special && snap.special.grid) {
+    Object.keys(snap.special.grid).forEach(function(ts) {
+      if (!timeSet[ts]) {
+        timeSet[ts] = true;
+        grid[ts] = {}; days.forEach(function(d) { grid[ts][d] = []; });
+      }
+      Object.keys(snap.special.grid[ts]).forEach(function(d) {
+        if (!grid[ts] || !grid[ts][d]) return;
+        var existingNames = grid[ts][d].map(function(s) { return s.name; });
+        (snap.special.grid[ts][d] || []).forEach(function(name) {
+          if (existingNames.indexOf(name) !== -1) return;
+          var obj = { id: 'special_' + name, name: name, _isSpecial: true };
+          grid[ts][d].push(obj);
+        });
+      });
+    });
+  }
+
+  var timeSlots = Object.keys(timeSet).sort(function(a, b) { return tsToMin(a) - tsToMin(b); });
+  timeSlots.forEach(function(ts) {
+    if (!grid[ts]) { grid[ts] = {}; days.forEach(function(d) { grid[ts][d] = []; }); }
+  });
+  return { timeSlots: timeSlots, grid: grid };
 }
 
 // ══════════════════════════════════════════════════════
@@ -2354,94 +2481,121 @@ function renderWeeklyTimetable(){
   var now=new Date();
   if(!window._wtYr)window._wtYr=now.getFullYear();
   if(!window._wtMo)window._wtMo=now.getMonth()+1;
+  var isCurrentMo=_wtIsCurrentMonth();
+  var days=['월','화','수','목','금'];
 
-  var data=_buildWeeklyGrid(window._wtYr,window._wtMo);
-  var timeSlots=data.timeSlots,grid=data.grid,days=data.days;
-  var movedMap=_wtGetMoved();
+  function doRender(data,isSnap,snapInfo){
+    var timeSlots=data.timeSlots,grid=data.grid;
+    var movedMap=_wtGetMoved();
+    var now2=new Date();
+    if(!window._wtYr)window._wtYr=now2.getFullYear();
+    if(!window._wtMo)window._wtMo=now2.getMonth()+1;
+    var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===window._wtYr?' selected':'')+'>'+y+'년</option>';
+    var moOpts='';for(var mo=1;mo<=12;mo++)moOpts+='<option value="'+mo+'"'+(mo===window._wtMo?' selected':'')+'>'+mo+'월</option>';
+    var planKey='specialPlan_'+(window._specialYr||now2.getFullYear())+'_'+(window._specialSeason||'여름');
 
-  // 연도/월 드롭다운 옵션
-  var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===window._wtYr?' selected':'')+'>'+y+'년</option>';
-  var moOpts='';for(var mo=1;mo<=12;mo++)moOpts+='<option value="'+mo+'"'+(mo===window._wtMo?' selected':'')+'>'+mo+'월</option>';
+    function findPeriodWT(slot){
+      var m=slot.match(/(\d+):(\d+)/);if(!m)return 0;
+      var tMin=parseInt(m[1])*60+parseInt(m[2]),best=0;
+      customPeriods.forEach(function(cp){var ms=cp.time?cp.time.match(/(\d+):(\d+)/):null;if(ms){var cpMin=parseInt(ms[1])*60+parseInt(ms[2]);if(tMin>=cpMin)best=cp.period;}});
+      return best;
+    }
 
-  // 특강 계획용 planKey
-  var planKey='specialPlan_'+(window._specialYr||now.getFullYear())+'_'+(window._specialSeason||'여름');
+    var html='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-right:4px">📋 주간 시간표</div>'
+      +'<select class="fi" style="width:80px;font-size:11px" onchange="window._wtYr=parseInt(this.value);renderWeeklyTimetable()">'+yrOpts+'</select>'
+      +'<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">'+moOpts+'</select>';
 
-  function findPeriodWT(slot){
-    var m=slot.match(/(\d+):(\d+)/);if(!m)return 0;
-    var tMin=parseInt(m[1])*60+parseInt(m[2]),best=0;
-    customPeriods.forEach(function(cp){var ms=cp.time?cp.time.match(/(\d+):(\d+)/):null;if(ms){var cpMin=parseInt(ms[1])*60+parseInt(ms[2]);if(tMin>=cpMin)best=cp.period;}});
-    return best;
-  }
+    if(isCurrentMo){
+      html+='<button class="btn btn-outline btn-sm" onclick="addWeeklyTimetableTime()">+ 시간 추가</button>'
+        +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
+        +'<button class="btn btn-navy btn-sm" onclick="_wtSaveSnapshot();saveSpecialData();toast('💾 저장됨')">💾 저장</button>'
+        +'<button class="btn btn-outline btn-xs" onclick="_wtUndo()" title="직전 이동 되돌리기">↩ 되돌리기</button>';
+    }else{
+      var snapDate=snapInfo?new Date(snapInfo.savedAt).toLocaleDateString('ko-KR'):'';
+      html+='<span style="font-size:11px;color:var(--txt3);background:#f1f5f9;border-radius:6px;padding:3px 8px">'
+        +(isSnap?'📸 '+snapDate+' 저장된 스냅샷':'⚠️ 스냅샷 없음 — 현재 데이터 표시')
+        +'</span>';
+    }
+    html+='<span style="font-size:10px;color:var(--txt3)">🔵 재원 · 🟡 특강 · 🟠 이동됨</span>'
+      +'<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
+      +'</div>';
 
-  var html='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
-    // ── 헤더 행: 제목 + 버튼들 + 접기
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
-    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-right:4px">📋 주간 시간표</div>'
-    // 연도/월 선택
-    +'<select class="fi" style="width:80px;font-size:11px" onchange="window._wtYr=parseInt(this.value);renderWeeklyTimetable()">'+yrOpts+'</select>'
-    +'<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">'+moOpts+'</select>'
-    // 특강 관련 버튼
-    +'<button class="btn btn-outline btn-sm" onclick="addWeeklyTimetableTime()">+ 시간 추가</button>'
-    +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
-    +'<button class="btn btn-navy btn-sm" onclick="saveSpecialData()">💾 저장</button>'
-    +'<span style="font-size:10px;color:var(--txt3)">🔵 재원생 · 🟡 특강 · 🟠 이동됨</span>'
-    +'<button class="btn btn-outline btn-xs" onclick="_wtUndo()" title="직전 이동 되돌리기">↩ 되돌리기</button>'
-    +'<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
-    +'</div>';
+    if(!timeSlots.length){
+      html+='<div style="text-align:center;padding:20px;font-size:12px;color:var(--txt3)">시간 설정된 학생이 없습니다</div></div>';
+      area.innerHTML=html;return;
+    }
 
-  if(!timeSlots.length){
-    html+='<div style="text-align:center;padding:20px;font-size:12px;color:var(--txt3)">시간 설정된 학생이 없습니다</div></div>';
-    area.innerHTML=html;return;
-  }
-
-  html+='<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px">'
-    +'<thead><tr><th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
-  days.forEach(function(d){html+='<th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:70px">'+d+'</th>';});
-  html+='</tr></thead><tbody>';
-  var lastPrd=0;
-  timeSlots.forEach(function(ts){
-    var prd=findPeriodWT(ts);
-    if(prd!==lastPrd&&prd>0){html+='<tr><td colspan="'+(days.length+1)+'" style="background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:4px 10px">'+prd+'교시</td></tr>';lastPrd=prd;}
-    var h=parseInt(ts.split(':')[0]),mn=parseInt(ts.split(':')[1]);
-    var endH=mn===0?h:h+1,endM=mn===0?30:0;
-    var label=_fmt12hRange(ts+'~'+String(endH).padStart(2,'0')+':'+String(endM).padStart(2,'0'));
-    var isCustomSlot=_wtGetCustomSlots().indexOf(ts)!==-1;
-    html+='<tr data-ts="'+ts+'">'
-      +'<td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'
-      +label
-      +(isCustomSlot?'<button onclick="_wtRemoveCustomSlot(\''+ts+'\')" style="display:block;margin:2px auto 0;background:none;border:none;cursor:pointer;font-size:10px;color:#dc2626;padding:0" title="시간 삭제">🗑</button>':'')
-      +'</td>';
-    days.forEach(function(d){
-      var sList=grid[ts][d]||[];
-      // 셀: ondragover에서 좌우 위치 표시, ondrop에서 삽입 위치 계산
-      html+='<td data-ts="'+ts+'" data-day="'+d+'"'
-        +' style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"'
-        +' ondragover="_wtDragOver(event)"'
-        +' ondragleave="_wtDragLeave(event)"'
-        +' ondrop="_wtDrop(event,\''+ts+'\',\''+d+'\')">'
-        +'<div class="wt-cell-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">';
-      sList.forEach(function(s,idx){
-        var isMoved=!!(movedMap[s.id]&&movedMap[s.id].toTs===ts&&movedMap[s.id].toDay===d);
-        var bg=isMoved?'#fed7aa':s._isSpecial?'#fef9c3':'#dbeafe';
-        var color=isMoved?'#9a3412':s._isSpecial?'#854d0e':'#1e40af';
-        html+='<div draggable="true"'
-          +' data-sid="'+s.id+'"'
-          +' data-name="'+s.name+'"'
-          +' data-ts="'+ts+'"'
-          +' data-day="'+d+'"'
-          +' data-idx="'+idx+'"'
-          +' ondragstart="_wtDragStart(event,\''+s.id+'\',\''+s.name+'\',\''+ts+'\',\''+d+'\','+idx+')"'
-          +' style="padding:2px 3px;background:'+bg+';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;color:'+color+'"'
-          +' title="드래그하여 이동">'+s.name+'</div>';
+    html+='<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px">'
+      +'<thead><tr><th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
+    days.forEach(function(d){html+='<th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:70px">'+d+'</th>';});
+    html+='</tr></thead><tbody>';
+    var lastPrd=0;
+    timeSlots.forEach(function(ts){
+      var prd=findPeriodWT(ts);
+      if(prd!==lastPrd&&prd>0){html+='<tr><td colspan="'+(days.length+1)+'" style="background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:4px 10px">'+prd+'교시</td></tr>';lastPrd=prd;}
+      var h=parseInt(ts.split(':')[0]),mn=parseInt(ts.split(':')[1]);
+      var endH=mn===0?h:h+1,endM=mn===0?30:0;
+      var label=_fmt12hRange(ts+'~'+String(endH).padStart(2,'0')+':'+String(endM).padStart(2,'0'));
+      var isCustomSlot=_wtGetCustomSlots().indexOf(ts)!==-1;
+      html+='<tr data-ts="'+ts+'">'
+        +'<td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'
+        +label
+        +(isCurrentMo&&isCustomSlot?'<button onclick="_wtRemoveCustomSlot(\''+ts+'\')" style="display:block;margin:2px auto 0;background:none;border:none;cursor:pointer;font-size:10px;color:#dc2626;padding:0" title="시간 삭제">🗑</button>':'')
+        +'</td>';
+      days.forEach(function(d){
+        var sList=grid[ts]&&grid[ts][d]?grid[ts][d]:[];
+        var tdAttrs='style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"';
+        if(isCurrentMo){
+          tdAttrs='data-ts="'+ts+'" data-day="'+d+'" style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"'
+            +' ondragover="_wtDragOver(event)" ondragleave="_wtDragLeave(event)" ondrop="_wtDrop(event,''+ts+'',''+d+'')"';
+        }
+        html+='<td '+tdAttrs+'>'
+          +'<div class="wt-cell-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">';
+        sList.forEach(function(s,idx){
+          var isMoved=isCurrentMo&&!!(movedMap[s.id]&&movedMap[s.id].toTs===ts&&movedMap[s.id].toDay===d);
+          var bg=isMoved?'#fed7aa':s._isSpecial?'#fef9c3':'#dbeafe';
+          var color=isMoved?'#9a3412':s._isSpecial?'#854d0e':'#1e40af';
+          if(isCurrentMo){
+            html+='<div draggable="true"'
+              +' data-sid="'+s.id+'" data-name="'+s.name+'" data-ts="'+ts+'" data-day="'+d+'" data-idx="'+idx+'"'
+              +' ondragstart="_wtDragStart(event,''+s.id+'',''+s.name+'',''+ts+'',''+d+'','+idx+')"'
+              +' style="padding:2px 3px;background:'+bg+';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;color:'+color+'"'
+              +' title="드래그하여 이동">'+s.name+'</div>';
+          }else{
+            html+='<div style="padding:2px 3px;background:'+bg+';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+color+'">'+s.name+'</div>';
+          }
+        });
+        html+='</div></td>';
       });
-      html+='</div></td>';
+      html+='</tr>';
     });
-    html+='</tr>';
-  });
-  html+='</tbody></table></div>';
-  area.innerHTML=html;
-}
+    html+='</tbody></table></div>';
+    area.innerHTML=html;
+  }
 
+  if(isCurrentMo){
+    // 현재 달: 실시간 데이터
+    var data=_buildWeeklyGrid();
+    doRender(data,false,null);
+  }else{
+    // 다른 달: 스냅샷 불러오기
+    var key=_wtMonthKey(window._wtYr,window._wtMo);
+    area.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">⏳ 불러오는 중...</div>';
+    _wtLoadSnapshots().then(function(){
+      var snap=_wtSnapshots&&_wtSnapshots[key];
+      if(snap){
+        var data=_buildGridFromSnapshot(snap,days);
+        doRender(data,true,snap);
+      }else{
+        // 스냅샷 없으면 현재 데이터로 표시
+        var data=_buildWeeklyGrid();
+        doRender(data,false,null);
+      }
+    });
+  }
+}
 // ══════════════════════════════════════════════════════
 // 드래그앤드롭 핸들러
 // ══════════════════════════════════════════════════════
@@ -2548,6 +2702,7 @@ function _wtDrop(e,toTs,toDay){
     db.collection('students').doc(sid).update({days:days,periods:periods})
       .then(function(){
         s.days=days;s.periods=periods;
+        _wtSaveSnapshot();
         renderWeeklyTimetable();
         if($('special-area')&&$('special-area').innerHTML)renderSpecialPlan();
         toast('✓ '+name+' 이동 완료');
@@ -7945,8 +8100,8 @@ function _confirmAddSpecialTime(overlay){
   if(plan.timeSlots.indexOf(blk)===-1)plan.timeSlots.push(blk);
   overlay.remove();
   renderSpecialPlan();
-  // 주간 시간표도 갱신 (특강 학생 표시)
   if($('weekly-timetable-area')&&$('weekly-timetable-area').innerHTML)renderWeeklyTimetable();
+  _wtSaveSnapshot(); // 학생 추가 후 스냅샷 저장
 }
 function removeSpecialPlanTime(planKey,ts){
   if(!window._specialData||!window._specialData[planKey])return;
@@ -8020,8 +8175,8 @@ function _confirmSpecialStudentPick(planKey,overlay){
   });
   overlay.remove();
   renderSpecialPlan();
-  // 주간 시간표도 갱신 (특강 학생 표시)
   if($('weekly-timetable-area')&&$('weekly-timetable-area').innerHTML)renderWeeklyTimetable();
+  _wtSaveSnapshot(); // 학생 추가 후 스냅샷 저장
 }
 function saveSpecialData(){
   db.collection('config').doc('specialClass').set(window._specialData,{merge:true}).then(function(){toast('💾 저장됨');}).catch(function(){toast('❌ 저장 실패');});
