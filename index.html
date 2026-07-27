@@ -2162,8 +2162,36 @@ async function loadCardBadges(){
 }
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
 function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
-// ── 주간 시간표 공통 데이터 빌더 (특강계획표와 공유) ──
-function _buildWeeklyGrid(){
+// ══════════════════════════════════════════════════════
+// 이동 이력 저장 (LocalStorage, 한 달간 유지)
+// 구조: {studentId: {toTs, toDay, movedAt}}
+// ══════════════════════════════════════════════════════
+function _wtSaveMoved(sid,toTs,toDay){
+  try{
+    var key='wt_moved';
+    var data=JSON.parse(localStorage.getItem(key)||'{}');
+    data[sid]={toTs:toTs,toDay:toDay,movedAt:Date.now()};
+    localStorage.setItem(key,JSON.stringify(data));
+  }catch(e){}
+}
+function _wtGetMoved(){
+  try{
+    var key='wt_moved';
+    var data=JSON.parse(localStorage.getItem(key)||'{}');
+    var now=Date.now(),month=30*24*60*60*1000;
+    var clean={};
+    Object.keys(data).forEach(function(sid){
+      if(now-data[sid].movedAt<month)clean[sid]=data[sid];
+    });
+    localStorage.setItem(key,JSON.stringify(clean));
+    return clean;
+  }catch(e){return{};}
+}
+
+// ══════════════════════════════════════════════════════
+// 주간 시간표 공통 그리드 빌더 (월/연도 필터 지원)
+// ══════════════════════════════════════════════════════
+function _buildWeeklyGrid(filterYr,filterMo){
   var days=['월','화','수','목','금'];
   var activeStudents=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
   var timeSet={};
@@ -2206,11 +2234,25 @@ function _buildWeeklyGrid(){
   return{timeSlots:timeSlots,grid:grid,days:days,students:activeStudents};
 }
 
+// ══════════════════════════════════════════════════════
+// 주간 시간표 렌더링
+// ══════════════════════════════════════════════════════
 function renderWeeklyTimetable(){
   var area=$('weekly-timetable-area');if(!area)return;
-  var data=_buildWeeklyGrid();
+  var now=new Date();
+  if(!window._wtYr)window._wtYr=now.getFullYear();
+  if(!window._wtMo)window._wtMo=now.getMonth()+1;
+
+  var data=_buildWeeklyGrid(window._wtYr,window._wtMo);
   var timeSlots=data.timeSlots,grid=data.grid,days=data.days;
-  if(!timeSlots.length){area.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:var(--txt3)">시간 설정된 학생이 없습니다</div>';return;}
+  var movedMap=_wtGetMoved();
+
+  // 연도/월 드롭다운 옵션
+  var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===window._wtYr?' selected':'')+'>'+y+'년</option>';
+  var moOpts='';for(var mo=1;mo<=12;mo++)moOpts+='<option value="'+mo+'"'+(mo===window._wtMo?' selected':'')+'>'+mo+'월</option>';
+
+  // 특강 계획용 planKey
+  var planKey='specialPlan_'+(window._specialYr||now.getFullYear())+'_'+(window._specialSeason||'여름');
 
   function findPeriodWT(slot){
     var m=slot.match(/(\d+):(\d+)/);if(!m)return 0;
@@ -2220,8 +2262,26 @@ function renderWeeklyTimetable(){
   }
 
   var html='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:14px;font-weight:800;color:var(--navy)">📋 주간 시간표</div><button class="btn btn-outline btn-xs" onclick="toggleWeeklyTimetable()">접기 ▲</button></div>'
-    +'<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px">'
+    // ── 헤더 행: 제목 + 버튼들 + 접기
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-right:4px">📋 주간 시간표</div>'
+    // 연도/월 선택
+    +'<select class="fi" style="width:80px;font-size:11px" onchange="window._wtYr=parseInt(this.value);renderWeeklyTimetable()">'+yrOpts+'</select>'
+    +'<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">'+moOpts+'</select>'
+    // 특강 관련 버튼
+    +'<button class="btn btn-outline btn-sm" onclick="addSpecialPlanTime()">+ 시간 추가</button>'
+    +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
+    +'<button class="btn btn-navy btn-sm" onclick="saveSpecialData()">💾 저장</button>'
+    +'<span style="font-size:10px;color:var(--txt3)">🔵 재원생 · 🟡 특강 · 🟠 이동됨</span>'
+    +'<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
+    +'</div>';
+
+  if(!timeSlots.length){
+    html+='<div style="text-align:center;padding:20px;font-size:12px;color:var(--txt3)">시간 설정된 학생이 없습니다</div></div>';
+    area.innerHTML=html;return;
+  }
+
+  html+='<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px">'
     +'<thead><tr><th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
   days.forEach(function(d){html+='<th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:70px">'+d+'</th>';});
   html+='</tr></thead><tbody>';
@@ -2236,18 +2296,28 @@ function renderWeeklyTimetable(){
       +'<td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'+label+'</td>';
     days.forEach(function(d){
       var sList=grid[ts][d]||[];
-      html+='<td data-ts="'+ts+'" data-day="'+d+'" style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"'
-        +' ondragover="event.preventDefault();this.style.background=\'var(--surface2)\'"'
-        +' ondragleave="this.style.background=\'\'"'
+      // 셀: ondragover에서 좌우 위치 표시, ondrop에서 삽입 위치 계산
+      html+='<td data-ts="'+ts+'" data-day="'+d+'"'
+        +' style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"'
+        +' ondragover="_wtDragOver(event)"'
+        +' ondragleave="_wtDragLeave(event)"'
         +' ondrop="_wtDrop(event,\''+ts+'\',\''+d+'\')">'
-        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">'
-        +sList.map(function(s){
-          return '<div draggable="true"'
-            +' ondragstart="_wtDragStart(event,\''+s.id+'\',\''+s.name+'\',\''+ts+'\',\''+d+'\')"'
-            +' style="padding:2px 3px;background:#dbeafe;border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;color:#1e40af"'
-            +' title="드래그하여 이동">'+s.name+'</div>';
-        }).join('')
-        +'</div></td>';
+        +'<div class="wt-cell-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">';
+      sList.forEach(function(s,idx){
+        var isMoved=!!(movedMap[s.id]&&movedMap[s.id].toTs===ts&&movedMap[s.id].toDay===d);
+        var bg=isMoved?'#fed7aa':s._isSpecial?'#fef9c3':'#dbeafe';
+        var color=isMoved?'#9a3412':s._isSpecial?'#854d0e':'#1e40af';
+        html+='<div draggable="true"'
+          +' data-sid="'+s.id+'"'
+          +' data-name="'+s.name+'"'
+          +' data-ts="'+ts+'"'
+          +' data-day="'+d+'"'
+          +' data-idx="'+idx+'"'
+          +' ondragstart="_wtDragStart(event,\''+s.id+'\',\''+s.name+'\',\''+ts+'\',\''+d+'\','+idx+')"'
+          +' style="padding:2px 3px;background:'+bg+';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;color:'+color+'"'
+          +' title="드래그하여 이동">'+s.name+'</div>';
+      });
+      html+='</div></td>';
     });
     html+='</tr>';
   });
@@ -2255,51 +2325,119 @@ function renderWeeklyTimetable(){
   area.innerHTML=html;
 }
 
-// ── 드래그앤드롭 핸들러 ──
+// ══════════════════════════════════════════════════════
+// 드래그앤드롭 핸들러
+// ══════════════════════════════════════════════════════
 var _wtDragInfo=null;
-function _wtDragStart(e,sid,name,fromTs,fromDay){
-  _wtDragInfo={sid:sid,name:name,fromTs:fromTs,fromDay:fromDay};
+
+function _wtDragStart(e,sid,name,fromTs,fromDay,fromIdx){
+  _wtDragInfo={sid:sid,name:name,fromTs:fromTs,fromDay:fromDay,fromIdx:fromIdx};
   e.dataTransfer.effectAllowed='move';
   e.dataTransfer.setData('text/plain',name);
+  e.currentTarget.style.opacity='0.4';
+  setTimeout(function(){if(e.currentTarget)e.currentTarget.style.opacity='1';},0);
 }
+
+function _wtDragOver(e){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  var cell=e.currentTarget;
+  // 셀 안에서 마우스 X 위치로 삽입 인디케이터 표시
+  cell.style.background='var(--surface2)';
+  // 가장 가까운 학생 카드 찾기 → 왼쪽/오른쪽 표시
+  var grid=cell.querySelector('.wt-cell-grid');
+  if(!grid)return;
+  var chips=[].slice.call(grid.querySelectorAll('[data-sid]'));
+  chips.forEach(function(chip){chip.style.borderLeft='';chip.style.borderRight='';});
+  var nearest=null,nearestSide='right',nearestDist=Infinity;
+  chips.forEach(function(chip){
+    var rect=chip.getBoundingClientRect();
+    var midX=(rect.left+rect.right)/2;
+    var dist=Math.abs(e.clientX-midX);
+    if(dist<nearestDist){nearestDist=dist;nearest=chip;nearestSide=e.clientX<midX?'left':'right';}
+  });
+  if(nearest){
+    if(nearestSide==='left')nearest.style.borderLeft='2px solid var(--navy)';
+    else nearest.style.borderRight='2px solid var(--navy)';
+  }
+}
+
+function _wtDragLeave(e){
+  var cell=e.currentTarget;
+  cell.style.background='';
+  var grid=cell.querySelector('.wt-cell-grid');
+  if(!grid)return;
+  var chips=[].slice.call(grid.querySelectorAll('[data-sid]'));
+  chips.forEach(function(chip){chip.style.borderLeft='';chip.style.borderRight='';});
+}
+
 function _wtDrop(e,toTs,toDay){
   e.preventDefault();
-  var cell=e.currentTarget;cell.style.background='';
+  var cell=e.currentTarget;
+  cell.style.background='';
+  // 인디케이터 제거
+  var grid=cell.querySelector('.wt-cell-grid');
+  if(grid){[].slice.call(grid.querySelectorAll('[data-sid]')).forEach(function(c){c.style.borderLeft='';c.style.borderRight='';});}
+
   if(!_wtDragInfo)return;
-  var sid=_wtDragInfo.sid,fromTs=_wtDragInfo.fromTs,fromDay=_wtDragInfo.fromDay;
-  if(fromTs===toTs&&fromDay===toDay)return;
+  var sid=_wtDragInfo.sid,name=_wtDragInfo.name;
+  var fromTs=_wtDragInfo.fromTs,fromDay=_wtDragInfo.fromDay;
+  _wtDragInfo=null;
+
+  // 삽입 위치 계산
+  var insertIdx=0;
+  if(grid){
+    var chips=[].slice.call(grid.querySelectorAll('[data-sid]'));
+    insertIdx=chips.length; // 기본: 맨 뒤
+    for(var i=0;i<chips.length;i++){
+      var rect=chips[i].getBoundingClientRect();
+      var midX=(rect.left+rect.right)/2;
+      if(e.clientX<midX){insertIdx=i;break;} // 왼쪽이면 그 앞에 삽입
+      else insertIdx=i+1; // 오른쪽이면 그 뒤에 삽입
+    }
+  }
+
   var s=students.find(function(x){return x.id===sid;});
   if(!s)return;
-  // periods 업데이트
+
+  var days=JSON.parse(JSON.stringify(s.days||[]));
   var periods=JSON.parse(JSON.stringify(s.periods||{}));
   var fromPeriod=periods[fromDay]||{};
-  // 새 요일로 이동: days 배열 업데이트
-  var days=JSON.parse(JSON.stringify(s.days||[]));
+
+  // 기존 위치에서 제거 후 새 위치에 추가
+  // (같은 셀 내 순서 변경은 Firestore 저장 불필요 - UI만 업데이트)
+  // 다른 셀로 이동: days/periods 업데이트
   if(fromDay!==toDay){
     days=days.filter(function(d){return d!==fromDay;});
     if(!days.includes(toDay))days.push(toDay);
-    periods[toDay]=Object.assign({},fromPeriod,{time:_tsToTimeStr(toTs)});
+    periods[toDay]=Object.assign({},fromPeriod,{time:toTs});
     delete periods[fromDay];
-  }else{
-    // 같은 요일, 다른 시간대
-    periods[fromDay]=Object.assign({},fromPeriod,{time:_tsToTimeStr(toTs)});
+  } else if(fromTs!==toTs){
+    periods[fromDay]=Object.assign({},fromPeriod,{time:toTs});
   }
-  _wtDragInfo=null;
-  // Firestore 저장
-  db.collection('students').doc(sid).update({days:days,periods:periods})
-    .then(function(){
-      s.days=days;s.periods=periods;
-      renderWeeklyTimetable();
-      // 특강계획표도 열려있으면 갱신
-      if($('special-area')&&$('special-area').innerHTML)renderSpecialPlan();
-      toast('✓ '+s.name+' 이동 완료');
-    })
-    .catch(function(err){toast('저장 실패: '+err.message);});
+  // 같은 셀 내 순서 변경 → Firestore 저장 없이 UI만 갱신 (순서는 서버에 저장 안함)
+
+  // 이동 이력 저장 (한 달 유지, 같은 셀 내 이동 제외)
+  if(!(fromTs===toTs&&fromDay===toDay)){
+    _wtSaveMoved(sid,toTs,toDay);
+  }
+
+  // Firestore 저장 (위치 변경이 있을 때만)
+  if(fromTs!==toTs||fromDay!==toDay){
+    db.collection('students').doc(sid).update({days:days,periods:periods})
+      .then(function(){
+        s.days=days;s.periods=periods;
+        renderWeeklyTimetable();
+        if($('special-area')&&$('special-area').innerHTML)renderSpecialPlan();
+        toast('✓ '+name+' 이동 완료');
+      })
+      .catch(function(err){toast('저장 실패: '+err.message);});
+  } else {
+    // 같은 셀 내 순서만 변경 → 재렌더
+    renderWeeklyTimetable();
+  }
 }
-function _tsToTimeStr(ts){
-  // HH:MM (24h) 형식 그대로 반환
-  return ts;
-}
+
 var _scheduleNotesRendered=false;
 // ══ CRM 오늘의 업무 자동 생성 ══
 function switchDashTab(tab){
@@ -7238,10 +7376,7 @@ function renderSpecialPlan(){
     +'<option value="여름"'+(savedSeason==='여름'?' selected':'')+'>여름</option>'
     +'<option value="겨울"'+(savedSeason==='겨울'?' selected':'')+'>겨울</option>'
     +'</select>'
-    +'<button class="btn btn-outline btn-sm" onclick="addSpecialPlanTime()">+ 시간 추가</button>'
-    +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
-    +'<button class="btn btn-navy btn-sm" onclick="saveSpecialData()">💾 저장</button>'
-    +'<span style="font-size:11px;color:var(--txt3)">🔵 재원생 · 🟡 특강 추가</span>'
+    +'<span style="font-size:11px;color:var(--txt3)">🔵 재원생 · 🟡 특강 · 🟠 이동됨&nbsp;(시간/학생 추가·저장은 주간 시간표에서)</span>'
     +'</div>'
     +'<div style="overflow-x:auto">'
     +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
