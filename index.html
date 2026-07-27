@@ -2304,6 +2304,41 @@ function _buildWeeklyGrid(filterYr,filterMo){
       grid[ts]={};days.forEach(function(d){grid[ts][d]=[];});
     }
   });
+
+  // 특강 추가 학생 병합 (현재 시즌 특강 데이터)
+  (function(){
+    if(!window._specialData)return;
+    var now=new Date();
+    var yr=window._specialYr||now.getFullYear();
+    var season=window._specialSeason||'여름';
+    var planKey='specialPlan_'+yr+'_'+season;
+    var plan=window._specialData[planKey];
+    if(!plan||!plan.grid)return;
+    Object.keys(plan.grid).forEach(function(ts){
+      // 슬롯이 없으면 추가
+      if(!timeSet[ts]){
+        timeSet[ts]=true;
+        timeSlots.push(ts);
+        grid[ts]={};days.forEach(function(d){grid[ts][d]=[];});
+      }
+      Object.keys(plan.grid[ts]).forEach(function(d){
+        if(!grid[ts]||!grid[ts][d])return;
+        var specialNames=plan.grid[ts][d]||[];
+        var existingNames=grid[ts][d].map(function(s){return s.name;});
+        specialNames.forEach(function(name){
+          // 이미 재원생으로 있으면 중복 추가 안 함
+          if(existingNames.indexOf(name)!==-1)return;
+          // 가상 학생 객체로 추가 (특강 구분용 플래그)
+          var realStudent=(students||[]).find(function(s){return s.name===name;});
+          var obj=realStudent
+            ?Object.assign({},realStudent,{_isSpecial:true})
+            :{id:'special_'+name,name:name,_isSpecial:true};
+          grid[ts][d].push(obj);
+        });
+      });
+    });
+  })();
+
   timeSlots=Object.keys(timeSet).sort(function(a,b){return tsToMin(a)-tsToMin(b);});
   return{timeSlots:timeSlots,grid:grid,days:days,students:activeStudents};
 }
@@ -7907,6 +7942,8 @@ function _confirmAddSpecialTime(overlay){
   if(plan.timeSlots.indexOf(blk)===-1)plan.timeSlots.push(blk);
   overlay.remove();
   renderSpecialPlan();
+  // 주간 시간표도 갱신 (특강 학생 표시)
+  if($('weekly-timetable-area')&&$('weekly-timetable-area').innerHTML)renderWeeklyTimetable();
 }
 function removeSpecialPlanTime(planKey,ts){
   if(!window._specialData||!window._specialData[planKey])return;
@@ -7980,6 +8017,8 @@ function _confirmSpecialStudentPick(planKey,overlay){
   });
   overlay.remove();
   renderSpecialPlan();
+  // 주간 시간표도 갱신 (특강 학생 표시)
+  if($('weekly-timetable-area')&&$('weekly-timetable-area').innerHTML)renderWeeklyTimetable();
 }
 function saveSpecialData(){
   db.collection('config').doc('specialClass').set(window._specialData,{merge:true}).then(function(){toast('💾 저장됨');}).catch(function(){toast('❌ 저장 실패');});
