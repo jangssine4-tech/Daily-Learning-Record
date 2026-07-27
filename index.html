@@ -2266,9 +2266,23 @@ function _wtLoadSnapshots() {
 
 // 현재 달 스냅샷 저장
 function _wtSaveSnapshot() {
-  var key = _wtMonthKey(window._wtYr || new Date().getFullYear(),
-                        window._wtMo || (new Date().getMonth() + 1));
-  if (!_wtSnapshots) _wtSnapshots = {};
+  // 호출 시점의 yr/mo를 캡처 (비동기 실행 중 변경 방지)
+  var captureYr = window._wtYr || new Date().getFullYear();
+  var captureMo = window._wtMo || (new Date().getMonth() + 1);
+  var key = _wtMonthKey(captureYr, captureMo);
+  // 커스텀 슬롯도 호출 시점 캡처
+  var captureKey = 'wt_custom_slots_' + captureYr + '_' + String(captureMo).padStart(2,'0');
+  var captureSlots;
+  try { captureSlots = JSON.parse(localStorage.getItem(captureKey)||'[]'); } catch(e) { captureSlots=[]; }
+
+  // 기존 스냅샷이 로드되지 않았으면 먼저 로드 후 저장
+  if (!_wtSnapshots) {
+    _wtLoadSnapshots().then(function(){
+      if(!_wtSnapshots)_wtSnapshots={};
+      _wtSaveSnapshot();
+    });
+    return;
+  }
 
   // 현재 학생 데이터 스냅샷
   var activeStudents = students.filter(function(s) {
@@ -2289,7 +2303,7 @@ function _wtSaveSnapshot() {
 
   _wtSnapshots[key] = {
     students: studentSnap,
-    customSlots: _wtGetCustomSlots(),
+    customSlots: captureSlots,
     special: specialSnap,
     savedAt: Date.now()
   };
@@ -2699,10 +2713,10 @@ function _wtDrop(e,toTs,toDay){
     db.collection('students').doc(sid).update({days:days,periods:periods})
       .then(function(){
         s.days=days;s.periods=periods;
-        _wtSaveSnapshot();
         renderWeeklyTimetable();
         if($('special-area')&&$('special-area').innerHTML)renderSpecialPlan();
         toast('✓ '+name+' 이동 완료');
+        setTimeout(_wtSaveSnapshot, 300); // 렌더 완료 후 스냅샷 저장
       })
       .catch(function(err){toast('저장 실패: '+err.message);});
   } else {
