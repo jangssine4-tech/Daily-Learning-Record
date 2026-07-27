@@ -2540,12 +2540,20 @@ function addWeeklyTimetableTime() {
   overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
   var now = new Date();
   var defTime = String(now.getHours()).padStart(2, '0') + ':' + String(Math.floor(now.getMinutes() / 30) * 30).padStart(2, '0');
-  overlay.innerHTML = '<div class="ms" style="max-width:320px"><div class="mh"></div><div class="mt">주간 시간표 시간 추가</div>'
+  var inner = document.createElement('div');
+  inner.className = 'ms';
+  inner.style.maxWidth = '320px';
+  inner.innerHTML = '<div class="mh"></div><div class="mt">주간 시간표 시간 추가</div>'
     + '<div class="field"><div class="fl">시간 (HH:MM)</div>'
     + '<input class="fi" id="wt-add-time" type="time" value="' + defTime + '"></div>'
-    + '<button class="btn btn-green btn-block" onclick="_wtConfirmAddTime(this.closest(\\'.mo\\'))">추가</button>'
-    + '<button class="btn btn-outline btn-block" onclick="this.closest(\\'.mo\\').remove()">취소</button>'
-    + '</div>';
+    + '<button class="btn btn-green btn-block">추가</button>'
+    + '<button class="btn btn-outline btn-block">취소</button>';
+  inner.querySelectorAll && setTimeout(function(){
+    var btns = inner.querySelectorAll('button');
+    if (btns[0]) btns[0].onclick = function(){ _wtConfirmAddTime(overlay); };
+    if (btns[1]) btns[1].onclick = function(){ overlay.remove(); };
+  }, 0);
+  overlay.appendChild(inner);
   document.body.appendChild(overlay);
   setTimeout(function() { var el = document.getElementById('wt-add-time'); if (el) el.focus(); }, 100);
 }
