@@ -2186,6 +2186,32 @@ function addWeeklyTimetableTime(){
   document.body.appendChild(overlay);
   setTimeout(function(){var el=document.getElementById('wt-add-time');if(el)el.focus();},100);
 }
+function _wtUndo(){
+  if(!_wtUndoStack){toast('되돌릴 이동이 없습니다');return;}
+  var u=_wtUndoStack;
+  _wtUndoStack=null;
+  var s=students.find(function(x){return x.id===u.sid;});
+  if(!s){toast('학생 정보를 찾을 수 없습니다');return;}
+  db.collection('students').doc(u.sid).update({days:u.days,periods:u.periods})
+    .then(function(){
+      s.days=u.days;s.periods=u.periods;
+      // 이동 이력에서도 제거
+      try{
+        var moved=JSON.parse(localStorage.getItem('wt_moved')||'{}');
+        delete moved[u.sid];
+        localStorage.setItem('wt_moved',JSON.stringify(moved));
+      }catch(e){}
+      renderWeeklyTimetable();
+      if($('special-area')&&$('special-area').innerHTML)renderSpecialPlan();
+      toast('↩ '+u.name+' 이동 취소됨');
+    })
+    .catch(function(err){toast('되돌리기 실패: '+err.message);});
+}
+function _wtRemoveCustomSlot(ts){
+  var slots=_wtGetCustomSlots().filter(function(s){return s!==ts;});
+  _wtSaveCustomSlots(slots);
+  renderWeeklyTimetable();
+}
 function _confirmAddWeeklyTime(overlay){
   var t=(document.getElementById('wt-add-time')||{}).value;
   if(!t){toast('시간을 입력하세요');return;}
@@ -2321,6 +2347,7 @@ function renderWeeklyTimetable(){
     +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
     +'<button class="btn btn-navy btn-sm" onclick="saveSpecialData()">💾 저장</button>'
     +'<span style="font-size:10px;color:var(--txt3)">🔵 재원생 · 🟡 특강 · 🟠 이동됨</span>'
+    +'<button class="btn btn-outline btn-xs" onclick="_wtUndo()" title="직전 이동 되돌리기">↩ 되돌리기</button>'
     +'<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
     +'</div>';
 
@@ -2340,8 +2367,12 @@ function renderWeeklyTimetable(){
     var h=parseInt(ts.split(':')[0]),mn=parseInt(ts.split(':')[1]);
     var endH=mn===0?h:h+1,endM=mn===0?30:0;
     var label=_fmt12hRange(ts+'~'+String(endH).padStart(2,'0')+':'+String(endM).padStart(2,'0'));
+    var isCustomSlot=_wtGetCustomSlots().indexOf(ts)!==-1;
     html+='<tr data-ts="'+ts+'">'
-      +'<td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'+label+'</td>';
+      +'<td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'
+      +label
+      +(isCustomSlot?'<button onclick="_wtRemoveCustomSlot(\''+ts+'\')" style="display:block;margin:2px auto 0;background:none;border:none;cursor:pointer;font-size:10px;color:#dc2626;padding:0" title="시간 삭제">🗑</button>':'')
+      +'</td>';
     days.forEach(function(d){
       var sList=grid[ts][d]||[];
       // 셀: ondragover에서 좌우 위치 표시, ondrop에서 삽입 위치 계산
@@ -2377,6 +2408,7 @@ function renderWeeklyTimetable(){
 // 드래그앤드롭 핸들러
 // ══════════════════════════════════════════════════════
 var _wtDragInfo=null;
+var _wtUndoStack=null; // 직전 이동 상태 저장
 
 function _wtDragStart(e,sid,name,fromTs,fromDay,fromIdx){
   _wtDragInfo={sid:sid,name:name,fromTs:fromTs,fromDay:fromDay,fromIdx:fromIdx};
@@ -2447,6 +2479,9 @@ function _wtDrop(e,toTs,toDay){
 
   var s=students.find(function(x){return x.id===sid;});
   if(!s)return;
+
+  // 이동 전 상태 저장 (되돌리기용)
+  _wtUndoStack={sid:sid,name:s.name,days:JSON.parse(JSON.stringify(s.days||[])),periods:JSON.parse(JSON.stringify(s.periods||{}))};
 
   var days=JSON.parse(JSON.stringify(s.days||[]));
   var periods=JSON.parse(JSON.stringify(s.periods||{}));
