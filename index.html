@@ -2300,7 +2300,6 @@ function _buildWeeklyGrid(filterYr,filterMo){
   wtCustom.forEach(function(ts){
     if(!timeSet[ts]){
       timeSet[ts]=true;
-      timeSlots.push(ts);
       grid[ts]={};days.forEach(function(d){grid[ts][d]=[];});
     }
   });
@@ -2315,10 +2314,9 @@ function _buildWeeklyGrid(filterYr,filterMo){
     var plan=window._specialData[planKey];
     if(!plan||!plan.grid)return;
     Object.keys(plan.grid).forEach(function(ts){
-      // 슬롯이 없으면 추가
+      // 슬롯이 없으면 추가 (timeSet에만, 정렬은 마지막에)
       if(!timeSet[ts]){
         timeSet[ts]=true;
-        timeSlots.push(ts);
         grid[ts]={};days.forEach(function(d){grid[ts][d]=[];});
       }
       Object.keys(plan.grid[ts]).forEach(function(d){
@@ -2339,7 +2337,12 @@ function _buildWeeklyGrid(filterYr,filterMo){
     });
   })();
 
+  // 모든 슬롯 병합 완료 후 최종 정렬
   timeSlots=Object.keys(timeSet).sort(function(a,b){return tsToMin(a)-tsToMin(b);});
+  // grid도 새 슬롯이 추가됐을 수 있으니 누락된 슬롯 보완
+  timeSlots.forEach(function(ts){
+    if(!grid[ts]){grid[ts]={};days.forEach(function(d){grid[ts][d]=[];});}
+  });
   return{timeSlots:timeSlots,grid:grid,days:days,students:activeStudents};
 }
 
