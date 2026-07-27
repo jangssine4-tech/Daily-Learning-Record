@@ -2564,10 +2564,10 @@ function renderWeeklyTimetable(){
         +'</td>';
       days.forEach(function(d){
         var sList=grid[ts]&&grid[ts][d]?grid[ts][d]:[];
-        var tdAttrs='data-ts="'+ts+'" data-day="'+d+'" style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"'
+        var tdAttrs='data-ts="'+ts+'" data-day="'+d+'" style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:48px"'
             +' ondragover="_wtDragOver(event)" ondragleave="_wtDragLeave(event)" ondrop="_wtDrop(event,\''+ts+'\',\''+d+'\')";'
         html+='<td '+tdAttrs+'>'
-          +'<div class="wt-cell-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">';
+          +'<div class="wt-cell-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;min-height:40px">';
         sList.forEach(function(s,idx){
           var isMoved=!!(movedMap[s.id]&&movedMap[s.id].toTs===ts&&movedMap[s.id].toDay===d);
           var bg=isMoved?'#fed7aa':s._isSpecial?'#fef9c3':'#dbeafe';
@@ -2623,6 +2623,7 @@ function _wtDragStart(e,sid,name,fromTs,fromDay,fromIdx){
 
 function _wtDragOver(e){
   e.preventDefault();
+  e.stopPropagation();
   e.dataTransfer.dropEffect='move';
   var cell=e.currentTarget;
   // 셀 안에서 마우스 X 위치로 삽입 인디케이터 표시
@@ -2656,6 +2657,7 @@ function _wtDragLeave(e){
 
 function _wtDrop(e,toTs,toDay){
   e.preventDefault();
+  e.stopPropagation();
   var cell=e.currentTarget;
   cell.style.background='';
   // 인디케이터 제거
@@ -2712,11 +2714,14 @@ function _wtDrop(e,toTs,toDay){
   if(fromTs!==toTs||fromDay!==toDay){
     db.collection('students').doc(sid).update({days:days,periods:periods})
       .then(function(){
-        s.days=days;s.periods=periods;
+        // onSnapshot이 students 배열을 교체했을 수 있으므로 다시 찾아 업데이트
+        var sLatest=students.find(function(x){return x.id===sid;});
+        if(sLatest){sLatest.days=days;sLatest.periods=periods;}
+        else{s.days=days;s.periods=periods;}
         renderWeeklyTimetable();
         if($('special-area')&&$('special-area').innerHTML)renderSpecialPlan();
         toast('✓ '+name+' 이동 완료');
-        setTimeout(_wtSaveSnapshot, 300); // 렌더 완료 후 스냅샷 저장
+        setTimeout(_wtSaveSnapshot, 300);
       })
       .catch(function(err){toast('저장 실패: '+err.message);});
   } else {
