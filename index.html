@@ -2507,16 +2507,15 @@ function renderWeeklyTimetable(){
       +'<select class="fi" style="width:80px;font-size:11px" onchange="window._wtYr=parseInt(this.value);renderWeeklyTimetable()">'+yrOpts+'</select>'
       +'<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">'+moOpts+'</select>';
 
-    if(isCurrentMo){
-      html+='<button class="btn btn-outline btn-sm" onclick="addWeeklyTimetableTime()">+ 시간 추가</button>'
-        +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
-        +'<button class="btn btn-navy btn-sm" onclick="_wtSaveSnapshot();saveSpecialData()">💾 저장</button>'
-        +'<button class="btn btn-outline btn-xs" onclick="_wtUndo()" title="직전 이동 되돌리기">↩ 되돌리기</button>';
-    }else{
-      var snapDate=snapInfo?new Date(snapInfo.savedAt).toLocaleDateString('ko-KR'):'';
-      html+='<span style="font-size:11px;color:var(--txt3);background:#f1f5f9;border-radius:6px;padding:3px 8px">'
-        +(isSnap?'📸 '+snapDate+' 저장된 스냅샷':'⚠️ 스냅샷 없음 — 현재 데이터 표시')
-        +'</span>';
+    html+='<button class="btn btn-outline btn-sm" onclick="addWeeklyTimetableTime()">+ 시간 추가</button>'
+      +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
+      +'<button class="btn btn-navy btn-sm" onclick="_wtSaveSnapshot();saveSpecialData()">💾 저장</button>'
+      +'<button class="btn btn-outline btn-xs" onclick="_wtUndo()" title="직전 이동 되돌리기">↩ 되돌리기</button>';
+    if(isSnap){
+      var snapDate=new Date(snapInfo.savedAt).toLocaleDateString('ko-KR');
+      html+='<span style="font-size:10px;color:var(--txt3);background:#f1f5f9;border-radius:6px;padding:2px 6px">📸 '+snapDate+'</span>';
+    }else if(!isCurrentMo){
+      html+='<span style="font-size:10px;color:var(--gold);background:#fffbeb;border-radius:6px;padding:2px 6px">⚠️ 스냅샷 없음</span>';
     }
     html+='<span style="font-size:10px;color:var(--txt3)">🔵 재원 · 🟡 특강 · 🟠 이동됨</span>'
       +'<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
@@ -2542,30 +2541,23 @@ function renderWeeklyTimetable(){
       html+='<tr data-ts="'+ts+'">'
         +'<td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'
         +label
-        +(isCurrentMo&&isCustomSlot?'<button onclick="_wtRemoveCustomSlot(\''+ts+'\')" style="display:block;margin:2px auto 0;background:none;border:none;cursor:pointer;font-size:10px;color:#dc2626;padding:0" title="시간 삭제">🗑</button>':'')
+        +(isCustomSlot?'<button onclick="_wtRemoveCustomSlot(\''+ts+'\')" style="display:block;margin:2px auto 0;background:none;border:none;cursor:pointer;font-size:10px;color:#dc2626;padding:0" title="시간 삭제">🗑</button>':'')
         +'</td>';
       days.forEach(function(d){
         var sList=grid[ts]&&grid[ts][d]?grid[ts][d]:[];
-        var tdAttrs='style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"';
-        if(isCurrentMo){
-          tdAttrs='data-ts="'+ts+'" data-day="'+d+'" style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"'
+        var tdAttrs='data-ts="'+ts+'" data-day="'+d+'" style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:32px"'
             +' ondragover="_wtDragOver(event)" ondragleave="_wtDragLeave(event)" ondrop="_wtDrop(event,\''+ts+'\',\''+d+'\')";'
-        }
         html+='<td '+tdAttrs+'>'
           +'<div class="wt-cell-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">';
         sList.forEach(function(s,idx){
-          var isMoved=isCurrentMo&&!!(movedMap[s.id]&&movedMap[s.id].toTs===ts&&movedMap[s.id].toDay===d);
+          var isMoved=!!(movedMap[s.id]&&movedMap[s.id].toTs===ts&&movedMap[s.id].toDay===d);
           var bg=isMoved?'#fed7aa':s._isSpecial?'#fef9c3':'#dbeafe';
           var color=isMoved?'#9a3412':s._isSpecial?'#854d0e':'#1e40af';
-          if(isCurrentMo){
-            html+='<div draggable="true"'
-              +' data-sid="'+s.id+'" data-name="'+s.name+'" data-ts="'+ts+'" data-day="'+d+'" data-idx="'+idx+'"'
-              +' ondragstart="_wtDragStart(event,\''+s.id+'\',\''+s.name+'\',\''+ts+'\',\''+d+'\','+idx+')"'
-              +' style="padding:2px 3px;background:'+bg+';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;color:'+color+'"'
-              +' title="드래그하여 이동">'+s.name+'</div>';
-          }else{
-            html+='<div style="padding:2px 3px;background:'+bg+';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:'+color+'">'+s.name+'</div>';
-          }
+          html+='<div draggable="true"'
+            +' data-sid="'+s.id+'" data-name="'+s.name+'" data-ts="'+ts+'" data-day="'+d+'" data-idx="'+idx+'"'
+            +' ondragstart="_wtDragStart(event,\''+s.id+'\',\''+s.name+'\',\''+ts+'\',\''+d+'\','+idx+')"'
+            +' style="padding:2px 3px;background:'+bg+';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab;color:'+color+'"'
+            +' title="드래그하여 이동">'+s.name+'</div>';
         });
         html+='</div></td>';
       });
