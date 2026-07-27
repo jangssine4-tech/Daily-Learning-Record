@@ -2163,6 +2163,44 @@ async function loadCardBadges(){
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
 function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
 // ══════════════════════════════════════════════════════
+// 주간 시간표 전용 추가 슬롯 관리 (localStorage)
+// ══════════════════════════════════════════════════════
+function _wtGetCustomSlots(){
+  try{return JSON.parse(localStorage.getItem('wt_custom_slots')||'[]');}catch(e){return[];}
+}
+function _wtSaveCustomSlots(slots){
+  try{localStorage.setItem('wt_custom_slots',JSON.stringify(slots));}catch(e){}
+}
+function addWeeklyTimetableTime(){
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  var now=new Date();
+  var defTime=String(now.getHours()).padStart(2,'0')+':'+String(Math.floor(now.getMinutes()/30)*30).padStart(2,'0');
+  overlay.innerHTML='<div class="ms" style="max-width:320px"><div class="mh"></div><div class="mt">주간 시간표 시간 추가</div>'
+    +'<div class="field"><div class="fl">시간 (HH:MM)</div>'
+    +'<input class="fi" id="wt-add-time" type="time" value="'+defTime+'"></div>'
+    +'<button class="btn btn-green btn-block" onclick="_confirmAddWeeklyTime(this.closest(\'.mo\'))">추가</button>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){var el=document.getElementById('wt-add-time');if(el)el.focus();},100);
+}
+function _confirmAddWeeklyTime(overlay){
+  var t=(document.getElementById('wt-add-time')||{}).value;
+  if(!t){toast('시간을 입력하세요');return;}
+  var mm=t.match(/(\d{1,2}):(\d{2})/);
+  if(!mm){toast('올바른 시간 형식이 아닙니다');return;}
+  var h=parseInt(mm[1]),min=parseInt(mm[2]);
+  var blk=String(h).padStart(2,'0')+':'+String(min<30?0:30).padStart(2,'0');
+  var slots=_wtGetCustomSlots();
+  if(slots.indexOf(blk)===-1)slots.push(blk);
+  _wtSaveCustomSlots(slots);
+  overlay.remove();
+  renderWeeklyTimetable();
+}
+
+// ══════════════════════════════════════════════════════
 // 이동 이력 저장 (LocalStorage, 한 달간 유지)
 // 구조: {studentId: {toTs, toDay, movedAt}}
 // ══════════════════════════════════════════════════════
@@ -2231,6 +2269,16 @@ function _buildWeeklyGrid(filterYr,filterMo){
       }
     });
   });
+  // 주간 시간표 전용 추가 슬롯 병합 (localStorage 저장)
+  var wtCustom=_wtGetCustomSlots();
+  wtCustom.forEach(function(ts){
+    if(!timeSet[ts]){
+      timeSet[ts]=true;
+      timeSlots.push(ts);
+      grid[ts]={};days.forEach(function(d){grid[ts][d]=[];});
+    }
+  });
+  timeSlots=Object.keys(timeSet).sort(function(a,b){return tsToMin(a)-tsToMin(b);});
   return{timeSlots:timeSlots,grid:grid,days:days,students:activeStudents};
 }
 
@@ -2269,7 +2317,7 @@ function renderWeeklyTimetable(){
     +'<select class="fi" style="width:80px;font-size:11px" onchange="window._wtYr=parseInt(this.value);renderWeeklyTimetable()">'+yrOpts+'</select>'
     +'<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">'+moOpts+'</select>'
     // 특강 관련 버튼
-    +'<button class="btn btn-outline btn-sm" onclick="addSpecialPlanTime()">+ 시간 추가</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="addWeeklyTimetableTime()">+ 시간 추가</button>'
     +'<button class="btn btn-green btn-sm" onclick="openSpecialStudentPicker(\''+planKey+'\')">+ 학생 추가</button>'
     +'<button class="btn btn-navy btn-sm" onclick="saveSpecialData()">💾 저장</button>'
     +'<span style="font-size:10px;color:var(--txt3)">🔵 재원생 · 🟡 특강 · 🟠 이동됨</span>'
