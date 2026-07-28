@@ -2242,7 +2242,6 @@ function _buildWeeklyGrid() {
     var mm = t.match(/(\d{1,2}):(\d{2})/);
     if (!mm) return null;
     var h = parseInt(mm[1]), min = parseInt(mm[2]);
-    if (h >= 1 && h <= 9) h += 12;
     return String(h).padStart(2, '0') + ':' + String(min < 30 ? 0 : 30).padStart(2, '0');
   }
 
@@ -2374,7 +2373,6 @@ function _doRenderWT(area, data, yr, mo) {
       var ms = cp.time.match(/(\d+):(\d+)/); if (!ms) return;
       var cpMin = parseInt(ms[1]) * 60 + parseInt(ms[2]);
       // 오전 시간(1~9시) → 오후로 변환 (오전 특강 제외: 0~11시대 그대로)
-      if(cpMin < 600) cpMin += 720;
       var cpEnd = cp.endTime ? (function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;var e=parseInt(em[1])*60+parseInt(em[2]);if(e<600)e+=720;return e;})() : cpMin + 60;
       if(tMin >= cpMin && tMin < cpEnd) best = cp.period;
     });
@@ -3176,7 +3174,6 @@ function fmt12h(t){
   var m=String(t).trim().match(/(\d{1,2}):(\d{2})/);if(!m)return t;
   var h=parseInt(m[1]),ms=m[2];
   // Treat 1~9 as afternoon (13~21) for legacy data
-  if(h>=1&&h<=9)h+=12;
   var h12=h%12||12;
   return h12+':'+ms;
 }
@@ -3207,11 +3204,10 @@ function renderSchedule(){
     // 시간 기반으로만 교시 결정 (등록 모달의 교시 설정 무시)
     if(pTime&&customPeriods.length>0){
       var tMin=timeToMin(pTime);
-      if(tMin<600)tMin+=720; // 10시 이전 → 오후로 변환
       var bestP=null;
       customPeriods.forEach(function(cp){
-        var cpStart=timeToMin(cp.time);if(cpStart<600)cpStart+=720;
-        var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;if(cpEnd<600)cpEnd+=720;
+        var cpStart=timeToMin(cp.time);
+        var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
         if(tMin>=cpStart&&tMin<cpEnd)bestP=cp.period;
       });
       if(bestP)pNum=bestP;
@@ -3228,12 +3224,11 @@ function renderSchedule(){
     var pNum=0;
     if(mt){
       var tMin=timeToMin(mt);
-      if(tMin<600)tMin+=720; // 10시 이전 → 오후로 변환
       // Try matching customPeriods first
       if(customPeriods.length>0){
         customPeriods.forEach(function(cp){
-          var cpStart=timeToMin(cp.time);if(cpStart<600)cpStart+=720;
-          var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;if(cpEnd<600)cpEnd+=720;
+          var cpStart=timeToMin(cp.time);
+          var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
           if(tMin>=cpStart&&tMin<cpEnd)pNum=cp.period;
         });
       }
@@ -3304,7 +3299,7 @@ function renderSchedule(){
       if(s._isMakeup)pTime2=s._makeupTime;
       else if(pData&&typeof pData==='object')pTime2=pData.time||'';
       var blkLabel='시간미설정';
-      if(pTime2){var mm=pTime2.match(/(\d{1,2}):(\d{2})/);if(mm){var h=parseInt(mm[1]),min=parseInt(mm[2]);if(h>=1&&h<=9)h+=12;var blkMin=min<30?0:30;var blkEndMin=min<30?30:0;var blkEndH=min<30?h:h+1;blkLabel=pad(h)+':'+pad(blkMin)+'~'+pad(blkEndH)+':'+pad(blkEndMin);blkLabel=_fmt12hRange(blkLabel);}}
+      if(pTime2){var mm=pTime2.match(/(\d{1,2}):(\d{2})/);if(mm){var h=parseInt(mm[1]),min=parseInt(mm[2]);var blkMin=min<30?0:30;var blkEndMin=min<30?30:0;var blkEndH=min<30?h:h+1;blkLabel=pad(h)+':'+pad(blkMin)+'~'+pad(blkEndH)+':'+pad(blkEndMin);blkLabel=_fmt12hRange(blkLabel);}}
       if(!blocks[blkLabel])blocks[blkLabel]={time:pTime2,students:[]};
       blocks[blkLabel].students.push(s);
     });
