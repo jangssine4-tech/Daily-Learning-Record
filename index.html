@@ -10184,8 +10184,12 @@ async function saveMenuPerms(userId,overlay){loading(true);var perms={};_menuStr
 // ══ SETTINGS ══
 function renderPeriodSettings(){
   var el=$('period-settings');if(!el)return;
-  // customPeriods를 번호순 정렬
-  var ps=customPeriods.slice().sort(function(a,b){return (a.period||0)-(b.period||0);});
+  var ps=customPeriods.slice().sort(function(a,b){
+    // 특강(0)은 맨 위, 나머지는 period 번호순
+    if(a.period===0)return -1;if(b.period===0)return 1;
+    return a.period-b.period;
+  });
+  var periodOpts=[{v:0,l:'특강'},{v:1,l:'1교시'},{v:2,l:'2교시'},{v:3,l:'3교시'},{v:4,l:'4교시'},{v:5,l:'5교시'},{v:6,l:'6교시'},{v:7,l:'7교시'},{v:8,l:'8교시'},{v:9,l:'9교시'}];
   var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
     +'<div style="font-size:13px;font-weight:700;color:var(--navy)">교시별 시간 설정</div>'
     +'<button class="btn btn-outline btn-sm" onclick="addPeriodRow()">+ 교시 추가</button>'
@@ -10195,26 +10199,56 @@ function renderPeriodSettings(){
     html+='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">교시가 없습니다. + 교시 추가를 눌러주세요.</div>';
   }
   ps.forEach(function(cp,i){
-    html+='<div class="period-row" id="prow-'+i+'" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;background:var(--surface2);border-radius:8px;padding:8px 10px">'
-      // 교시 번호 (편집 가능)
+    html+='<div class="period-row" id="prow-'+i+'"'
+      +' draggable="true"'
+      +' ondragstart="_pDragStart(event,'+i+')"'
+      +' ondragover="_pDragOver(event,'+i+')"'
+      +' ondragleave="_pDragLeave(event)"'
+      +' ondrop="_pDrop(event,'+i+')"'
+      +' style="display:flex;align-items:center;gap:8px;margin-bottom:6px;background:var(--surface2);border-radius:8px;padding:8px 10px;cursor:grab;border:2px solid transparent">'
+      +'<span style="color:var(--txt3);font-size:14px;cursor:grab;flex-shrink:0">⠿</span>'
       +'<select class="fi" id="psel-num-'+i+'" style="width:70px;font-size:12px">'
-      +[{v:0,l:'특강'},{v:1,l:'1교시'},{v:2,l:'2교시'},{v:3,l:'3교시'},{v:4,l:'4교시'},{v:5,l:'5교시'},{v:6,l:'6교시'},{v:7,l:'7교시'},{v:8,l:'8교시'},{v:9,l:'9교시'}].map(function(o){return'<option value="'+o.v+'"'+(o.v===cp.period?' selected':'')+'>'+o.l+'</option>';}).join('')
+      +periodOpts.map(function(o){return'<option value="'+o.v+'"'+(o.v===cp.period?' selected':'')+'>'+o.l+'</option>';}).join('')
       +'</select>'
-      // 시작 시간
-      +'<input class="fi" id="psel-start-'+i+'" type="time" value="'+(cp.time||'')+'" style="flex:1;font-size:12px;padding:5px 8px" placeholder="시작 시간">'
-      // 종료 시간
-      +'<input class="fi" id="psel-end-'+i+'" type="time" value="'+(cp.endTime||'')+'" style="flex:1;font-size:12px;padding:5px 8px" placeholder="종료 시간">'
-      // 위/아래 이동 버튼
-      +(i>0?'<button onclick="movePeriodRow('+i+',-1)" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--txt3);padding:0 2px" title="위로">▲</button>':'<span style="width:22px"></span>')
-      +(i<ps.length-1?'<button onclick="movePeriodRow('+i+',1)" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--txt3);padding:0 2px" title="아래로">▼</button>':'<span style="width:22px"></span>')
-      // 삭제 버튼
-      +'<button onclick="deletePeriodRow('+i+')" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--red);padding:0 4px" title="삭제">✕</button>'
+      +'<input class="fi" id="psel-start-'+i+'" type="time" value="'+(cp.time||'')+'" style="flex:1;font-size:12px;padding:5px 8px" placeholder="시작">'
+      +'<input class="fi" id="psel-end-'+i+'" type="time" value="'+(cp.endTime||'')+'" style="flex:1;font-size:12px;padding:5px 8px" placeholder="종료">'
+      +'<button onclick="deletePeriodRow('+i+')" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--red);padding:0 4px;flex-shrink:0" title="삭제">✕</button>'
       +'</div>';
   });
   html+='</div>'
     +'<button class="btn btn-green btn-sm" onclick="savePeriodSettings()" style="margin-top:8px">💾 저장</button>';
   el.innerHTML=html;
 }
+
+// ── 교시 설정 드래그앤드롭 ─────────────────────────
+var _pDragIdx=null;
+function _pDragStart(e,idx){
+  _pDragIdx=idx;
+  e.dataTransfer.effectAllowed='move';
+  e.currentTarget.style.opacity='0.5';
+}
+function _pDragOver(e,idx){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  var row=document.getElementById('prow-'+idx);
+  if(row&&_pDragIdx!==idx)row.style.borderColor='var(--navy)';
+}
+function _pDragLeave(e){
+  e.currentTarget.style.borderColor='transparent';
+}
+function _pDrop(e,toIdx){
+  e.preventDefault();
+  var rows=[].slice.call(document.querySelectorAll('#period-rows .period-row'));
+  rows.forEach(function(r){r.style.borderColor='transparent';r.style.opacity='1';});
+  if(_pDragIdx===null||_pDragIdx===toIdx){_pDragIdx=null;return;}
+  var current=_collectPeriodRows();
+  var moved=current.splice(_pDragIdx,1)[0];
+  current.splice(toIdx,0,moved);
+  _pDragIdx=null;
+  customPeriods=current;
+  renderPeriodSettings();
+}
+
 
 function _collectPeriodRows(){
   var rows=document.querySelectorAll('#period-rows .period-row');
@@ -10223,11 +10257,28 @@ function _collectPeriodRows(){
     var numEl=document.getElementById('psel-num-'+i);
     var startEl=document.getElementById('psel-start-'+i);
     var endEl=document.getElementById('psel-end-'+i);
-    if(startEl&&startEl.value){
-      periods.push({period:parseInt(numEl?numEl.value:i+1),time:startEl.value,endTime:endEl?endEl.value:''});
+    // 시간이 비어있어도 행이 존재하면 수집 (특강처럼 시간 없이 등록 가능)
+    if(numEl){
+      periods.push({
+        period:parseInt(numEl.value),
+        time:startEl?startEl.value||'':'',
+        endTime:endEl?endEl.value||'':''
+      });
     }
   });
   return periods;
+}
+
+async function savePeriodSettings(){
+  var periods=_collectPeriodRows();
+  var nums=periods.filter(function(p){return p.period>0;}).map(function(p){return p.period;});
+  var hasDup=nums.some(function(n,i){return nums.indexOf(n)!==i;});
+  if(hasDup){toast('⚠️ 교시 번호가 중복됩니다. 확인해 주세요.');return;}
+  loading(true);
+  await db.collection('config').doc('periods').set({periods:periods,updatedAt:new Date().toISOString()});
+  customPeriods=periods;
+  loading(false);
+  toast('✅ 교시 설정 저장됨');
 }
 
 function addPeriodRow(){
@@ -10244,77 +10295,16 @@ function addPeriodRow(){
 function deletePeriodRow(idx){
   var current=_collectPeriodRows();
   current.splice(idx,1);
-  // 교시 번호 재정렬
-  current.forEach(function(p,i){p.period=i+1;});
+  // 교시 번호 재정렬 (특강=0번은 그대로 유지)
+  var numIdx=0;
+  current.forEach(function(p){
+    if(p.period!==0){p.period=++numIdx;}
+  });
   customPeriods=current;
   renderPeriodSettings();
 }
 
-function movePeriodRow(idx,dir){
-  var current=_collectPeriodRows();
-  var target=idx+dir;
-  if(target<0||target>=current.length)return;
-  var tmp=current[idx];current[idx]=current[target];current[target]=tmp;
-  // 교시 번호도 swap
-  var tmpN=current[idx].period;current[idx].period=current[target].period;current[target].period=tmpN;
-  customPeriods=current;
-  renderPeriodSettings();
-}
 
-async function savePeriodSettings(){
-  var periods=_collectPeriodRows();
-  // 교시 번호 중복 체크
-  var nums=periods.map(function(p){return p.period;});
-  var hasDup=nums.some(function(n,i){return nums.indexOf(n)!==i;});
-  if(hasDup){toast('⚠️ 교시 번호가 중복됩니다. 확인해 주세요.');return;}
-  loading(true);
-  await db.collection('config').doc('periods').set({periods:periods,updatedAt:new Date().toISOString()});
-  customPeriods=periods;
-  loading(false);
-  toast('✅ 교시 설정 저장됨');
-}
-async function renderSolapiSettings(){
-  var el=$('solapi-settings');if(!el)return;
-  var cfg={};
-  try{var doc=await db.collection('config').doc('solapi').get();if(doc.exists)cfg=doc.data();}catch(e){}
-  el.innerHTML='<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">카카오 알림톡 연동 시 숙제 알림이 학부모에게 카카오톡으로 자동 발송됩니다.<br>미설정 시 클립보드 복사 모드로 동작합니다.</div>'
-    +'<div class="field"><label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer"><input type="checkbox" id="sol-enabled" '+(cfg.enabled?'checked':'')+' style="width:18px;height:18px"> 카카오 알림톡 자동발송 활성화</label></div>'
-    +'<div class="r2"><div class="field"><div class="fl">NHN Cloud AppKey</div><input class="fi" id="sol-apikey" value="'+(cfg.apiKey||'')+'" placeholder="Notification > 알림톡 > AppKey"></div><div class="field"><div class="fl">NHN Cloud SecretKey</div><input class="fi" id="sol-secret" type="password" value="'+(cfg.apiSecret||'')+'" placeholder="SecretKey"></div></div>'
-    +'<div class="r2"><div class="field"><div class="fl">발신프로필 키 (senderKey)</div><input class="fi" id="sol-sender" value="'+(cfg.senderKey||'')+'" placeholder="카카오톡 채널 발신프로필 키"></div><div class="field"><div class="fl">템플릿 코드 (완료)</div><input class="fi" id="sol-tpl-done" value="'+(cfg.tplDone||'')+'" placeholder="예: HW_DONE_001"></div></div>'
-    +'<div class="r2"><div class="field"><div class="fl">템플릿 코드 (미완료)</div><input class="fi" id="sol-tpl-miss" value="'+(cfg.tplMiss||'')+'" placeholder="예: HW_MISS_001"></div><div class="field"><div class="fl">SMS 폴백 발신번호</div><input class="fi" id="sol-phone" value="'+(cfg.senderPhone||'')+'" placeholder="031-000-0000" type="tel"></div></div>'
-    +'<div style="font-size:12px;font-weight:600;color:var(--navy);margin-top:12px;margin-bottom:6px">📌 설정 방법 (순서대로)</div>'
-    +'<div style="font-size:11px;color:var(--txt2);line-height:1.9">'
-    +'1. <a href="https://business.kakao.com/dashboard/" target="_blank" style="color:var(--blue)">카카오 비즈니스</a>에서 카카오톡 채널 개설<br>'
-    +'2. <a href="https://www.nhncloud.com" target="_blank" style="color:var(--blue)">NHN Cloud</a> 가입 → Notification > 카카오톡 알림톡 활성화<br>'
-    +'3. 카카오톡 채널 연동 + 발신프로필 등록<br>'
-    +'4. 메시지 템플릿 2개 등록 (완료용/미완료용) → 카카오 심사 (1~2일)<br>'
-    +'5. Firebase Blaze 요금제 전환 + Cloud Functions 배포<br>'
-    +'6. 위 설정 입력 후 저장 → 테스트 발송</div>'
-    +'<div style="margin-top:10px;padding:10px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--txt2)">'
-    +'<strong>💡 알림톡 실패 시 자동으로 SMS로 대체 발송됩니다.</strong><br>'
-    +'알림톡: 건당 ~8원 / SMS 폴백: 건당 ~20원</div>';
-}
-async function saveSolapiConfig(){
-  loading(true);
-  var data={apiKey:$('sol-apikey').value.trim(),apiSecret:$('sol-secret').value.trim(),senderKey:$('sol-sender').value.trim(),tplDone:$('sol-tpl-done').value.trim(),tplMiss:$('sol-tpl-miss').value.trim(),senderPhone:$('sol-phone').value.trim(),enabled:$('sol-enabled').checked,provider:'kakao',updatedAt:new Date().toISOString()};
-  await db.collection('config').doc('solapi').set(data);
-  _solapiConfigCache=data.enabled&&data.apiKey?true:false;
-  loading(false);toast('✅ 카카오 알림톡 설정 저장됨');
-}
-async function testSolapi(){
-  var phone=prompt('테스트 수신 번호 (본인 번호 입력):');
-  if(!phone)return;
-  loading(true);
-  try{
-    var fn=firebase.functions().httpsCallable('sendHomeworkMsg',{region:'asia-northeast3'});
-    var result=await fn({studentId:'test',studentName:'테스트',phone:phone,msgText:'[잉글리시아이] 카카오 알림톡 테스트입니다. 정상 수신되면 설정 완료!',date:todayISO(),type:'test',sentBy:currentUser.name||'',parentName:'테스트'});
-    loading(false);
-    if(result.data.success)toast('✅ 테스트 발송 성공! 카카오톡 확인하세요');
-    else toast('❌ 실패: '+(result.data.error||''));
-  }catch(e){loading(false);toast('❌ Cloud Functions 연결 실패. 배포 상태를 확인하세요.');}
-}
-
-// ══ APP INIT ══
 function _initApp(){
   bootProgress(5, 'Firebase 확인 중...');
   var cfg=getCfg();
