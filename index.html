@@ -1978,7 +1978,17 @@ function goto(view){
   else if(view==='settings'){loadPeriods().then(function(){renderPeriodSettings();});loadKakaoConfigUI();}
   else if(view==='dashboard'){renderDashboard();}
   else if(view==='special'){
-    window._specialData=window._specialData||{}
+    window._specialData=window._specialData||{};
+    window._specialYr=window._specialYr||new Date().getFullYear();
+    window._specialSeason=window._specialSeason||'여름';
+    switchSpecialTab(window._specialTab||'courses');
+    if(!window._specialLoaded){
+      window._specialLoaded=true;
+      db.collection('config').doc('specialClass').get().then(function(d){
+        if(d.exists){window._specialData=d.data();switchSpecialTab(window._specialTab||'courses');}
+      }).catch(function(){});
+    }
+  }
   else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){var yr2=new Date().getFullYear();loadGoalTargets(yr2).then(function(){renderGoalsView();});}else renderGoalsView();}
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
