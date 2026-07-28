@@ -1887,7 +1887,7 @@ async function loadUsers(){var s=await db.collection('users').get();users=s.docs
   try{var ps=await db.collection('userPerms').get();ps.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
 }
 async function loadRefItems(){var s=await db.collection('refItems').get();refItems=s.docs.map(function(d){return{id:d.id,...d.data()};});}
-async function loadPeriods(){try{var d=await db.collection('config').doc('periods').get();customPeriods=d.exists?(d.data().periods||[]):[];}catch(e){customPeriods=[];}}
+async async function loadPeriods(){try{var d=await db.collection('config').doc('periods').get();customPeriods=d.exists?(d.data().periods||[]):[];}catch(e){customPeriods=[];}}
 
 // Populate Selects
 function populateStudentSelects(){
@@ -1974,7 +1974,7 @@ function goto(view){
   else if(view==='marketing'){initMkSelects();renderMarketing();}
   else if(view==='portfolio'){var pfSel=$('pf-student');if(pfSel){var prevVal=pfSel.value;pfSel.innerHTML='<option value="">학생 선택</option>';students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name>b.name?1:-1;}).forEach(function(s){pfSel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';});if(prevVal)pfSel.value=prevVal;}}
   else if(view==='admin'){renderUsers();}
-  else if(view==='settings'){renderPeriodSettings();loadKakaoConfigUI();}
+  else if(view==='settings'){loadPeriods().then(function(){renderPeriodSettings();});loadKakaoConfigUI();}
   else if(view==='dashboard'){renderDashboard();}
   else if(view==='special'){
     window._specialData=window._specialData||{};
@@ -2367,8 +2367,17 @@ function _doRenderWT(area, data, yr, mo) {
 
   function findPeriod(slot) {
     var mm = slot.match(/(\d+):(\d+)/); if (!mm) return 0;
-    var tMin = parseInt(mm[1]) * 60 + parseInt(mm[2]), best = 0;
-    customPeriods.forEach(function(cp) { var ms = cp.time ? cp.time.match(/(\d+):(\d+)/) : null; if (ms) { var cpMin = parseInt(ms[1]) * 60 + parseInt(ms[2]); if (tMin >= cpMin) best = cp.period; } });
+    var tMin = parseInt(mm[1]) * 60 + parseInt(mm[2]);
+    var best = 0;
+    customPeriods.forEach(function(cp) {
+      if(!cp.time) return;
+      var ms = cp.time.match(/(\d+):(\d+)/); if (!ms) return;
+      var cpMin = parseInt(ms[1]) * 60 + parseInt(ms[2]);
+      // 오전 시간(1~9시) → 오후로 변환 (오전 특강 제외: 0~11시대 그대로)
+      if(cpMin < 600) cpMin += 720;
+      var cpEnd = cp.endTime ? (function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;var e=parseInt(em[1])*60+parseInt(em[2]);if(e<600)e+=720;return e;})() : cpMin + 60;
+      if(tMin >= cpMin && tMin < cpEnd) best = cp.period;
+    });
     return best;
   }
 
