@@ -2372,8 +2372,7 @@ function _doRenderWT(area, data, yr, mo) {
       if(!cp.time) return;
       var ms = cp.time.match(/(\d+):(\d+)/); if (!ms) return;
       var cpMin = parseInt(ms[1]) * 60 + parseInt(ms[2]);
-      // 오전 시간(1~9시) → 오후로 변환 (오전 특강 제외: 0~11시대 그대로)
-      var cpEnd = cp.endTime ? (function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;var e=parseInt(em[1])*60+parseInt(em[2]);if(e<600)e+=720;return e;})() : cpMin + 60;
+      var cpEnd = cp.endTime ? (function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;return parseInt(em[1])*60+parseInt(em[2]);})() : cpMin + 60;
       if(tMin >= cpMin && tMin < cpEnd) best = cp.period;
     });
     return best;
@@ -5131,7 +5130,7 @@ function renderWeeklySchedule(){
         for(var t=startMin;t<endMin;t+=30){var hh=Math.floor(t/60),mm=t%60;allTimes.add(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'));}}
     }
   });
-  var sortedTimes=[...allTimes].sort();
+  var sortedTimes=[...allTimes].sort(function(a,b){var ta=a.split(':'),tb=b.split(':');return(parseInt(ta[0])*60+parseInt(ta[1]))-(parseInt(tb[0])*60+parseInt(tb[1]));});
   if(!sortedTimes.length){el.innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">교시 시간 설정을 먼저 해주세요</div></div>';return;}
   // Find which period each slot belongs to
   function findPeriod(slot){
@@ -5139,8 +5138,11 @@ function renderWeeklySchedule(){
     var tMin=parseInt(m[1])*60+parseInt(m[2]);
     var best=0;
     customPeriods.forEach(function(cp){
-      var ms2=cp.time?cp.time.match(/(\d+):(\d+)/):null;
-      if(ms2){var cpMin=parseInt(ms2[1])*60+parseInt(ms2[2]);if(tMin>=cpMin)best=cp.period;}
+      if(!cp.time)return;
+      var ms2=cp.time.match(/(\d+):(\d+)/);if(!ms2)return;
+      var cpMin=parseInt(ms2[1])*60+parseInt(ms2[2]);
+      var cpEnd=cp.endTime?(function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;return parseInt(em[1])*60+parseInt(em[2]);})():cpMin+60;
+      if(tMin>=cpMin&&tMin<cpEnd)best=cp.period;
     });
     return best;
   }
