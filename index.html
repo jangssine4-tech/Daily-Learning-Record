@@ -575,6 +575,8 @@ var db=null, currentUser=null;
 var students=[], classes=[], reports=[], makeups=[], consultations=[];
 var revenues=[], expenses=[], teachers=[], users=[], refItems=[];
 var newConsults=[], customPeriods=[];
+var _PROMO_SCHEDULE=[];
+var _promoLoaded=false;
 var currentGoalsTab='annual', currentSummaryTab='summary', currentRefTab='fees';
 var makeupViewYear=new Date().getFullYear(), makeupViewMonth=new Date().getMonth();
 var siblingCount=0, _goalTargets={};
@@ -5121,6 +5123,41 @@ function renderSpecialTarget(){
 
   });
 }
+function loadPromoData(){
+  if(_promoLoaded)return Promise.resolve();
+  _promoLoaded=true;
+  return db.collection('config').doc('promoSchedule').get().then(function(d){
+    if(d.exists&&d.data().schedule&&d.data().schedule.length){
+      _PROMO_SCHEDULE=d.data().schedule||[];
+      _EXEC_TABLE=d.data().execTable||[];
+    } else {
+      // 초기 시드 데이터를 Firestore에 저장
+      _PROMO_SCHEDULE=_PROMO_SEED_SCHEDULE;
+      _EXEC_TABLE=_PROMO_SEED_EXEC;
+      db.collection('config').doc('promoSchedule').set({schedule:_PROMO_SCHEDULE,execTable:_EXEC_TABLE});
+    }
+  }).catch(function(){_PROMO_SCHEDULE=_PROMO_SEED_SCHEDULE;_EXEC_TABLE=_PROMO_SEED_EXEC;});
+}
+
+function _promoCard(t,bg,color){
+  return'<div style="background:'+bg+';border-left:4px solid '+color+';border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
+    +'<span style="font-size:11px;font-weight:700;color:'+color+'">📣 홍보</span>'
+    +'<span style="font-size:12px;font-weight:700">'+t.title+'</span>'
+    +'<span style="font-size:10px;color:var(--txt3);margin-left:auto">'+t.d+' · '+t.channel+'</span></div>'
+    +'<div style="font-size:11px;color:var(--txt2)">'+t.message+'</div>'
+    +'</div>';
+}
+function _execCard(t,bg,color){
+  return'<div style="background:'+bg+';border-left:4px solid '+color+';border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
+    +'<span style="font-size:11px;font-weight:700;color:'+color+'">✅ 실행</span>'
+    +'<span style="font-size:12px;font-weight:700">#'+t.priority+' '+t.task+'</span>'
+    +'<span style="font-size:10px;color:var(--txt3);margin-left:auto">'+t.channel+'</span></div>'
+    +'<div style="font-size:11px;color:var(--txt2)">'+t.content+'</div>'
+    +'</div>';
+}
+
 function renderSpecialPromo(){
   var el=$('special-area');if(!el)return;
   if(!_promoLoaded){
