@@ -3200,7 +3200,6 @@ function renderSchedule(){
   todayStudents.forEach(function(s){
     var pData=(s.periods||{})[dayName];var pNum=0,pTime='';
     if(pData&&typeof pData==='object'){pTime=pData.time||'';}
-    // 시간 기반으로만 교시 결정 (등록 모달의 교시 설정 무시)
     if(pTime&&customPeriods.length>0){
       var tMin=timeToMin(pTime);
       var bestP=null;
@@ -3209,12 +3208,39 @@ function renderSchedule(){
         var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
         if(tMin>=cpStart&&tMin<cpEnd)bestP=cp.period;
       });
-      if(bestP)pNum=bestP;
+      if(bestP!==null)pNum=bestP;
     }
-    var pKey=pNum?String(pNum):'미설정';
+    var pKey=pNum!==null?String(pNum):'미설정';
     if(!byPeriod[pKey])byPeriod[pKey]={pNum:pNum,students:[],firstTime:'99:99'};
     byPeriod[pKey].students.push(s);
     if(pTime&&pTime<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=pTime;
+  });
+
+  // 특강 학생 추가 (specialPeriods에 오늘 요일이 있는 학생)
+  var todayStudentIds=new Set(todayStudents.map(function(s){return s.id;}));
+  students.filter(function(s){
+    var st=s.status||'재원';
+    return(st==='재원'||st==='신규')&&s.specialPeriods&&s.specialPeriods[dayName];
+  }).forEach(function(s){
+    var sp=s.specialPeriods[dayName];
+    var spTime=sp.time||'';
+    var spPeriod=sp.period!==undefined?sp.period:0; // 특강=0
+    // 본수업으로 이미 추가된 학생은 특강으로 중복 추가 안 함
+    // (단, 특강 시간대가 다르면 별도 카드)
+    var pNum=spPeriod;
+    // 교시 설정으로 시간 범위 매핑
+    if(spTime&&customPeriods.length>0){
+      var tMin=timeToMin(spTime);
+      customPeriods.forEach(function(cp){
+        var cpStart=timeToMin(cp.time);
+        var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
+        if(tMin>=cpStart&&tMin<cpEnd)pNum=cp.period;
+      });
+    }
+    var pKey=String(pNum);
+    if(!byPeriod[pKey])byPeriod[pKey]={pNum:pNum,students:[],firstTime:'99:99'};
+    byPeriod[pKey].students.push(Object.assign({},s,{_isSpecialClass:true,_specialTime:spTime}));
+    if(spTime&&spTime<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=spTime;
   });
   todayMakeups.forEach(function(m){
     var s=students.find(function(x){return x.id===m.studentId;});
@@ -3291,11 +3317,12 @@ function renderSchedule(){
     var p=byPeriod[pKey];
     var headerTitle='';
     if(pKey==='미설정')headerTitle='교시 미설정';
-    else{var pn=parseInt(pKey);var cp=customPeriods.find(function(x){return x.period===pn;});headerTitle=(pn?pn+'교시 ':'')+((cp&&cp.time)?'('+_fmt12hRange(cp.time)+')':'');}
+    else{var pn=parseInt(pKey);var cp=customPeriods.find(function(x){return x.period===pn;});var pLabel=pn===0?'특강':(pn+'교시');headerTitle=pLabel+((cp&&cp.time)?' ('+_fmt12hRange(cp.time)+')':'');}
     var blocks={};
     p.students.forEach(function(s){
       var pData=(s.periods||{})[dayName];var pTime2='';
       if(s._isMakeup)pTime2=s._makeupTime;
+      else if(s._isSpecialClass)pTime2=s._specialTime||'';
       else if(pData&&typeof pData==='object')pTime2=pData.time||'';
       var blkLabel='시간미설정';
       if(pTime2){var mm=pTime2.match(/(\d{1,2}):(\d{2})/);if(mm){var h=parseInt(mm[1]),min=parseInt(mm[2]);var blkMin=min<30?0:30;var blkEndMin=min<30?30:0;var blkEndH=min<30?h:h+1;blkLabel=pad(h)+':'+pad(blkMin)+'~'+pad(blkEndH)+':'+pad(blkEndMin);blkLabel=_fmt12hRange(blkLabel);}}
