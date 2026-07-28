@@ -10259,13 +10259,8 @@ function renderPeriodSettings(){
   }
   ps.forEach(function(cp,i){
     html+='<div class="period-row" id="prow-'+i+'"'
-      +' draggable="true"'
-      +' ondragstart="_pDragStart(event,'+i+')"'
-      +' ondragover="_pDragOver(event,'+i+')"'
-      +' ondragleave="_pDragLeave(event)"'
-      +' ondrop="_pDrop(event,'+i+')"'
-      +' style="display:flex;align-items:center;gap:8px;margin-bottom:6px;background:var(--surface2);border-radius:8px;padding:8px 10px;cursor:grab;border:2px solid transparent">'
-      +'<span style="color:var(--txt3);font-size:14px;cursor:grab;flex-shrink:0">⠿</span>'
+      +' style="display:flex;align-items:center;gap:8px;margin-bottom:6px;background:var(--surface2);border-radius:8px;padding:8px 10px">'
+      +'<span style="color:var(--txt3);font-size:13px;font-weight:700;min-width:24px;text-align:center">'+(i+1)+'</span>'
       +'<select class="fi" id="psel-num-'+i+'" style="width:70px;font-size:12px">'
       +periodOpts.map(function(o){return'<option value="'+o.v+'"'+(o.v===cp.period?' selected':'')+'>'+o.l+'</option>';}).join('')
       +'</select>'
@@ -10280,33 +10275,8 @@ function renderPeriodSettings(){
 }
 
 // ── 교시 설정 드래그앤드롭 ─────────────────────────
-var _pDragIdx=null;
-function _pDragStart(e,idx){
-  _pDragIdx=idx;
-  e.dataTransfer.effectAllowed='move';
-  e.currentTarget.style.opacity='0.5';
-}
-function _pDragOver(e,idx){
-  e.preventDefault();
-  e.dataTransfer.dropEffect='move';
-  var row=document.getElementById('prow-'+idx);
-  if(row&&_pDragIdx!==idx)row.style.borderColor='var(--navy)';
-}
-function _pDragLeave(e){
-  e.currentTarget.style.borderColor='transparent';
-}
-function _pDrop(e,toIdx){
-  e.preventDefault();
-  var rows=[].slice.call(document.querySelectorAll('#period-rows .period-row'));
-  rows.forEach(function(r){r.style.borderColor='transparent';r.style.opacity='1';});
-  if(_pDragIdx===null||_pDragIdx===toIdx){_pDragIdx=null;return;}
-  var current=_collectPeriodRows();
-  var moved=current.splice(_pDragIdx,1)[0];
-  current.splice(toIdx,0,moved);
-  _pDragIdx=null;
-  customPeriods=current;
-  renderPeriodSettings();
-}
+
+
 
 
 function _collectPeriodRows(){
@@ -10330,6 +10300,12 @@ function _collectPeriodRows(){
 
 async function savePeriodSettings(){
   var periods=_collectPeriodRows();
+  // 특강(0)은 맨 앞, 나머지는 period 번호 오름차순 정렬
+  periods.sort(function(a,b){
+    if(a.period===0&&b.period!==0)return -1;
+    if(a.period!==0&&b.period===0)return 1;
+    return a.period-b.period;
+  });
   var nums=periods.filter(function(p){return p.period>0;}).map(function(p){return p.period;});
   var hasDup=nums.some(function(n,i){return nums.indexOf(n)!==i;});
   if(hasDup){toast('⚠️ 교시 번호가 중복됩니다. 확인해 주세요.');return;}
@@ -10338,6 +10314,7 @@ async function savePeriodSettings(){
   customPeriods=periods;
   loading(false);
   toast('✅ 교시 설정 저장됨');
+  renderPeriodSettings(); // 정렬된 상태로 화면 갱신
 }
 
 function addPeriodRow(){
