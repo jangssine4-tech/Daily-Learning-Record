@@ -319,7 +319,6 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex">
     <button class="rev-tab active" id="sptab-courses" onclick="switchSpecialTab('courses')">📚 주요 강좌</button>
     <button class="rev-tab" id="sptab-target" onclick="switchSpecialTab('target')">🎯 특강 대상</button>
-    <button class="rev-tab" id="sptab-plan" onclick="switchSpecialTab('plan')">📋 특강 계획</button>
     <button class="rev-tab" id="sptab-promo" onclick="switchSpecialTab('promo')">📣 홍보 일정</button>
   </div>
   <div class="cp" id="special-area"></div>
@@ -5074,7 +5073,7 @@ function renderSpecialTarget(){
     +'<button class="btn btn-green btn-sm" onclick="saveSpecialData()">💾 저장</button>'
     +'</div>'
     +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:860px"><thead>'
-    +'<tr><th colspan="9" style="padding:4px 8px;background:#f8fafc;border-bottom:1px solid var(--border)">'
+    +'<tr><th colspan="10" style="padding:4px 8px;background:#f8fafc;border-bottom:1px solid var(--border)">'
     +'<div style="display:flex;gap:12px;align-items:center;font-size:11px">'
     +'<label style="display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--txt3)">'
     +'<input type="checkbox" id="sp-notice-all" onchange="toggleAllSpecialCheck(\'sp-notice\',this.checked)"> 안내문 전체 선택</label>'
@@ -5090,6 +5089,7 @@ function renderSpecialTarget(){
     +'<th style="width:100px">특강 시간</th>'
     +'<th style="width:60px">안내문</th>'
     +'<th style="width:50px">상담</th>'
+    +'<th style="width:70px">특강 여부</th>'
     +'<th>비고</th>'
     +'</tr></thead><tbody>';
   activeStudents.forEach(function(s){
@@ -5105,7 +5105,7 @@ function renderSpecialTarget(){
       +'<td><input class="fi sp-time" style="font-size:11px" value="'+(r.classTime||'').replace(/"/g,'&quot;')+'" placeholder="예: 오후 2시"></td>'
       +'<td style="text-align:center"><input type="checkbox" class="sp-notice" '+(r.noticeSent?'checked':'')+'></td>'
       +'<td style="text-align:center"><input type="checkbox" class="sp-counsel" '+(r.counselDone?'checked':'')+'></td>'
-      +'<td><input class="fi sp-note" style="font-size:11px" value="'+(r.note||'').replace(/"/g,'&quot;')+'" placeholder="비고"></td>'
+      +'<td style="text-align:center">'+'<select class="fi sp-join" style="font-size:11px;padding:3px 4px">'+'<option value=""'+((!r.joinStatus||r.joinStatus==="")?" selected":"")+"></option>'+'<option value="O"'+(r.joinStatus==="O"?" selected":"")+">O</option>'+'<option value="X"'+(r.joinStatus==="X"?" selected":"")+">X</option>'+'</select></td>'+'<td><input class="fi sp-note" style="font-size:11px" value="'+(r.note||'').replace(/"/g,'&quot;')+'" placeholder="비고"></td>'
       +'</tr>';
   });
   html+='</tbody></table></div>';
@@ -5119,7 +5119,7 @@ function renderSpecialTarget(){
       inp.addEventListener('blur',function(){if(this.type!=='checkbox')sv(field,this.value);});
     }
     wire('sp-mock','mockScore');wire('sp-prog','program');
-    wire('sp-time','classTime');wire('sp-notice','noticeSent');wire('sp-counsel','counselDone');wire('sp-note','note');
+    wire('sp-time','classTime');wire('sp-notice','noticeSent');wire('sp-counsel','counselDone');wire('sp-join','joinStatus');wire('sp-note','note');
 
   });
 }
@@ -5229,13 +5229,12 @@ function renderSpecialPromo(){
   el.innerHTML=html;
 }
 function switchSpecialTab(tab){
-  ['courses','target','plan','promo'].forEach(function(t){
+  ['courses','target','promo'].forEach(function(t){
     var btn=$('sptab-'+t);if(btn)btn.classList.toggle('active',t===tab);
   });
   window._specialTab=tab;
   if(tab==='courses')renderSpecialPage();
   else if(tab==='target')renderSpecialTarget();
-  else if(tab==='plan')renderSpecialPlan();
   else if(tab==='promo')renderSpecialPromo();
 }
 
