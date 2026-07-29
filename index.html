@@ -3204,6 +3204,7 @@ function _fmt12hRange(t){
   return t.split('~').map(function(p){return fmt12h(p.trim());}).join('~');
 }
 function renderSchedule(){
+  try{
   var schedList=$('schedule-list');
   var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
   var dow=targetDate.getDay();var dayName=DAY_MAP[dow];
@@ -3360,7 +3361,7 @@ function renderSchedule(){
       blocks[blk].students.forEach(function(s){
         var rep;
         if(s._isMakeup){rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.makeupId===s._makeupId;});}
-        else{var _cst=s._specialTime||s._isMakeup?'':( (typeof pTime2!=='undefined')?pTime2:'');rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.makeupId&&(r.sessionTime||'')==_cst;});}
+        else{var _cst=s._isSpecialClass?(s._specialTime||''):(s._isMakeup?'':(pTime2||''));rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.makeupId&&(r.sessionTime||'')==_cst;});}
         var done=rep&&!rep.absent&&!rep.earlyLeave;
         var absent=rep&&rep.absent;
         var early=rep&&rep.earlyLeave;
@@ -3418,9 +3419,10 @@ function renderSchedule(){
     html+='</div>';
   });
   $('schedule-list').innerHTML=html;
+  }catch(e){console.error('renderSchedule 오류:',e);$('schedule-list').innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
 }
 
-async function _setSessionTime(t){ window._currentSessionTime = t || ''; }
+function _setSessionTime(t){ window._currentSessionTime = t || ''; }
 async function markAttendance(studentId, action, makeupId){
   // action: 'present', 'absent', 'early'
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
