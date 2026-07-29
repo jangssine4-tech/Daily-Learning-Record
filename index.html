@@ -3359,14 +3359,12 @@ function renderSchedule(){
       if(blk!=='시간미설정'&&sortedBlks.length>1)html+='<div style="font-size:13px;color:var(--txt2);padding:6px 12px 2px;font-weight:700">'+blk+'</div>';
       html+='<div class="student-cards">';
       blocks[blk].students.forEach(function(s){
+        // pTime2: 이 스코프에서 수업 시간 계산
+        var _pData3=(s.periods||{})[dayName];
+        var pTime2=s._isSpecialClass?(s._specialTime||''):(s._isMakeup?(s._makeupTime||''):(_pData3&&typeof _pData3==='object'?_pData3.time||'':''));
         var rep;
         if(s._isMakeup){rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.makeupId===s._makeupId;});}
-        else{
-          var _pData2=(s.periods||{})[dayName];
-          var _pTime2calc=s._isSpecialClass?(s._specialTime||''):(s._isMakeup?(s._makeupTime||''):(_pData2&&typeof _pData2==='object'?_pData2.time||'':''));
-          var _cst=_pTime2calc;
-          rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.makeupId&&(r.sessionTime||'')==_cst;});
-        }
+        else{var _cst=pTime2;rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.makeupId&&(r.sessionTime||'')==_cst;});}
         var done=rep&&!rep.absent&&!rep.earlyLeave;
         var absent=rep&&rep.absent;
         var early=rep&&rep.earlyLeave;
