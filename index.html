@@ -2252,52 +2252,6 @@ function _wtToggleEdit() {
 }
 
 // 셀 클릭 시 이름 입력 모달
-function _wtOpenCellEditor(ts, day) {
-  if (!_wtEditMode) return;
-  var key = _wtPlanKey();
-  var plan = _wtPlanData[key] || {};
-  var current = (plan[ts] && plan[ts][day]) ? plan[ts][day].join('\n') : '';
-
-  var overlay = document.createElement('div');
-  overlay.className = 'mo'; overlay.style.display = 'flex';
-  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-
-  var inner = document.createElement('div');
-  inner.className = 'ms'; inner.style.maxWidth = '280px';
-  inner.innerHTML = '<div class="mt">' + day + '요일 ' + ts + ' 계획</div>'
-    + '<div class="field"><div class="fl" style="font-size:11px;color:var(--txt3)">이름을 한 줄에 한 명씩 입력하세요</div>'
-    + '<textarea class="fi" id="wt-plan-input" rows="5" style="width:100%;font-size:12px;resize:vertical" placeholder="예)\\n홍길동\\n김철수">' + current + '</textarea></div>';
-
-  var btnWrap = document.createElement('div');
-  btnWrap.style.cssText = 'display:flex;gap:8px;margin-top:8px';
-
-  var saveBtn = document.createElement('button');
-  saveBtn.className = 'btn btn-green btn-block';
-  saveBtn.textContent = '확인';
-  saveBtn.onclick = function() {
-    var val = document.getElementById('wt-plan-input').value.trim();
-    var names = val ? val.split('\n').map(function(n){return n.trim();}).filter(Boolean) : [];
-    if (!_wtPlanData[key]) _wtPlanData[key] = {};
-    if (!_wtPlanData[key][ts]) _wtPlanData[key][ts] = {};
-    if (names.length) _wtPlanData[key][ts][day] = names;
-    else delete _wtPlanData[key][ts][day];
-    overlay.remove();
-    renderWeeklyTimetable();
-  };
-
-  var cancelBtn = document.createElement('button');
-  cancelBtn.className = 'btn btn-outline btn-block';
-  cancelBtn.textContent = '취소';
-  cancelBtn.onclick = function() { overlay.remove(); };
-
-  btnWrap.appendChild(saveBtn);
-  btnWrap.appendChild(cancelBtn);
-  inner.appendChild(btnWrap);
-  overlay.appendChild(inner);
-  document.body.appendChild(overlay);
-  setTimeout(function() { var el = document.getElementById('wt-plan-input'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 100);
-}
-
 
 // ── 그리드 빌더 ───────────────────────────────────────
 function _buildWeeklyGrid() {
@@ -2347,7 +2301,13 @@ function _buildWeeklyGrid() {
       var blk = timeToBlk(t);
       if (!blk) return;
       addSlot(blk);
-      grid[blk][d].push(Object.assign({}, s, { _overridden: !!ov[d] }));
+      // 이달 계획에서 제거된 학생 제외
+      var planKey2 = _wtPlanKey();
+      var planData2 = _wtPlanData[planKey2] || {};
+      var removed2 = (planData2[blk] && planData2[blk]._removed) ? planData2[blk]._removed : [];
+      if (removed2.indexOf(s.id) === -1) {
+        grid[blk][d].push(Object.assign({}, s, { _overridden: !!ov[d] }));
+      }
     });
     // 오버라이드로 새 요일 추가된 경우
     Object.keys(ov).forEach(function(d) {
@@ -2438,6 +2398,7 @@ function _doRenderWT(area, data, yr, mo) {
     + '<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">' + moOpts + '</select>'
     + '<button class="btn ' + (_wtEditMode ? 'btn-navy' : 'btn-outline') + ' btn-xs" onclick="_wtToggleEdit()">' + (_wtEditMode ? '✏️ 편집 중' : '✏️ 계획 편집') + '</button>'
     + (_wtEditMode ? '<button class="btn btn-green btn-xs" onclick="_wtSavePlan()">💾 저장</button>' : '')
+    + '<span style="font-size:10px;color:var(--txt3)">🔵 재원 · 🩷 계획</span>'
     + '<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
     + '</div>';
 
@@ -2447,8 +2408,8 @@ function _doRenderWT(area, data, yr, mo) {
   }
 
   html += '<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px">'
-    + '<thead><tr><th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
-  days.forEach(function(d) { html += '<th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:80px">' + d + '</th>'; });
+    + '<thead><tr><th style="padding:6px 4px;background:#4a6fa5;color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
+  days.forEach(function(d) { html += '<th style="padding:6px 4px;background:#4a6fa5;color:#fff;border:1px solid var(--border);text-align:center;min-width:80px">' + d + '</th>'; });
   html += '</tr></thead><tbody>';
 
   var lastPrd = 0;
@@ -2456,7 +2417,7 @@ function _doRenderWT(area, data, yr, mo) {
     var prd = findPeriod(ts);
     if (prd !== 0 && prd !== lastPrd) {
       var pLabel = prd < 0 ? '특강 ' + Math.abs(prd) : prd + '교시';
-      html += '<tr><td colspan="' + (days.length + 1) + '" style="background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:4px 10px">' + pLabel + '</td></tr>';
+      html += '<tr><td colspan="' + (days.length + 1) + '" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px">' + pLabel + '</td></tr>';
       lastPrd = prd;
     }
     var h = parseInt(ts.split(':')[0]), mn = parseInt(ts.split(':')[1]);
@@ -2468,25 +2429,46 @@ function _doRenderWT(area, data, yr, mo) {
     days.forEach(function(d) {
       var sList = grid[ts] && grid[ts][d] ? grid[ts][d] : [];
       var planNames = (plan[ts] && plan[ts][d]) ? plan[ts][d] : [];
-      var cellClick = _wtEditMode ? ' onclick="_wtOpenCellEditor(\''+ts+'\',\''+d+'\')" style="padding:3px;border:1px solid var(--border);vertical-align:top;cursor:pointer;background:#fffbeb"' : ' style="padding:3px;border:1px solid var(--border);vertical-align:top"';
+      var tdStyle = _wtEditMode
+        ? 'padding:4px;border:1px solid var(--border);vertical-align:top;background:#fffbeb'
+        : 'padding:4px;border:1px solid var(--border);vertical-align:top';
 
-      html += '<td' + cellClick + '>'
-        + '<div style="display:flex;flex-wrap:wrap;gap:2px;min-height:32px">';
+      html += '<td style="' + tdStyle + '">'
+        + '<div style="display:flex;flex-wrap:wrap;gap:3px;min-height:32px">';
 
       // 원본 학생 카드
       sList.forEach(function(s) {
         var bg = s._isSpecial ? '#fef9c3' : s._overridden ? '#e0e7ff' : '#dbeafe';
         var color = s._isSpecial ? '#854d0e' : s._overridden ? '#4338ca' : '#1e40af';
-        html += '<div style="padding:2px 5px;background:' + bg + ';border-radius:4px;font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap">' + s.name + '</div>';
+        if (_wtEditMode) {
+          // 편집 모드: 삭제 버튼 포함
+          html += '<div style="display:flex;align-items:center;gap:1px;padding:2px 4px;background:' + bg + ';border-radius:4px;font-size:11px;font-weight:600;color:' + color + '">'
+            + s.name
+            + '<span onclick="_wtDeleteOrigCard(\''+ts+'\',\''+d+'\',\''+s.id+'\',this.parentNode.parentNode.parentNode)" '
+            + 'style="cursor:pointer;margin-left:2px;color:#ef4444;font-size:10px;line-height:1" title="이 셀에서 제거">✕</span>'
+            + '</div>';
+        } else {
+          html += '<div style="padding:2px 5px;background:' + bg + ';border-radius:4px;font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap">' + s.name + '</div>';
+        }
       });
 
-      // 계획 이름 (편집 모드 또는 계획 데이터 있을 때)
-      planNames.forEach(function(name) {
-        html += '<div style="padding:2px 5px;background:#fce7f3;border-radius:4px;font-size:11px;font-weight:600;color:#9d174d;white-space:nowrap;border:1px dashed #f9a8d4">' + name + '</div>';
+      // 계획 이름 (핑크 카드)
+      planNames.forEach(function(name, idx) {
+        if (_wtEditMode) {
+          html += '<div style="display:flex;align-items:center;gap:1px;padding:2px 4px;background:#fce7f3;border-radius:4px;font-size:11px;font-weight:600;color:#9d174d;border:1px dashed #f9a8d4">'
+            + name
+            + '<span onclick="_wtDeletePlanCard(\''+ts+'\',\''+d+'\','+idx+',this.parentNode.parentNode.parentNode)" '
+            + 'style="cursor:pointer;margin-left:2px;color:#ef4444;font-size:10px;line-height:1" title="삭제">✕</span>'
+            + '</div>';
+        } else {
+          html += '<div style="padding:2px 5px;background:#fce7f3;border-radius:4px;font-size:11px;font-weight:600;color:#9d174d;white-space:nowrap;border:1px dashed #f9a8d4">' + name + '</div>';
+        }
       });
 
-      if (_wtEditMode && !sList.length && !planNames.length) {
-        html += '<div style="font-size:10px;color:#d1d5db;padding:4px">+</div>';
+      // 편집 모드: + 추가 버튼
+      if (_wtEditMode) {
+        html += '<button onclick="_wtAddPlanCard(\''+ts+'\',\''+d+'\',this.parentNode.parentNode.parentNode)" '
+          + 'style="padding:1px 6px;background:#fce7f3;border:1px dashed #f9a8d4;border-radius:4px;font-size:12px;color:#9d174d;cursor:pointer;line-height:1.4" title="이름 추가">+</button>';
       }
 
       html += '</div></td>';
@@ -2496,6 +2478,36 @@ function _doRenderWT(area, data, yr, mo) {
 
   html += '</tbody></table></div>';
   area.innerHTML = html;
+}
+
+// ── 편집 모드 카드 조작 함수 ─────────────────────────
+function _wtDeleteOrigCard(ts, day, sid, cellDiv) {
+  // 원본 카드를 계획 데이터에 "삭제됨"으로 기록
+  var key = _wtPlanKey();
+  if (!_wtPlanData[key]) _wtPlanData[key] = {};
+  if (!_wtPlanData[key][ts]) _wtPlanData[key][ts] = {};
+  if (!_wtPlanData[key][ts]._removed) _wtPlanData[key][ts]._removed = [];
+  var removed = _wtPlanData[key][ts]._removed;
+  if (removed.indexOf(sid) === -1) removed.push(sid);
+  renderWeeklyTimetable();
+}
+
+function _wtDeletePlanCard(ts, day, idx, cellDiv) {
+  var key = _wtPlanKey();
+  if (!_wtPlanData[key] || !_wtPlanData[key][ts] || !_wtPlanData[key][ts][day]) return;
+  _wtPlanData[key][ts][day].splice(idx, 1);
+  renderWeeklyTimetable();
+}
+
+function _wtAddPlanCard(ts, day, cellDiv) {
+  var name = prompt('추가할 학생 이름을 입력하세요');
+  if (!name || !name.trim()) return;
+  var key = _wtPlanKey();
+  if (!_wtPlanData[key]) _wtPlanData[key] = {};
+  if (!_wtPlanData[key][ts]) _wtPlanData[key][ts] = {};
+  if (!_wtPlanData[key][ts][day]) _wtPlanData[key][ts][day] = [];
+  _wtPlanData[key][ts][day].push(name.trim());
+  renderWeeklyTimetable();
 }
 
 
@@ -3347,13 +3359,13 @@ function renderSchedule(){
         if(done)cardCls+=' done';else if(absent)cardCls+=' absent';else if(early)cardCls+=' early';
         if(isNew||isObserved)cardCls+=' observed';
         html+='<div class="'+cardCls+'" style="position:relative">';
-        // Pin/Action 메모 블록 (출석 버튼 아래 표시)
-        var sPins=memoMap[s.id]||[];
+        // Action/Pin 메모 블록 (출석 버튼 아래 표시, 실행 메모 우선)
         var aMemos=actionMemoMap[s.id]||[];
+        var sPins=memoMap[s.id]||[];
         var isTablet=(window._cardBadges||{})['tbl_'+s.id];
         var isBook=(window._cardBadges||{})['bk_'+s.id];
         html+='<div class="s-card-name" data-student-id="'+s.id+'">'+s.name
-          +(s._isSpecialClass?'<span style="position:absolute;top:-8px;right:-8px;width:36px;height:36px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2" title="특강">특</span>':'')
+          +(s._isSpecialClass?'<span style="position:absolute;top:-5px;right:-5px;width:24px;height:24px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2" title="특강">특</span>':'')
           +(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')
           +(dispTime?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+dispTime+'</span>':'')
           +'<span style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')">관찰</span>'
@@ -3370,15 +3382,15 @@ function renderSchedule(){
         if(done||absent||early)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\',\''+_mkId+'\')" title="일지 작성">📝</button>';
         html+='</div>';
         // 메모 (출석 버튼 아래)
-        sPins.forEach(function(pm){
-          html+='<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:4px 8px;margin-top:4px;font-size:10px;color:#1e40af;display:flex;align-items:center;gap:4px">'
-            +'<span style="cursor:pointer" onclick="event.stopPropagation();toggleMemoPin(\''+pm.id+'\')" title="고정 해제">📌</span>'
-            +'<span style="flex:1">'+pm.content+'</span></div>';
-        });
         aMemos.forEach(function(aMemo){
           html+='<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:4px 8px;margin-top:4px;font-size:10px;color:#92400e;display:flex;align-items:center;gap:4px">'
             +'<input type="checkbox" onclick="event.stopPropagation();completeMemo(\''+aMemo.id+'\')" title="완료 처리" style="width:13px;height:13px">'
             +'<span style="flex:1">⚡ '+aMemo.content+'</span></div>';
+        });
+        sPins.forEach(function(pm){
+          html+='<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:4px 8px;margin-top:4px;font-size:10px;color:#1e40af;display:flex;align-items:center;gap:4px">'
+            +'<span style="cursor:pointer" onclick="event.stopPropagation();toggleMemoPin(\''+pm.id+'\')" title="고정 해제">📌</span>'
+            +'<span style="flex:1">'+pm.content+'</span></div>';
         });
         html+='</div>';
       });
@@ -5447,14 +5459,14 @@ function renderWeeklySchedule(){
     });
     return best;
   }
-  var thead='<tr style="background:var(--navy);color:#fff;font-size:12px;font-weight:700"><th style="text-align:center;padding:8px 6px;min-width:80px">시간</th>';
+  var thead='<tr style="background:#4a6fa5;color:#fff;font-size:12px;font-weight:700"><th style="text-align:center;padding:8px 6px;min-width:80px">시간</th>';
   days.forEach(function(d){thead+='<th style="text-align:center;padding:8px;min-width:80px">'+d+'</th>';});
   thead+='</tr>';
   var tbody='';var lastPeriod=0;
   sortedTimes.forEach(function(slot){
     var prd=findPeriod(slot);
     if(prd!==0&&prd!==lastPeriod){
-      tbody+='<tr><td colspan="'+(days.length+1)+'" style="background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;text-align:left">'+(prd<0?'특강 '+Math.abs(prd):prd+'교시')+'</td></tr>';
+      tbody+='<tr><td colspan="'+(days.length+1)+'" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;text-align:left">'+(prd<0?'특강 '+Math.abs(prd):prd+'교시')+'</td></tr>';
       lastPeriod=prd;
     }
     tbody+='<tr><td style="text-align:center;background:var(--surface2);font-weight:600;font-size:12px;padding:6px;border-right:2px solid var(--border)">'+fmt12h(slot)+'</td>';
@@ -8787,7 +8799,7 @@ function _renderAcademicCalendarUI(el){
       return e.date<=moEnd&&eEnd>=moStart;
     }).sort(function(a,b){return a.date>b.date?1:-1;});
     html+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
-      +'<div style="background:var(--navy);color:#fff;font-size:12px;font-weight:700;padding:6px 10px">'+mLabel+'</div>'
+      +'<div style="background:#4a6fa5;color:#fff;font-size:12px;font-weight:700;padding:6px 10px">'+mLabel+'</div>'
       +'<div style="padding:6px;min-height:60px">'
       +evts.map(function(e){
         var col=catColors[e.cat]||'#94a3b8';
