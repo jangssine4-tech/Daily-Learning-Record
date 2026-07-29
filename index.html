@@ -596,6 +596,7 @@ var revenues=[], expenses=[], teachers=[], users=[], refItems=[];
 var newConsults=[], customPeriods=[];
 var _PROMO_SCHEDULE=[];
 var _EXEC_TABLE=[];
+var _dbTasks=null;
 var _promoLoaded=false;
 var currentGoalsTab='annual', currentSummaryTab='summary', currentRefTab='fees';
 var makeupViewYear=new Date().getFullYear(), makeupViewMonth=new Date().getMonth();
@@ -7875,7 +7876,16 @@ function saveDashBoard(){
 function renderDashBoard(){
   var el=$('dashboard-board-area');if(!el)return;
   el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
-  loadDashBoard().then(function(){_renderDashBoardUI(el);});
+  loadDashBoard().then(function(){
+    try{_renderDashBoardUI(el);}
+    catch(e){
+      console.error('renderDashBoard 오류:',e);
+      el.innerHTML='<div style="padding:20px;color:red">대시보드 오류: '+e.message+'</div>';
+    }
+  }).catch(function(e){
+    console.error('loadDashBoard 오류:',e);
+    el.innerHTML='<div style="padding:20px;color:red">데이터 로드 오류: '+e.message+'</div>';
+  });
 }
 
 // ── 뷰 렌더링 ─────────────────────────────────────
@@ -8255,6 +8265,7 @@ function resetCrmDate(){
 
 // ── 대시보드 자동 업무 수집 ──
 function getAutoTodayTasks(dateStr){
+  try{
   var tasks=[];
   var dt=new Date(dateStr+'T00:00:00');
   var dayNames=['일','월','화','수','목','금','토'];
@@ -8433,6 +8444,7 @@ function getAutoTodayTasks(dateStr){
   })();
 
   return tasks;
+  }catch(e){console.error('getAutoTodayTasks 오류:',e);return[];}
 }
 function renderAutoTasksSection(dateStr){
   var tasks=getAutoTodayTasks(dateStr);
