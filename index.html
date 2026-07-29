@@ -2215,6 +2215,90 @@ function _wtSave() {
   _wtDirty = false;
 }
 
+// ══════════════════════════════════════════════════════
+// 월간 시간표 계획 편집 (monthlyPlan_YYYY_MM)
+// 학생 원본 데이터와 완전 분리
+// ══════════════════════════════════════════════════════
+var _wtPlanData = {};   // 캐시: 'YYYY_MM' → {ts: {day: ['이름'...]}}
+var _wtEditMode = false;
+
+function _wtPlanKey() {
+  var yr = window._wtYr || new Date().getFullYear();
+  var mo = window._wtMo || (new Date().getMonth() + 1);
+  return 'monthlyPlan_' + yr + '_' + String(mo).padStart(2,'0');
+}
+
+function _wtLoadPlan() {
+  var key = _wtPlanKey();
+  if (_wtPlanData[key] !== undefined) return Promise.resolve();
+  return db.collection('config').doc(key).get()
+    .then(function(d) {
+      _wtPlanData[key] = d.exists ? (d.data().plan || {}) : {};
+    })
+    .catch(function() { _wtPlanData[key] = {}; });
+}
+
+function _wtSavePlan() {
+  var key = _wtPlanKey();
+  var plan = _wtPlanData[key] || {};
+  db.collection('config').doc(key).set({ plan: plan }, { merge: false })
+    .then(function() { toast('💾 월간 계획 저장됨'); })
+    .catch(function(e) { toast('저장 실패: ' + e.message); });
+}
+
+function _wtToggleEdit() {
+  _wtEditMode = !_wtEditMode;
+  renderWeeklyTimetable();
+}
+
+// 셀 클릭 시 이름 입력 모달
+function _wtOpenCellEditor(ts, day) {
+  if (!_wtEditMode) return;
+  var key = _wtPlanKey();
+  var plan = _wtPlanData[key] || {};
+  var current = (plan[ts] && plan[ts][day]) ? plan[ts][day].join('\n') : '';
+
+  var overlay = document.createElement('div');
+  overlay.className = 'mo'; overlay.style.display = 'flex';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  var inner = document.createElement('div');
+  inner.className = 'ms'; inner.style.maxWidth = '280px';
+  inner.innerHTML = '<div class="mt">' + day + '요일 ' + ts + ' 계획</div>'
+    + '<div class="field"><div class="fl" style="font-size:11px;color:var(--txt3)">이름을 한 줄에 한 명씩 입력하세요</div>'
+    + '<textarea class="fi" id="wt-plan-input" rows="5" style="width:100%;font-size:12px;resize:vertical" placeholder="예)\\n홍길동\\n김철수">' + current + '</textarea></div>';
+
+  var btnWrap = document.createElement('div');
+  btnWrap.style.cssText = 'display:flex;gap:8px;margin-top:8px';
+
+  var saveBtn = document.createElement('button');
+  saveBtn.className = 'btn btn-green btn-block';
+  saveBtn.textContent = '확인';
+  saveBtn.onclick = function() {
+    var val = document.getElementById('wt-plan-input').value.trim();
+    var names = val ? val.split('\n').map(function(n){return n.trim();}).filter(Boolean) : [];
+    if (!_wtPlanData[key]) _wtPlanData[key] = {};
+    if (!_wtPlanData[key][ts]) _wtPlanData[key][ts] = {};
+    if (names.length) _wtPlanData[key][ts][day] = names;
+    else delete _wtPlanData[key][ts][day];
+    overlay.remove();
+    renderWeeklyTimetable();
+  };
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-outline btn-block';
+  cancelBtn.textContent = '취소';
+  cancelBtn.onclick = function() { overlay.remove(); };
+
+  btnWrap.appendChild(saveBtn);
+  btnWrap.appendChild(cancelBtn);
+  inner.appendChild(btnWrap);
+  overlay.appendChild(inner);
+  document.body.appendChild(overlay);
+  setTimeout(function() { var el = document.getElementById('wt-plan-input'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 100);
+}
+
+
 // ── 그리드 빌더 ───────────────────────────────────────
 function _buildWeeklyGrid() {
   var days = ['월', '화', '수', '목', '금'];
@@ -2320,7 +2404,7 @@ function renderWeeklyTimetable() {
   var yr = window._wtYr, mo = window._wtMo;
 
   area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">⏳ 불러오는 중...</div>';
-  _wtLoad(yr, mo).then(function() {
+  Promise.all([_wtLoad(yr, mo), _wtLoadPlan()]).then(function() {
     var data = _buildWeeklyGrid();
     _doRenderWT(area, data, yr, mo);
   });
@@ -2328,23 +2412,21 @@ function renderWeeklyTimetable() {
 
 function _doRenderWT(area, data, yr, mo) {
   var timeSlots = data.timeSlots, grid = data.grid, days = data.days;
-  var key = _wtKey(yr, mo);
-  var mData = _wtMonthData[key] || {};
+  var key = _wtPlanKey();
+  var plan = _wtPlanData[key] || {};
 
   var yrOpts = ''; for (var y = 2024; y <= 2030; y++) yrOpts += '<option value="' + y + '"' + (y === yr ? ' selected' : '') + '>' + y + '년</option>';
   var moOpts = ''; for (var m = 1; m <= 12; m++) moOpts += '<option value="' + m + '"' + (m === mo ? ' selected' : '') + '>' + m + '월</option>';
 
-
   function findPeriod(slot) {
     var mm = slot.match(/(\d+):(\d+)/); if (!mm) return 0;
-    var tMin = parseInt(mm[1]) * 60 + parseInt(mm[2]);
-    var best = 0;
+    var tMin = parseInt(mm[1]) * 60 + parseInt(mm[2]), best = 0;
     customPeriods.forEach(function(cp) {
-      if(!cp.time) return;
+      if (!cp.time) return;
       var ms = cp.time.match(/(\d+):(\d+)/); if (!ms) return;
       var cpMin = parseInt(ms[1]) * 60 + parseInt(ms[2]);
       var cpEnd = cp.endTime ? (function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;return parseInt(em[1])*60+parseInt(em[2]);})() : cpMin + 60;
-      if(tMin >= cpMin && tMin < cpEnd) best = cp.period;
+      if (tMin >= cpMin && tMin < cpEnd) best = cp.period;
     });
     return best;
   }
@@ -2354,6 +2436,8 @@ function _doRenderWT(area, data, yr, mo) {
     + '<div style="font-size:14px;font-weight:800;color:var(--navy);margin-right:4px">📋 월간 시간표</div>'
     + '<select class="fi" style="width:80px;font-size:11px" onchange="window._wtYr=parseInt(this.value);renderWeeklyTimetable()">' + yrOpts + '</select>'
     + '<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">' + moOpts + '</select>'
+    + '<button class="btn ' + (_wtEditMode ? 'btn-navy' : 'btn-outline') + ' btn-xs" onclick="_wtToggleEdit()">' + (_wtEditMode ? '✏️ 편집 중' : '✏️ 계획 편집') + '</button>'
+    + (_wtEditMode ? '<button class="btn btn-green btn-xs" onclick="_wtSavePlan()">💾 저장</button>' : '')
     + '<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
     + '</div>';
 
@@ -2364,41 +2448,55 @@ function _doRenderWT(area, data, yr, mo) {
 
   html += '<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px">'
     + '<thead><tr><th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
-  days.forEach(function(d) { html += '<th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:70px">' + d + '</th>'; });
+  days.forEach(function(d) { html += '<th style="padding:6px 4px;background:var(--navy);color:#fff;border:1px solid var(--border);text-align:center;min-width:80px">' + d + '</th>'; });
   html += '</tr></thead><tbody>';
+
   var lastPrd = 0;
   timeSlots.forEach(function(ts) {
     var prd = findPeriod(ts);
-    if (prd !== 0 && prd !== lastPrd) { html += '<tr><td colspan="' + (days.length + 1) + '" style="background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:4px 10px">'+(prd<0?'특강 '+Math.abs(prd):prd+'교시')+'</td></tr>'; lastPrd = prd; }
+    if (prd !== 0 && prd !== lastPrd) {
+      var pLabel = prd < 0 ? '특강 ' + Math.abs(prd) : prd + '교시';
+      html += '<tr><td colspan="' + (days.length + 1) + '" style="background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:4px 10px">' + pLabel + '</td></tr>';
+      lastPrd = prd;
+    }
     var h = parseInt(ts.split(':')[0]), mn = parseInt(ts.split(':')[1]);
     var endH = mn === 0 ? h : h + 1, endM = mn === 0 ? 30 : 0;
-    var label = _fmt12hRange(ts + '~' + String(endH).padStart(2, '0') + ':' + String(endM).padStart(2, '0'));
-    html += '<tr data-ts="' + ts + '">'
-      + '<td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">'
-      + label
+    var label = _fmt12hRange(ts + '~' + String(endH).padStart(2,'0') + ':' + String(endM).padStart(2,'0'));
 
-      + '</td>';
+    html += '<tr><td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">' + label + '</td>';
+
     days.forEach(function(d) {
       var sList = grid[ts] && grid[ts][d] ? grid[ts][d] : [];
-      html += '<td style="padding:3px;border:1px solid var(--border);vertical-align:top;min-height:48px">';
-        + '<div class="wt-cell-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;min-height:40px">';
-       sList.forEach(function(s) {
-         var bg = s._isSpecial ? '#fef9c3' : s._overridden ? '#e0e7ff' : '#dbeafe';
-         var color = s._isSpecial ? '#854d0e' : s._overridden ? '#4338ca' : '#1e40af';
-         html += '<div style="padding:2px 3px;background:' + bg + ';border-radius:4px;text-align:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:' + color + '">'
-           + s.name + '</div>';
-       });
+      var planNames = (plan[ts] && plan[ts][d]) ? plan[ts][d] : [];
+      var cellClick = _wtEditMode ? ' onclick="_wtOpenCellEditor(\''+ts+'\',\''+d+'\')" style="padding:3px;border:1px solid var(--border);vertical-align:top;cursor:pointer;background:#fffbeb"' : ' style="padding:3px;border:1px solid var(--border);vertical-align:top"';
+
+      html += '<td' + cellClick + '>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:2px;min-height:32px">';
+
+      // 원본 학생 카드
+      sList.forEach(function(s) {
+        var bg = s._isSpecial ? '#fef9c3' : s._overridden ? '#e0e7ff' : '#dbeafe';
+        var color = s._isSpecial ? '#854d0e' : s._overridden ? '#4338ca' : '#1e40af';
+        html += '<div style="padding:2px 5px;background:' + bg + ';border-radius:4px;font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap">' + s.name + '</div>';
+      });
+
+      // 계획 이름 (편집 모드 또는 계획 데이터 있을 때)
+      planNames.forEach(function(name) {
+        html += '<div style="padding:2px 5px;background:#fce7f3;border-radius:4px;font-size:11px;font-weight:600;color:#9d174d;white-space:nowrap;border:1px dashed #f9a8d4">' + name + '</div>';
+      });
+
+      if (_wtEditMode && !sList.length && !planNames.length) {
+        html += '<div style="font-size:10px;color:#d1d5db;padding:4px">+</div>';
+      }
+
       html += '</div></td>';
     });
     html += '</tr>';
   });
+
   html += '</tbody></table></div>';
   area.innerHTML = html;
 }
-
-// ── 드래그앤드롭 핸들러 ──────────────────────────────
-
-
 
 
 function switchDashTab(tab){
