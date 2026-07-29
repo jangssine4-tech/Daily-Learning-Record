@@ -595,6 +595,7 @@ var students=[], classes=[], reports=[], makeups=[], consultations=[];
 var revenues=[], expenses=[], teachers=[], users=[], refItems=[];
 var newConsults=[], customPeriods=[];
 var _PROMO_SCHEDULE=[];
+var _EXEC_TABLE=[];
 var _promoLoaded=false;
 var currentGoalsTab='annual', currentSummaryTab='summary', currentRefTab='fees';
 var makeupViewYear=new Date().getFullYear(), makeupViewMonth=new Date().getMonth();
@@ -2846,13 +2847,13 @@ function renderCrmDailyInto(targetId){
   if(typeof _PROMO_SCHEDULE!=='undefined'){
     var tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
     var tmStr=tomorrow.toISOString().substring(0,10);
-    _PROMO_SCHEDULE.forEach(function(s){
+    (_PROMO_SCHEDULE||[]).forEach(function(s){
       if(s.date===todayStr)
         tasks.push({id:'promo_'+s.date,priority:2,cat:'🟡 학습 관리',type:'📣 특강 홍보 ('+s.d+')',name:'홍보 일정',reason:s.title+' · '+s.channel,action:s.type});
       else if(s.date===tmStr)
         tasks.push({id:'promo_tmr_'+s.date,priority:3,cat:'🟢 CRM',type:'📣 내일 홍보 예정',name:'내일 홍보',reason:'[D+1] '+s.title,action:'콘텐츠 준비 확인'});
     });
-    _EXEC_TABLE.forEach(function(t){
+    (_EXEC_TABLE||[]).forEach(function(t){
       if(t.prepDate===todayStr)
         tasks.push({id:'exec_prep_'+t.priority,priority:2,cat:'🟡 학습 관리',type:'✅ 제작 ('+t.channel+')',name:t.task,reason:t.content+' 제작 예정일',action:'오늘 제작 시작'});
       else if(t.postDate===todayStr)
@@ -2949,7 +2950,7 @@ function renderCrmDailyInto(targetId){
   }
   html+='</div>';
   el.innerHTML=html;
-  }catch(e){console.error('renderCrmDailyInto 오류:',e);el.innerHTML='<div style="padding:20px;text-align:center;color:red">오류: '+e.message+'</div>';}
+  }catch(e){console.error('renderCrmDailyInto 오류:',e);el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">📋 일부 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.<br><small style="color:#ef4444">'+e.message+'</small></div>';}
 }
 function openConsultPrepCard(studentId){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
@@ -8334,7 +8335,7 @@ function getAutoTodayTasks(dateStr){
       tasks.push({cat:'특강 홍보',icon:'📣',label:'['+s.d+'] '+s.title,sub:s.channel+' · '+s.type});
     });
   }
-  if(typeof _EXEC_TABLE!=='undefined'){
+  if(typeof _EXEC_TABLE!=='undefined'&&_EXEC_TABLE){
     _EXEC_TABLE.filter(function(t){return t.prepDate===dateStr||t.postDate===dateStr;}).forEach(function(t){
       tasks.push({cat:'특강 실행',icon:'✅',label:'['+(t.prepDate===dateStr?'제작':'게시')+'] '+t.task,sub:t.content+' · '+t.channel});
     });
