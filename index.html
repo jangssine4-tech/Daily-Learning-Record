@@ -3376,7 +3376,7 @@ function renderSchedule(){
         if(pTime3)pTime3=_fmt12hRange(pTime3);
         var dispTime=pTime3;
         var isNew=(s.status||'재원')==='신규';
-        var isJoy=(getStudentLevel(s)||'').toLowerCase().startsWith('joy');
+        var _cardLevel=(rep&&rep.level)?rep.level:getStudentLevel(s);var isJoy=(_cardLevel||'').toLowerCase().startsWith('joy');
         var isObserved=(window._cardBadges||{})['obs_'+s.id];
         var cardCls='s-card';
         if(done)cardCls+=' done';else if(absent)cardCls+=' absent';else if(early)cardCls+=' early';
@@ -3396,7 +3396,7 @@ function renderSchedule(){
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #a78bfa;background:'+(isBook?'#7c3aed;color:#fff':'#f3e8ff;color:#6b21a8')+'" onclick="event.stopPropagation();toggleCardTag(\'bk_'+s.id+'\',this)">B</span>'
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #94a3b8;background:#f1f5f9;color:#475569" title="메모 작성" onclick="event.stopPropagation();goToMemo(\''+s.id+'\')">M</span>'
           +'</div>';
-        html+='<div class="s-card-sub">'+getStudentLevel(s)+'</div>';
+        html+='<div class="s-card-sub">'+((rep&&rep.level)?rep.level:getStudentLevel(s))+'</div>';
         html+='<div class="s-card-btns">';
         var _mkId=s._isMakeup?s._makeupId:'';var _st=encodeURIComponent(pTime2||'');
         html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');markAttendance(\''+s.id+'\',\'present\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
@@ -4305,22 +4305,7 @@ async function saveReport(){
       if(mkIdx>=0) makeups[mkIdx].makeupNote=data.makeupContent;
     }
   }
-  // Sync student level if changed
-  var newLevel=$('r-level').value;
-  if(newLevel&&s&&getStudentLevel(s)!==newLevel){
-    var lvUpdate=s.level==='직접입력'?{customLevel:newLevel}:{level:newLevel,customLevel:''};
-    // Record level history
-    var lvHistory=s.levelHistory||[];
-    if(!lvHistory.length)lvHistory.push({level:s.level||'',customLevel:s.customLevel||'',date:s.enrollDate||s.createdAt?.split('T')[0]||todayISO()});
-    lvHistory.push({level:lvUpdate.level||'직접입력',customLevel:lvUpdate.customLevel||'',date:todayISO()});
-    lvUpdate.levelHistory=lvHistory;
-    // Also auto-update module (classId) to match new level
-    var newEvalMod=getEvalModuleForLevel(newLevel);
-    if(newEvalMod){var matchCls=classes.find(function(c){return c.evalModule===newEvalMod;});if(matchCls&&matchCls.id!==s.classId)lvUpdate.classId=matchCls.id;}
-    await db.collection('students').doc(sId).update(lvUpdate);
-    var si=students.findIndex(function(x){return x.id===sId;});
-    if(si>=0){if(lvUpdate.customLevel!==undefined)students[si].customLevel=lvUpdate.customLevel;if(lvUpdate.level)students[si].level=lvUpdate.level;if(lvUpdate.classId)students[si].classId=lvUpdate.classId;students[si].levelHistory=lvHistory;}
-  }
+  // 레벨 자동 업데이트 제거 - 일지 저장이 학생 레벨에 영향 없음
   window._evalState={};_lastLoadedReportTs=data.updatedAt;
   // Clear temp data after successful DB save
   var tempKey='tempReport_'+sId+'_'+data.date+(_mkId?'_mk'+_mkId:'');localStorage.removeItem(tempKey);
