@@ -732,18 +732,18 @@ var _menuStruct=[
   {id:'admin',label:'관리자'},
   {id:'settings',label:'설정'}]}];
 function applyMenuPerms(){
-  // 모든 사이드바 항목과 탭을 표시 (권한 시스템 비활성화)
-  document.querySelectorAll('.sb-item').forEach(function(el){el.style.display='';});
-  var tabIds=['gtab-annual','gtab-monthly','gtab-memo',
-    'optab-flyer','optab-poster','optab-banner','optab-briefing','optab-trial',
-    'mktab-calendar','mktab-stats','mktab-funnel','mktab-events','mktab-promo',
-    'stab-summary','stab-monthly','stab-expense','stab-staff','stab-tax',
-    'schtab-today','schtab-weekly','schtab-capacity','schtab-notes',
-    'pftab-newcon','pftab-style','pftab-lsreport','pftab-report','pftab-consult','pftab-ai',
-    'ctab-history','ctab-new','ctab-manual',
-    'reftab-fees','reftab-curriculum','reftab-eval','reftab-classes',
-    'wmtab-weekly','wmtab-quality','wmtab-annual','wmtab-guide'];
-  tabIds.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='';});
+  if(!currentUser||currentUser.role==='admin'||currentUser.role==='owner'||currentUser.role==='원장')return;
+  var matchedUser=users.find(function(u){return u.loginId===currentUser.loginId;})||users.find(function(u){return u.id===currentUser.docId;});
+  if(matchedUser&&matchedUser.menuPerms)currentUser.menuPerms=matchedUser.menuPerms;
+  var perms=currentUser.menuPerms||{};
+  if(Object.keys(perms).length===0)return;
+  var alwaysShow=['reference','admin','settings','board'];
+  _menuStruct.forEach(function(sec){sec.items.forEach(function(m){
+    var el=document.getElementById('snav-'+m.id);
+    if(el)el.style.display=(perms[m.id]===false&&alwaysShow.indexOf(m.id)===-1)?'none':'';
+  });});
+  var tabMap={'goals_annual':'gtab-annual','goals_monthly':'gtab-monthly','goals_memo':'gtab-memo','op_flyer':'optab-flyer','op_poster':'optab-poster','op_banner':'optab-banner','op_briefing':'optab-briefing','op_trial':'optab-trial','mk_calendar':'mktab-calendar','mk_stats':'mktab-stats','mk_funnel':'mktab-funnel','mk_events':'mktab-events','mk_promo':'mktab-promo','sum_overview':'stab-summary','sum_revenue':'stab-monthly','sum_expense':'stab-expense','sum_teacher':'stab-staff','sum_tax':'stab-tax','sch_today':'schtab-today','sch_weekly':'schtab-weekly','sch_capacity':'schtab-capacity','sch_notes':'schtab-notes','pf_newcon':'pftab-newcon','pf_style':'pftab-style','pf_lsreport':'pftab-lsreport','pf_report':'pftab-report','pf_consult':'pftab-consult','pf_ai':'pftab-ai','con_history':'ctab-history','con_new':'ctab-new','con_manual':'ctab-manual','ref_fees':'reftab-fees','ref_curriculum':'reftab-curriculum','ref_eval':'reftab-eval','ref_classes':'reftab-classes'};
+  Object.keys(tabMap).forEach(function(k){var tel=document.getElementById(tabMap[k]);if(tel)tel.style.display=perms[k]===false?'none':'';});
 }
 async function bootApp(){
   $('sb-username').textContent=currentUser.name;
@@ -777,7 +777,7 @@ async function bootApp(){
     toast('👋 환영합니다, '+currentUser.name+'님!');
     // Load perms before applying
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
-    // applyMenuPerms 비활성화
+    applyMenuPerms();
     // Background sync after 1 second
     setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
@@ -806,13 +806,13 @@ async function bootApp(){
       hideBootOverlay();
       toast('👋 환영합니다, '+currentUser.name+'님!');
       try{var permSnap2=await db.collection('userPerms').get();permSnap2.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
-      // applyMenuPerms 비활성화
+      applyMenuPerms();
       // Stage 2: Non-essential data in background
       setTimeout(async function(){
         try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes(),loadCardBadges()]);}catch(e){}
         try{var kDoc=await db.collection('config').doc('kakao').get();if(kDoc.exists)window._kakaoConfig=kDoc.data();}catch(e){}
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return {id:d.id,...d.data()};});}catch(e){}
-        saveCache();renderCrmDaily();setTimeout(showJarvisAlert,1500);
+        saveCache();applyMenuPerms();renderCrmDaily();setTimeout(showJarvisAlert,1500);
         startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();
       }, 500);
     } catch(e) {
@@ -1718,7 +1718,7 @@ async function syncFromFirestore(){
   try{
     await Promise.all([loadStudents(),loadClasses(),loadTeachers(),loadUsers(),loadPeriods(),loadRefItems()]);
     _fullyPopulated=false;
-    // applyMenuPerms 비활성화
+    applyMenuPerms();
     setTimeout(async function(){
       await Promise.all([loadReports(),loadMakeups()]);
       setTimeout(async function(){
@@ -1846,7 +1846,7 @@ function startRealtimeListeners(){
         var u=users.find(function(x){return x.id===pd.id;});
         if(u)u.menuPerms=pd.data().menuPerms||{};
       });
-      // applyMenuPerms 비활성화 - 모든 메뉴 항상 표시
+      applyMenuPerms(); - 모든 메뉴 항상 표시
     },function(err){});
     _rtListeners.push(unsub8);
   }catch(e){}
@@ -1994,7 +1994,7 @@ function goto(view){
   }
   else if(view==='memo'){loadStudentMemos().then(renderMemoPage);}
   else if(view==='msgboard'){initMsgBoard();}
-  else if(view==='reference'){switchRefTab(currentRefTab||'fees');var _refInit=function(){if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}; if(!_CURRICULUM){loadCurriculumFromFirestore().then(_refInit);}else{_refInit();}}
+  else if(view==='reference'){switchRefTab(currentRefTab||'fees');var _refInit=function(){try{if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}catch(e){var el=$('ref-panel-fees');if(el)el.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}}; if(!_CURRICULUM){loadCurriculumFromFirestore().then(_refInit).catch(function(e){_refInit();});}else{_refInit();}}
   else if(view==='offline-promo'){switchOfflinePromoTab(window._offlinePromoTab||'flyer');}
   else if(view==='op-meeting'){goto('meeting-page');}
   else if(view==='meeting-page'){renderMeetingPage();}
@@ -2010,8 +2010,8 @@ var btn=$('onlinetab-blog');if(btn)['blog','sns','naver'].forEach(function(t){va
   else if(view==='blog-plan'){renderBlogPlan();}
   else if(view==='marketing'){initMkSelects();switchMktTab(_mkTab||'calendar');renderMarketing();}
   else if(view==='portfolio'){var pfSel=$('pf-student');if(pfSel){var prevVal=pfSel.value;pfSel.innerHTML='<option value="">학생 선택</option>';students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name>b.name?1:-1;}).forEach(function(s){pfSel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';});if(prevVal)pfSel.value=prevVal;;switchPfTab(_pfTab||'newcon');}}
-  else if(view==='admin'){renderUsers();}
-  else if(view==='settings'){loadPeriods().then(function(){renderPeriodSettings();});loadKakaoConfigUI();}
+  else if(view==='admin'){try{renderUsers();}catch(e){var ea=$('users-list');if(ea)ea.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}}
+  else if(view==='settings'){loadPeriods().then(function(){try{renderPeriodSettings();}catch(e){var ep=$('period-settings');if(ep)ep.innerHTML='<div style="color:red">오류:'+e.message+'</div>';}});try{loadKakaoConfigUI();}catch(e){}}
   else if(view==='board'){renderDashBoard();}
   else if(view==='dashboard'){renderDashboard();}
   else if(view==='special'){
@@ -6592,12 +6592,14 @@ function toggleAiFields(){
   else m.innerHTML='<option value="claude-sonnet-4-20250514">Claude Sonnet 4</option><option value="claude-haiku-3-5-20241022">Claude Haiku 3.5</option>';
 }
 function loadKakaoConfigUI(){
+  try{
   db.collection('config').doc('kakao').get().then(function(doc){
     var d=doc.exists?doc.data():{};
     if($('kakao-booking-url'))$('kakao-booking-url').value=d.bookingUrl||'';
     if($('kakao-absent-msg'))$('kakao-absent-msg').value=d.absentMsg||'안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';
     window._kakaoConfig=d;
   }).catch(function(){});
+  }catch(e){console.error('loadKakaoConfigUI 오류:',e);}
 }
 async function testAiConfig(){
   var cfg=getAiConfig();if(!cfg||!cfg.apiKey){toast('⚠️ API Key를 먼저 저장하세요');return;}
@@ -9119,8 +9121,9 @@ async function saveGoalTargets(){var yr=parseInt($('goals-year')?.value)||new Da
 
 // ══ REFERENCE ══
 function switchRefTab(tab){currentRefTab=tab;['fees','curriculum','eval','classes'].forEach(function(t){var btn=$('reftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('ref-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='fees')renderRefFees();else if(tab==='curriculum')renderRefCurriculum();else if(tab==='eval')renderEvalModulesPage();else if(tab==='classes'){var el=$('class-list-ref');if(el){if(!classes.length){el.innerHTML='<div class="empty"><div class="ei">🏫</div><div class="et">모듈이 없습니다</div></div>';}else{el.innerHTML=classes.map(function(cls2){var stuCount=students.filter(function(s){return s.classId===cls2.id;}).length;return'<div class="card" style="padding:14px;cursor:pointer;margin-bottom:10px" onclick="openClassModal(\''+cls2.id+'\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:14px;font-weight:700">'+cls2.name+'</div><div style="font-size:11px;color:var(--txt3);margin-top:2px">담임: '+(cls2.teacher||'-')+' · 학생: '+stuCount+'명</div></div><span class="badge bg-gray">'+(cls2.evalModule||'평가 없음')+'</span></div></div>';}).join('');}};}}
-function renderRefFees(){var tbT=$('ref-tuition-tbody');var tbB=$('ref-textbook-tbody');var tuitionItems=refItems.filter(function(i){return i.refType==='tuition'||(!i.refType&&i.baseFee);});var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});if(tbT)tbT.innerHTML=tuitionItems.length?tuitionItems.map(function(item){var base=parseInt(item.baseFee)||0;var w3=item.feeW3||Math.round(base/20*12);var w4=item.feeW4||Math.round(base/20*16);var w5=item.feeW5||base;return'<tr onclick="openRefItemModal(\'tuition\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--mint)">'+base.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w3.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w4.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w5.toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--txt3)">교육비 기준을 추가하세요</td></tr>';if(tbB)tbB.innerHTML=textbookItems.length?textbookItems.map(function(item){return'<tr onclick="openRefItemModal(\'textbook\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--blue)">'+(parseInt(item.textbookFee)||0).toLocaleString()+'원</td><td style="text-align:center">'+(item.supMaterial||'-')+'</td><td style="text-align:center">'+(parseInt(item.supFee)||0).toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="6" style="text-align:center;padding:14px;color:var(--txt3)">교재비 기준을 추가하세요</td></tr>';}
-var _levelOrder=null;
+function renderRefFees(){
+  try{var tbT=$('ref-tuition-tbody');var tbB=$('ref-textbook-tbody');var tuitionItems=refItems.filter(function(i){return i.refType==='tuition'||(!i.refType&&i.baseFee);});var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});if(tbT)tbT.innerHTML=tuitionItems.length?tuitionItems.map(function(item){var base=parseInt(item.baseFee)||0;var w3=item.feeW3||Math.round(base/20*12);var w4=item.feeW4||Math.round(base/20*16);var w5=item.feeW5||base;return'<tr onclick="openRefItemModal(\'tuition\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--mint)">'+base.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w3.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w4.toLocaleString()+'원</td><td style="text-align:center;color:var(--blue)">'+w5.toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--txt3)">교육비 기준을 추가하세요</td></tr>';if(tbB)tbB.innerHTML=textbookItems.length?textbookItems.map(function(item){return'<tr onclick="openRefItemModal(\'textbook\',\''+item.id+'\')" style="cursor:pointer"><td style="text-align:center">'+(item.grade||'-')+'</td><td style="text-align:center;font-weight:600">'+(item.level||'-')+'</td><td style="text-align:center;font-weight:600;color:var(--blue)">'+(parseInt(item.textbookFee)||0).toLocaleString()+'원</td><td style="text-align:center">'+(item.supMaterial||'-')+'</td><td style="text-align:center">'+(parseInt(item.supFee)||0).toLocaleString()+'원</td><td><button class="btn btn-red btn-xs" onclick="event.stopPropagation();deleteRefItem(\''+item.id+'\')">삭제</button></td></tr>';}).join(''):'<tr><td colspan="6" style="text-align:center;padding:14px;color:var(--txt3)">교재비 기준을 추가하세요</td></tr>';  }catch(e){console.error('renderRefFees 오류:',e);var _ea=document.getElementById('ref-panel-fees');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
+}
 function getLevelOrder(){
   if(_levelOrder&&_levelOrder.length)return _levelOrder;
   _levelOrder=Object.keys(CURRICULUM);
@@ -10038,7 +10041,9 @@ function renderChecklistOverview(){
     el.innerHTML=html;
   });
 }
-function renderUsers(){var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.adminDeleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong>'+(u.engName?' <span style="font-size:11px;color:var(--blue)">('+u.engName+')</span>':'')+'</td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>')+'</td><td><button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button></td></tr>';}).join('');}
+function renderUsers(){
+  try{var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.adminDeleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong>'+(u.engName?' <span style="font-size:11px;color:var(--blue)">('+u.engName+')</span>':'')+'</td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>')+'</td><td><button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button></td></tr>';}).join('');  }catch(e){console.error('renderUsers 오류:',e);var _ea=document.getElementById('users-list');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
+}
 function openUserModal(id){var u=id?users.find(function(x){return x.id===id;}):null;$('u-id-key').value=id||'';$('u-name').value=u?u.name||'':'';$('u-engname').value=u?u.engName||'':'';$('u-role').value=u?u.role||'teacher':'teacher';$('u-id').value=u?u.loginId||'':'';$('u-pw').value='';$('u-phone').value=u?u.phone||'':'';if(u&&u.ssn){try{$('u-ssn').value=atob(u.ssn);}catch(e){$('u-ssn').value='';}}else{$('u-ssn').value='';}$('u-ssn').type='password';$('u-address').value=u?u.address||'':'';$('u-del-wrap').style.display=id?'block':'none';$('modal-user').style.display='flex';}
 async function saveUser(){var name=$('u-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}var loginId=$('u-id').value.trim();if(!loginId){toast('⚠️ 아이디 필수');return;}loading(true);var data={name:name,engName:$('u-engname').value.trim(),role:$('u-role').value,loginId:loginId,phone:$('u-phone').value.trim(),address:$('u-address').value.trim(),updatedAt:new Date().toISOString()};var ssnVal=$('u-ssn').value;if(ssnVal&&ssnVal!=='******'){data.ssn=btoa(ssnVal);}var pw=$('u-pw').value;if(pw)data.password=pw;var id=$('u-id-key').value;if(id)await db.collection('users').doc(id).update(data);else{data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}await loadUsers();renderUsers();_fullyPopulated=false;closeM('user');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
 async function deleteUser(){var id=$('u-id-key').value;if(!id||!confirm('관리자 페이지에서 삭제합니다. 강사 페이지에는 영향이 없습니다.\n삭제하시겠습니까?'))return;loading(true);await db.collection('users').doc(id).update({adminDeleted:true,adminDeletedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===id;});if(u)u.adminDeleted=true;await loadUsers();renderUsers();closeM('user');loading(false);saveCacheDebounced();toast('🗑 관리자 페이지에서 삭제됨');}
@@ -10048,6 +10053,7 @@ async function saveMenuPerms(userId,overlay){loading(true);var perms={};_menuStr
 
 // ══ SETTINGS ══
 function renderPeriodSettings(){
+  try{
   var el=$('period-settings');if(!el)return;
   var ps=customPeriods.slice().sort(function(a,b){
     var aSpec=a.period<0,bSpec=b.period<0;
@@ -10080,13 +10086,8 @@ function renderPeriodSettings(){
   html+='</div>'
     +'<button class="btn btn-green btn-sm" onclick="savePeriodSettings()" style="margin-top:8px">💾 저장</button>';
   el.innerHTML=html;
+  }catch(e){console.error('renderPeriodSettings 오류:',e);var _ea=document.getElementById('period-settings');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
 }
-
-// ── 교시 설정 드래그앤드롭 ─────────────────────────
-
-
-
-
 function _collectPeriodRows(){
   var rows=document.querySelectorAll('#period-rows .period-row');
   var periods=[];
