@@ -393,11 +393,13 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="cp" id="mk-kakao-area" style="display:none"></div>
 </div>
 <div class="view" id="view-mk-blog">
-  <div class="page-top"><h2>📝 블로그</h2></div>
+  <div class="page-top"><h2>🌐 온라인 홍보</h2></div>
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
-    <button class="rev-tab active" id="mkblog-tab-strategy" onclick="switchMkBlogTab('strategy')">📋 운영안</button>
-    <button class="rev-tab" id="mkblog-tab-plan" onclick="switchMkBlogTab('plan')">📅 플랜</button>
+    <button class="rev-tab active" id="onlinetab-blog" onclick="switchOnlinePromoTab('blog')">📝 블로그</button>
+    <button class="rev-tab" id="onlinetab-sns" onclick="switchOnlinePromoTab('sns')">📸 인스타·당근·카톡</button>
+    <button class="rev-tab" id="onlinetab-naver" onclick="switchOnlinePromoTab('naver')">🔍 네이버 플레이스</button>
   </div>
+  <div id="onlinepanel-blog">
   <div class="cp">
     <div id="mkblog-panel-strategy"><div id="mkblog-strategy-area"></div></div>
     <div id="mkblog-panel-plan" style="display:none">
@@ -2001,7 +2003,8 @@ function goto(view){
   else if(view==='mk-today'){loadMpPlans().then(function(){renderMkTodayPage();});}
   else if(view==='mk-insta'){switchSnsTab('insta');}
   else if(view==='mk-danggeun'){loadMpPlans().then(function(){renderMkChannelPage('danggeun','mk-danggeun-area');});}
-  else if(view==='mk-blog'){switchMkBlogTab('strategy');}
+  else if(view==='mk-blog'){switchMkBlogTab('strategy');// 탭 초기화
+var btn=$('onlinetab-blog');if(btn)['blog','sns','naver'].forEach(function(t){var b=$('onlinetab-'+t);if(b)b.classList.toggle('active',t==='blog');});}
   else if(view==='mk-kakao'){loadMpPlans().then(function(){renderMkChannelPage('kakao','mk-kakao-area');});}
   else if(view==='mk-naver'){renderMkNaverPage();}
   else if(view==='blog-strategy'){renderBlogStrategy();}
@@ -5187,6 +5190,20 @@ function renderSpecialTarget(){
     wire('sp-time','classTime');wire('sp-notice','noticeSent');wire('sp-counsel','counselDone');wire('sp-join','joinStatus');wire('sp-note','note');
 
   });
+}
+
+function switchOnlinePromoTab(tab){
+  ['blog','sns','naver'].forEach(function(t){
+    var btn=$('onlinetab-'+t);if(btn)btn.classList.toggle('active',t===tab);
+  });
+  if(tab==='blog'){
+    // 블로그 패널 표시
+    var bp=$('mkblog-panel-strategy');if(bp)switchMkBlogTab('strategy');
+  } else if(tab==='sns'){
+    goto('mk-insta');
+  } else if(tab==='naver'){
+    goto('mk-naver');
+  }
 }
 function loadPromoData(){
   if(_promoLoaded)return Promise.resolve();
