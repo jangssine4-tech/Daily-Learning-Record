@@ -772,7 +772,7 @@ async function bootApp(){
     toast('👋 환영합니다, '+currentUser.name+'님!');
     // Load perms before applying
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
-    applyMenuPerms();
+    // applyMenuPerms 비활성화
     // Background sync after 1 second
     setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
@@ -801,13 +801,13 @@ async function bootApp(){
       hideBootOverlay();
       toast('👋 환영합니다, '+currentUser.name+'님!');
       try{var permSnap2=await db.collection('userPerms').get();permSnap2.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
-      applyMenuPerms();
+      // applyMenuPerms 비활성화
       // Stage 2: Non-essential data in background
       setTimeout(async function(){
         try{await Promise.all([loadRevenues(),loadExpenses(),loadConsultations(),loadStudentMemos(),loadCustomEvalModules(),loadTeacherNotes(),loadCardBadges()]);}catch(e){}
         try{var kDoc=await db.collection('config').doc('kakao').get();if(kDoc.exists)window._kakaoConfig=kDoc.data();}catch(e){}
         try{var s2=await db.collection('newConsults').orderBy('date','desc').get();newConsults=s2.docs.map(function(d){return {id:d.id,...d.data()};});}catch(e){}
-        saveCache();applyMenuPerms();renderCrmDaily();setTimeout(showJarvisAlert,1500);
+        saveCache();renderCrmDaily();setTimeout(showJarvisAlert,1500);
         startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();
       }, 500);
     } catch(e) {
@@ -1713,7 +1713,7 @@ async function syncFromFirestore(){
   try{
     await Promise.all([loadStudents(),loadClasses(),loadTeachers(),loadUsers(),loadPeriods(),loadRefItems()]);
     _fullyPopulated=false;
-    applyMenuPerms();
+    // applyMenuPerms 비활성화
     setTimeout(async function(){
       await Promise.all([loadReports(),loadMakeups()]);
       setTimeout(async function(){
@@ -1841,7 +1841,7 @@ function startRealtimeListeners(){
         var u=users.find(function(x){return x.id===pd.id;});
         if(u)u.menuPerms=pd.data().menuPerms||{};
       });
-      applyMenuPerms();
+      // applyMenuPerms 비활성화 - 모든 메뉴 항상 표시
     },function(err){});
     _rtListeners.push(unsub8);
   }catch(e){}
