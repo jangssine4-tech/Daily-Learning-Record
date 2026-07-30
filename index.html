@@ -399,25 +399,44 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab" id="onlinetab-sns" onclick="switchOnlinePromoTab('sns')">📸 인스타·당근·카톡</button>
     <button class="rev-tab" id="onlinetab-naver" onclick="switchOnlinePromoTab('naver')">🔍 네이버 플레이스</button>
   </div>
+  <!-- 블로그 패널 -->
   <div id="onlinepanel-blog">
-  <div style="background:var(--surface2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
-    <button class="rev-tab active" id="mkblog-tab-strategy" onclick="switchMkBlogTab('strategy')">📋 운영안</button>
-    <button class="rev-tab" id="mkblog-tab-plan" onclick="switchMkBlogTab('plan')">📅 플랜</button>
-  </div>
-  <div class="cp">
-    <div id="mkblog-panel-strategy"><div id="mkblog-strategy-area"></div></div>
-    <div id="mkblog-panel-plan" style="display:none">
-      <div style="background:var(--surface2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;position:sticky;top:0;z-index:10">
-        <button class="rev-tab" id="mkbp-tab-daily" onclick="switchMkBlogPlanTab('daily')">✍️ 하루 루틴</button>
-        <button class="rev-tab" id="mkbp-tab-weekly" onclick="switchMkBlogPlanTab('weekly')">📅 주간 루틴</button>
-        <button class="rev-tab active" id="mkbp-tab-monthly" onclick="switchMkBlogPlanTab('monthly')">📊 월간 계획</button>
-        <button class="rev-tab" id="mkbp-tab-yearly" onclick="switchMkBlogPlanTab('yearly')">📆 연간 계획</button>
-        <button class="rev-tab" id="mkbp-tab-roles" onclick="switchMkBlogPlanTab('roles')">📊 목적별 역할</button>
+    <div style="background:var(--surface2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
+      <button class="rev-tab active" id="mkblog-tab-strategy" onclick="switchMkBlogTab('strategy')">📋 운영안</button>
+      <button class="rev-tab" id="mkblog-tab-plan" onclick="switchMkBlogTab('plan')">📅 플랜</button>
+    </div>
+    <div class="cp">
+      <div id="mkblog-panel-strategy"><div id="mkblog-strategy-area"></div></div>
+      <div id="mkblog-panel-plan" style="display:none">
+        <div style="background:var(--surface2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;position:sticky;top:0;z-index:10">
+          <button class="rev-tab" id="mkbp-tab-daily" onclick="switchMkBlogPlanTab('daily')">✍️ 하루 루틴</button>
+          <button class="rev-tab" id="mkbp-tab-weekly" onclick="switchMkBlogPlanTab('weekly')">📅 주간 루틴</button>
+          <button class="rev-tab active" id="mkbp-tab-monthly" onclick="switchMkBlogPlanTab('monthly')">📊 월간 계획</button>
+          <button class="rev-tab" id="mkbp-tab-yearly" onclick="switchMkBlogPlanTab('yearly')">📆 연간 계획</button>
+          <button class="rev-tab" id="mkbp-tab-roles" onclick="switchMkBlogPlanTab('roles')">📊 목적별 역할</button>
+        </div>
+        <div id="mkblog-plan-area"></div>
       </div>
-      <div id="mkblog-plan-area"></div>
     </div>
   </div>
+  <!-- 인스타·당근·카톡 패널 -->
+  <div id="onlinepanel-sns" style="display:none">
+    <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex">
+    <button class="rev-tab active" id="snstab-insta" onclick="switchSnsTab('insta')">📸 인스타</button>
+    <button class="rev-tab" id="snstab-danggeun" onclick="switchSnsTab('danggeun')">🥕 당근</button>
+    <button class="rev-tab" id="snstab-kakao" onclick="switchSnsTab('kakao')">💬 카톡 채널</button>
+  </div>
+  <div class="cp" id="mk-insta-area"></div>
+  <div class="cp" id="mk-danggeun-area" style="display:none"></div>
+  <div class="cp" id="mk-kakao-area" style="display:none"></div>
 </div>
+  </div>
+  <!-- 네이버 플레이스 패널 -->
+  <div id="onlinepanel-naver" style="display:none">
+    <div class="page-top"><h2>🔍 네이버 플레이스</h2></div><div class="cp" id="mk-naver-area"></div></div>
+  </div>
+</div>
+
 
 <div class="view" id="view-mk-naver"><div class="page-top"><h2>🔍 네이버 플레이스</h2></div><div class="cp" id="mk-naver-area"></div></div>
 <div class="view" id="view-marketing"><div class="page-top"><h2>📣 마케팅 관리</h2></div>
@@ -610,6 +629,7 @@ var revenues=[], expenses=[], teachers=[], users=[], refItems=[];
 var newConsults=[], customPeriods=[];
 var _PROMO_SCHEDULE=[];
 var _EXEC_TABLE=[];
+var _mkBlogTab='strategy';
 var _dbTasks=null;
 var _dbView='today';
 var _dbAreaFilter='';
@@ -898,7 +918,7 @@ function showJarvisAlert(){
     document.body.appendChild(overlay);
   }catch(e){}
 }
-function switchMkBlogTab(tab){
+function switchMkBlogTab(tab){_mkBlogTab=tab;
   ['strategy','plan'].forEach(function(t){
     var btn=$('mkblog-tab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('mkblog-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
@@ -2002,8 +2022,7 @@ function goto(view){
   else if(view==='mk-today'){loadMpPlans().then(function(){renderMkTodayPage();});}
   else if(view==='mk-insta'){switchSnsTab('insta');}
   else if(view==='mk-danggeun'){loadMpPlans().then(function(){renderMkChannelPage('danggeun','mk-danggeun-area');});}
-  else if(view==='mk-blog'){switchMkBlogTab('strategy');// 탭 초기화
-var btn=$('onlinetab-blog');if(btn)['blog','sns','naver'].forEach(function(t){var b=$('onlinetab-'+t);if(b)b.classList.toggle('active',t==='blog');});}
+  else if(view==='mk-blog'){switchOnlinePromoTab('blog');}
   else if(view==='mk-kakao'){loadMpPlans().then(function(){renderMkChannelPage('kakao','mk-kakao-area');});}
   else if(view==='mk-naver'){renderMkNaverPage();}
   else if(view==='blog-strategy'){renderBlogStrategy();}
@@ -5194,15 +5213,9 @@ function renderSpecialTarget(){
 function switchOnlinePromoTab(tab){
   ['blog','sns','naver'].forEach(function(t){
     var btn=$('onlinetab-'+t);if(btn)btn.classList.toggle('active',t===tab);
+    var pn=$('onlinepanel-'+t);if(pn)pn.style.display=t===tab?'':'none';
   });
-  if(tab==='blog'){
-    // 블로그 패널 표시
-    var bp=$('mkblog-panel-strategy');if(bp)switchMkBlogTab('strategy');
-  } else if(tab==='sns'){
-    goto('mk-insta');
-  } else if(tab==='naver'){
-    goto('mk-naver');
-  }
+  if(tab==='blog'){switchMkBlogTab(_mkBlogTab||'strategy');}
 }
 function loadPromoData(){
   if(_promoLoaded)return Promise.resolve();
