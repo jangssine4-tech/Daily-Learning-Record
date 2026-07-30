@@ -732,15 +732,13 @@ var _menuStruct=[
   {id:'admin',label:'관리자'},
   {id:'settings',label:'설정'}]}];
 function applyMenuPerms(){
-  if(!currentUser||currentUser.role==='admin'||currentUser.role==='owner'||currentUser.role==='원장')return;
+  if(!currentUser||currentUser.role==='admin')return;
   var matchedUser=users.find(function(u){return u.loginId===currentUser.loginId;})||users.find(function(u){return u.id===currentUser.docId;});
   if(matchedUser&&matchedUser.menuPerms)currentUser.menuPerms=matchedUser.menuPerms;
   var perms=currentUser.menuPerms||{};
-  if(Object.keys(perms).length===0)return;
-  var alwaysShow=['reference','admin','settings','board'];
   _menuStruct.forEach(function(sec){sec.items.forEach(function(m){
     var el=document.getElementById('snav-'+m.id);
-    if(el)el.style.display=(perms[m.id]===false&&alwaysShow.indexOf(m.id)===-1)?'none':'';
+    if(el)el.style.display=perms[m.id]===true?'':'none';
   });});
   var tabMap={'goals_annual':'gtab-annual','goals_monthly':'gtab-monthly','goals_memo':'gtab-memo','op_flyer':'optab-flyer','op_poster':'optab-poster','op_banner':'optab-banner','op_briefing':'optab-briefing','op_trial':'optab-trial','mk_calendar':'mktab-calendar','mk_stats':'mktab-stats','mk_funnel':'mktab-funnel','mk_events':'mktab-events','mk_promo':'mktab-promo','sum_overview':'stab-summary','sum_revenue':'stab-monthly','sum_expense':'stab-expense','sum_teacher':'stab-staff','sum_tax':'stab-tax','sch_today':'schtab-today','sch_weekly':'schtab-weekly','sch_capacity':'schtab-capacity','sch_notes':'schtab-notes','pf_newcon':'pftab-newcon','pf_style':'pftab-style','pf_lsreport':'pftab-lsreport','pf_report':'pftab-report','pf_consult':'pftab-consult','pf_ai':'pftab-ai','con_history':'ctab-history','con_new':'ctab-new','con_manual':'ctab-manual','ref_fees':'reftab-fees','ref_curriculum':'reftab-curriculum','ref_eval':'reftab-eval','ref_classes':'reftab-classes'};
   Object.keys(tabMap).forEach(function(k){var tel=document.getElementById(tabMap[k]);if(tel)tel.style.display=perms[k]===false?'none':'';});
