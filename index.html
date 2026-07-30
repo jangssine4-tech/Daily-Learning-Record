@@ -5438,6 +5438,7 @@ function renderWeeklySchedule(){
   var slotGrid={};
   var allTimes=new Set();
   activeS.forEach(function(s){
+    // 본수업
     (s.days||[]).forEach(function(day){
       var pData=(s.periods||{})[day];var pTime='';
       if(pData&&typeof pData==='object') pTime=pData.time||'';
@@ -5447,16 +5448,27 @@ function renderWeeklySchedule(){
         if(cp) pTime=cp.time||'';
       }
       if(!pTime) return;
-      // Round down to 30-min slot
       var m=pTime.match(/(\d{1,2}):(\d{2})/);if(!m) return;
       var hr=parseInt(m[1]),mn=parseInt(m[2]);
-      if(hr>=1&&hr<=9)hr+=12;
       mn=mn>=30?30:0;
       var slotKey=String(hr).padStart(2,'0')+':'+String(mn).padStart(2,'0');
       allTimes.add(slotKey);
-      var gKey=slotKey+'_'+day;
-      slotGrid[gKey]=(slotGrid[gKey]||0)+1;
+      slotGrid[slotKey+'_'+day]=(slotGrid[slotKey+'_'+day]||0)+1;
     });
+    // 특강
+    if(s.specialPeriods){
+      Object.keys(s.specialPeriods).forEach(function(day){
+        var sp=s.specialPeriods[day];
+        var spTime=sp&&sp.time?sp.time:'';
+        if(!spTime) return;
+        var m2=spTime.match(/(\d{1,2}):(\d{2})/);if(!m2) return;
+        var hr2=parseInt(m2[1]),mn2=parseInt(m2[2]);
+        mn2=mn2>=30?30:0;
+        var slotKey2=String(hr2).padStart(2,'0')+':'+String(mn2).padStart(2,'0');
+        allTimes.add(slotKey2);
+        slotGrid[slotKey2+'_'+day]=(slotGrid[slotKey2+'_'+day]||0)+1;
+      });
+    }
   });
   // Also add slots from customPeriods
   customPeriods.forEach(function(cp){
