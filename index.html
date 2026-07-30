@@ -732,14 +732,18 @@ var _menuStruct=[
   {id:'admin',label:'관리자'},
   {id:'settings',label:'설정'}]}];
 function applyMenuPerms(){
-  if(!currentUser||currentUser.role==='admin')return;
+  if(!currentUser||currentUser.role==='admin'||currentUser.role==='owner'||currentUser.role==='원장')return;
   var matchedUser=users.find(function(u){return u.loginId===currentUser.loginId;})||users.find(function(u){return u.id===currentUser.docId;});
   if(matchedUser&&matchedUser.menuPerms)currentUser.menuPerms=matchedUser.menuPerms;
   var perms=currentUser.menuPerms||{};
-  // Hide/show sidebar items — hidden by default, show only if perms[id]===true
+  // 권한이 전혀 설정 안 된 경우(빈 객체) 모두 표시
+  if(Object.keys(perms).length===0)return;
+  // Hide/show sidebar items — false로 명시된 것만 숨김
+  // reference, admin, settings는 항상 표시 (시스템 메뉴)
+  var alwaysShow=['reference','admin','settings','board'];
   _menuStruct.forEach(function(sec){sec.items.forEach(function(m){
     var el=document.getElementById('snav-'+m.id);
-    if(el)el.style.display=perms[m.id]===false?'none':'';
+    if(el)el.style.display=(perms[m.id]===false&&alwaysShow.indexOf(m.id)===-1)?'none':'';
   });});
   // Hide/show sub-tabs
   var tabMap={
