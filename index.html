@@ -732,35 +732,18 @@ var _menuStruct=[
   {id:'admin',label:'관리자'},
   {id:'settings',label:'설정'}]}];
 function applyMenuPerms(){
-  if(!currentUser||currentUser.role==='admin'||currentUser.role==='owner'||currentUser.role==='원장')return;
-  var matchedUser=users.find(function(u){return u.loginId===currentUser.loginId;})||users.find(function(u){return u.id===currentUser.docId;});
-  if(matchedUser&&matchedUser.menuPerms)currentUser.menuPerms=matchedUser.menuPerms;
-  var perms=currentUser.menuPerms||{};
-  // 권한이 전혀 설정 안 된 경우(빈 객체) 모두 표시
-  if(Object.keys(perms).length===0)return;
-  // Hide/show sidebar items — false로 명시된 것만 숨김
-  // reference, admin, settings는 항상 표시 (시스템 메뉴)
-  var alwaysShow=['reference','admin','settings','board'];
-  _menuStruct.forEach(function(sec){sec.items.forEach(function(m){
-    var el=document.getElementById('snav-'+m.id);
-    if(el)el.style.display=(perms[m.id]===false&&alwaysShow.indexOf(m.id)===-1)?'none':'';
-  });});
-  // Hide/show sub-tabs
-  var tabMap={
-    'goals_annual':'gtab-annual','goals_monthly':'gtab-monthly','goals_memo':'gtab-memo',
-    'op_flyer':'optab-flyer','op_poster':'optab-poster','op_banner':'optab-banner','op_briefing':'optab-briefing','op_trial':'optab-trial',
-    'mk_calendar':'mktab-calendar','mk_stats':'mktab-stats','mk_funnel':'mktab-funnel','mk_events':'mktab-events','mk_promo':'mktab-promo',
-    'sum_overview':'stab-summary','sum_revenue':'stab-monthly','sum_expense':'stab-expense','sum_teacher':'stab-staff','sum_tax':'stab-tax',
-    'sch_today':'schtab-today','sch_weekly':'schtab-weekly','sch_capacity':'schtab-capacity','sch_notes':'schtab-notes',
-    'pf_newcon':'pftab-newcon','pf_style':'pftab-style','pf_lsreport':'pftab-lsreport','pf_report':'pftab-report','pf_consult':'pftab-consult','pf_ai':'pftab-ai',
-    'con_history':'ctab-history','con_new':'ctab-new','con_manual':'ctab-manual',
-    'ref_fees':'reftab-fees','ref_curriculum':'reftab-curriculum','ref_eval':'reftab-eval','ref_classes':'reftab-classes',
-    'wm_weekly':'wmtab-weekly','wm_quality':'wmtab-quality','wm_annual':'wmtab-annual','wm_guide':'wmtab-guide'
-  };
-  Object.keys(tabMap).forEach(function(k){
-    var tel=document.getElementById(tabMap[k]);
-    if(tel)tel.style.display=perms[k]===false?'none':'';
-  });
+  // 모든 사이드바 항목과 탭을 표시 (권한 시스템 비활성화)
+  document.querySelectorAll('.sb-item').forEach(function(el){el.style.display='';});
+  var tabIds=['gtab-annual','gtab-monthly','gtab-memo',
+    'optab-flyer','optab-poster','optab-banner','optab-briefing','optab-trial',
+    'mktab-calendar','mktab-stats','mktab-funnel','mktab-events','mktab-promo',
+    'stab-summary','stab-monthly','stab-expense','stab-staff','stab-tax',
+    'schtab-today','schtab-weekly','schtab-capacity','schtab-notes',
+    'pftab-newcon','pftab-style','pftab-lsreport','pftab-report','pftab-consult','pftab-ai',
+    'ctab-history','ctab-new','ctab-manual',
+    'reftab-fees','reftab-curriculum','reftab-eval','reftab-classes',
+    'wmtab-weekly','wmtab-quality','wmtab-annual','wmtab-guide'];
+  tabIds.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='';});
 }
 async function bootApp(){
   $('sb-username').textContent=currentUser.name;
