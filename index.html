@@ -7981,28 +7981,55 @@ function _renderFocusSection(type,title,color,icon){
   var items=_focusTasks[type]||[];
   var done=items.filter(function(t){return t.done;}).length;
   var inputId='focus-'+type+'-input';
-  var html='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
-  html+='<div style="background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px">';
-  html+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+icon+' '+title+'</span>';
-  if(items.length)html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료</span>';
-  html+='</div>';
-  html+='<div style="padding:8px 14px;background:var(--surface)">';
-  html+='<div style="display:flex;gap:6px;margin-bottom:8px">';
-  html+='<input class="fi" id="'+inputId+'" placeholder="내용 입력 후 Enter" style="flex:1;font-size:12px;padding:5px 8px" onkeydown="if(event.key===\'Enter\')addFocusTask(\''+type+'\')">';
-  html+='<button class="btn btn-navy btn-xs" onclick="addFocusTask(\''+type+'\')" >추가</button>';
-  html+='</div>';
+  var wrap=document.createElement('div');
+  wrap.setAttribute('style','border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px');
+  var hdr=document.createElement('div');
+  hdr.setAttribute('style','background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px');
+  var hdrTitle=document.createElement('span');
+  hdrTitle.setAttribute('style','font-size:13px;font-weight:800;color:var(--navy)');
+  hdrTitle.textContent=icon+' '+title;
+  hdr.appendChild(hdrTitle);
+  if(items.length){var cnt=document.createElement('span');cnt.setAttribute('style','margin-left:auto;font-size:11px;color:var(--txt3)');cnt.textContent=done+'/'+items.length+' 완료';hdr.appendChild(cnt);}
+  wrap.appendChild(hdr);
+  var body=document.createElement('div');
+  body.setAttribute('style','padding:8px 14px;background:var(--surface)');
+  var row=document.createElement('div');
+  row.setAttribute('style','display:flex;gap:6px;margin-bottom:8px');
+  var inp=document.createElement('input');
+  inp.className='fi';inp.id=inputId;inp.placeholder='내용 입력 후 Enter';
+  inp.setAttribute('style','flex:1;font-size:12px;padding:5px 8px');
+  (function(t){inp.addEventListener('keydown',function(e){if(e.key==='Enter')addFocusTask(t);});})(type);
+  var addBtn=document.createElement('button');
+  addBtn.className='btn btn-navy btn-xs';addBtn.textContent='추가';
+  (function(t){addBtn.addEventListener('click',function(){addFocusTask(t);});})(type);
+  row.appendChild(inp);row.appendChild(addBtn);body.appendChild(row);
   if(items.length){
     items.forEach(function(t){
-      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">';
-      html+='<span style="cursor:grab;color:var(--txt3);font-size:14px">⠿</span>';
-      html+='<input type="checkbox" '+(t.done?'checked':'')+' onchange="toggleFocusTask(\''+type+'\',\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">';
-      html+='<span style="flex:1;font-size:12px;'+(t.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.text+'</span>';
-      html+='<button onclick="deleteFocusTask(\''+type+'\',\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;padding:0 2px">×</button>';
-      html+='</div>';
+      var ir=document.createElement('div');
+      ir.setAttribute('style','display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)');
+      var grip=document.createElement('span');
+      grip.setAttribute('style','cursor:grab;color:var(--txt3);font-size:14px');grip.textContent='⠿';
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!t.done;
+      cb.setAttribute('style','width:15px;height:15px;flex-shrink:0;cursor:pointer');
+      (function(tp,id){cb.addEventListener('change',function(){toggleFocusTask(tp,id);});})(type,t.id);
+      var lbl=document.createElement('span');
+      lbl.setAttribute('style','flex:1;font-size:12px;'+(t.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)'));
+      lbl.textContent=t.text;
+      var del=document.createElement('button');
+      del.setAttribute('style','background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;padding:0 2px');
+      del.textContent='×';
+      (function(tp,id){del.addEventListener('click',function(){deleteFocusTask(tp,id);});})(type,t.id);
+      ir.appendChild(grip);ir.appendChild(cb);ir.appendChild(lbl);ir.appendChild(del);
+      body.appendChild(ir);
     });
   }else{
-    html+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">등록된 항목이 없습니다</div>';
+    var empty=document.createElement('div');
+    empty.setAttribute('style','text-align:center;padding:10px;color:var(--txt3);font-size:12px');
+    empty.textContent='등록된 항목이 없습니다';body.appendChild(empty);
   }
+  wrap.appendChild(body);
+  return wrap.outerHTML;
+}
   html+='</div></div>';
   return html;
 }
