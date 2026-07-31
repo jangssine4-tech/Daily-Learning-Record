@@ -4902,10 +4902,11 @@ function renderMakeupCalendar(){
 }
 function openMakeupModal(id){var m=makeups.find(function(x){return x.id===id;});if(!m)return;
   // Close any open day view modal first
-  document.querySelectorAll('.mo').forEach(function(el){if(el.id!=='modal-makeup'&&!el.closest('#modal-makeup')&&el.querySelector('.mt')&&(el.querySelector('.mt').textContent.indexOf('보강 현황')>=0||el.querySelector('.mt').textContent.indexOf('보강 등록')>=0))el.remove();});
+  document.querySelectorAll('.mo').forEach(function(el){if(el.id==='modal-makeup')return;if(el.querySelector('.mt')&&(el.querySelector('.mt').textContent.indexOf('보강 현황')>=0||el.querySelector('.mt').textContent.indexOf('보강 등록')>=0))el.remove();});
   $('mk-id').value=id;$('mk-mode').value='edit';
   var mkSR=$('mk-student-row');if(mkSR)mkSR.style.display='none';
   var mkInfo=$('mk-info');if(mkInfo)mkInfo.style.display='';
+  var _mkModal2=$('modal-makeup');if(_mkModal2&&!document.body.contains(_mkModal2))document.body.appendChild(_mkModal2);
   var _mkInfoEl=$('mk-info');if(_mkInfoEl){var _mkName=$('mk-info-name');var _mkDate=$('mk-info-date');if(_mkName)_mkName.textContent=m.studentName;if(_mkDate)_mkDate.textContent='결석일 '+m.absentDate;}$('mk-status').value=m.makeupStatus||'pending';$('mk-date').value=m.makeupDate||'';$('mk-time').value=m.makeupTime||'';populateMkPeriod(m.makeupPeriod||0);$('mk-note').value=m.makeupNote||'';$('mk-content').value=m.makeupContent||'';$('modal-makeup').style.display='flex';}
 function openNewMakeupModal(dateStr,dayOverlay){
   // 학생 선택 드롭다운 채우기
@@ -4927,10 +4928,12 @@ function openNewMakeupModal(dateStr,dayOverlay){
   var timeEl=$('mk-time');if(timeEl)timeEl.value='';populateMkPeriod(0);
   var noteEl=$('mk-note');if(noteEl)noteEl.value='';
   var contentEl=$('mk-content');if(contentEl)contentEl.value='';
-  // 보강 등록 모달 먼저 열기
-  $('modal-makeup').style.display='flex';
+  // 보강 등록 모달 먼저 열기 (DOM에서 없어진 경우 body에 다시 추가)
+  var _mkModal=$('modal-makeup');
+  if(_mkModal&&!document.body.contains(_mkModal))document.body.appendChild(_mkModal);
+  if(_mkModal)_mkModal.style.display='flex';
   // 날짜 모달은 다음 틱에 제거 (모달 열기와 충돌 방지)
-  if(dayOverlay)setTimeout(function(){dayOverlay.remove();},0);
+  if(dayOverlay)setTimeout(function(){if(document.body.contains(dayOverlay))dayOverlay.remove();},0);
 }
 
 async function saveMakeup(){
@@ -5003,7 +5006,7 @@ async function deleteMakeupEntry(){
 function openMakeupStatusModal(id){
   var m=makeups.find(function(x){return x.id===id;});if(!m)return;
   // Close day view modal
-  document.querySelectorAll('.mo').forEach(function(el){if(el.querySelector('.mt')&&(el.querySelector('.mt').textContent.indexOf('보강 현황')>=0||el.querySelector('.mt').textContent.indexOf('보강 등록')>=0))el.remove();});
+  document.querySelectorAll('.mo').forEach(function(el){if(el.id==='modal-makeup')return;if(el.querySelector('.mt')&&(el.querySelector('.mt').textContent.indexOf('보강 현황')>=0||el.querySelector('.mt').textContent.indexOf('보강 등록')>=0))el.remove();});
   var statusVal=m.makeupResult||'';
   var html='<div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div class="mt">보강 현황</div>'
     +'<div style="padding:10px 12px;background:var(--surface2);border-radius:8px;margin-bottom:12px">'
@@ -5034,7 +5037,7 @@ async function saveMakeupStatus(id){
   var idx=makeups.findIndex(function(m){return m.id===id;});
   if(idx>=0)Object.assign(makeups[idx],updateData);
   renderMakeupCalendar();renderSchedule();
-  document.querySelectorAll('.mo').forEach(function(el){if(el.id!=='modal-makeup')el.remove();});
+  document.querySelectorAll('.mo').forEach(function(el){if(el.id==='modal-makeup')return;el.remove();});
   loading(false);saveCacheDebounced();toast('✅ 보강 현황 저장됨');
 }
 
