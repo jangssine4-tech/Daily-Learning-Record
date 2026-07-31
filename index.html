@@ -4872,13 +4872,19 @@ function renderMakeupCalendar(){
         monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':m.makeupStatus==='scheduled'?'scheduled':'';chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'+m.studentName+'</div>';});
         makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':'scheduled';chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupStatusModal(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+(m.makeupTime?' '+fmt12h(m.makeupTime):'')+'</div>';});
       }
-      var _cellClick=cellDate?'onclick="openMakeupDayView(\''+dateStr+'\')" style="cursor:pointer"':'';
-      html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px" '+_cellClick+'>'+dateLbl+chips+'</div>';
+      var _cellAttr=cellDate?'data-date="'+dateStr+'" style="cursor:pointer"':'';
+      html+='<div class="makeup-cal-cell" style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px" '+_cellAttr+'>'+dateLbl+chips+'</div>';
       if(col<6&&date>lastDate){for(var rr=col+1;rr<7;rr++)html+='<div style="background:var(--surface);border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-height:65px"></div>';break;}
     }
     weekNum++;if(date>lastDate)break;
   }
   html+='</div>';$('makeup-calendar').innerHTML=html;
+  $('makeup-calendar').onclick=function(e){
+    var chip=e.target.closest('.makeup-chip');
+    if(chip)return; // 칩 클릭은 칩 자체 onclick이 처리
+    var cell=e.target.closest('.makeup-cal-cell');
+    if(cell&&cell.dataset.date)openMakeupDayView(cell.dataset.date);
+  };
 }
 function openMakeupModal(id){var m=makeups.find(function(x){return x.id===id;});if(!m)return;
   // Close any open day view modal first
