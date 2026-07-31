@@ -4255,7 +4255,7 @@ function onReportLevelChange(){
   var s=students.find(function(x){return x.id===sId;});
   if(s){$('write-student-info').textContent=s.name+' · '+newLevel+' · '+(s.grade||'');}
   var foundModule=getEvalModuleForLevel(newLevel);
-  if(foundModule)renderEvalArea(foundModule,{});
+  if(foundModule)renderEvalArea(foundModule,window._evalState||{});
   else{var area=$('eval-area');if(area)area.innerHTML='';}
 }
 function renderEvalArea(moduleId,savedItems){
@@ -4872,7 +4872,8 @@ function renderMakeupCalendar(){
         monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':m.makeupStatus==='scheduled'?'scheduled':'';chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'+m.studentName+'</div>';});
         makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;var cls3=m.makeupStatus==='done'?'done':'scheduled';chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupStatusModal(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+(m.makeupTime?' '+fmt12h(m.makeupTime):'')+'</div>';});
       }
-      html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px;cursor:pointer" onclick="openMakeupDayView(\''+dateStr+'\')">'+dateLbl+chips+'</div>';
+      var _cellClick=cellDate?'onclick="openMakeupDayView(\''+dateStr+'\')" style="cursor:pointer"':'';
+      html+='<div style="background:'+(isSun2?'#fff8f8':isSat2?'#f8f9ff':'var(--surface)')+';border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px;min-height:65px" '+_cellClick+'>'+dateLbl+chips+'</div>';
       if(col<6&&date>lastDate){for(var rr=col+1;rr<7;rr++)html+='<div style="background:var(--surface);border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-height:65px"></div>';break;}
     }
     weekNum++;if(date>lastDate)break;
@@ -5039,9 +5040,9 @@ function openMakeupDayView(dateStr){
   if(absentHere.length){
     html+='<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">📋 보강 등록 건</div>';
     html+=absentHere.map(function(m){
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'
         +'<span style="font-size:13px;font-weight:600">'+m.studentName+'</span>'
-        +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupModal(\''+m.id+'\')">'+statusLabels[m.makeupStatus||'pending']+'</span>'
+        +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'">'+statusLabels[m.makeupStatus||'pending']+'</span>'
         +'</div>';
     }).join('');
   }
@@ -5050,9 +5051,9 @@ function openMakeupDayView(dateStr){
   if(schedHere.length){
     html+='<div style="font-size:13px;font-weight:700;color:var(--blue);margin:12px 0 6px">🔄 이 날 보강 예정</div>';
     html+=schedHere.map(function(m){
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="event.stopPropagation();openMakeupStatusModal(\''+m.id+'\')">' 
         +'<span style="font-size:13px">'+m.studentName+' <span style="font-size:10px;color:var(--txt3)">(결석: '+m.absentDate+')</span></span>'
-        +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'" style="cursor:pointer" onclick="event.stopPropagation();openMakeupStatusModal(\''+m.id+'\')">'+fmt12h(m.makeupTime||'')+' '+statusLabels[m.makeupStatus||'pending']+'</span>'
+        +'<span class="badge '+(statusColors[m.makeupStatus]||'bg-gray')+'">'+fmt12h(m.makeupTime||'')+' '+statusLabels[m.makeupStatus||'pending']+'</span>'
         +'</div>';
     }).join('');
   }
