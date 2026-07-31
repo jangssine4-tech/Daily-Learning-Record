@@ -337,14 +337,14 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </div>
 <div class="view" id="view-dashboard">
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
-    
+    <button class="rev-tab active" id="dtab-board" onclick="switchDashTab('board')">📋 오늘의 업무</button>
     <button class="rev-tab" id="dtab-crm" onclick="switchDashTab('crm')">👥 상담</button>
     <button class="rev-tab" id="dtab-mk" onclick="switchDashTab('mk')">📣 마케팅 · 홍보</button>
     <button class="rev-tab" id="dtab-calendar" onclick="switchDashTab('calendar')">📆 연간 학사일정</button>
     <button class="rev-tab" id="dtab-conditions" onclick="switchDashTab('conditions')">⚙️ 자동 분류 조건</button>
   </div>
-  <div id="dash-panel-board" style="" class="cp"><div id="dashboard-board-area"></div></div>
-  <div id="dash-panel-crm" class="cp">
+  <div id="dash-panel-board" class="cp"><div id="dashboard-board-area"></div></div>
+  <div id="dash-panel-crm" style="display:none" class="cp">
     <div style="display:flex;align-items:center;gap:8px;padding:8px 0;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--txt3)">날짜</span>
       <select class="fi" style="width:90px;font-size:12px;padding:3px 6px" id="crm-sel-yr" onchange="refreshCrmDate()"></select>
@@ -2572,7 +2572,7 @@ function switchDashTab(tab){
   else if(tab==='calendar'){renderAcademicCalendar();}
   else if(tab==='conditions'){loadCrmConditions().then(function(){_renderCrmConditionsUI($('crm-conditions-area'));});}
 }
-function renderDashboard(){switchDashTab('crm');}
+function renderDashboard(){switchDashTab('board');}
 function renderCrmDaily(){
   renderCrmDailyInto('crm-daily-area');
 }
@@ -7864,6 +7864,7 @@ function saveDashBoard(){
 function renderDashBoard(){
   var el=$('dashboard-board-area');if(!el)return;
   el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+  loadFocusTasks();
   loadDashBoard().then(function(){
     try{_renderDashBoardUI(el);}
     catch(e){
@@ -7919,7 +7920,11 @@ function _renderDashBoardUI(el){
   html+='<button class="btn btn-navy btn-sm" style="margin-left:auto" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
   html+='</div>';
 
-  if(_dbView==='today') html+=_renderDbTodayView(autoTasks,today,now);
+  if(_dbView==='today'){
+    html+=_renderFocusSection('monthly','이달의 중점 추진 사항','#f0f9ff','🎯');
+    html+=_renderFocusSection('weekly','이번 주 중점 추진 사항','#f5f3ff','📅');
+    html+=_renderDbTodayView(autoTasks,today,now);
+  }
   else if(_dbView==='week') html+=_renderDbWeekView(now);
   else html+=_renderDbAreaView();
 
@@ -7937,6 +7942,69 @@ function _dbFiltered(tasks){
     if(_dbPriorityFilter&&t.priority!==_dbPriorityFilter)return false;
     return true;
   });
+}
+
+// ── 중점 추진사항 데이터 ──────────────────────────
+var _focusTasks={monthly:[],weekly:[]};
+var _focusLoaded=false;
+
+function loadFocusTasks(){
+  if(_focusLoaded)return Promise.resolve();
+  return db.collection('config').doc('focusTasks').get().then(function(d){
+    if(d.exists){
+      _focusTasks.monthly=d.data().monthly||[];
+      _focusTasks.weekly=d.data().weekly||[];
+    }
+    _focusLoaded=true;
+  }).catch(function(){_focusLoaded=true;});
+}
+function saveFocusTasks(){
+  db.collection('config').doc('focusTasks').set(_focusTasks,{merge:false}).catch(function(){});
+}
+function addFocusTask(type){
+  var inp=$(type==='monthly'?'focus-monthly-input':'focus-weekly-input');
+  if(!inp||!inp.value.trim())return;
+  _focusTasks[type].push({id:'ft_'+Date.now(),text:inp.value.trim(),done:false});
+  inp.value='';
+  saveFocusTasks();
+  _renderDashBoardUI($('dashboard-board-area'));
+}
+function toggleFocusTask(type,id){
+  var t=_focusTasks[type].find(function(x){return x.id===id;});
+  if(t){t.done=!t.done;saveFocusTasks();_renderDashBoardUI($('dashboard-board-area'));}
+}
+function deleteFocusTask(type,id){
+  _focusTasks[type]=_focusTasks[type].filter(function(x){return x.id!==id;});
+  saveFocusTasks();_renderDashBoardUI($('dashboard-board-area'));
+}
+function _renderFocusSection(type,title,color,icon){
+  var items=_focusTasks[type]||[];
+  var done=items.filter(function(t){return t.done;}).length;
+  var inputId='focus-'+type+'-input';
+  var html='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
+  html+='<div style="background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px">';
+  html+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+icon+' '+title+'</span>';
+  if(items.length)html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료</span>';
+  html+='</div>';
+  html+='<div style="padding:8px 14px;background:var(--surface)">';
+  html+='<div style="display:flex;gap:6px;margin-bottom:8px">';
+  html+='<input class="fi" id="'+inputId+'" placeholder="내용 입력 후 Enter" style="flex:1;font-size:12px;padding:5px 8px" onkeydown="if(event.key==='Enter')addFocusTask(''+type+'')">';
+  html+='<button class="btn btn-navy btn-xs" onclick="addFocusTask(''+type+'')">추가</button>';
+  html+='</div>';
+  if(items.length){
+    items.forEach(function(t){
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">';
+      html+='<span style="cursor:grab;color:var(--txt3);font-size:14px">⠿</span>';
+      html+='<input type="checkbox" '+(t.done?'checked':'')+' onchange="toggleFocusTask(''+type+'',''+t.id+'')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">';
+      html+='<span style="flex:1;font-size:12px;'+(t.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.text+'</span>';
+      html+='<button onclick="deleteFocusTask(''+type+'',''+t.id+'')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;padding:0 2px">×</button>';
+      html+='</div>';
+    });
+  }else{
+    html+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">등록된 항목이 없습니다</div>';
+  }
+  html+='</div></div>';
+  return html;
 }
 
 // ── 오늘 뷰 ──────────────────────────────────────
