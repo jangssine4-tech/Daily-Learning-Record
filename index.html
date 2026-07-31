@@ -4072,10 +4072,12 @@ function startReport(studentId,makeupId,sessionTime){
   if(makeupId){rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&r.makeupId===makeupId;});}
   else{var _sTime=sessionTime||'';rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&!r.makeupId&&(r.sessionTime||'')==_sTime;});}
   $('r-student-id').value=studentId;
-  $('write-student-info').textContent=s.name+' · '+getStudentLevel(s)+' · '+(s.grade||'')+(makeupId?' · 🔴 보강':'');
+  var _dispLevel=window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s);
+  $('write-student-info').textContent=s.name+' · '+_dispLevel+' · '+(s.grade||'')+(makeupId?' · 🔴 보강':'');
   $('r-date').value=_scheduleDate||todayISO();
   var lvSel=$('r-level');
-  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===getStudentLevel(s)?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(getStudentLevel(s),rep?.progress||'');}updateDictationDropdown(getStudentLevel(s),rep?.dictation||'');
+  var _initLvForModal=rep?rep.level:(window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s));
+  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===_initLvForModal?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(_initLvForModal,rep?.progress||'');}updateDictationDropdown(_initLvForModal,rep?.dictation||'');
   // Check for temp saved data
   var tempKey='tempReport_'+studentId+'_'+((_scheduleDate||todayISO()))+(makeupId?'_mk'+makeupId:'')+(sessionTime?'_t'+sessionTime.replace(':',''):'');
   var tempData=null;
@@ -4103,7 +4105,7 @@ function startReport(studentId,makeupId,sessionTime){
     if(ind)ind.style.display='none';
     if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';_setAttitudeFields(rep.attitude||'');$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';var _hw1=splitHw(rep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw1.video;if($('r-hw-book'))$('r-hw-book').value=_hw1.book;$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-parent-contact'))$('r-parent-contact').checked=rep.parentContact||false;if($('r-exam-date'))$('r-exam-date').value=rep.examDate||'';if($('r-exam-type'))$('r-exam-type').value=rep.examType||'';if(rep.dictation){var _dm2=rep.dictation.match(/^(\d+)\/(\d+)/);if(_dm2){if($('r-dictation-correct'))$('r-dictation-correct').value=_dm2[1];if($('r-dictation-total'))$('r-dictation-total').value=_dm2[2];}$('r-dictation').value=rep.dictation;}else{if($('r-dictation-correct'))$('r-dictation-correct').value='';if($('r-dictation-total'))$('r-dictation-total').value='';$('r-dictation').value='';}}
     else{_lastLoadedReportTs='';['r-review-yn','r-review','r-attitude-level','r-hw','r-hw-video','r-hw-book','r-dictation-correct','r-dictation-total'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-attitude').style.display='none';$('r-attitude').value='';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';if($('r-parent-contact'))$('r-parent-contact').checked=false;}
-    var levelModule=getEvalModuleForLevel(getStudentLevel(s));
+    var levelModule=getEvalModuleForLevel(_initLvForModal);
     if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
   }
