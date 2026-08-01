@@ -643,7 +643,7 @@ var _dbAreaFilter='';
 var _dbStatusFilter='';
 var _dbPriorityFilter='';
 var _DB_AREAS=['수업 관리','학생 관리','학부모 소통','홍보','경영 관리','시스템'];
-var _DB_CYCLES=['매일','매주','매월','비정기'];
+var _DB_CYCLES=['반복없음','매일','매주','매월','매년'];
 var _dbEditId=null;
 var _DB_AREA_ICONS={'수업 관리':'📚','학생 관리':'👨‍🎓','학부모 소통':'👨‍👩‍👧','홍보':'📣','경영 관리':'📊','시스템':'⚙️'};
 var _DB_PRIORITIES=['긴급','중요','일반'];
@@ -8297,12 +8297,93 @@ function _dbToggleAutoTask(date,label,checked){
 }
 
 // ── 업무 추가/편집 모달 ───────────────────────────
-function openDbTaskModal(id,defaultArea){  var t=id?(_dbTasks||[]).find(function(x){return x.id===id;}):null;  _dbEditId=id||null;  var today=todayISO();  var old=document.getElementById('db-task-modal');if(old)old.remove();  var modal=document.createElement('div');  modal.id='db-task-modal';  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';  modal.onclick=function(e){if(e.target===modal)modal.remove();};  var box=document.createElement('div');  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto';  // 헤더  var hdr=document.createElement('div');  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px';  var ttl=document.createElement('div');ttl.style.cssText='font-size:15px;font-weight:800;color:var(--navy)';  ttl.textContent=id?'✏️ 업무 편집':'+ 업무 추가';  var xBtn=document.createElement('button');xBtn.style.cssText='background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)';  xBtn.textContent='✕';xBtn.onclick=function(){modal.remove();};  hdr.appendChild(ttl);hdr.appendChild(xBtn);box.appendChild(hdr);  function mkLbl(txt){var l=document.createElement('div');l.style.cssText='font-size:11px;color:var(--txt3);margin-bottom:4px';l.textContent=txt;return l;}  function mkWrap(mb){var w=document.createElement('div');w.style.marginBottom=(mb||10)+'px';return w;}  function mkSel(elId,opts,selected){    var s=document.createElement('select');s.className='fi';s.id=elId;s.style.fontSize='12px';    opts.forEach(function(o){var op=document.createElement('option');op.value=o.v;op.textContent=o.l;if(o.v===selected)op.selected=true;s.appendChild(op);});    return s;  }  // 업무명  var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';  nameInp.placeholder='업무 내용을 입력하세요';nameInp.style.fontSize='13px';nameInp.value=t?t.name:'';  var nw=mkWrap();nw.appendChild(mkLbl('업무명 *'));nw.appendChild(nameInp);box.appendChild(nw);  // 업무 영역  var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));  var aw=mkWrap();aw.appendChild(mkLbl('업무 영역 *'));aw.appendChild(areaSel);box.appendChild(aw);  // 2열: 완료기한 + 우선순위  var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';  var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';dueInp.value=t&&t.dueDate?t.dueDate:today;  var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');  var dw=document.createElement('div');dw.appendChild(mkLbl('완료 기한'));dw.appendChild(dueInp);  var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);  r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);  // 상세 설정 토글  var hasDetail=!!(t&&(t.status||t.cycle||t.notify||t.linkedStudent||t.parentTask));  var detBtn=document.createElement('button');  detBtn.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px';  var arrow=document.createElement('span');arrow.id='dbt-arrow';arrow.textContent=hasDetail?'▲':'▼';  var detLbl=document.createElement('span');detLbl.textContent='⚙️ 상세 설정';  detBtn.appendChild(detLbl);detBtn.appendChild(arrow);  var detPanel=document.createElement('div');  detPanel.style.cssText='display:'+(hasDetail?'block':'none')+';background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px';  detBtn.onclick=function(){    var open=detPanel.style.display!=='none';    detPanel.style.display=open?'none':'block';    arrow.textContent=open?'▼':'▲';  };  // 상세: 진행상태 + 반복설정  var r2=document.createElement('div');r2.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';  var stSel=mkSel('dbt-status',_DB_STATUSES.map(function(s){return{v:s,l:s};}),t?t.status:'대기');  var cySel=mkSel('dbt-cycle',_DB_CYCLES.map(function(c){return{v:c,l:c};}),t?t.cycle:'비정기');  var sw=document.createElement('div');sw.appendChild(mkLbl('진행 상태'));sw.appendChild(stSel);  var cw=document.createElement('div');cw.appendChild(mkLbl('반복 설정'));cw.appendChild(cySel);  r2.appendChild(sw);r2.appendChild(cw);detPanel.appendChild(r2);  // 상세: 연결 대상  var lkSel=document.createElement('select');lkSel.className='fi';lkSel.id='dbt-linked-student';lkSel.style.fontSize='12px';  var lkNone=document.createElement('option');lkNone.value='';lkNone.textContent='없음';lkSel.appendChild(lkNone);  (students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';}).forEach(function(s){    var op=document.createElement('option');op.value=s.id;op.textContent=s.name+(s.grade?' ('+s.grade+')':'');    if(t&&t.linkedStudent===s.id)op.selected=true;lkSel.appendChild(op);  });  var lkw=mkWrap();lkw.appendChild(mkLbl('연결 대상 (학생)'));lkw.appendChild(lkSel);detPanel.appendChild(lkw);  // 상세: 상위 업무  var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';  var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);  (_dbTasks||[]).filter(function(x){return x.id!==id;}).forEach(function(x){    var op=document.createElement('option');op.value=x.id;op.textContent=x.name.substring(0,30);    if(t&&t.parentTask===x.id)op.selected=true;ptSel.appendChild(op);  });  var ptw=mkWrap();ptw.appendChild(mkLbl('상위 업무'));ptw.appendChild(ptSel);detPanel.appendChild(ptw);  // 상세: 알림  var ntInp=document.createElement('input');ntInp.className='fi';ntInp.id='dbt-notify';ntInp.type='date';ntInp.style.fontSize='12px';  ntInp.value=t&&t.notify?t.notify:'';  var ntw=mkWrap();ntw.appendChild(mkLbl('알림 날짜'));ntw.appendChild(ntInp);detPanel.appendChild(ntw);  // 상세: 메모  var moTa=document.createElement('textarea');moTa.className='fi';moTa.id='dbt-memo';moTa.rows=2;  moTa.style.cssText='font-size:12px;resize:none';moTa.placeholder='추가 메모';moTa.value=t&&t.memo?t.memo:'';  var mow=mkWrap(0);mow.appendChild(mkLbl('메모'));mow.appendChild(moTa);detPanel.appendChild(mow);  box.appendChild(detBtn);box.appendChild(detPanel);  // 버튼  var br=document.createElement('div');br.style.cssText='display:flex;gap:8px;margin-top:4px';  if(id){    var delB=document.createElement('button');delB.className='btn btn-red btn-sm';delB.textContent='삭제';    (function(tid){delB.onclick=function(){_dbDeleteTask(tid);modal.remove();};})(id);    br.appendChild(delB);  }  var canB=document.createElement('button');canB.className='btn btn-outline btn-sm';canB.textContent='취소';  canB.style.marginLeft='auto';canB.onclick=function(){modal.remove();};  var savB=document.createElement('button');savB.className='btn btn-navy btn-sm';savB.textContent='저장';  (function(tid){savB.onclick=function(){_dbSaveTaskModal(tid);};})(id);  br.appendChild(canB);br.appendChild(savB);box.appendChild(br);  modal.appendChild(box);document.body.appendChild(modal);nameInp.focus();}
-
+function openDbTaskModal(id,defaultArea){
+  var t=id?(_dbTasks||[]).find(function(x){return x.id===id;}):null;
+  _dbEditId=id||null;
+  var today=todayISO();
+  var old=document.getElementById('db-task-modal');if(old)old.remove();
+  var modal=document.createElement('div');
+  modal.id='db-task-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px';
+  var ttl=document.createElement('div');ttl.style.cssText='font-size:15px;font-weight:800;color:var(--navy)';
+  ttl.textContent=id?'✏️ 업무 편집':'+ 업무 추가';
+  var xBtn=document.createElement('button');xBtn.style.cssText='background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)';
+  xBtn.textContent='✕';xBtn.onclick=function(){modal.remove();};
+  hdr.appendChild(ttl);hdr.appendChild(xBtn);box.appendChild(hdr);
+  function mkLbl(txt){var l=document.createElement('div');l.style.cssText='font-size:11px;color:var(--txt3);margin-bottom:4px';l.textContent=txt;return l;}
+  function mkSel(elId,opts,selected){
+    var s=document.createElement('select');s.className='fi';s.id=elId;s.style.fontSize='12px';
+    opts.forEach(function(o){var op=document.createElement('option');op.value=o.v;op.textContent=o.l;if(o.v===selected)op.selected=true;s.appendChild(op);});
+    return s;
+  }
+  var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';
+  nameInp.placeholder='업무 내용을 입력하세요';nameInp.style.fontSize='13px';nameInp.value=t?t.name:'';
+  var nw=document.createElement('div');nw.style.marginBottom='10px';nw.appendChild(mkLbl('업무명 *'));nw.appendChild(nameInp);box.appendChild(nw);
+  var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
+  var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역 *'));aw.appendChild(areaSel);box.appendChild(aw);
+  var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
+  var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';dueInp.value=t&&t.dueDate?t.dueDate:today;
+  var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');
+  var dw=document.createElement('div');dw.appendChild(mkLbl('완료 기한'));dw.appendChild(dueInp);
+  var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
+  r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
+  var hasDetail=!!(t&&(t.status||t.cycle||t.notify||t.linkedStudent||t.parentTask));
+  var detBtn=document.createElement('button');
+  detBtn.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px';
+  var arrow=document.createElement('span');arrow.id='dbt-arrow';arrow.textContent=hasDetail?'▲':'▼';
+  var detLbl=document.createElement('span');detLbl.textContent='⚙️ 상세 설정';
+  detBtn.appendChild(detLbl);detBtn.appendChild(arrow);
+  var detPanel=document.createElement('div');
+  detPanel.style.cssText='display:'+(hasDetail?'block':'none')+';background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px';
+  detBtn.onclick=function(){var open=detPanel.style.display!=='none';detPanel.style.display=open?'none':'block';arrow.textContent=open?'▼':'▲';};
+  var r2=document.createElement('div');r2.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
+  var stSel=mkSel('dbt-status',_DB_STATUSES.map(function(s){return{v:s,l:s};}),t?t.status:'대기');
+  var cySel=mkSel('dbt-cycle',_DB_CYCLES.map(function(c){return{v:c,l:c};}),t?t.cycle:'반복없음');
+  var sw=document.createElement('div');sw.appendChild(mkLbl('진행 상태'));sw.appendChild(stSel);
+  var cw=document.createElement('div');cw.appendChild(mkLbl('반복 설정'));cw.appendChild(cySel);
+  r2.appendChild(sw);r2.appendChild(cw);detPanel.appendChild(r2);
+  var lkSel=document.createElement('select');lkSel.className='fi';lkSel.id='dbt-linked-student';lkSel.style.fontSize='12px';
+  var lkNone=document.createElement('option');lkNone.value='';lkNone.textContent='없음';lkSel.appendChild(lkNone);
+  (students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';}).forEach(function(s){
+    var op=document.createElement('option');op.value=s.id;op.textContent=s.name+(s.grade?' ('+s.grade+')':'');
+    if(t&&t.linkedStudent===s.id)op.selected=true;lkSel.appendChild(op);
+  });
+  var lkw=document.createElement('div');lkw.style.marginBottom='10px';lkw.appendChild(mkLbl('연결 대상 (학생)'));lkw.appendChild(lkSel);detPanel.appendChild(lkw);
+  var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';
+  var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);
+  (_dbTasks||[]).filter(function(x){return x.id!==id;}).forEach(function(x){
+    var op=document.createElement('option');op.value=x.id;op.textContent=x.name.substring(0,30);
+    if(t&&t.parentTask===x.id)op.selected=true;ptSel.appendChild(op);
+  });
+  var ptw=document.createElement('div');ptw.style.marginBottom='10px';ptw.appendChild(mkLbl('상위 업무'));ptw.appendChild(ptSel);detPanel.appendChild(ptw);
+  var ntInp=document.createElement('input');ntInp.className='fi';ntInp.id='dbt-notify';ntInp.type='date';ntInp.style.fontSize='12px';ntInp.value=t&&t.notify?t.notify:'';
+  var ntw=document.createElement('div');ntw.style.marginBottom='10px';ntw.appendChild(mkLbl('알림 날짜'));ntw.appendChild(ntInp);detPanel.appendChild(ntw);
+  var moTa=document.createElement('textarea');moTa.className='fi';moTa.id='dbt-memo';moTa.rows=2;
+  moTa.style.cssText='font-size:12px;resize:none';moTa.placeholder='추가 메모';moTa.value=t&&t.memo?t.memo:'';
+  var mow=document.createElement('div');mow.appendChild(mkLbl('메모'));mow.appendChild(moTa);detPanel.appendChild(mow);
+  box.appendChild(detBtn);box.appendChild(detPanel);
+  var br=document.createElement('div');br.style.cssText='display:flex;gap:8px;margin-top:4px';
+  if(id){
+    var delB=document.createElement('button');delB.className='btn btn-red btn-sm';delB.textContent='삭제';
+    (function(tid){delB.onclick=function(){_dbDeleteTask(tid);modal.remove();};})(id);
+    br.appendChild(delB);
+  }
+  var canB=document.createElement('button');canB.className='btn btn-outline btn-sm';canB.textContent='취소';
+  canB.style.marginLeft='auto';canB.onclick=function(){modal.remove();};
+  var savB=document.createElement('button');savB.className='btn btn-navy btn-sm';savB.textContent='저장';
+  (function(tid){savB.onclick=function(){_dbSaveTaskModal(tid);};})(id);
+  br.appendChild(canB);br.appendChild(savB);box.appendChild(br);
+  modal.appendChild(box);document.body.appendChild(modal);nameInp.focus();
+}
 function _dbSaveTaskModal(id){
   var name=(document.getElementById('dbt-name')||{}).value||'';
   var area=(document.getElementById('dbt-area')||{}).value||'';
-  var cycle=(document.getElementById('dbt-cycle')||{}).value||'비정기';
+  var cycle=(document.getElementById('dbt-cycle')||{}).value||'반복없음';
   var priority=(document.getElementById('dbt-priority')||{}).value||'2순위 (중요)';
   var dueDate=(document.getElementById('dbt-due')||{}).value||todayISO();
   var status=(document.getElementById('dbt-status')||{}).value||'예정';
