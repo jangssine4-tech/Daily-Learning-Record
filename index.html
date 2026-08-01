@@ -652,6 +652,9 @@ var _DB_PRIORITY_COLORS={'긴급':'#dc2626','중요':'#d97706','일반':'#16a34a
 var _DB_STATUSES=['대기','진행 중','완료','보류'];
 var _DB_STATUS_COLORS={'대기':'#6b7280','진행 중':'#2563eb','완료':'#16a34a','보류':'#d97706'};
 var _DB_STATUS_BG={'대기':'#f3f4f6','진행 중':'#eff6ff','완료':'#f0fdf4','보류':'#fffbeb'};
+var _DB_TASK_TYPES=['일반 업무','이달의 중점','이번 주 중점'];
+var _DB_TASK_TYPE_ICONS={'일반 업무':'📋','이달의 중점':'🎯','이번 주 중점':'📅'};
+var _dbTypeFilter='';
 var _promoLoaded=false;
 var currentGoalsTab='annual', currentSummaryTab='summary', currentRefTab='fees';
 var makeupViewYear=new Date().getFullYear(), makeupViewMonth=new Date().getMonth();
@@ -7912,23 +7915,8 @@ function _renderDashBoardUI(el){
   });
   html+='</div>';
 
-  // ── 필터 바 ──
-  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
-  // 영역 필터
-  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbAreaFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
-  html+='<option value="">전체 영역</option>';
-  _DB_AREAS.forEach(function(a){html+='<option value="'+a+'"'+(_dbAreaFilter===a?' selected':'')+'>'+_DB_AREA_ICONS[a]+' '+a+'</option>';});
-  html+='</select>';
-  // 상태 필터
-  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbStatusFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
-  html+='<option value="">전체 상태</option>';
-  _DB_STATUSES.forEach(function(s){html+='<option value="'+s+'"'+(_dbStatusFilter===s?' selected':'')+'>'+s+'</option>';});
-  html+='</select>';
-  // 우선순위 필터
-  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbPriorityFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
-  html+='<option value="">전체 우선순위</option>';
-  _DB_PRIORITIES.forEach(function(p){html+='<option value="'+p+'"'+(_dbPriorityFilter===p?' selected':'')+'>'+_DB_PRIORITY_SHORT[p]+'</option>';});
-  html+='</select>';
+  // ── 업무 추가 버튼 ──
+  html+='<div style="display:flex;align-items:center">';
   html+='<button class="btn btn-navy btn-sm" style="margin-left:auto" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
   html+='</div>';
 
@@ -8044,49 +8032,73 @@ function _renderDashRightPanel(){
 // ── 필터 적용 ─────────────────────────────────────
 function _dbFiltered(tasks){
   return tasks.filter(function(t){
+    if(t.id&&t.id.startsWith('__'))return false; // 내부 메타 객체 제외
     if(_dbAreaFilter&&t.area!==_dbAreaFilter)return false;
     if(_dbStatusFilter&&t.status!==_dbStatusFilter)return false;
     if(_dbPriorityFilter&&t.priority!==_dbPriorityFilter)return false;
+    if(_dbTypeFilter&&(t.taskType||'일반 업무')!==_dbTypeFilter)return false;
     return true;
   });
 }
-
-// ── 중점 추진사항 데이터 ──────────────────────────
-var _focusTasks={monthly:[],weekly:[]};
-var _focusLoaded=false;
-
-function loadFocusTasks(){
-  if(_focusLoaded)return Promise.resolve();
-  return db.collection('config').doc('focusTasks').get().then(function(d){
-    if(d.exists){
-      _focusTasks.monthly=d.data().monthly||[];
-      _focusTasks.weekly=d.data().weekly||[];
-    }
-    _focusLoaded=true;
-  }).catch(function(){_focusLoaded=true;});
+function _dbGeneralTasks(tasks){
+  // 오늘/주간/영역 뷰에서는 '일반 업무'만 표시
+  return (tasks||[]).filter(function(t){
+    if(t.id&&t.id.startsWith('__'))return false;
+    return !t.taskType||t.taskType==='일반 업무';
+  });
 }
-function saveFocusTasks(){
-  db.collection('config').doc('focusTasks').set(_focusTasks,{merge:false}).catch(function(){});
+function _dbFocusTasks(type){
+  // taskType 기반 중점 추진사항 목록
+  var key=type==='monthly'?'이달의 중점':'이번 주 중점';
+  return (_dbTasks||[]).filter(function(t){
+    return t.taskType===key&&!(t.id&&t.id.startsWith('__'));
+  });
+}
+
+// ── 중점 추진사항 (dashBoardV2 통합) ──────────────
+// focusTasks Firestore는 더 이상 사용하지 않음
+// taskType 필드로 dashBoardV2에서 관리
+function loadFocusTasks(){
+  // dashBoardV2 로드와 통합 — 별도 로드 불필요
+  return Promise.resolve();
 }
 function addFocusTask(type){
   var inp=$(type==='monthly'?'focus-monthly-input':'focus-weekly-input');
   if(!inp||!inp.value.trim())return;
-  _focusTasks[type].push({id:'ft_'+Date.now(),text:inp.value.trim(),done:false});
+  if(!_dbTasks)_dbTasks=[];
+  var taskType=type==='monthly'?'이달의 중점':'이번 주 중점';
+  _dbTasks.push({
+    id:'ft_'+Date.now(),
+    name:inp.value.trim(),
+    taskType:taskType,
+    area:'경영 관리',
+    priority:'일반',
+    status:'대기',
+    dueDate:todayISO(),
+    cycle:'반복없음',
+    memo:'',
+    createdAt:todayISO()
+  });
   inp.value='';
-  saveFocusTasks();
+  saveDashBoard();
   _renderDashBoardUI($('dashboard-board-area'));
 }
 function toggleFocusTask(type,id){
-  var t=_focusTasks[type].find(function(x){return x.id===id;});
-  if(t){t.done=!t.done;saveFocusTasks();_renderDashBoardUI($('dashboard-board-area'));}
+  var t=(_dbTasks||[]).find(function(x){return x.id===id;});
+  if(t){
+    t.status=t.status==='완료'?'대기':'완료';
+    saveDashBoard();
+    _renderDashBoardUI($('dashboard-board-area'));
+  }
 }
 function deleteFocusTask(type,id){
-  _focusTasks[type]=_focusTasks[type].filter(function(x){return x.id!==id;});
-  saveFocusTasks();_renderDashBoardUI($('dashboard-board-area'));
+  _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==id;});
+  saveDashBoard();
+  _renderDashBoardUI($('dashboard-board-area'));
 }
 function _renderFocusSection(type,title,color,icon){
-  var items=_focusTasks[type]||[];
-  var done=items.filter(function(t){return t.done;}).length;
+  var items=_dbFocusTasks(type);
+  var done=items.filter(function(t){return t.status==='완료';}).length;
   var inputId='focus-'+type+'-input';
   var wrap=document.createElement('div');
   wrap.setAttribute('style','border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px');
@@ -8097,36 +8109,50 @@ function _renderFocusSection(type,title,color,icon){
   hdrTitle.textContent=icon+' '+title;
   hdr.appendChild(hdrTitle);
   if(items.length){var cnt=document.createElement('span');cnt.setAttribute('style','margin-left:auto;font-size:11px;color:var(--txt3)');cnt.textContent=done+'/'+items.length+' 완료';hdr.appendChild(cnt);}
+  // 업무 추가 모달로 바로 열기 버튼
+  var addModal=document.createElement('button');
+  addModal.className='btn btn-navy btn-xs';
+  addModal.setAttribute('style','margin-left:'+(items.length?'4px':'auto'));
+  addModal.textContent='＋ 업무로 추가';
+  (function(tp){addModal.addEventListener('click',function(){openDbTaskModal(null,null,tp==='monthly'?'이달의 중점':'이번 주 중점');});})(type);
+  hdr.appendChild(addModal);
   wrap.appendChild(hdr);
   var body=document.createElement('div');
   body.setAttribute('style','padding:8px 14px;background:var(--surface)');
+  // 빠른 입력 행
   var row=document.createElement('div');
   row.setAttribute('style','display:flex;gap:6px;margin-bottom:8px');
   var inp=document.createElement('input');
-  inp.className='fi';inp.id=inputId;inp.placeholder='내용 입력 후 Enter';
+  inp.className='fi';inp.id=inputId;inp.placeholder='간단히 입력 후 Enter (빠른 추가)';
   inp.setAttribute('style','flex:1;font-size:12px;padding:5px 8px');
   (function(t){inp.addEventListener('keydown',function(e){if(e.key==='Enter')addFocusTask(t);});})(type);
   var addBtn=document.createElement('button');
-  addBtn.className='btn btn-navy btn-xs';addBtn.textContent='추가';
+  addBtn.className='btn btn-outline btn-xs';addBtn.textContent='추가';
   (function(t){addBtn.addEventListener('click',function(){addFocusTask(t);});})(type);
   row.appendChild(inp);row.appendChild(addBtn);body.appendChild(row);
   if(items.length){
     items.forEach(function(t){
+      var isDone=t.status==='완료';
       var ir=document.createElement('div');
       ir.setAttribute('style','display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)');
       var grip=document.createElement('span');
       grip.setAttribute('style','cursor:grab;color:var(--txt3);font-size:14px');grip.textContent='⠿';
-      var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!t.done;
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=isDone;
       cb.setAttribute('style','width:15px;height:15px;flex-shrink:0;cursor:pointer');
       (function(tp,id){cb.addEventListener('change',function(){toggleFocusTask(tp,id);});})(type,t.id);
       var lbl=document.createElement('span');
-      lbl.setAttribute('style','flex:1;font-size:12px;'+(t.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)'));
-      lbl.textContent=t.text;
+      lbl.setAttribute('style','flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt))'));
+      lbl.textContent=t.name;
+      (function(tid){lbl.addEventListener('click',function(){openDbTaskModal(tid);});})(t.id);
+      // 우선순위 뱃지
+      var pBadge=document.createElement('span');
+      pBadge.setAttribute('style','font-size:10px;color:'+(_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)')+';flex-shrink:0');
+      pBadge.textContent=_DB_PRIORITY_SHORT[t.priority]||'';
       var del=document.createElement('button');
       del.setAttribute('style','background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;padding:0 2px');
       del.textContent='×';
       (function(tp,id){del.addEventListener('click',function(){deleteFocusTask(tp,id);});})(type,t.id);
-      ir.appendChild(grip);ir.appendChild(cb);ir.appendChild(lbl);ir.appendChild(del);
+      ir.appendChild(grip);ir.appendChild(cb);ir.appendChild(lbl);ir.appendChild(pBadge);ir.appendChild(del);
       body.appendChild(ir);
     });
   }else{
@@ -8158,8 +8184,8 @@ function _renderDbTodayView(autoTasks,today,now){
     html+='</div></div>';
   }
 
-  // 오늘 업무 — 상태별 묶음
-  var todayTasks=(_dbTasks||[]).filter(function(t){
+  // 오늘 업무 — 상태별 묶음 (일반 업무만)
+  var todayTasks=_dbGeneralTasks(_dbTasks||[]).filter(function(t){
     return t.dueDate===today||(t.status==='오늘 할 일'&&t.dueDate>=today);
   });
   todayTasks=_dbFiltered(todayTasks);
@@ -8198,7 +8224,7 @@ function _renderDbWeekView(now){
   var fmt=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   var monStr=fmt(mon),sunStr=fmt(sun);
 
-  var weekTasks=(_dbTasks||[]).filter(function(t){
+  var weekTasks=_dbGeneralTasks(_dbTasks||[]).filter(function(t){
     return t.dueDate>=monStr&&t.dueDate<=sunStr;
   });
   weekTasks=_dbFiltered(weekTasks);
@@ -8228,7 +8254,7 @@ function _renderDbWeekView(now){
 // ── 영역별 뷰 ────────────────────────────────────
 function _renderDbAreaView(){
   var areas=_dbAreaFilter?[_dbAreaFilter]:_DB_AREAS;
-  var allTasks=_dbFiltered(_dbTasks||[]);
+  var allTasks=_dbFiltered(_dbGeneralTasks(_dbTasks||[]));
   var html='';
   areas.forEach(function(area){
     var items=allTasks.filter(function(t){return t.area===area;});
@@ -8257,12 +8283,16 @@ function _dbTaskRow(t){
   var isDone=t.status==='완료';
   var pColor=_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)';
   var pShort=_DB_PRIORITY_SHORT[t.priority]||'';
+  var typeIcon='';
+  if(t.taskType==='이달의 중점')typeIcon='<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:4px;background:#dbeafe;color:#1d4ed8;flex-shrink:0">🎯</span>';
+  else if(t.taskType==='이번 주 중점')typeIcon='<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:4px;background:#ede9fe;color:#6d28d9;flex-shrink:0">📅</span>';
   var statusOpts=_DB_STATUSES.map(function(s){
     return '<option value="'+s+'"'+(t.status===s?' selected':'')+'>'+s+'</option>';
   }).join('');
   return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
     +'<span style="font-size:10px;font-weight:700;color:'+pColor+';flex-shrink:0;min-width:28px">'+pShort+'</span>'
     +'<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+(_DB_AREA_ICONS[t.area]||'')+'</span>'
+    +typeIcon
     +'<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'" onclick="openDbTaskModal(\''+t.id+'\')" style="cursor:pointer">'+t.name+'</span>'
     +(t.dueDate?'<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.dueDate.slice(5)+'</span>':'')
     +'<select style="font-size:10px;border:1px solid var(--border);border-radius:6px;padding:1px 3px;background:var(--surface);color:'+(_DB_STATUS_COLORS[t.status]||'var(--txt)')+';cursor:pointer" onchange="_dbUpdateStatus(\''+t.id+'\',this.value)">'+statusOpts+'</select>'
@@ -8298,7 +8328,7 @@ function _dbToggleAutoTask(date,label,checked){
 }
 
 // ── 업무 추가/편집 모달 ───────────────────────────
-function openDbTaskModal(id,defaultArea){
+function openDbTaskModal(id,defaultArea,defaultTaskType){
   var t=id?(_dbTasks||[]).find(function(x){return x.id===id;}):null;
   _dbEditId=id||null;
   var today=todayISO();
@@ -8322,11 +8352,16 @@ function openDbTaskModal(id,defaultArea){
     opts.forEach(function(o){var op=document.createElement('option');op.value=o.v;op.textContent=o.l;if(o.v===selected)op.selected=true;s.appendChild(op);});
     return s;
   }
+  // ── 업무 유형 선택 (최상단) ──
+  var curType=t?t.taskType||'일반 업무':(defaultTaskType||'일반 업무');
+  var typeSel=mkSel('dbt-tasktype',_DB_TASK_TYPES.map(function(tp){return{v:tp,l:_DB_TASK_TYPE_ICONS[tp]+' '+tp};}),curType);
+  typeSel.style.cssText='font-size:13px;font-weight:600;background:var(--surface2);border-color:var(--navy);color:var(--navy)';
+  var tw=document.createElement('div');tw.style.marginBottom='12px';tw.appendChild(mkLbl('업무 유형 *'));tw.appendChild(typeSel);box.appendChild(tw);
   var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';
   nameInp.placeholder='업무 내용을 입력하세요';nameInp.style.fontSize='13px';nameInp.value=t?t.name:'';
   var nw=document.createElement('div');nw.style.marginBottom='10px';nw.appendChild(mkLbl('업무명 *'));nw.appendChild(nameInp);box.appendChild(nw);
   var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
-  var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역 *'));aw.appendChild(areaSel);box.appendChild(aw);
+  var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
   var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
   var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';dueInp.value=t&&t.dueDate?t.dueDate:today;
   var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');
@@ -8384,22 +8419,22 @@ function openDbTaskModal(id,defaultArea){
 function _dbSaveTaskModal(id){
   var name=(document.getElementById('dbt-name')||{}).value||'';
   var area=(document.getElementById('dbt-area')||{}).value||'';
+  var taskType=(document.getElementById('dbt-tasktype')||{}).value||'일반 업무';
   var cycle=(document.getElementById('dbt-cycle')||{}).value||'반복없음';
-  var priority=(document.getElementById('dbt-priority')||{}).value||'2순위 (중요)';
+  var priority=(document.getElementById('dbt-priority')||{}).value||'일반';
   var dueDate=(document.getElementById('dbt-due')||{}).value||todayISO();
-  var status=(document.getElementById('dbt-status')||{}).value||'예정';
+  var status=(document.getElementById('dbt-status')||{}).value||'대기';
   var memo=(document.getElementById('dbt-memo')||{}).value||'';
   if(!name.trim()){alert('업무명을 입력하세요');return;}
-  if(!area){alert('업무 영역을 선택하세요');return;}
   if(!_dbTasks)_dbTasks=[];
   var linkedStudent=(document.getElementById('dbt-linked-student')||{}).value||'';
   var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
   var notify=(document.getElementById('dbt-notify')||{}).value||'';
   if(id){
     var t=_dbTasks.find(function(x){return x.id===id;});
-    if(t){t.name=name;t.area=area;t.cycle=cycle;t.priority=priority;t.dueDate=dueDate;t.status=status;t.memo=memo;t.linkedStudent=linkedStudent;t.parentTask=parentTask;t.notify=notify;}
+    if(t){t.name=name;t.area=area;t.taskType=taskType;t.cycle=cycle;t.priority=priority;t.dueDate=dueDate;t.status=status;t.memo=memo;t.linkedStudent=linkedStudent;t.parentTask=parentTask;t.notify=notify;}
   }else{
-    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,cycle:cycle,priority:priority,dueDate:dueDate,status:status,memo:memo,linkedStudent:linkedStudent,parentTask:parentTask,notify:notify,createdAt:todayISO()});
+    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,taskType:taskType,cycle:cycle,priority:priority,dueDate:dueDate,status:status,memo:memo,linkedStudent:linkedStudent,parentTask:parentTask,notify:notify,createdAt:todayISO()});
   }
   saveDashBoard();
   var m=document.getElementById('db-task-modal');if(m)m.remove();
