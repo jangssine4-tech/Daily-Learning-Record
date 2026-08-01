@@ -8062,27 +8062,6 @@ function loadFocusTasks(){
   // dashBoardV2 로드와 통합 — 별도 로드 불필요
   return Promise.resolve();
 }
-function addFocusTask(type){
-  var inp=$(type==='monthly'?'focus-monthly-input':'focus-weekly-input');
-  if(!inp||!inp.value.trim())return;
-  if(!_dbTasks)_dbTasks=[];
-  var taskType=type==='monthly'?'이달의 중점':'이번 주 중점';
-  _dbTasks.push({
-    id:'ft_'+Date.now(),
-    name:inp.value.trim(),
-    taskType:taskType,
-    area:'경영 관리',
-    priority:'일반',
-    status:'대기',
-    dueDate:todayISO(),
-    cycle:'반복없음',
-    memo:'',
-    createdAt:todayISO()
-  });
-  inp.value='';
-  saveDashBoard();
-  _renderDashBoardUI($('dashboard-board-area'));
-}
 function toggleFocusTask(type,id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(t){
@@ -8099,7 +8078,6 @@ function deleteFocusTask(type,id){
 function _renderFocusSection(type,title,color,icon){
   var items=_dbFocusTasks(type);
   var done=items.filter(function(t){return t.status==='완료';}).length;
-  var inputId='focus-'+type+'-input';
   var wrap=document.createElement('div');
   wrap.setAttribute('style','border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px');
   var hdr=document.createElement('div');
@@ -8109,27 +8087,15 @@ function _renderFocusSection(type,title,color,icon){
   hdrTitle.textContent=icon+' '+title;
   hdr.appendChild(hdrTitle);
   if(items.length){var cnt=document.createElement('span');cnt.setAttribute('style','margin-left:auto;font-size:11px;color:var(--txt3)');cnt.textContent=done+'/'+items.length+' 완료';hdr.appendChild(cnt);}
-  // 업무 추가 모달로 바로 열기 버튼
-  var addModal=document.createElement('button');
-  addModal.className='btn btn-navy btn-xs';
-  addModal.setAttribute('style','margin-left:'+(items.length?'4px':'auto'));
-  addModal.textContent='＋ 업무로 추가';
-  (function(tp){addModal.addEventListener('click',function(){openDbTaskModal(null,null,tp==='monthly'?'이달의 중점':'이번 주 중점');});})(type);
-  hdr.appendChild(addModal);
+  var addBtn=document.createElement('button');
+  addBtn.className='btn btn-navy btn-xs';
+  addBtn.setAttribute('style','margin-left:'+(items.length?'4px':'auto'));
+  addBtn.textContent='＋ 추가';
+  (function(tp){addBtn.addEventListener('click',function(){openDbTaskModal(null,null,tp==='monthly'?'이달의 중점':'이번 주 중점');});})(type);
+  hdr.appendChild(addBtn);
   wrap.appendChild(hdr);
   var body=document.createElement('div');
   body.setAttribute('style','padding:8px 14px;background:var(--surface)');
-  // 빠른 입력 행
-  var row=document.createElement('div');
-  row.setAttribute('style','display:flex;gap:6px;margin-bottom:8px');
-  var inp=document.createElement('input');
-  inp.className='fi';inp.id=inputId;inp.placeholder='간단히 입력 후 Enter (빠른 추가)';
-  inp.setAttribute('style','flex:1;font-size:12px;padding:5px 8px');
-  (function(t){inp.addEventListener('keydown',function(e){if(e.key==='Enter')addFocusTask(t);});})(type);
-  var addBtn=document.createElement('button');
-  addBtn.className='btn btn-outline btn-xs';addBtn.textContent='추가';
-  (function(t){addBtn.addEventListener('click',function(){addFocusTask(t);});})(type);
-  row.appendChild(inp);row.appendChild(addBtn);body.appendChild(row);
   if(items.length){
     items.forEach(function(t){
       var isDone=t.status==='완료';
@@ -8141,10 +8107,9 @@ function _renderFocusSection(type,title,color,icon){
       cb.setAttribute('style','width:15px;height:15px;flex-shrink:0;cursor:pointer');
       (function(tp,id){cb.addEventListener('change',function(){toggleFocusTask(tp,id);});})(type,t.id);
       var lbl=document.createElement('span');
-      lbl.setAttribute('style','flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt))'));
+      lbl.setAttribute('style','flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)'));
       lbl.textContent=t.name;
       (function(tid){lbl.addEventListener('click',function(){openDbTaskModal(tid);});})(t.id);
-      // 우선순위 뱃지
       var pBadge=document.createElement('span');
       pBadge.setAttribute('style','font-size:10px;color:'+(_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)')+';flex-shrink:0');
       pBadge.textContent=_DB_PRIORITY_SHORT[t.priority]||'';
