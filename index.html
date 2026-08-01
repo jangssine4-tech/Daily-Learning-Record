@@ -8297,71 +8297,7 @@ function _dbToggleAutoTask(date,label,checked){
 }
 
 // ── 업무 추가/편집 모달 ───────────────────────────
-function openDbTaskModal(id,defaultArea){
-  var t=id?(_dbTasks||[]).find(function(x){return x.id===id;}):null;
-  _dbEditId=id||null;
-  var today=todayISO();
-
-  var areaOpts=_DB_AREAS.map(function(a){
-    var sel=(t?t.area===a:a===(defaultArea||''));
-    return '<option value="'+a+'"'+(sel?' selected':'')+'>'+_DB_AREA_ICONS[a]+' '+a+'</option>';
-  }).join('');
-  var cycleOpts=_DB_CYCLES.map(function(c){
-    return '<option value="'+c+'"'+(t&&t.cycle===c?' selected':'')+(c==='비정기'&&!t?' selected':'')+'>'+c+'</option>';
-  }).join('');
-  var priorityOpts=_DB_PRIORITIES.map(function(p){
-    return '<option value="'+p+'"'+(t?t.priority===p:p==='중요'?' selected':'')+'>'+_DB_PRIORITY_SHORT[p]+'</option>';
-  }).join('');
-  var statusOpts=_DB_STATUSES.map(function(s){
-    return '<option value="'+s+'"'+(t?t.status===s:s==='예정'?' selected':'')+'>'+s+'</option>';
-  }).join('');
-
-  var modal=document.createElement('div');
-  modal.id='db-task-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.innerHTML=
-    '<div style="background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    +'<div style="font-size:15px;font-weight:800;color:var(--navy)">'+(id?'✏️ 업무 편집':'+ 업무 추가')+'</div>'
-    +'<button onclick="document.getElementById(\'db-task-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>'
-    +'</div>'
-    // 업무명
-    +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">업무명 *</div>'
-    +'<input class="fi" id="dbt-name" style="font-size:13px" placeholder="업무 내용을 입력하세요" value="'+(t?t.name:'')+'">'
-    +'</div>'
-    // 업무 영역
-    +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">업무 영역 *</div>'
-    +'<select class="fi" id="dbt-area" style="font-size:12px">'+areaOpts+'</select>'
-    +'</div>'
-    // 2열: 주기 + 우선순위
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
-    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">실행 주기</div>'
-    +'<select class="fi" id="dbt-cycle" style="font-size:12px">'+cycleOpts+'</select></div>'
-    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">우선순위</div>'
-    +'<select class="fi" id="dbt-priority" style="font-size:12px">'+priorityOpts+'</select></div>'
-    +'</div>'
-    // 2열: 기한 + 상태
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
-    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">완료 기한</div>'
-    +'<input class="fi" type="date" id="dbt-due" style="font-size:12px" value="'+(t&&t.dueDate?t.dueDate:today)+'"></div>'
-    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">진행 상태</div>'
-    +'<select class="fi" id="dbt-status" style="font-size:12px">'+statusOpts+'</select></div>'
-    +'</div>'
-    // 메모
-    +'<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">메모</div>'
-    +'<textarea class="fi" id="dbt-memo" rows="2" style="font-size:12px;resize:none" placeholder="추가 메모">'+(t&&t.memo?t.memo:'')+'</textarea>'
-    +'</div>'
-    // 버튼
-    +'<div style="display:flex;gap:8px">'
-    +(id?'<button class="btn btn-red btn-sm" onclick="_dbDeleteTask(\''+id+'\');document.getElementById(\'db-task-modal\').remove()">삭제</button>':'')
-    +'<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="document.getElementById(\'db-task-modal\').remove()">취소</button>'
-    +'<button class="btn btn-navy btn-sm" onclick="_dbSaveTaskModal(\''+id+'\')">저장</button>'
-    +'</div>'
-    +'</div>';
-  document.body.appendChild(modal);
-  var nameEl=document.getElementById('dbt-name');
-  if(nameEl)nameEl.focus();
-}
+function openDbTaskModal(id,defaultArea){  var t=id?(_dbTasks||[]).find(function(x){return x.id===id;}):null;  _dbEditId=id||null;  var today=todayISO();  var old=document.getElementById('db-task-modal');if(old)old.remove();  var modal=document.createElement('div');  modal.id='db-task-modal';  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';  modal.onclick=function(e){if(e.target===modal)modal.remove();};  var box=document.createElement('div');  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto';  // 헤더  var hdr=document.createElement('div');  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px';  var ttl=document.createElement('div');ttl.style.cssText='font-size:15px;font-weight:800;color:var(--navy)';  ttl.textContent=id?'✏️ 업무 편집':'+ 업무 추가';  var xBtn=document.createElement('button');xBtn.style.cssText='background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)';  xBtn.textContent='✕';xBtn.onclick=function(){modal.remove();};  hdr.appendChild(ttl);hdr.appendChild(xBtn);box.appendChild(hdr);  function mkLbl(txt){var l=document.createElement('div');l.style.cssText='font-size:11px;color:var(--txt3);margin-bottom:4px';l.textContent=txt;return l;}  function mkWrap(mb){var w=document.createElement('div');w.style.marginBottom=(mb||10)+'px';return w;}  function mkSel(elId,opts,selected){    var s=document.createElement('select');s.className='fi';s.id=elId;s.style.fontSize='12px';    opts.forEach(function(o){var op=document.createElement('option');op.value=o.v;op.textContent=o.l;if(o.v===selected)op.selected=true;s.appendChild(op);});    return s;  }  // 업무명  var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';  nameInp.placeholder='업무 내용을 입력하세요';nameInp.style.fontSize='13px';nameInp.value=t?t.name:'';  var nw=mkWrap();nw.appendChild(mkLbl('업무명 *'));nw.appendChild(nameInp);box.appendChild(nw);  // 업무 영역  var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));  var aw=mkWrap();aw.appendChild(mkLbl('업무 영역 *'));aw.appendChild(areaSel);box.appendChild(aw);  // 2열: 완료기한 + 우선순위  var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';  var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';dueInp.value=t&&t.dueDate?t.dueDate:today;  var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');  var dw=document.createElement('div');dw.appendChild(mkLbl('완료 기한'));dw.appendChild(dueInp);  var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);  r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);  // 상세 설정 토글  var hasDetail=!!(t&&(t.status||t.cycle||t.notify||t.linkedStudent||t.parentTask));  var detBtn=document.createElement('button');  detBtn.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px';  var arrow=document.createElement('span');arrow.id='dbt-arrow';arrow.textContent=hasDetail?'▲':'▼';  var detLbl=document.createElement('span');detLbl.textContent='⚙️ 상세 설정';  detBtn.appendChild(detLbl);detBtn.appendChild(arrow);  var detPanel=document.createElement('div');  detPanel.style.cssText='display:'+(hasDetail?'block':'none')+';background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px';  detBtn.onclick=function(){    var open=detPanel.style.display!=='none';    detPanel.style.display=open?'none':'block';    arrow.textContent=open?'▼':'▲';  };  // 상세: 진행상태 + 반복설정  var r2=document.createElement('div');r2.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';  var stSel=mkSel('dbt-status',_DB_STATUSES.map(function(s){return{v:s,l:s};}),t?t.status:'대기');  var cySel=mkSel('dbt-cycle',_DB_CYCLES.map(function(c){return{v:c,l:c};}),t?t.cycle:'비정기');  var sw=document.createElement('div');sw.appendChild(mkLbl('진행 상태'));sw.appendChild(stSel);  var cw=document.createElement('div');cw.appendChild(mkLbl('반복 설정'));cw.appendChild(cySel);  r2.appendChild(sw);r2.appendChild(cw);detPanel.appendChild(r2);  // 상세: 연결 대상  var lkSel=document.createElement('select');lkSel.className='fi';lkSel.id='dbt-linked-student';lkSel.style.fontSize='12px';  var lkNone=document.createElement('option');lkNone.value='';lkNone.textContent='없음';lkSel.appendChild(lkNone);  (students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';}).forEach(function(s){    var op=document.createElement('option');op.value=s.id;op.textContent=s.name+(s.grade?' ('+s.grade+')':'');    if(t&&t.linkedStudent===s.id)op.selected=true;lkSel.appendChild(op);  });  var lkw=mkWrap();lkw.appendChild(mkLbl('연결 대상 (학생)'));lkw.appendChild(lkSel);detPanel.appendChild(lkw);  // 상세: 상위 업무  var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';  var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);  (_dbTasks||[]).filter(function(x){return x.id!==id;}).forEach(function(x){    var op=document.createElement('option');op.value=x.id;op.textContent=x.name.substring(0,30);    if(t&&t.parentTask===x.id)op.selected=true;ptSel.appendChild(op);  });  var ptw=mkWrap();ptw.appendChild(mkLbl('상위 업무'));ptw.appendChild(ptSel);detPanel.appendChild(ptw);  // 상세: 알림  var ntInp=document.createElement('input');ntInp.className='fi';ntInp.id='dbt-notify';ntInp.type='date';ntInp.style.fontSize='12px';  ntInp.value=t&&t.notify?t.notify:'';  var ntw=mkWrap();ntw.appendChild(mkLbl('알림 날짜'));ntw.appendChild(ntInp);detPanel.appendChild(ntw);  // 상세: 메모  var moTa=document.createElement('textarea');moTa.className='fi';moTa.id='dbt-memo';moTa.rows=2;  moTa.style.cssText='font-size:12px;resize:none';moTa.placeholder='추가 메모';moTa.value=t&&t.memo?t.memo:'';  var mow=mkWrap(0);mow.appendChild(mkLbl('메모'));mow.appendChild(moTa);detPanel.appendChild(mow);  box.appendChild(detBtn);box.appendChild(detPanel);  // 버튼  var br=document.createElement('div');br.style.cssText='display:flex;gap:8px;margin-top:4px';  if(id){    var delB=document.createElement('button');delB.className='btn btn-red btn-sm';delB.textContent='삭제';    (function(tid){delB.onclick=function(){_dbDeleteTask(tid);modal.remove();};})(id);    br.appendChild(delB);  }  var canB=document.createElement('button');canB.className='btn btn-outline btn-sm';canB.textContent='취소';  canB.style.marginLeft='auto';canB.onclick=function(){modal.remove();};  var savB=document.createElement('button');savB.className='btn btn-navy btn-sm';savB.textContent='저장';  (function(tid){savB.onclick=function(){_dbSaveTaskModal(tid);};})(id);  br.appendChild(canB);br.appendChild(savB);box.appendChild(br);  modal.appendChild(box);document.body.appendChild(modal);nameInp.focus();}
 
 function _dbSaveTaskModal(id){
   var name=(document.getElementById('dbt-name')||{}).value||'';
@@ -8374,11 +8310,14 @@ function _dbSaveTaskModal(id){
   if(!name.trim()){alert('업무명을 입력하세요');return;}
   if(!area){alert('업무 영역을 선택하세요');return;}
   if(!_dbTasks)_dbTasks=[];
+  var linkedStudent=(document.getElementById('dbt-linked-student')||{}).value||'';
+  var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
+  var notify=(document.getElementById('dbt-notify')||{}).value||'';
   if(id){
     var t=_dbTasks.find(function(x){return x.id===id;});
-    if(t){t.name=name;t.area=area;t.cycle=cycle;t.priority=priority;t.dueDate=dueDate;t.status=status;t.memo=memo;}
+    if(t){t.name=name;t.area=area;t.cycle=cycle;t.priority=priority;t.dueDate=dueDate;t.status=status;t.memo=memo;t.linkedStudent=linkedStudent;t.parentTask=parentTask;t.notify=notify;}
   }else{
-    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,cycle:cycle,priority:priority,dueDate:dueDate,status:status,memo:memo,createdAt:todayISO()});
+    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,cycle:cycle,priority:priority,dueDate:dueDate,status:status,memo:memo,linkedStudent:linkedStudent,parentTask:parentTask,notify:notify,createdAt:todayISO()});
   }
   saveDashBoard();
   var m=document.getElementById('db-task-modal');if(m)m.remove();
