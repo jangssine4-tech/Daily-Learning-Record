@@ -343,7 +343,16 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab" id="dtab-calendar" onclick="switchDashTab('calendar')">📆 연간 학사일정</button>
     <button class="rev-tab" id="dtab-conditions" onclick="switchDashTab('conditions')">⚙️ 자동 분류 조건</button>
   </div>
-  <div id="dash-panel-board" class="cp"><div id="dashboard-board-area"></div></div>
+  <div id="dash-panel-board" style="display:flex;gap:0;height:calc(100vh - 100px);overflow:hidden">
+    <!-- 왼쪽: 업무 목록 -->
+    <div style="flex:1;overflow-y:auto;padding:12px;border-right:1px solid var(--border)">
+      <div id="dashboard-board-area"></div>
+    </div>
+    <!-- 오른쪽: 운영 현황 + 일정 알림 -->
+    <div style="width:280px;overflow-y:auto;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
+      <div id="dashboard-right-area"></div>
+    </div>
+  </div>
   <div id="dash-panel-crm" style="display:none" class="cp">
     <div style="display:flex;align-items:center;gap:8px;padding:8px 0;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--txt3)">날짜</span>
@@ -7932,9 +7941,103 @@ function _renderDashBoardUI(el){
 
   html+='</div>';
   el.innerHTML=html;
+  // 오른쪽 패널 렌더링
+  _renderDashRightPanel();
 }
 
 function _dbSetView(v){_dbView=v;_renderDashBoardUI($('dashboard-board-area'));}
+
+function _renderDashRightPanel(){
+  var el=$('dashboard-right-area');if(!el)return;
+  var today=todayISO();
+
+  // ── 운영 현황 카드 ──
+  var todayStudents=(students||[]).filter(function(s){
+    var st=s.status||'재원';
+    return st==='재원'||st==='신규';
+  });
+  var todayReports=(reports||[]).filter(function(r){return r.date===today;});
+  var absentCount=todayReports.filter(function(r){return r.absent;}).length;
+  var reportCount=todayReports.filter(function(r){return !r.absent;}).length;
+  var noReportCount=Math.max(0,todayStudents.length-todayReports.length);
+  var pendingMakeup=(makeups||[]).filter(function(m){return m.makeupStatus==='pending';}).length;
+  var scheduledMakeup=(makeups||[]).filter(function(m){return m.makeupStatus==='scheduled'&&m.makeupDate===today;}).length;
+
+  var html='';
+
+  // 운영 현황 카드
+  html+='<div style="background:var(--surface);border-radius:12px;padding:12px;border:1px solid var(--border)">';
+  html+='<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 오늘의 운영 현황</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  var cards=[
+    {label:'재원 학생',val:todayStudents.length,icon:'👨‍🎓',color:'#eff6ff',tc:'#1d4ed8'},
+    {label:'일지 작성',val:reportCount,icon:'✍️',color:'#f0fdf4',tc:'#15803d'},
+    {label:'오늘 결석',val:absentCount,icon:'🔴',color:'#fff1f2',tc:'#be123c'},
+    {label:'미처리 보강',val:pendingMakeup,icon:'📋',color:'#fff7ed',tc:'#c2410c'},
+  ];
+  cards.forEach(function(c){
+    html+='<div onclick="goto(''+( c.label==='미처리 보강'?'makeup':c.label==='일지 작성'?'write':'schedule')+'')" style="background:'+c.color+';border-radius:10px;padding:10px;text-align:center;cursor:pointer">';
+    html+='<div style="font-size:20px">'+c.icon+'</div>';
+    html+='<div style="font-size:18px;font-weight:800;color:'+c.tc+'">'+c.val+'</div>';
+    html+='<div style="font-size:10px;color:var(--txt3)">'+c.label+'</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+  if(scheduledMakeup>0){
+    html+='<div style="margin-top:8px;padding:6px 10px;background:#fef9c3;border-radius:8px;font-size:11px;color:#92400e">⭐ 오늘 보강 예정: '+scheduledMakeup+'건</div>';
+  }
+  html+='</div>';
+
+  // ── 오늘 시간표 미니뷰 ──
+  var todaySchedule=(students||[]).filter(function(s){
+    var st=s.status||'재원';
+    if(st!=='재원'&&st!=='신규')return false;
+    var dayNames=['일','월','화','수','목','금','토'];
+    var dn=dayNames[new Date().getDay()];
+    return s.periods&&s.periods[dn];
+  }).sort(function(a,b){
+    var dayNames=['일','월','화','수','목','금','토'];
+    var dn=dayNames[new Date().getDay()];
+    var ta=(a.periods[dn]||{}).time||'99:99';
+    var tb=(b.periods[dn]||{}).time||'99:99';
+    return ta>tb?1:-1;
+  }).slice(0,8);
+
+  if(todaySchedule.length){
+    html+='<div style="background:var(--surface);border-radius:12px;padding:12px;border:1px solid var(--border)">';
+    html+='<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px">🕐 오늘 수업</div>';
+    todaySchedule.forEach(function(s){
+      var dayNames=['일','월','화','수','목','금','토'];
+      var dn=dayNames[new Date().getDay()];
+      var period=s.periods[dn]||{};
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">';
+      html+='<span style="font-size:11px;color:var(--txt3);min-width:38px">'+(period.time||'-')+'</span>';
+      html+='<span style="font-size:12px;font-weight:600;flex:1">'+s.name+'</span>';
+      html+='<span style="font-size:10px;color:var(--txt3)">'+(s.level||'')+'</span>';
+      html+='</div>';
+    });
+    if(todayStudents.length>8){
+      html+='<div style="text-align:center;font-size:10px;color:var(--txt3);padding-top:4px">+ '+(todayStudents.length-8)+'명 더보기</div>';
+    }
+    html+='</div>';
+  }
+
+  // ── 미처리 보강 목록 ──
+  var pendingList=(makeups||[]).filter(function(m){return m.makeupStatus==='pending';}).slice(0,5);
+  if(pendingList.length){
+    html+='<div style="background:var(--surface);border-radius:12px;padding:12px;border:1px solid var(--border)">';
+    html+='<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px">📋 미처리 보강</div>';
+    pendingList.forEach(function(m){
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openMakeupUnified(''+m.id+'')">';
+      html+='<span style="font-size:12px;flex:1">'+m.studentName+'</span>';
+      html+='<span style="font-size:10px;color:var(--txt3)">결석 '+m.absentDate+'</span>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
+  el.innerHTML=html;
+}
 
 // ── 필터 적용 ─────────────────────────────────────
 function _dbFiltered(tasks){
