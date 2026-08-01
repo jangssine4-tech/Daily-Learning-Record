@@ -7907,17 +7907,15 @@ function _renderDashBoardUI(el){
   ];
   var html='<div style="max-width:720px;padding:12px;display:flex;flex-direction:column;gap:10px">';
 
-  // ── 뷰 전환 탭 ──
-  html+='<div style="display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:3px">';
+  // ── 뷰 전환 탭 + 업무 추가 버튼 ──
+  html+='<div style="display:flex;align-items:center;gap:6px">';
+  html+='<div style="display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:3px;flex:1">';
   viewTabs.forEach(function(t){
     var on=_dbView===t.id;
     html+='<button onclick="_dbSetView(\''+t.id+'\')" style="flex:1;padding:6px 4px;border:none;border-radius:8px;font-size:12px;font-weight:'+(on?'800':'500')+';cursor:pointer;background:'+(on?'var(--navy)':'transparent')+';color:'+(on?'#fff':'var(--txt2)')+';transition:all .15s">'+t.label+'</button>';
   });
   html+='</div>';
-
-  // ── 업무 추가 버튼 ──
-  html+='<div style="display:flex;align-items:center">';
-  html+='<button class="btn btn-navy btn-sm" style="margin-left:auto" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
+  html+='<button class="btn btn-navy btn-sm" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
   html+='</div>';
 
   if(_dbView==='today'){
@@ -8097,12 +8095,31 @@ function _renderFocusSection(type,title,color,icon){
   var body=document.createElement('div');
   body.setAttribute('style','padding:8px 14px;background:var(--surface)');
   if(items.length){
+    // 드래그 상태 변수
+    var dragSrcId=null;
     items.forEach(function(t){
       var isDone=t.status==='완료';
       var ir=document.createElement('div');
-      ir.setAttribute('style','display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)');
+      ir.setAttribute('draggable','true');
+      ir.dataset.id=t.id;
+      ir.setAttribute('style','display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);transition:opacity .15s');
+      // 드래그 이벤트
+      ir.addEventListener('dragstart',function(e){
+        dragSrcId=t.id;
+        e.dataTransfer.effectAllowed='move';
+        setTimeout(function(){ir.style.opacity='0.4';},0);
+      });
+      ir.addEventListener('dragend',function(){ir.style.opacity='1';});
+      ir.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';ir.style.background='var(--surface2)';});
+      ir.addEventListener('dragleave',function(){ir.style.background='';});
+      ir.addEventListener('drop',function(e){
+        e.preventDefault();ir.style.background='';
+        if(!dragSrcId||dragSrcId===t.id)return;
+        _focusDragReorder(type,dragSrcId,t.id);
+      });
       var grip=document.createElement('span');
-      grip.setAttribute('style','cursor:grab;color:var(--txt3);font-size:14px');grip.textContent='⠿';
+      grip.setAttribute('style','cursor:grab;color:var(--txt3);font-size:14px;user-select:none');
+      grip.textContent='⠿';
       var cb=document.createElement('input');cb.type='checkbox';cb.checked=isDone;
       cb.setAttribute('style','width:15px;height:15px;flex-shrink:0;cursor:pointer');
       (function(tp,id){cb.addEventListener('change',function(){toggleFocusTask(tp,id);});})(type,t.id);
@@ -8114,9 +8131,15 @@ function _renderFocusSection(type,title,color,icon){
       pBadge.setAttribute('style','font-size:10px;color:'+(_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)')+';flex-shrink:0');
       pBadge.textContent=_DB_PRIORITY_SHORT[t.priority]||'';
       var del=document.createElement('button');
-      del.setAttribute('style','background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;padding:0 2px');
+      del.setAttribute('style','background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 4px;line-height:1;flex-shrink:0');
       del.textContent='×';
-      (function(tp,id){del.addEventListener('click',function(){deleteFocusTask(tp,id);});})(type,t.id);
+      del.type='button';
+      (function(tp,id){
+        del.addEventListener('click',function(e){
+          e.stopPropagation();
+          deleteFocusTask(tp,id);
+        });
+      })(type,t.id);
       ir.appendChild(grip);ir.appendChild(cb);ir.appendChild(lbl);ir.appendChild(pBadge);ir.appendChild(del);
       body.appendChild(ir);
     });
@@ -8127,6 +8150,22 @@ function _renderFocusSection(type,title,color,icon){
   }
   wrap.appendChild(body);
   return wrap.outerHTML;
+}
+
+function _focusDragReorder(type,srcId,tgtId){
+  // dashBoardV2 tasks 배열에서 해당 type의 항목 순서 변경
+  var key=type==='monthly'?'이달의 중점':'이번 주 중점';
+  var all=_dbTasks||[];
+  var focusItems=all.filter(function(t){return t.taskType===key&&!(t.id&&t.id.startsWith('__'));});
+  var others=all.filter(function(t){return !(t.taskType===key&&!(t.id&&t.id.startsWith('__')));});
+  var srcIdx=focusItems.findIndex(function(t){return t.id===srcId;});
+  var tgtIdx=focusItems.findIndex(function(t){return t.id===tgtId;});
+  if(srcIdx<0||tgtIdx<0)return;
+  var moved=focusItems.splice(srcIdx,1)[0];
+  focusItems.splice(tgtIdx,0,moved);
+  _dbTasks=others.concat(focusItems);
+  saveDashBoard();
+  _renderDashBoardUI($('dashboard-board-area'));
 }
 
 // ── 오늘 뷰 ──────────────────────────────────────
