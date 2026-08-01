@@ -8076,82 +8076,63 @@ function deleteFocusTask(type,id){
 function _renderFocusSection(type,title,color,icon){
   var items=_dbFocusTasks(type);
   var done=items.filter(function(t){return t.status==='완료';}).length;
-  var wrap=document.createElement('div');
-  wrap.setAttribute('style','border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px');
-  var hdr=document.createElement('div');
-  hdr.setAttribute('style','background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px');
-  var hdrTitle=document.createElement('span');
-  hdrTitle.setAttribute('style','font-size:13px;font-weight:800;color:var(--navy)');
-  hdrTitle.textContent=icon+' '+title;
-  hdr.appendChild(hdrTitle);
-  if(items.length){var cnt=document.createElement('span');cnt.setAttribute('style','margin-left:auto;font-size:11px;color:var(--txt3)');cnt.textContent=done+'/'+items.length+' 완료';hdr.appendChild(cnt);}
-  var addBtn=document.createElement('button');
-  addBtn.className='btn btn-navy btn-xs';
-  addBtn.setAttribute('style','margin-left:'+(items.length?'4px':'auto'));
-  addBtn.textContent='＋ 추가';
-  (function(tp){addBtn.addEventListener('click',function(){openDbTaskModal(null,null,tp==='monthly'?'이달의 중점':'이번 주 중점');});})(type);
-  hdr.appendChild(addBtn);
-  wrap.appendChild(hdr);
-  var body=document.createElement('div');
-  body.setAttribute('style','padding:8px 14px;background:var(--surface)');
+  var typeKey=type==='monthly'?'이달의 중점':'이번 주 중점';
+  var h='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
+  // 헤더
+  h+='<div style="background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px">';
+  h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+icon+' '+title+'</span>';
   if(items.length){
-    // 드래그 상태 변수
-    var dragSrcId=null;
-    items.forEach(function(t){
+    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료</span>';
+    h+='<button class="btn btn-navy btn-xs" style="margin-left:4px" onclick="openDbTaskModal(null,null,\''+typeKey+'\')">＋ 추가</button>';
+  }else{
+    h+='<button class="btn btn-navy btn-xs" style="margin-left:auto" onclick="openDbTaskModal(null,null,\''+typeKey+'\')">＋ 추가</button>';
+  }
+  h+='</div>';
+  // 바디
+  h+='<div style="padding:8px 14px;background:var(--surface)">';
+  if(items.length){
+    items.forEach(function(t,i){
       var isDone=t.status==='완료';
-      var ir=document.createElement('div');
-      ir.setAttribute('draggable','true');
-      ir.dataset.id=t.id;
-      ir.setAttribute('style','display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);transition:opacity .15s');
-      // 드래그 이벤트
-      ir.addEventListener('dragstart',function(e){
-        dragSrcId=t.id;
-        e.dataTransfer.effectAllowed='move';
-        setTimeout(function(){ir.style.opacity='0.4';},0);
-      });
-      ir.addEventListener('dragend',function(){ir.style.opacity='1';});
-      ir.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';ir.style.background='var(--surface2)';});
-      ir.addEventListener('dragleave',function(){ir.style.background='';});
-      ir.addEventListener('drop',function(e){
-        e.preventDefault();ir.style.background='';
-        if(!dragSrcId||dragSrcId===t.id)return;
-        _focusDragReorder(type,dragSrcId,t.id);
-      });
-      var grip=document.createElement('span');
-      grip.setAttribute('style','cursor:grab;color:var(--txt3);font-size:14px;user-select:none');
-      grip.textContent='⠿';
-      var cb=document.createElement('input');cb.type='checkbox';cb.checked=isDone;
-      cb.setAttribute('style','width:15px;height:15px;flex-shrink:0;cursor:pointer');
-      (function(tp,id){cb.addEventListener('change',function(){toggleFocusTask(tp,id);});})(type,t.id);
-      var lbl=document.createElement('span');
-      lbl.setAttribute('style','flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)'));
-      lbl.textContent=t.name;
-      (function(tid){lbl.addEventListener('click',function(){openDbTaskModal(tid);});})(t.id);
-      var pBadge=document.createElement('span');
-      pBadge.setAttribute('style','font-size:10px;color:'+(_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)')+';flex-shrink:0');
-      pBadge.textContent=_DB_PRIORITY_SHORT[t.priority]||'';
-      var del=document.createElement('button');
-      del.setAttribute('style','background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 4px;line-height:1;flex-shrink:0');
-      del.textContent='×';
-      del.type='button';
-      (function(tp,id){
-        del.addEventListener('click',function(e){
-          e.stopPropagation();
-          deleteFocusTask(tp,id);
-        });
-      })(type,t.id);
-      ir.appendChild(grip);ir.appendChild(cb);ir.appendChild(lbl);ir.appendChild(pBadge);ir.appendChild(del);
-      body.appendChild(ir);
+      h+='<div draggable="true" data-id="'+t.id+'" data-type="'+type+'" '
+        +'ondragstart="focusDragStart(event,\''+t.id+'\')" '
+        +'ondragover="event.preventDefault()" '
+        +'ondrop="focusDragDrop(event,\''+type+'\',\''+t.id+'\')" '
+        +'ondragend="focusDragEnd(event)" '
+        +'style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+      h+='<span style="cursor:grab;color:var(--txt3);font-size:14px;user-select:none" '
+        +'onmousedown="this.parentElement.setAttribute(\'draggable\',\'true\')">⠿</span>';
+      h+='<input type="checkbox"'+(isDone?' checked':'')+' '
+        +'onchange="toggleFocusTask(\''+type+'\',\''+t.id+'\')" '
+        +'style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
+      h+='<span onclick="openDbTaskModal(\''+t.id+'\')" '
+        +'style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+      h+='<span style="font-size:10px;color:'+(_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)')+';flex-shrink:0">'
+        +(_DB_PRIORITY_SHORT[t.priority]||'')+'</span>';
+      h+='<button onclick="deleteFocusTask(\''+type+'\',\''+t.id+'\')" '
+        +'style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;line-height:1;padding:0 4px;flex-shrink:0">×</button>';
+      h+='</div>';
     });
   }else{
-    var empty=document.createElement('div');
-    empty.setAttribute('style','text-align:center;padding:10px;color:var(--txt3);font-size:12px');
-    empty.textContent='등록된 항목이 없습니다';body.appendChild(empty);
+    h+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">등록된 항목이 없습니다</div>';
   }
-  wrap.appendChild(body);
-  return wrap.outerHTML;
+  h+='</div></div>';
+  return h;
 }
 
+var _focusDragSrcId=null;
+function focusDragStart(e,id){
+  _focusDragSrcId=id;
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){if(e.target)e.target.style.opacity='0.4';},0);
+}
+function focusDragEnd(e){if(e.target)e.target.style.opacity='1';}
+function focusDragDrop(e,type,tgtId){
+  e.preventDefault();
+  if(e.target&&e.target.closest)e.target.closest('[draggable]').style.opacity='1';
+  if(!_focusDragSrcId||_focusDragSrcId===tgtId)return;
+  _focusDragReorder(type,_focusDragSrcId,tgtId);
+  _focusDragSrcId=null;
+}
 function _focusDragReorder(type,srcId,tgtId){
   // dashBoardV2 tasks 배열에서 해당 type의 항목 순서 변경
   var key=type==='monthly'?'이달의 중점':'이번 주 중점';
@@ -8342,9 +8323,10 @@ function openDbTaskModal(id,defaultArea,defaultTaskType){
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';
   modal.onclick=function(e){if(e.target===modal)modal.remove();};
   var box=document.createElement('div');
-  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto';
+  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:420px';
+  // 헤더
   var hdr=document.createElement('div');
-  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:14px';
+  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px';
   var ttl=document.createElement('div');ttl.style.cssText='font-size:15px;font-weight:800;color:var(--navy)';
   ttl.textContent=id?'✏️ 업무 편집':'+ 업무 추가';
   var xBtn=document.createElement('button');xBtn.style.cssText='background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)';
@@ -8356,58 +8338,35 @@ function openDbTaskModal(id,defaultArea,defaultTaskType){
     opts.forEach(function(o){var op=document.createElement('option');op.value=o.v;op.textContent=o.l;if(o.v===selected)op.selected=true;s.appendChild(op);});
     return s;
   }
-  // ── 업무 유형 선택 (최상단) ──
+  // 업무 유형
   var curType=t?t.taskType||'일반 업무':(defaultTaskType||'일반 업무');
   var typeSel=mkSel('dbt-tasktype',_DB_TASK_TYPES.map(function(tp){return{v:tp,l:_DB_TASK_TYPE_ICONS[tp]+' '+tp};}),curType);
   typeSel.style.cssText='font-size:13px;font-weight:600;background:var(--surface2);border-color:var(--navy);color:var(--navy)';
-  var tw=document.createElement('div');tw.style.marginBottom='12px';tw.appendChild(mkLbl('업무 유형 *'));tw.appendChild(typeSel);box.appendChild(tw);
+  var tw=document.createElement('div');tw.style.marginBottom='10px';tw.appendChild(mkLbl('업무 유형'));tw.appendChild(typeSel);box.appendChild(tw);
+  // 업무명
   var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';
   nameInp.placeholder='업무 내용을 입력하세요';nameInp.style.fontSize='13px';nameInp.value=t?t.name:'';
   var nw=document.createElement('div');nw.style.marginBottom='10px';nw.appendChild(mkLbl('업무명 *'));nw.appendChild(nameInp);box.appendChild(nw);
+  // 업무 영역
   var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
   var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
+  // 완료 기한 + 우선순위
   var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
   var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';dueInp.value=t&&t.dueDate?t.dueDate:today;
   var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');
   var dw=document.createElement('div');dw.appendChild(mkLbl('완료 기한'));dw.appendChild(dueInp);
   var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
   r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
-  var hasDetail=!!(t&&(t.status||t.cycle||t.notify||t.linkedStudent||t.parentTask));
-  var detBtn=document.createElement('button');
-  detBtn.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px';
-  var arrow=document.createElement('span');arrow.id='dbt-arrow';arrow.textContent=hasDetail?'▲':'▼';
-  var detLbl=document.createElement('span');detLbl.textContent='⚙️ 상세 설정';
-  detBtn.appendChild(detLbl);detBtn.appendChild(arrow);
-  var detPanel=document.createElement('div');
-  detPanel.style.cssText='display:'+(hasDetail?'block':'none')+';background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px';
-  detBtn.onclick=function(){var open=detPanel.style.display!=='none';detPanel.style.display=open?'none':'block';arrow.textContent=open?'▼':'▲';};
-  var r2=document.createElement('div');r2.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
-  var stSel=mkSel('dbt-status',_DB_STATUSES.map(function(s){return{v:s,l:s};}),t?t.status:'대기');
-  var cySel=mkSel('dbt-cycle',_DB_CYCLES.map(function(c){return{v:c,l:c};}),t?t.cycle:'반복없음');
-  var sw=document.createElement('div');sw.appendChild(mkLbl('진행 상태'));sw.appendChild(stSel);
-  var cw=document.createElement('div');cw.appendChild(mkLbl('반복 설정'));cw.appendChild(cySel);
-  r2.appendChild(sw);r2.appendChild(cw);detPanel.appendChild(r2);
-  var lkSel=document.createElement('select');lkSel.className='fi';lkSel.id='dbt-linked-student';lkSel.style.fontSize='12px';
-  var lkNone=document.createElement('option');lkNone.value='';lkNone.textContent='없음';lkSel.appendChild(lkNone);
-  (students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';}).forEach(function(s){
-    var op=document.createElement('option');op.value=s.id;op.textContent=s.name+(s.grade?' ('+s.grade+')':'');
-    if(t&&t.linkedStudent===s.id)op.selected=true;lkSel.appendChild(op);
-  });
-  var lkw=document.createElement('div');lkw.style.marginBottom='10px';lkw.appendChild(mkLbl('연결 대상 (학생)'));lkw.appendChild(lkSel);detPanel.appendChild(lkw);
+  // 상위 업무
   var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';
   var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);
   (_dbTasks||[]).filter(function(x){return x.id!==id;}).forEach(function(x){
     var op=document.createElement('option');op.value=x.id;op.textContent=x.name.substring(0,30);
     if(t&&t.parentTask===x.id)op.selected=true;ptSel.appendChild(op);
   });
-  var ptw=document.createElement('div');ptw.style.marginBottom='10px';ptw.appendChild(mkLbl('상위 업무'));ptw.appendChild(ptSel);detPanel.appendChild(ptw);
-  var ntInp=document.createElement('input');ntInp.className='fi';ntInp.id='dbt-notify';ntInp.type='date';ntInp.style.fontSize='12px';ntInp.value=t&&t.notify?t.notify:'';
-  var ntw=document.createElement('div');ntw.style.marginBottom='10px';ntw.appendChild(mkLbl('알림 날짜'));ntw.appendChild(ntInp);detPanel.appendChild(ntw);
-  var moTa=document.createElement('textarea');moTa.className='fi';moTa.id='dbt-memo';moTa.rows=2;
-  moTa.style.cssText='font-size:12px;resize:none';moTa.placeholder='추가 메모';moTa.value=t&&t.memo?t.memo:'';
-  var mow=document.createElement('div');mow.appendChild(mkLbl('메모'));mow.appendChild(moTa);detPanel.appendChild(mow);
-  box.appendChild(detBtn);box.appendChild(detPanel);
-  var br=document.createElement('div');br.style.cssText='display:flex;gap:8px;margin-top:4px';
+  var ptw=document.createElement('div');ptw.style.marginBottom='16px';ptw.appendChild(mkLbl('상위 업무'));ptw.appendChild(ptSel);box.appendChild(ptw);
+  // 버튼
+  var br=document.createElement('div');br.style.cssText='display:flex;gap:8px';
   if(id){
     var delB=document.createElement('button');delB.className='btn btn-red btn-sm';delB.textContent='삭제';
     (function(tid){delB.onclick=function(){_dbDeleteTask(tid);modal.remove();};})(id);
@@ -8424,21 +8383,16 @@ function _dbSaveTaskModal(id){
   var name=(document.getElementById('dbt-name')||{}).value||'';
   var area=(document.getElementById('dbt-area')||{}).value||'';
   var taskType=(document.getElementById('dbt-tasktype')||{}).value||'일반 업무';
-  var cycle=(document.getElementById('dbt-cycle')||{}).value||'반복없음';
-  var priority=(document.getElementById('dbt-priority')||{}).value||'일반';
+  var priority=(document.getElementById('dbt-priority')||{}).value||'중요';
   var dueDate=(document.getElementById('dbt-due')||{}).value||todayISO();
-  var status=(document.getElementById('dbt-status')||{}).value||'대기';
-  var memo=(document.getElementById('dbt-memo')||{}).value||'';
+  var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
   if(!name.trim()){alert('업무명을 입력하세요');return;}
   if(!_dbTasks)_dbTasks=[];
-  var linkedStudent=(document.getElementById('dbt-linked-student')||{}).value||'';
-  var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
-  var notify=(document.getElementById('dbt-notify')||{}).value||'';
   if(id){
     var t=_dbTasks.find(function(x){return x.id===id;});
-    if(t){t.name=name;t.area=area;t.taskType=taskType;t.cycle=cycle;t.priority=priority;t.dueDate=dueDate;t.status=status;t.memo=memo;t.linkedStudent=linkedStudent;t.parentTask=parentTask;t.notify=notify;}
+    if(t){t.name=name;t.area=area;t.taskType=taskType;t.priority=priority;t.dueDate=dueDate;t.parentTask=parentTask;}
   }else{
-    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,taskType:taskType,cycle:cycle,priority:priority,dueDate:dueDate,status:status,memo:memo,linkedStudent:linkedStudent,parentTask:parentTask,notify:notify,createdAt:todayISO()});
+    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,taskType:taskType,priority:priority,dueDate:dueDate,parentTask:parentTask,status:'대기',cycle:'반복없음',memo:'',createdAt:todayISO()});
   }
   saveDashBoard();
   var m=document.getElementById('db-task-modal');if(m)m.remove();
