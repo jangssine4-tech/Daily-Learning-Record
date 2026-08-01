@@ -8751,155 +8751,267 @@ function _wmWeekKey(){
 function _renderWMWeekly(el){
   var wk=_wmWeekKey();
   var d=_wmData[wk]||{};
-  var stuRows=d.students||[{name:'',reasons:[],action:'',contact:'',check:''}];
-  var contactRows=d.contacts||[{name:'',type:'문제 예방 연락',manager:'',deadline:''}];
+  var stuRows=d.students||[{name:'',reasons:[],action:'',contact:'',check:'',fact:'',cause:''}];
+  var contactRows=d.contacts||[{name:'',type:'문제 예방 연락',manager:'',deadline:'',followup:''}];
   var actionRows=d.actions||[{content:'',manager:'',deadline:'',criterion:'',done:false}];
   var qualArea=d.qualArea||'태블릿 수업';
   var savedChecks=d.qualChecks||[];
   var prevActions=_wmPrevActions(wk);
+
   var QUAL={
     '태블릿 수업':['학생이 단순히 화면을 넘기고 있지 않은지 확인했는가?','듣고 따라 말하는 활동을 제대로 하고 있는가?','오답이나 어려워하는 부분이 교재 수업과 연결되고 있는가?','교사가 태블릿 활동을 확인하고 피드백하고 있는가?'],
-    '교재 수업':['읽기의 정확도와 유창성을 함께 지도하고 있는가?','의미 단위로 끊어 읽는 기준이 일관적인가?','문법 설명 후 학생이 직접 문장을 만들어 보는가?','학생이 틀린 이유를 이해하고 있는가?'],
+    '교재 수업':['읽기의 정확도와 유창성을 함께 지도하고 있는가?','의미 단위로 끊어 읽는 기준이 일관적인가?','문법 설명 후 학생이 직접 문장을 만들어 보는가?','학생이 틀린 이유를 이해하고 있는가?','학생 수준에 맞는 질문을 하고 있는가?'],
     '숙제 점검':['숙제의 목적을 학생이 알고 있는가?','학생 수준에 비해 양이 많거나 적지 않은가?','제출 여부만 확인하고 내용은 확인하지 않는 경우가 없는가?','다음 수업에서 숙제 결과가 활용되고 있는가?'],
     '읽기 유창성':['WPM(분당 읽기 단어 수)을 주기적으로 확인하고 있는가?','소리 내어 읽는 시간이 충분히 확보되고 있는가?','실수한 부분을 바로 수정하기보다 끝까지 읽게 하는가?','학생 스스로 읽기 목표를 인식하고 있는가?'],
     '받아쓰기':['받아쓰기 결과를 다음 수업에 반영하고 있는가?','오답 단어를 재학습하는 루틴이 있는가?','점수가 낮은 학생에게 양을 줄여 성공 경험을 주고 있는가?','받아쓰기 결과를 학부모와 공유하고 있는가?']
   };
   var curChecks=QUAL[qualArea]||QUAL['태블릿 수업'];
   var IND=[
-    {id:'ind_att',label:'출결 (결석·반복 지각)'},
-    {id:'ind_hw',label:'숙제 (미제출·대충 제출)'},
-    {id:'ind_study',label:'학습 (진도·복습·받아쓰기)'},
-    {id:'ind_att2',label:'수업 태도 (참여·집중·방해)'},
-    {id:'ind_makeup',label:'보강 (미실시·일정)'},
-    {id:'ind_report',label:'보고서·학부모 연락'}
+    {id:'ind_att',label:'출결',desc:'결석·반복 지각',icon:'📋'},
+    {id:'ind_hw',label:'숙제',desc:'미제출·대충 제출',icon:'📝'},
+    {id:'ind_study',label:'학습 진도',desc:'진도·복습·받아쓰기',icon:'📚'},
+    {id:'ind_att2',label:'수업 태도',desc:'참여·집중·방해',icon:'🎯'},
+    {id:'ind_makeup',label:'보강',desc:'미실시·일정',icon:'🔄'},
+    {id:'ind_report',label:'보고서',desc:'누락·학부모 전달',icon:'📨'},
+    {id:'ind_parent',label:'학부모 연락',desc:'예정·완료·재확인',icon:'📞'},
+    {id:'ind_class',label:'반 운영',desc:'학생 수·수준 차이',icon:'🏫'}
   ];
   var STATUS=['안정적','관찰 필요','조치 필요'];
-  var REASONS=['숙제 미제출 반복','진도 지연','집중도 저하','퇴원 가능성','자신감 부족','학부모 불만'];
+  var STATUS_COLOR={'안정적':'#16a34a','관찰 필요':'#d97706','조치 필요':'#dc2626'};
+  var REASONS=['숙제 미제출 반복','진도 지연','집중도 저하','퇴원 가능성','자신감 부족','학부모 불만','교사 관계 불편','수업 수준 불일치'];
   var CTYPES=['문제 예방 연락','성장 공유 연락','확인 연락','정기 연락','신규 적응 연락'];
+  var CTYPE_COLOR={'문제 예방 연락':'#dc2626','성장 공유 연락':'#16a34a','확인 연락':'#2563eb','정기 연락':'#7c3aed','신규 적응 연락':'#d97706'};
+  var CTYPE_BG={'문제 예방 연락':'#fee2e2','성장 공유 연락':'#dcfce7','확인 연락':'#dbeafe','정기 연락':'#ede9fe','신규 적응 연락':'#fef3c7'};
+  var CTYPE_INFO={'문제 예방 연락':'숙제·태도·성취도가 떨어지기 시작한 학생','성장 공유 연락':'눈에 띄게 발전하거나 노력한 학생','확인 연락':'상담 후 후속 확인이 필요한 학생','정기 연락':'일정 기간 별도 연락이 없었던 학생','신규 적응 연락':'등록 후 1주·4주가 지난 학생'};
 
-  function sec(num,title,sub,content){
-    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-      +'<div style="width:24px;height:24px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+num+'</div>'
-      +'<div style="font-size:14px;font-weight:700;color:var(--navy)">'+title+'</div>'
-      +'<div style="font-size:11px;color:var(--txt3);margin-left:auto">'+sub+'</div>'
+  // 날짜 계산
+  var dt=new Date();
+  var dow=dt.getDay();
+  var diff=dow===0?-6:1-dow;
+  var mon=new Date(dt);mon.setDate(dt.getDate()+diff);
+  var sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  var fmt=function(d){return (d.getMonth()+1)+'월 '+d.getDate()+'일';};
+  var weekRange=fmt(mon)+' ~ '+fmt(sun);
+  var prevTotalCount=prevActions.length;
+  var prevDoneCount=prevActions.filter(function(a){return a.done;}).length;
+
+  function sec(num,title,sub,color,content){
+    return '<div style="background:var(--surface);border:1.5px solid var(--border);border-left:4px solid '+color+';border-radius:12px;padding:16px;margin-bottom:14px">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
+      +'<div style="width:28px;height:28px;border-radius:50%;background:'+color+'22;color:'+color+';font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+num+'</div>'
+      +'<div style="font-size:14px;font-weight:800;color:var(--navy)">'+title+'</div>'
+      +'<div style="margin-left:auto;background:'+color+'22;border:1px solid '+color+'44;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;color:'+color+'">⏱ '+sub+'</div>'
       +'</div>'+content+'</div>';
   }
-  function indSel(ind){
+
+  function indCard(ind){
     var val=d[ind.id]||'안정적';
-    var col=val==='조치 필요'?'var(--red)':val==='관찰 필요'?'var(--gold)':'var(--mint)';
-    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">'
-      +'<div style="font-size:10px;color:var(--txt3);margin-bottom:4px">'+ind.label+'</div>'
-      +'<select class="fi" style="font-size:11px;padding:3px 6px;border-color:'+col+';color:'+col+';font-weight:700" onchange="wmSetInd(\'+wk+\',\'+ind.id+\',this.value)">'
-      +STATUS.map(function(s){return'<option'+(s===val?' selected':'')+'>'+s+'</option>';}).join('')
+    var col=STATUS_COLOR[val]||'#16a34a';
+    var bgMap={'안정적':'#f0fdf4','관찰 필요':'#fffbeb','조치 필요':'#fef2f2'};
+    return '<div style="background:'+(bgMap[val]||'#f0fdf4')+';border:1.5px solid '+col+'44;border-radius:10px;padding:10px 12px">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      +'<span style="font-size:15px">'+ind.icon+'</span>'
+      +'<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--navy)">'+ind.label+'</div>'
+      +'<div style="font-size:10px;color:var(--txt3)">'+ind.desc+'</div></div>'
+      +'</div>'
+      +'<select class="fi" style="font-size:11px;padding:4px 6px;border-color:'+col+';font-weight:700;color:'+col+'" onchange="wmSetIndR(\''+wk+'\',\''+ind.id+'\',this.value,this)">'
+      +STATUS.map(function(s){return'<option value="'+s+'"'+(s===val?' selected':'')+'>'+s+'</option>';}).join('')
       +'</select></div>';
   }
+
   function stuRow(s,i){
-    return '<div style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:8px">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--navy)">집중 관리 학생 '+(i+1)+'</div>'
-      +(i>0?'<button class="btn btn-red btn-xs" onclick="wmRmStu(\'+wk+\','+i+')">✕ 삭제</button>':'')
+    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+      +'<div style="width:22px;height:22px;border-radius:50%;background:#fce7f3;color:#be185d;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy)">집중 관리 학생 '+(i+1)+'</div>'
+      +(i>0?'<button class="btn btn-red btn-xs" style="margin-left:auto" onclick="wmRmStu(\''+wk+'\','+i+')">✕ 삭제</button>':'')
       +'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
-      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">학생 이름</div>'
-      +'<input class="fi" style="font-size:12px" value="'+(s.name||'')+'" placeholder="이름" onblur="wmStuF(\'+wk+\','+i+',\'name\',this.value)"></div>'
-      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">선정 이유</div>'
+      +'<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;margin-bottom:10px">'
+      +'<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px">학생 이름</div>'
+      +'<input class="fi" style="font-size:13px;font-weight:600" value="'+(s.name||'')+'" placeholder="이름" onblur="wmStuF(\''+wk+'\','+i+',\'name\',this.value)"></div>'
+      +'<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px">선정 이유 (복수 선택)</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:4px">'
       +REASONS.map(function(r){
         var on=(s.reasons||[]).indexOf(r)>=0;
-        return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid '+(on?'var(--mint)':'var(--border)')+';background:'+(on?'var(--mint)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+';cursor:pointer" onclick="wmTogReason(\'+wk+\','+i+',\'+r+\',this)">'+r+'</span>';
+        return '<span style="font-size:10px;padding:3px 8px;border-radius:20px;border:1px solid '+(on?'#be185d':'var(--border)')+';background:'+(on?'#fce7f3':'var(--surface)')+';color:'+(on?'#be185d':'var(--txt2)')+';cursor:pointer" onclick="wmTogReason(\''+wk+'\','+i+',\''+r+'\',this)">'+r+'</span>';
       }).join('')+'</div></div></div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
-      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">수업 조치</div>'
-      +'<input class="fi" style="font-size:12px" value="'+(s.action||'')+'" placeholder="예) 숙제량 절반으로 줄이고 확인 강화" onblur="wmStuF(\'+wk+\','+i+',\'action\',this.value)"></div>'
-      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">학부모 연락 내용</div>'
-      +'<input class="fi" style="font-size:12px" value="'+(s.contact||'')+'" placeholder="예) 수요일까지 상황·지도계획 안내" onblur="wmStuF(\'+wk+\','+i+',\'contact\',this.value)"></div>'
+      +'<div style="background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+      +'<div style="background:#fce7f3;padding:6px 12px;font-size:10px;font-weight:700;color:#be185d">📋 5단계 논의 순서 (운영안 기준)</div>'
+      +'<div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">① 현재 관찰된 사실 (느낌 X, 구체적 사실로)</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.fact||'')+'" placeholder="예) 최근 2주 숙제 미제출 3회, 수업 집중 시간 5분 이내" onblur="wmStuF(\''+wk+'\','+i+',\'fact\',this.value)"></div>'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">② 가능한 원인 추정</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.cause||'')+'" placeholder="예) 학교 과제 증가, 숙제 방법 이해 부족" onblur="wmStuF(\''+wk+'\','+i+',\'cause\',this.value)"></div>'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">③ 수업에서 바꿀 점</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.action||'')+'" placeholder="예) 숙제량 절반으로 줄이고 수업 마지막 3분에 제출 확인" onblur="wmStuF(\''+wk+'\','+i+',\'action\',this.value)"></div>'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">④ 가정과 공유할 내용</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.contact||'')+'" placeholder="예) 수요일까지 상황과 지도 계획 학부모 안내" onblur="wmStuF(\''+wk+'\','+i+',\'contact\',this.value)"></div>'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">⑤ 다음 주 확인할 변화</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(s.check||'')+'" placeholder="예) 주 3회 제출 여부, 수업 집중 시간 개선" onblur="wmStuF(\''+wk+'\','+i+',\'check\',this.value)"></div>'
+      +'</div></div></div>';
+  }
+
+  function contactCard(c,i){
+    var ctype=c.type||'문제 예방 연락';
+    var ctCol=CTYPE_COLOR[ctype]||'#6b7280';
+    var ctBg=CTYPE_BG[ctype]||'#f3f4f6';
+    return '<div style="background:var(--surface);border:1.5px solid '+ctCol+'44;border-radius:10px;padding:12px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      +'<select class="fi" style="font-size:11px;padding:3px 6px;background:'+ctBg+';color:'+ctCol+';border-color:'+ctCol+';font-weight:700;width:auto" onchange="wmContF(\''+wk+'\','+i+',\'type\',this.value)">'
+      +CTYPES.map(function(t){return'<option value="'+t+'"'+(t===ctype?' selected':'')+'>'+t+'</option>';}).join('')
+      +'</select>'
+      +'<span style="font-size:10px;color:var(--txt3);flex:1">'+( CTYPE_INFO[ctype]||'')+'</span>'
+      +'<button class="btn btn-red btn-xs" onclick="wmRmCont(\''+wk+'\','+i+')">✕</button>'
       +'</div>'
-      +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:3px">다음 주 확인할 변화</div>'
-      +'<input class="fi" style="font-size:12px" value="'+(s.check||'')+'" placeholder="예) 주 3회 제출 여부" onblur="wmStuF(\'+wk+\','+i+',\'check\',this.value)"></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">학생 이름</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(c.name||'')+'" placeholder="이름" onblur="wmContF(\''+wk+'\','+i+',\'name\',this.value)"></div>'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">담당</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(c.manager||'')+'" placeholder="원장 / 교사" onblur="wmContF(\''+wk+'\','+i+',\'manager\',this.value)"></div>'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">연락 기한</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(c.deadline||'')+'" placeholder="예) 수요일까지" onblur="wmContF(\''+wk+'\','+i+',\'deadline\',this.value)"></div>'
+      +'</div>'
+      +'<div><div style="font-size:10px;color:var(--txt3);margin-bottom:3px">연락 메모 (긍정 → 관찰 → 지도방법 → 가정협력 → 재확인)</div>'
+      +'<input class="fi" style="font-size:12px" value="'+(c.followup||'')+'" placeholder="예) 읽기 향상 → 숙제 간헐적 미제출 → 양 조정 중 → 가정에서 10분 읽기 → 금요일 재확인" onblur="wmContF(\''+wk+'\','+i+',\'followup\',this.value)"></div>'
       +'</div>';
   }
-  function contactRow(c,i){
-    return '<tr>'
-      +'<td><input class="fi" style="font-size:11px" value="'+(c.name||'')+'" placeholder="이름" onblur="wmContF(\'+wk+\','+i+',\'name\',this.value)"></td>'
-      +'<td><select class="fi" style="font-size:11px;padding:4px 6px" onchange="wmContF(\'+wk+\','+i+',\'type\',this.value)">'
-      +CTYPES.map(function(t){return'<option'+(t===c.type?' selected':'')+'>'+t+'</option>';}).join('')
-      +'</select></td>'
-      +'<td><input class="fi" style="font-size:11px" value="'+(c.manager||'')+'" placeholder="원장/교사명" onblur="wmContF(\'+wk+\','+i+',\'manager\',this.value)"></td>'
-      +'<td><input class="fi" style="font-size:11px" value="'+(c.deadline||'')+'" placeholder="예) 수요일" onblur="wmContF(\'+wk+\','+i+',\'deadline\',this.value)"></td>'
-      +'<td style="text-align:center"><button class="btn btn-red btn-xs" onclick="wmRmCont(\'+wk+\','+i+')">✕</button></td>'
-      +'</tr>';
-  }
-  function actionRow(a,i,isPrev){
-    var bg=isPrev?'background:#fef3c7':'';
-    return '<tr style="'+bg+'">'
+
+  function actionCard(a,i,isPrev){
+    var isDone=a.done;
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);background:'+(isPrev?(isDone?'#f0fdf4':'#fffbeb'):'var(--surface)')+';">'
+      +'<input type="checkbox"'+(isDone?' checked':'')+' onchange="'+(isPrev?'wmMarkDone(\''+a._sk+'\','+a._si+',this.checked)':'wmActDone(\''+wk+'\','+i+',this.checked)')+'" style="width:16px;height:16px;flex-shrink:0;margin-top:3px;accent-color:var(--mint);cursor:pointer">'
+      +'<div style="flex:1;min-width:0">'
       +(isPrev
-        ?'<td style="text-align:center"><input type="checkbox"'+(a.done?' checked':'')+' onchange="wmMarkDone(\'+a._sk+\','+a._si+',this.checked)" style="width:15px;height:15px"><div style="font-size:9px;color:var(--gold)">이월</div></td>'
-        :'<td style="text-align:center"><input type="checkbox"'+(a.done?' checked':'')+' onchange="wmActDone(\'+wk+\','+i+',this.checked)" style="width:15px;height:15px"></td>')
-      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.content||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.content||'')+'" placeholder="실행 내용" onblur="wmActF(\'+wk+\','+i+',\'content\',this.value)">')+'</td>'
-      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.manager||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.manager||'')+'" placeholder="담당자" onblur="wmActF(\'+wk+\','+i+',\'manager\',this.value)">')+'</td>'
-      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.deadline||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.deadline||'')+'" placeholder="기한" onblur="wmActF(\'+wk+\','+i+',\'deadline\',this.value)">')+'</td>'
-      +'<td>'+(isPrev?'<span style="font-size:11px;color:var(--txt2)">'+(a.criterion||'')+'</span>':'<input class="fi" style="font-size:11px" value="'+(a.criterion||'')+'" placeholder="확인 기준" onblur="wmActF(\'+wk+\','+i+',\'criterion\',this.value)">')+'</td>'
-      +(isPrev?'':'<td style="text-align:center"><button class="btn btn-red btn-xs" onclick="wmRmAct(\'+wk+\','+i+')">✕</button></td>')
-      +'</tr>';
+        ?'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:9px;font-weight:700;background:#fef3c7;color:#d97706;padding:1px 6px;border-radius:4px">이월</span><span style="font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--navy);font-weight:600')+'">'+(a.content||'')+'</span></div>'
+        :'<input class="fi" style="font-size:12px;font-weight:600;margin-bottom:6px" value="'+(a.content||'')+'" placeholder="실행 내용 (구체적으로)" onblur="wmActF(\''+wk+'\','+i+',\'content\',this.value)">'
+      )
+      +'<div style="display:grid;grid-template-columns:80px 80px 1fr;gap:6px">'
+      +(isPrev
+        ?'<div style="font-size:11px;color:var(--txt2)">👤 '+(a.manager||'-')+'</div><div style="font-size:11px;color:var(--txt2)">📅 '+(a.deadline||'-')+'</div><div style="font-size:11px;color:var(--txt2)">✓ '+(a.criterion||'-')+'</div>'
+        :'<input class="fi" style="font-size:11px" value="'+(a.manager||'')+'" placeholder="담당자" onblur="wmActF(\''+wk+'\','+i+',\'manager\',this.value)"><input class="fi" style="font-size:11px" value="'+(a.deadline||'')+'" placeholder="기한" onblur="wmActF(\''+wk+'\','+i+',\'deadline\',this.value)"><input class="fi" style="font-size:11px" value="'+(a.criterion||'')+'" placeholder="확인 기준" onblur="wmActF(\''+wk+'\','+i+',\'criterion\',this.value)">'
+      )
+      +'</div></div>'
+      +(isPrev?'':'<button onclick="wmRmAct(\''+wk+'\','+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 4px;flex-shrink:0">✕</button>')
+      +'</div>';
   }
 
-  var monLabel=wk.replace('weekly_','');
-  var html='<div style="max-width:700px">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
-    +'<div style="font-size:12px;color:var(--txt3)">📅 '+monLabel+' 주간 회의</div>'
-    +'</div>';
+  var html='<div style="max-width:740px">';
 
-  html+=sec('1','긍정적인 변화 공유','5분',
-    '<div style="font-size:11px;color:var(--txt3);margin-bottom:6px">한 주 동안 좋았던 학생 변화 또는 효과적이었던 수업 방법</div>'
-    +'<textarea class="fi" rows="3" placeholder="예) ○○가 처음으로 스스로 숙제를 완료해 왔음" onblur="wmSetField(\'+wk+\',\'positive\',this.value)">'+(d.positive||'')+'</textarea>');
+  // ── 헤더 ──
+  html+='<div style="background:linear-gradient(135deg,var(--navy) 0%,#1e40af 100%);border-radius:14px;padding:16px 20px;margin-bottom:16px;color:#fff">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+    +'<div><div style="font-size:11px;opacity:.7;margin-bottom:2px">잉글리시아이위드멘토링 주간 운영 회의</div>'
+    +'<div style="font-size:16px;font-weight:800">📅 '+weekRange+'</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<div style="background:rgba(255,255,255,.15);border-radius:8px;padding:6px 12px;font-size:11px;text-align:center"><div style="font-weight:700;font-size:15px">50분</div><div style="opacity:.8">회의 시간</div></div>'
+    +(prevTotalCount?'<div style="background:'+(prevDoneCount===prevTotalCount?'rgba(0,184,148,.35)':'rgba(245,158,11,.35)')+';border-radius:8px;padding:6px 12px;font-size:11px;text-align:center"><div style="font-weight:700;font-size:15px">'+prevDoneCount+'/'+prevTotalCount+'</div><div style="opacity:.8">전주 실행</div></div>':'')
+    +'</div></div></div>';
 
-  html+=sec('2','핵심 운영 지표 확인','10분',
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+IND.map(indSel).join('')+'</div>'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px;margin-top:4px">추가 메모</div>'
-    +'<textarea class="fi" rows="2" placeholder="이상이 있거나 조치가 필요한 항목 구체적으로 기록" onblur="wmSetField(\'+wk+\',\'indMemo\',this.value)">'+(d.indMemo||'')+'</textarea>');
+  // ── 전주 미완료 실행사항 (최상단) ──
+  var incomplete=prevActions.filter(function(a){return !a.done;});
+  if(incomplete.length){
+    html+='<div style="background:#fffbeb;border:2px solid var(--gold);border-radius:12px;margin-bottom:14px;overflow:hidden">'
+      +'<div style="background:#fef3c7;padding:10px 14px;display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:16px">⚠️</span>'
+      +'<div style="font-size:13px;font-weight:800;color:#92400e">지난 주 미완료 실행사항 — 회의 시작 전 먼저 확인</div>'
+      +'<span style="margin-left:auto;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">'+incomplete.length+'건</span>'
+      +'</div>'
+      +incomplete.map(function(a){return actionCard(a,-1,true);}).join('')
+      +'</div>';
+  }
 
-  html+=sec('3','집중 관리 학생 논의','15분 · 최대 3명',
-    '<div id="wm-stu-rows">'+stuRows.map(stuRow).join('')+'</div>'
-    +(stuRows.length<3?'<button class="btn btn-outline btn-sm" onclick="wmAddStu(\'+wk+\')">+ 학생 추가 (최대 3명)</button>':'<div style="font-size:11px;color:var(--txt3)">최대 3명 선정</div>'));
+  // ① 긍정적인 변화 공유
+  var posTags=['스스로 숙제 완료','읽기 속도 향상','발표 자신감','학부모 긍정 반응','효과적인 수업','단어 시험 향상','WPM 향상'];
+  var posHtml='<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">💡 회의가 문제 이야기로만 채워지지 않도록 — 작은 성장과 좋은 지도 사례를 먼저 나눕니다.</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'
+    +posTags.map(function(tag){return'<span style="font-size:10px;padding:3px 8px;border-radius:20px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;cursor:pointer" onclick="wmAddPosTag(\''+wk+'\',\''+tag+'\')">＋ '+tag+'</span>';}).join('')
+    +'</div>'
+    +'<textarea class="fi" rows="3" style="font-size:12px" placeholder="예) ○○가 처음으로 스스로 숙제 완료&#13;&#10;예) △△ WPM 이번 주 +20 향상&#13;&#10;예) 학부모님 일일 보고서에 긍정 피드백" onblur="wmSetField(\''+wk+'\',\'positive\',this.value)">'+(d.positive||'')+'</textarea>';
+  html+=sec('1','긍정적인 변화 공유','5분','#f59e0b',posHtml);
 
+  // ② 핵심 운영 지표 확인
+  var indHtml='<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">전체 수치를 보고하지 않습니다. <strong>이상이 있거나 조치가 필요한 항목만</strong> 확인합니다.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+IND.map(indCard).join('')+'</div>'
+    +'<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px">조치 필요 항목 메모</div>'
+    +'<textarea class="fi" rows="2" style="font-size:12px" placeholder="관찰 필요 / 조치 필요 항목 구체적으로 기록" onblur="wmSetField(\''+wk+'\',\'indMemo\',this.value)">'+(d.indMemo||'')+'</textarea></div>';
+  html+=sec('2','핵심 운영 지표 확인','10분','#3b82f6',indHtml);
+
+  // ③ 집중 관리 학생
+  var stuHtml='<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">관찰된 사실 → 원인 → 수업 조치 → 가정 공유 → 다음 주 확인 순서로 논의합니다.</div>'
+    +'<div id="wm-stu-rows">'+stuRows.map(stuRow).join('')+'</div>'
+    +(stuRows.length<3
+      ?'<button class="btn btn-outline btn-sm" onclick="wmAddStu(\''+wk+'\')">+ 학생 추가 <span style="font-size:10px;color:var(--txt3)">(최대 3명)</span></button>'
+      :'<div style="font-size:11px;color:var(--txt3);padding:8px 12px;background:var(--surface2);border-radius:6px;text-align:center">⚠️ 최대 3명 — 운영안 기준에 따라 집중도를 유지합니다</div>');
+  html+=sec('3','집중 관리 학생 논의','15분','#ec4899',stuHtml);
+
+  // ④ 수업 품질 개선
   var areaChips=['태블릿 수업','교재 수업','숙제 점검','읽기 유창성','받아쓰기'].map(function(a){
     var on=a===qualArea;
-    return '<span style="font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid '+(on?'var(--mint)':'var(--border)')+';background:'+(on?'var(--mint)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+'" onclick="wmSetQArea(\'+wk+\',\'+a+\')">'+a+'</span>';
+    return '<span style="font-size:11px;padding:5px 12px;border-radius:20px;cursor:pointer;border:1.5px solid '+(on?'var(--mint)':'var(--border)')+';background:'+(on?'var(--mint)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+';font-weight:'+(on?'700':'500')+'" onclick="wmSetQArea(\''+wk+'\',\''+a+'\')">'+a+'</span>';
   }).join('');
   var checkItems=curChecks.map(function(c){
     var chk=savedChecks.indexOf(c)>=0;
-    return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
-      +'<input type="checkbox"'+(chk?' checked':'')+' onchange="wmTogCheck(\'+wk+\',\'+c+\',this.checked)" style="width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:var(--mint)">'
-      +'<span style="font-size:12px;color:var(--txt);line-height:1.5'+(chk?';text-decoration:line-through;color:var(--txt3)':'')+'">'+(c)+'</span></div>';
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
+      +'<input type="checkbox"'+(chk?' checked':'')+' onchange="wmTogCheck(\''+wk+'\',\''+c+'\',this.checked)" style="width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:var(--mint);cursor:pointer">'
+      +'<span style="font-size:12px;line-height:1.6;'+(chk?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+c+'</span></div>';
   }).join('');
-  html+=sec('4','수업 품질 개선','10분 · 주제 1가지',
-    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+areaChips+'</div>'
-    +checkItems
-    +'<div style="margin-top:10px"><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">이번 주 공통 수업 기준 (구체적인 행동으로)</div>'
-    +'<textarea class="fi" rows="2" placeholder="예) 수업 마지막 3분, 모든 학생이 오늘 배운 문법으로 문장 한 개를 직접 말하게 한다" onblur="wmSetField(\'+wk+\',\'qualStd\',this.value)">'+(d.qualStd||'')+'</textarea></div>');
+  var qualHtml='<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">매주 주제 1가지만 다룹니다. "더 잘하자"가 아닌 <strong>구체적인 행동 기준</strong>으로 정합니다.</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+areaChips+'</div>'
+    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:8px">✅ 점검 항목</div>'
+    +checkItems+'</div>'
+    +'<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px">이번 주 공통 수업 기준 (행동으로)</div>'
+    +'<textarea class="fi" rows="2" style="font-size:12px" placeholder="예) 수업 마지막 3분, 모든 학생이 오늘 배운 문법으로 문장 한 개를 직접 말하게 한다" onblur="wmSetField(\''+wk+'\',\'qualStd\',this.value)">'+(d.qualStd||'')+'</textarea></div>';
+  html+=sec('4','수업 품질 개선','10분','#10b981',qualHtml);
 
-  html+=sec('5','학부모 소통 대상 선정','5분',
-    '<div style="overflow-x:auto"><table class="tbl" style="font-size:12px;min-width:500px">'
-    +'<thead><tr><th>학생</th><th>연락 유형</th><th>담당</th><th>기한</th><th></th></tr></thead>'
-    +'<tbody>'+contactRows.map(contactRow).join('')+'</tbody></table></div>'
-    +'<button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wmAddCont(\'+wk+\')">+ 행 추가</button>');
+  // ⑤ 학부모 소통
+  var ctypeGuide='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">';
+  CTYPES.forEach(function(t){ctypeGuide+='<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:'+CTYPE_BG[t]+';color:'+CTYPE_COLOR[t]+';border:1px solid '+CTYPE_COLOR[t]+'44">'+t+'</span>';});
+  ctypeGuide+='</div>';
+  var contHtml='<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">문제 학생에게만 한정하지 않습니다. <strong>성장 공유·정기 연락도 함께</strong> 계획합니다.</div>'
+    +ctypeGuide
+    +'<div id="wm-cont-rows">'+contactRows.map(contactCard).join('')+'</div>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:4px" onclick="wmAddCont(\''+wk+'\')">+ 연락 대상 추가</button>';
+  html+=sec('5','학부모 소통 대상 선정','5분','#8b5cf6',contHtml);
 
-  var actionHTML='';
-  if(prevActions.length){actionHTML+='<div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:6px">⚠️ 지난 주 미완료 실행사항</div>';}
-  actionHTML+='<div style="overflow-x:auto"><table class="tbl" style="font-size:12px;min-width:580px">'
-    +'<thead><tr><th style="width:40px">완료</th><th>실행 내용</th><th style="width:70px">담당</th><th style="width:60px">기한</th><th>확인 기준</th><th style="width:36px"></th></tr></thead>'
-    +'<tbody>'
-    +prevActions.map(function(a){return actionRow(a,-1,true);}).join('')
-    +actionRows.map(function(a,i){return actionRow(a,i,false);}).join('')
-    +'</tbody></table></div>'
-    +'<button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wmAddAct(\'+wk+\')">+ 행 추가</button>'
-    +'<div style="margin-top:12px;background:#fef3c7;border-radius:8px;padding:10px 12px">'
-    +'<div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:2px">다음 주 회의 첫 순서</div>'
-    +'<div style="font-size:11px;color:#b45309">이번 주 실행 사항의 완료 여부를 다음 주 회의에서 반드시 먼저 확인합니다.</div></div>';
-  html+=sec('6','실행 사항 확정','5분',actionHTML);
+  // ⑥ 실행 사항 확정
+  var actHtml='<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">모든 실행 사항에 <strong>담당자 + 기한 + 확인 기준</strong>을 반드시 정합니다.</div>'
+    +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">'
+    +'<div style="background:var(--navy);padding:8px 14px;font-size:11px;font-weight:700;color:#fff;display:flex;align-items:center;gap:6px">'
+    +'<span>📋 이번 주 실행 사항</span><span style="margin-left:auto;opacity:.7;font-size:10px">실행 내용 · 담당자 · 기한 · 확인기준 필수</span></div>'
+    +actionRows.map(function(a,i){return actionCard(a,i,false);}).join('')
+    +'<div style="padding:8px 12px;background:var(--surface)"><button class="btn btn-outline btn-sm" onclick="wmAddAct(\''+wk+'\')">+ 실행사항 추가</button></div>'
+    +'</div>'
+    +'<div style="background:#fffbeb;border:1.5px solid var(--gold);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px">'
+    +'<span style="font-size:20px">🔔</span>'
+    +'<div><div style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:3px">다음 주 회의 필수 첫 순서</div>'
+    +'<div style="font-size:11px;color:#92400e;line-height:1.6">이번 주 실행 사항의 완료 여부를 다음 주 회의에서 반드시 먼저 확인합니다.<br>회의 정착 5원칙: <em>다음 회의에서 실행 결과를 반드시 확인한다</em></div></div>'
+    +'</div>';
+  html+=sec('6','실행 사항 확정','5분','#ef4444',actHtml);
+
+  // 5원칙 푸터
+  html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:4px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px">📌 회의 정착 5원칙</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    +['① 보고보다 결정을 많이 한다','② 느낌보다 관찰된 사실을 이야기한다','③ 교사를 탓하기보다 지도 방법을 개선한다','④ 모든 결정에 담당자와 기한을 정한다','⑤ 다음 회의에서 실행 결과를 반드시 확인한다'].map(function(p,i){
+      return '<div style="background:#eff6ff;border-radius:6px;padding:8px 10px;font-size:11px;color:#1e40af'+(i===4?';grid-column:span 2;background:#dbeafe;font-weight:700':'')+'">'+(i===4?'⭐ '+p:p)+'</div>';
+    }).join('')+'</div></div>';
+
   html+='</div>';
   el.innerHTML=html;
+}
+
+function wmAddPosTag(wk,tag){
+  if(!_wmData[wk])_wmData[wk]={};
+  var cur=_wmData[wk].positive||'';
+  _wmData[wk].positive=cur+(cur?'\n':'')+tag+': ';
+  _wmSave();
+  _renderWMPanel(document.getElementById('meeting-area'));
+}
+function wmSetIndR(wk,field,val,sel){
+  wmSetField(wk,field,val);
+  var col={'안정적':'#16a34a','관찰 필요':'#d97706','조치 필요':'#dc2626'}[val]||'#16a34a';
+  if(sel){sel.style.borderColor=col;sel.style.color=col;}
 }
 
 function wmSetField(wk,field,val){if(!_wmData[wk])_wmData[wk]={};_wmData[wk][field]=val;_wmSave();}
