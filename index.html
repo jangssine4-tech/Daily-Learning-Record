@@ -7911,29 +7911,12 @@ function _renderDashBoardUI(el){
   });
   html+='</div>';
 
-  // ── 필터 바 ──
-  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
-  // 영역 필터
-  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbAreaFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
-  html+='<option value="">전체 영역</option>';
-  _DB_AREAS.forEach(function(a){html+='<option value="'+a+'"'+(_dbAreaFilter===a?' selected':'')+'>'+_DB_AREA_ICONS[a]+' '+a+'</option>';});
-  html+='</select>';
-  // 상태 필터
-  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbStatusFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
-  html+='<option value="">전체 상태</option>';
-  _DB_STATUSES.forEach(function(s){html+='<option value="'+s+'"'+(_dbStatusFilter===s?' selected':'')+'>'+s+'</option>';});
-  html+='</select>';
-  // 우선순위 필터
-  html+='<select class="fi" style="font-size:11px;padding:3px 6px;width:auto" onchange="_dbPriorityFilter=this.value;_renderDashBoardUI(document.getElementById(\'dashboard-board-area\'))">';
-  html+='<option value="">전체 우선순위</option>';
-  _DB_PRIORITIES.forEach(function(p){html+='<option value="'+p+'"'+(_dbPriorityFilter===p?' selected':'')+'>'+_DB_PRIORITY_SHORT[p]+'</option>';});
-  html+='</select>';
-  html+='<button class="btn btn-navy btn-sm" style="margin-left:auto" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
+  html+='<div style="display:flex;justify-content:flex-end">';
+  html+='<button class="btn btn-navy btn-sm" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
   html+='</div>';
 
+  var todayExtra=[];
   if(_dbView==='today'){
-    html+=_renderPriorityTaskSection('이달의 중점','이달의 중점 추진 사항','#f0f9ff','🎯');
-    html+=_renderPriorityTaskSection('이번 주 중점','이번 주 중점 추진 사항','#f5f3ff','📅');
     html+=_renderDbTodayView(autoTasks,today,now);
   }
   else if(_dbView==='week') html+=_renderDbWeekView(now);
@@ -7941,6 +7924,26 @@ function _renderDashBoardUI(el){
 
   html+='</div>';
   el.innerHTML=html;
+
+  // 중점 추진사항 섹션을 최상단에 DOM으로 삽입
+  if(_dbView==='today'){
+    var container=el.querySelector('div');
+    if(container){
+      var weeklyEl=document.createElement('div');
+      weeklyEl.innerHTML=_renderPriorityTaskSection('이번 주 중점','이번 주 중점 추진 사항','#f5f3ff','📅');
+      var monthlyEl=document.createElement('div');
+      monthlyEl.innerHTML=_renderPriorityTaskSection('이달의 중점','이달의 중점 추진 사항','#f0f9ff','🎯');
+      // 탭 다음에 삽입 (첫번째 자식 다음)
+      var firstChild=container.firstChild;
+      if(firstChild&&firstChild.nextSibling){
+        container.insertBefore(weeklyEl,firstChild.nextSibling);
+        container.insertBefore(monthlyEl,firstChild.nextSibling);
+      }else{
+        container.appendChild(monthlyEl);
+        container.appendChild(weeklyEl);
+      }
+    }
+  }
   // 오른쪽 패널 렌더링
   _renderDashRightPanel();
 }
