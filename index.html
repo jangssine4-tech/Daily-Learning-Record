@@ -9068,37 +9068,290 @@ function switchMeetingTab(tab){
 function _renderMeetingPagePanel(){
   var el=document.getElementById('meeting-page-area');
   if(!el)return;
-  if(_meetingPageTab==='monthly')renderMeetingPage();
+  if(_meetingPageTab==='monthly')_renderParentMeetingMonthly(el);
   else if(_meetingPageTab==='annual')_renderParentMeetingAnnual(el);
   else if(_meetingPageTab==='guide')_renderParentMeetingGuide(el);
-  else if(_meetingPageTab==='detail')el.innerHTML='<div style="padding:20px;color:var(--txt3)">간담회 준비 콘텐츠 준비 중</div>';
+  else if(_meetingPageTab==='detail')_renderParentMeetingDetail(el);
+}
+
+// ── 공통 헬퍼 ──────────────────────────────────────
+function _pmCard(title,content){
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+    +'<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">'+title+'</div>'
+    +content+'</div>';
+}
+function _pmTbl(headers,rows){
+  var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr>'+headers.map(function(h){return'<th style="background:var(--navy);color:#fff;padding:6px 10px;text-align:left">'+h+'</th>';}).join('')+'</tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    h+='<tr style="background:'+(i%2?'var(--surface2)':'var(--surface)')+'">'+r.map(function(c){return'<td style="padding:6px 10px;border-bottom:1px solid var(--border)">'+c+'</td>';}).join('')+'</tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function _pmSteps(items){
+  return '<div style="display:flex;flex-direction:column;gap:6px">'+items.map(function(s,i){
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:8px">'
+      +'<div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</div>'
+      +'<div style="font-size:12px;line-height:1.6">'+s+'</div></div>';
+  }).join('')+'</div>';
+}
+function _pmUl(items){
+  return '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:2">'+items.map(function(i){return'<li>'+i+'</li>';}).join('')+'</ul>';
+}
+
+// ── 월간 계획 탭 ──────────────────────────────────
+function _renderParentMeetingMonthly(el){
+  if(!_wmData)_wmData={};
+  var now=new Date();
+  var yr=now.getFullYear();
+  var mo=now.getMonth()+1;
+  var moStr=yr+'-'+String(mo).padStart(2,'0');
+  var saved=_wmData.parentMeetingAnnual||{};
+  var thisMonMemo=saved['m'+mo]||'';
+  var lastMonMemo=saved['m'+(mo===1?12:mo-1)]||'';
+
+  // 연간 학사일정에서 이번 달 간담회 관련 행사 찾기
+  var calEvts=(_academicCalendar&&_academicCalendar.events)||[];
+  var thisMonEvts=calEvts.filter(function(e){
+    return (e.date&&e.date.slice(0,7)===moStr)||(e.prepStartDate&&e.prepStartDate.slice(0,7)===moStr);
+  });
+
+  // 간담회 준비 데이터
+  var preparations=_wmData.parentMeetingPrep||{};
+
+  var html='<div style="max-width:700px;padding:4px">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📅 '+yr+'년 '+mo+'월 간담회 계획</div>'
+    +'<button class="btn btn-navy btn-sm" onclick="_saveParentMeetingMonthly()">💾 저장</button>'
+    +'</div>';
+
+  // 이번 달 예정 행사
+  var evtHTML='';
+  if(thisMonEvts.length){
+    thisMonEvts.forEach(function(e){
+      var dday='';
+      if(e.date){
+        var diff=Math.round((new Date(e.date)-now)/(1000*60*60*24));
+        dday=diff>0?'<span style="font-size:10px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:4px;margin-left:6px">D-'+diff+'</span>':diff===0?'<span style="font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;margin-left:6px">오늘</span>':'<span style="font-size:10px;font-weight:700;background:#f0fdf4;color:#16a34a;padding:1px 6px;border-radius:4px;margin-left:6px">완료</span>';
+      }
+      evtHTML+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;margin-bottom:6px">'
+        +'<span style="font-size:14px">📌</span>'
+        +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--navy)">'+e.title+dday+'</div>'
+        +'<div style="font-size:11px;color:var(--txt3)">'+(e.date||'')+' · '+(e.cat||'')+'</div></div>'
+        +'<button class="btn btn-outline btn-xs" onclick="switchMeetingTab(\'detail\');setTimeout(function(){_selectPmEvent(\''+e.id+'\')},100)">준비하기 →</button>'
+        +'</div>';
+    });
+  }else{
+    evtHTML='<div style="font-size:12px;color:var(--txt3);padding:10px;text-align:center">이번 달 예정된 간담회·설명회 행사가 없습니다<br><span style="font-size:11px">연간 학사일정에 행사를 등록하면 여기에 자동으로 표시됩니다</span></div>';
+  }
+  html+=_pmCard('📌 이번 달 예정 행사',evtHTML);
+
+  // 이번 달 메모
+  html+=_pmCard('📝 이번 달 메모',
+    '<textarea class="fi" id="pm-monthly-memo" rows="4" style="font-size:12px" placeholder="이번 달 간담회 관련 메모, 준비 현황, 특이사항을 기록하세요">'+thisMonMemo+'</textarea>'
+  );
+
+  // 지난 달 결과
+  html+=_pmCard('📋 지난 달 결과 요약',
+    '<textarea class="fi" id="pm-lastmon-memo" rows="3" style="font-size:12px" placeholder="지난 달 간담회·설명회 결과, 학부모 반응, 개선점을 기록하세요">'+lastMonMemo+'</textarea>'
+  );
+
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function _saveParentMeetingMonthly(){
+  if(!_wmData)_wmData={};
+  if(!_wmData.parentMeetingAnnual)_wmData.parentMeetingAnnual={};
+  var now=new Date();var mo=now.getMonth()+1;
+  var memo=document.getElementById('pm-monthly-memo');
+  var lastMemo=document.getElementById('pm-lastmon-memo');
+  if(memo)_wmData.parentMeetingAnnual['m'+mo]=memo.value;
+  if(lastMemo)_wmData.parentMeetingAnnual['m'+(mo===1?12:mo-1)]=lastMemo.value;
+  _wmSave();toast('✅ 월간 계획 저장됨');
+}
+
+// ── 간담회 준비 탭 ──────────────────────────────────
+var _pmSelectedEvtId='';
+function _selectPmEvent(id){_pmSelectedEvtId=id;_renderParentMeetingDetail(document.getElementById('meeting-page-area'));}
+
+function _renderParentMeetingDetail(el){
+  if(!_wmData)_wmData={};
+  var calEvts=(_academicCalendar&&_academicCalendar.events)||[];
+  var meetingEvts=calEvts.filter(function(e){return e.cat==='설명회·간담회';});
+  var allEvts=calEvts;
+
+  // 행사 선택 드롭다운
+  var selOpts='<option value="">행사를 선택하세요</option>';
+  if(meetingEvts.length){
+    selOpts+='<optgroup label="── 설명회·간담회">';
+    meetingEvts.forEach(function(e){selOpts+='<option value="'+e.id+'"'+(e.id===_pmSelectedEvtId?' selected':'')+'>'+e.date.slice(0,7)+' '+e.title+'</option>';});
+    selOpts+='</optgroup>';
+  }
+  var otherEvts=allEvts.filter(function(e){return e.cat!=='설명회·간담회';});
+  if(otherEvts.length){
+    selOpts+='<optgroup label="── 기타 행사">';
+    otherEvts.forEach(function(e){selOpts+='<option value="'+e.id+'"'+(e.id===_pmSelectedEvtId?' selected':'')+'>'+e.date.slice(0,7)+' '+e.title+'</option>';});
+    selOpts+='</optgroup>';
+  }
+
+  var html='<div style="max-width:700px;padding:4px">';
+  html+='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">🤝 간담회 준비 워크시트</div>';
+
+  // 행사 선택
+  html+='<div style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;gap:10px">';
+  html+='<span style="font-size:12px;font-weight:700;color:var(--navy);flex-shrink:0">행사 선택</span>';
+  html+='<select class="fi" style="flex:1;font-size:13px;font-weight:600" onchange="_selectPmEvent(this.value)">'+selOpts+'</select>';
+  html+='</div>';
+
+  if(!_pmSelectedEvtId||!calEvts.find(function(e){return e.id===_pmSelectedEvtId;})){
+    if(calEvts.length===0){
+      html+='<div style="text-align:center;padding:30px;color:var(--txt3);font-size:13px">연간 학사일정에 행사를 먼저 등록해 주세요<br><span style="font-size:11px">📆 연간 학사일정 메뉴에서 추가할 수 있어요</span></div>';
+    }else{
+      html+='<div style="text-align:center;padding:30px;color:var(--txt3);font-size:13px">위에서 준비할 행사를 선택해 주세요</div>';
+    }
+    html+='</div>';
+    el.innerHTML=html;
+    return;
+  }
+
+  var evt=calEvts.find(function(e){return e.id===_pmSelectedEvtId;});
+  var prep=(_wmData.parentMeetingPrep&&_wmData.parentMeetingPrep[_pmSelectedEvtId])||{};
+  var now=new Date();
+  var diff=evt.date?Math.round((new Date(evt.date)-now)/(1000*60*60*24)):null;
+  var ddayBadge=diff!==null?(diff>0?'<span style="font-size:11px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:6px">D-'+diff+'</span>':diff===0?'<span style="font-size:11px;font-weight:700;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:6px">오늘</span>':'<span style="font-size:11px;font-weight:700;background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:6px">완료</span>'):'';
+
+  // 행사 요약
+  html+='<div style="background:linear-gradient(135deg,var(--navy),#1e40af);border-radius:12px;padding:14px 16px;margin-bottom:12px;color:#fff">';
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+  html+='<div style="font-size:15px;font-weight:800">'+evt.title+'</div>'+ddayBadge+'</div>';
+  html+='<div style="font-size:12px;opacity:.8">'+evt.date+(evt.area?' · '+evt.area:'')+(evt.manager?' · '+evt.manager:'')+'</div>';
+  html+='</div>';
+
+  // 1. 핵심 메시지
+  html+=_pmCard('1️⃣ 핵심 메시지 (이번 행사에서 전달할 것)',
+    '<textarea class="fi" id="pmd-message" rows="3" style="font-size:12px" placeholder="예) 태블릿 30분 수업의 학습 효과와 교재 연계 방법을 중심으로 설명">'+(prep.message||'')+'</textarea>'
+  );
+
+  // 2. 예상 질문 & 답변
+  var qaList=prep.qa||[{q:'',a:''}];
+  var qaHTML='<div id="pmd-qa-list">';
+  qaList.forEach(function(qa,i){
+    qaHTML+='<div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      +'<span style="font-size:11px;font-weight:700;color:var(--navy)">Q'+(i+1)+'</span>'
+      +(i>0?'<button onclick="_pmRmQa('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px;margin-left:auto">✕</button>':'')
+      +'</div>'
+      +'<input class="fi" style="font-size:12px;margin-bottom:6px" id="pmd-q-'+i+'" placeholder="예상 질문" value="'+(qa.q||'')+'">'
+      +'<textarea class="fi" rows="2" style="font-size:12px" id="pmd-a-'+i+'" placeholder="답변 내용">'+(qa.a||'')+'</textarea>'
+      +'</div>';
+  });
+  qaHTML+='</div><button class="btn btn-outline btn-xs" onclick="_pmAddQa()">+ 질문 추가</button>';
+  html+=_pmCard('2️⃣ 예상 질문 & 답변',qaHTML);
+
+  // 3. 보여줄 자료 체크리스트
+  var docItems=['읽기·쓰기 변화 사례','실제 수업 자료 샘플','단계별 학습 목표표','숙제 전후 변화 예시','자주 묻는 질문(FAQ)','가정 학습 방법 안내'];
+  var checkedDocs=prep.docs||[];
+  var docsHTML='<div style="display:flex;flex-direction:column;gap:6px">';
+  docItems.forEach(function(d){
+    var chk=checkedDocs.indexOf(d)>=0;
+    docsHTML+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;padding:6px 8px;background:var(--surface2);border-radius:6px">'
+      +'<input type="checkbox"'+(chk?' checked':'')+' onchange="_pmToggleDoc(\''+d+'\',this.checked)" style="width:15px;height:15px;accent-color:var(--mint)"> '+d+'</label>';
+  });
+  docsHTML+='</div>';
+  html+=_pmCard('3️⃣ 보여줄 자료',docsHTML);
+
+  // 4. 역할 분담
+  html+=_pmCard('4️⃣ 역할 분담',
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">원장</div><textarea class="fi" id="pmd-role-director" rows="2" style="font-size:12px" placeholder="예) 전체 진행, 학습 방향 설명">'+(prep.roleDirector||'')+'</textarea></div>'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">교사</div><textarea class="fi" id="pmd-role-teacher" rows="2" style="font-size:12px" placeholder="예) 수업 자료 준비, 학생 사례 발표">'+(prep.roleTeacher||'')+'</textarea></div>'
+    +'</div>'
+  );
+
+  // 5. 참석 현황
+  html+=_pmCard('5️⃣ 참석 현황',
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">초대 인원</div><input class="fi" type="number" id="pmd-invited" style="font-size:13px;font-weight:700;text-align:center" value="'+(prep.invited||'')+'" placeholder="0"></div>'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">참석 확인</div><input class="fi" type="number" id="pmd-confirmed" style="font-size:13px;font-weight:700;text-align:center;color:var(--mint)" value="'+(prep.confirmed||'')+'" placeholder="0"></div>'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">미확인</div><input class="fi" type="number" id="pmd-unconfirmed" style="font-size:13px;font-weight:700;text-align:center;color:var(--gold)" value="'+(prep.unconfirmed||'')+'" placeholder="0"></div>'
+    +'</div>'
+    +'<div><div style="font-size:11px;color:var(--txt3);margin-bottom:4px">참석자 메모</div><textarea class="fi" id="pmd-attend-memo" rows="2" style="font-size:12px" placeholder="특이사항, 개별 연락 필요 학부모 등">'+(prep.attendMemo||'')+'</textarea></div>'
+  );
+
+  // 6. 후속 조치 (행사 후)
+  html+=_pmCard('6️⃣ 후속 조치 (행사 후 작성)',
+    '<div style="font-size:11px;color:var(--txt3);margin-bottom:6px">행사 결과, 학부모 반응, 약속한 조치사항을 기록하세요</div>'
+    +'<textarea class="fi" id="pmd-followup" rows="4" style="font-size:12px" placeholder="예) 참석 8명 / 태블릿 수업 효과에 긍정적 반응 / △△ 학부모 개별 상담 요청 → 8/25 예정">'+(prep.followup||'')+'</textarea>'
+  );
+
+  html+='<div style="display:flex;gap:8px;margin-top:4px">';
+  html+='<button class="btn btn-navy btn-sm" style="flex:1" onclick="_saveParentMeetingPrep()">💾 저장</button>';
+  html+='</div>';
+
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function _pmAddQa(){
+  if(!_wmData)_wmData={};
+  if(!_wmData.parentMeetingPrep)_wmData.parentMeetingPrep={};
+  if(!_wmData.parentMeetingPrep[_pmSelectedEvtId])_wmData.parentMeetingPrep[_pmSelectedEvtId]={};
+  var prep=_wmData.parentMeetingPrep[_pmSelectedEvtId];
+  _collectPmdFields(prep);
+  if(!prep.qa)prep.qa=[];
+  prep.qa.push({q:'',a:''});
+  _wmSave();
+  _renderParentMeetingDetail(document.getElementById('meeting-page-area'));
+}
+function _pmRmQa(idx){
+  if(!_wmData||!_wmData.parentMeetingPrep||!_wmData.parentMeetingPrep[_pmSelectedEvtId])return;
+  var prep=_wmData.parentMeetingPrep[_pmSelectedEvtId];
+  _collectPmdFields(prep);
+  if(prep.qa)prep.qa.splice(idx,1);
+  _wmSave();
+  _renderParentMeetingDetail(document.getElementById('meeting-page-area'));
+}
+function _pmToggleDoc(doc,checked){
+  if(!_wmData)_wmData={};
+  if(!_wmData.parentMeetingPrep)_wmData.parentMeetingPrep={};
+  if(!_wmData.parentMeetingPrep[_pmSelectedEvtId])_wmData.parentMeetingPrep[_pmSelectedEvtId]={};
+  var prep=_wmData.parentMeetingPrep[_pmSelectedEvtId];
+  if(!prep.docs)prep.docs=[];
+  var idx=prep.docs.indexOf(doc);
+  if(checked&&idx<0)prep.docs.push(doc);
+  else if(!checked&&idx>=0)prep.docs.splice(idx,1);
+  _wmSave();
+}
+function _collectPmdFields(prep){
+  var msg=document.getElementById('pmd-message');if(msg)prep.message=msg.value;
+  var rd=document.getElementById('pmd-role-director');if(rd)prep.roleDirector=rd.value;
+  var rt=document.getElementById('pmd-role-teacher');if(rt)prep.roleTeacher=rt.value;
+  var inv=document.getElementById('pmd-invited');if(inv)prep.invited=inv.value;
+  var con=document.getElementById('pmd-confirmed');if(con)prep.confirmed=con.value;
+  var unc=document.getElementById('pmd-unconfirmed');if(unc)prep.unconfirmed=unc.value;
+  var am=document.getElementById('pmd-attend-memo');if(am)prep.attendMemo=am.value;
+  var fu=document.getElementById('pmd-followup');if(fu)prep.followup=fu.value;
+  // Q&A 수집
+  var qaList=[];var i=0;
+  while(document.getElementById('pmd-q-'+i)){
+    var q=document.getElementById('pmd-q-'+i);var a=document.getElementById('pmd-a-'+i);
+    qaList.push({q:q?q.value:'',a:a?a.value:''});i++;
+  }
+  if(qaList.length)prep.qa=qaList;
+}
+function _saveParentMeetingPrep(){
+  if(!_pmSelectedEvtId)return;
+  if(!_wmData)_wmData={};
+  if(!_wmData.parentMeetingPrep)_wmData.parentMeetingPrep={};
+  if(!_wmData.parentMeetingPrep[_pmSelectedEvtId])_wmData.parentMeetingPrep[_pmSelectedEvtId]={};
+  var prep=_wmData.parentMeetingPrep[_pmSelectedEvtId];
+  _collectPmdFields(prep);
+  _wmSave();toast('✅ 간담회 준비 내용 저장됨');
 }
 
 function _renderParentMeetingGuide(el){
-  function gs(title,content){
-    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
-      +'<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">'+title+'</div>'
-      +content+'</div>';
-  }
-  function tbl(headers,rows){
-    var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr>'+headers.map(function(h){return'<th style="background:var(--navy);color:#fff;padding:6px 10px;text-align:left">'+h+'</th>';}).join('')+'</tr></thead><tbody>';
-    rows.forEach(function(r,i){
-      h+='<tr style="background:'+(i%2?'var(--surface2)':'var(--surface)')+'">'+r.map(function(c){return'<td style="padding:6px 10px;border-bottom:1px solid var(--border)">'+c+'</td>';}).join('')+'</tr>';
-    });
-    return h+'</tbody></table></div>';
-  }
-  function ul(items){
-    return '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:2">'+items.map(function(i){return'<li>'+i+'</li>';}).join('')+'</ul>';
-  }
-  function steps(items){
-    return '<div style="display:flex;flex-direction:column;gap:6px">'+items.map(function(s,i){
-      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:8px">'
-        +'<div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</div>'
-        +'<div style="font-size:12px;line-height:1.6">'+s+'</div></div>';
-    }).join('')+'</div>';
-  }
-
+  var gs=_pmCard,tbl=_pmTbl,ul=_pmUl,steps=_pmSteps;
   var html='<div style="max-width:700px;padding:4px">'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">📖 학부모 간담회·설명회 운영안</div>';
 
@@ -9159,19 +9412,7 @@ function _renderParentMeetingGuide(el){
 }
 
 function _renderParentMeetingAnnual(el){
-  function gs(title,content){
-    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
-      +'<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">'+title+'</div>'
-      +content+'</div>';
-  }
-  function tbl(headers,rows){
-    var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr>'+headers.map(function(h){return'<th style="background:var(--navy);color:#fff;padding:6px 10px;text-align:left">'+h+'</th>';}).join('')+'</tr></thead><tbody>';
-    rows.forEach(function(r,i){
-      h+='<tr style="background:'+(i%2?'var(--surface2)':'var(--surface)')+'">'+r.map(function(c){return'<td style="padding:6px 10px;border-bottom:1px solid var(--border)">'+c+'</td>';}).join('')+'</tr>';
-    });
-    return h+'</tbody></table></div>';
-  }
+  var gs=_pmCard,tbl=_pmTbl;
 
   // 저장된 간담회 연간 계획 불러오기
   var saved=(_wmData&&_wmData.parentMeetingAnnual)||{};
