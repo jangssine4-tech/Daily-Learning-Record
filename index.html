@@ -8151,47 +8151,86 @@ function deleteFocusTask(type,id){
 }
 function _renderTodayTaskSection(){
   var today=todayISO();
-  var items=(_dbTasks||[]).filter(function(t){
+  function addDays(dateStr,n){var d=new Date(dateStr);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+  var prep3End=addDays(today,3);
+
+  var allGeneral=(_dbTasks||[]).filter(function(t){
+    return (!t.taskType||t.taskType==='일반 업무')&&!(t.id&&t.id.startsWith('__'))&&t.status!=='완료';
+  });
+
+  var todayItems=(_dbTasks||[]).filter(function(t){
     return t.dueDate===today&&(!t.taskType||t.taskType==='일반 업무')&&!(t.id&&t.id.startsWith('__'));
   });
-  var done=items.filter(function(t){return t.status==='완료';}).length;
-  var h='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
-  // 헤더
+  var overdueItems=allGeneral.filter(function(t){return t.dueDate&&t.dueDate<today;});
+  var prepItems=allGeneral.filter(function(t){return t.dueDate&&t.dueDate>today&&t.dueDate<=prep3End;});
+  var done=todayItems.filter(function(t){return t.status==='완료';}).length;
+
+  function taskRow(t,badge){
+    var isDone=t.status==='완료';
+    var r='<div draggable="true" data-id="'+t.id+'" '
+      +'ondragstart="todayDragStart(event,\''+t.id+'\')" '
+      +'ondragover="event.preventDefault()" '
+      +'ondrop="todayDragDrop(event,\''+t.id+'\')" '
+      +'ondragend="todayDragEnd(event)" '
+      +'style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+    r+='<span style="cursor:grab;color:var(--txt3);font-size:14px;user-select:none">⠿</span>';
+    r+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleTodayTask(\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
+    if(badge)r+=badge;
+    r+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+    if(t.dueDate&&t.dueDate!==today)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">~'+t.dueDate.slice(5)+'</span>';
+    if(t.area)r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
+    r+='<button onclick="deleteTodayTask(\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;line-height:1;padding:0 4px;flex-shrink:0">×</button>';
+    r+='</div>';
+    return r;
+  }
+
+  var h='';
+
+  // 🚨 지연 업무
+  if(overdueItems.length){
+    h+='<div style="border:1.5px solid #dc2626;border-radius:12px;overflow:hidden;margin-bottom:10px">';
+    h+='<div style="background:#fee2e2;padding:8px 14px;display:flex;align-items:center;gap:8px">';
+    h+='<span style="font-size:13px;font-weight:800;color:#991b1b">🚨 지연 업무</span>';
+    h+='<span style="margin-left:auto;font-size:11px;color:#991b1b;font-weight:700">'+overdueItems.length+'건 미완료</span>';
+    h+='</div><div style="padding:8px 14px;background:var(--surface)">';
+    overdueItems.forEach(function(t){
+      h+=taskRow(t,'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연</span>');
+    });
+    h+='</div></div>';
+  }
+
+  // ☀️ 오늘의 업무
+  h+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
   h+='<div style="background:#fef3c7;padding:8px 14px;display:flex;align-items:center;gap:8px">';
   h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">☀️ 오늘의 업무</span>';
-  if(items.length){
-    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료</span>';
+  if(todayItems.length){
+    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+todayItems.length+' 완료</span>';
     h+='<button class="btn btn-navy btn-xs" style="margin-left:4px" onclick="openTodayTaskModal()">＋ 추가</button>';
   }else{
     h+='<button class="btn btn-navy btn-xs" style="margin-left:auto" onclick="openTodayTaskModal()">＋ 추가</button>';
   }
-  h+='</div>';
-  // 바디
-  h+='<div style="padding:8px 14px;background:var(--surface)">';
-  if(items.length){
-    items.forEach(function(t){
-      var isDone=t.status==='완료';
-      h+='<div draggable="true" data-id="'+t.id+'" '
-        +'ondragstart="todayDragStart(event,\''+t.id+'\')" '
-        +'ondragover="event.preventDefault()" '
-        +'ondrop="todayDragDrop(event,\''+t.id+'\')" '
-        +'ondragend="todayDragEnd(event)" '
-        +'style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
-      h+='<span style="cursor:grab;color:var(--txt3);font-size:14px;user-select:none">⠿</span>';
-      h+='<input type="checkbox"'+(isDone?' checked':'')+' '
-        +'onchange="toggleTodayTask(\''+t.id+'\')" '
-        +'style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
-      h+='<span onclick="openDbTaskModal(\''+t.id+'\')" '
-        +'style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
-      if(t.area) h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
-      h+='<button onclick="deleteTodayTask(\''+t.id+'\')" '
-        +'style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;line-height:1;padding:0 4px;flex-shrink:0">×</button>';
-      h+='</div>';
-    });
+  h+='</div><div style="padding:8px 14px;background:var(--surface)">';
+  if(todayItems.length){
+    todayItems.forEach(function(t){h+=taskRow(t,'');});
   }else{
     h+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">오늘 등록된 업무가 없습니다<br><span style="font-size:11px">＋ 추가 버튼 또는 업무 기한을 오늘로 설정하면 자동으로 표시됩니다</span></div>';
   }
   h+='</div></div>';
+
+  // 🔔 마감 임박 (1~3일 후)
+  if(prepItems.length){
+    h+='<div style="border:1.5px solid #f59e0b;border-radius:12px;overflow:hidden;margin-bottom:10px">';
+    h+='<div style="background:#fffbeb;padding:8px 14px;display:flex;align-items:center;gap:8px">';
+    h+='<span style="font-size:13px;font-weight:800;color:#92400e">🔔 마감 임박 업무 (3일 이내)</span>';
+    h+='<span style="margin-left:auto;font-size:11px;color:#92400e">'+prepItems.length+'건</span>';
+    h+='</div><div style="padding:8px 14px;background:var(--surface)">';
+    prepItems.forEach(function(t){
+      var daysLeft=Math.round((new Date(t.dueDate)-new Date(today))/(1000*60*60*24));
+      h+=taskRow(t,'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fef3c7;color:#d97706;flex-shrink:0">D-'+daysLeft+'</span>');
+    });
+    h+='</div></div>';
+  }
+
   return h;
 }
 function openMonthlyFocusModal(){
