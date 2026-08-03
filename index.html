@@ -3400,7 +3400,7 @@ function renderSchedule(){
     p.students.forEach(function(s){
       var pData=(s.periods||{})[dayName];var pTime2='';
       if(s._isMakeup)pTime2=s._makeupTime;
-      else if(s._isSpecialClass)pTime2=s._specialTime||'';
+      else if(s._specialTime!==undefined&&s._specialTime!=='')pTime2=s._specialTime; // 오른쪽 패널 시간 우선
       else if(pData&&typeof pData==='object')pTime2=pData.time||'';
       var blkLabel='시간미설정';
       if(pTime2){var mm=pTime2.match(/(\d{1,2}):(\d{2})/);if(mm){var h=parseInt(mm[1]),min=parseInt(mm[2]);var blkMin=min<30?0:30;var blkEndMin=min<30?30:0;var blkEndH=min<30?h:h+1;blkLabel=pad(h)+':'+pad(blkMin)+'~'+pad(blkEndH)+':'+pad(blkEndMin);blkLabel=_fmt12hRange(blkLabel);}}
@@ -3415,7 +3415,7 @@ function renderSchedule(){
       blocks[blk].students.forEach(function(s){
         // pTime2: 이 스코프에서 수업 시간 계산
         var _pData3=(s.periods||{})[dayName];
-        var pTime2=s._isSpecialClass?(s._specialTime||''):(s._isMakeup?(s._makeupTime||''):(_pData3&&typeof _pData3==='object'?_pData3.time||'':''));
+        var pTime2=s._isMakeup?(s._makeupTime||''):(s._specialTime!==undefined&&s._specialTime!==''?s._specialTime:(_pData3&&typeof _pData3==='object'?_pData3.time||'':''));
         var rep;
         if(s._isMakeup){rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.makeupId===s._makeupId;});}
         else{var _cst=pTime2;rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.makeupId&&(r.sessionTime||'')==_cst;});}
@@ -3425,7 +3425,7 @@ function renderSchedule(){
         var badge='';
         var pData2=(s.periods||{})[dayName];var pTime3='';
         if(s._isMakeup)pTime3=s._makeupTime||'';
-        else if(s._isSpecialClass)pTime3=s._specialTime||'';
+        else if(s._specialTime!==undefined&&s._specialTime!=='')pTime3=s._specialTime;
         else if(pData2&&typeof pData2==='object')pTime3=pData2.time||'';
         // Auto PM conversion + range time display fix
         if(pTime3)pTime3=_fmt12hRange(pTime3);
