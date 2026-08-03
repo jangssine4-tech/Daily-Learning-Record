@@ -5013,7 +5013,11 @@ async function saveMakeupUnified(){
     makeups.push({id:ref.id,...data});
     // 결석일 기준으로 자동 결석 처리
     await autoCreateAbsentReport(sId,absentDate);
-    toast('✅ 보강 등록 완료 — '+absentDate+' 결석 처리됨');
+    // 시간표 날짜를 결석일로 이동해서 카드에 결석 표시
+    _scheduleDate=absentDate;
+    var datePick=$('schedule-date-pick');
+    if(datePick)datePick.value=absentDate;
+    toast('✅ 보강 등록 완료 — '+absentDate+' 결석 처리됨 (시간표에서 확인하세요)');
   } else {
     var updateData={makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:mkStatus==='done'?'보강 ⭕':'',makeupResultMemo:mkResultMemo,updatedAt:new Date().toISOString()};
     await db.collection('makeups').doc(id).update(updateData);
@@ -5032,7 +5036,14 @@ async function deleteMakeupEntry(){
   loading(true);
   await db.collection('makeups').doc(id).delete();
   makeups=makeups.filter(function(m){return m.id!==id;});
-  closeM('makeup');renderMakeupCalendar();renderSchedule();
+  closeM('makeup');
+  renderMakeupCalendar();
+  renderSchedule();
+  // 보강 신규 등록 시 시간표 페이지로 이동해서 결석 확인
+  if(mode==='new'||!id){
+    goto('schedule');
+    switchSchTab('today');
+  }
   loading(false);saveCacheDebounced();toast('🗑 삭제 완료');
 }
 
