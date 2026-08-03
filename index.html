@@ -9069,9 +9069,168 @@ function _renderMeetingPagePanel(){
   var el=document.getElementById('meeting-page-area');
   if(!el)return;
   if(_meetingPageTab==='monthly')renderMeetingPage();
-  else if(_meetingPageTab==='annual')_renderWMAnnual(el);
-  else if(_meetingPageTab==='guide')_renderWMGuide(el);
+  else if(_meetingPageTab==='annual')_renderParentMeetingAnnual(el);
+  else if(_meetingPageTab==='guide')_renderParentMeetingGuide(el);
   else if(_meetingPageTab==='detail')el.innerHTML='<div style="padding:20px;color:var(--txt3)">간담회 준비 콘텐츠 준비 중</div>';
+}
+
+function _renderParentMeetingGuide(el){
+  function gs(title,content){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+      +'<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">'+title+'</div>'
+      +content+'</div>';
+  }
+  function tbl(headers,rows){
+    var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr>'+headers.map(function(h){return'<th style="background:var(--navy);color:#fff;padding:6px 10px;text-align:left">'+h+'</th>';}).join('')+'</tr></thead><tbody>';
+    rows.forEach(function(r,i){
+      h+='<tr style="background:'+(i%2?'var(--surface2)':'var(--surface)')+'">'+r.map(function(c){return'<td style="padding:6px 10px;border-bottom:1px solid var(--border)">'+c+'</td>';}).join('')+'</tr>';
+    });
+    return h+'</tbody></table></div>';
+  }
+  function ul(items){
+    return '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:2">'+items.map(function(i){return'<li>'+i+'</li>';}).join('')+'</ul>';
+  }
+  function steps(items){
+    return '<div style="display:flex;flex-direction:column;gap:6px">'+items.map(function(s,i){
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:8px">'
+        +'<div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(i+1)+'</div>'
+        +'<div style="font-size:12px;line-height:1.6">'+s+'</div></div>';
+    }).join('')+'</div>';
+  }
+
+  var html='<div style="max-width:700px;padding:4px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">📖 학부모 간담회·설명회 운영안</div>';
+
+  html+=gs('🎯 설명회와 간담회의 역할 구분',
+    tbl(['구분','목적','주요 내용','운영 방식'],[
+      ['학부모 설명회','학원 교육 방향과 수업 방법 안내','교육 철학, 태블릿·교재 수업 역할, 숙제와 평가 방식, 가정 협력 방법','학원이 주로 설명'],
+      ['학부모 간담회','학부모 의견 청취 및 운영 개선','자녀의 학원 생활, 만족도, 불편사항, 일일 보고서 의견','학부모가 더 많이 이야기']
+    ])
+  );
+
+  html+=gs('📋 행사 준비 체크리스트 (행사 3~4주 전)',
+    steps([
+      '이번 행사의 <strong>가장 중요한 메시지</strong> 결정',
+      '학부모가 궁금해할 <strong>주요 질문</strong> 예상 및 답변 준비',
+      '보여줄 <strong>실제 학생 자료</strong> 선정 (읽기 변화 사례, 실제 수업 자료)',
+      '<strong>원장과 교사의 역할</strong> 분담 확정',
+      '<strong>참석자 안내 및 신청 방법</strong> 공지',
+      '<strong>설문 문항</strong> 제작',
+      '행사 후 <strong>후속 연락 방식</strong> 결정'
+    ])
+  );
+
+  html+=gs('💬 간담회 주요 질문 (학부모에게 물어볼 것)',
+    ul([
+      '자녀가 학원에 대해 어떤 이야기를 하나요?',
+      '현재 만족하는 점은 무엇인가요?',
+      '이해하기 어려운 수업이나 관리 방식은 무엇인가요?',
+      '태블릿 수업에 대해 걱정되는 점은 무엇인가요?',
+      '일일 보고서에서 더 알고 싶은 내용은 무엇인가요?',
+      '학원과 어떤 방식으로 소통하기를 원하시나요?'
+    ])
+  );
+
+  html+=gs('📢 설명회 준비 자료 (홍보보다 교육 중심으로)',
+    ul([
+      '학생의 읽기·쓰기 변화 사례',
+      '실제 수업 자료 샘플',
+      '단계별 학습 목표표',
+      '숙제 전후 변화 예시',
+      '자주 묻는 질문(FAQ)',
+      '가정 학습 방법 안내',
+      '학원 개선 계획'
+    ])
+  );
+
+  html+=gs('📬 행사 후 48시간 이내 후속 조치',
+    steps([
+      '참석 감사 메시지 발송',
+      '핵심 내용 요약 전달',
+      '설문 또는 개별 상담 안내',
+      '미참석 학부모 별도 연락 (내용 요약 공유)',
+      '약속한 조치사항 기록 및 실행 일정 확정'
+    ])
+  );
+
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function _renderParentMeetingAnnual(el){
+  function gs(title,content){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+      +'<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">'+title+'</div>'
+      +content+'</div>';
+  }
+  function tbl(headers,rows){
+    var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr>'+headers.map(function(h){return'<th style="background:var(--navy);color:#fff;padding:6px 10px;text-align:left">'+h+'</th>';}).join('')+'</tr></thead><tbody>';
+    rows.forEach(function(r,i){
+      h+='<tr style="background:'+(i%2?'var(--surface2)':'var(--surface)')+'">'+r.map(function(c){return'<td style="padding:6px 10px;border-bottom:1px solid var(--border)">'+c+'</td>';}).join('')+'</tr>';
+    });
+    return h+'</tbody></table></div>';
+  }
+
+  // 저장된 간담회 연간 계획 불러오기
+  var saved=(_wmData&&_wmData.parentMeetingAnnual)||{};
+  var now=new Date();
+  var curMo=now.getMonth()+1;
+
+  var html='<div style="max-width:700px;padding:4px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">📆 학부모 행사 연간 계획</div>'
+    +'<button class="btn btn-navy btn-sm" onclick="saveParentMeetingAnnual()">💾 저장</button>'
+    +'</div>';
+
+  html+=gs('📅 연간 행사 일정',
+    tbl(['시기','행사','주요 내용','담당'],[
+      ['2월','신학기 학부모 설명회','연간 교육 방향, 단계별 목표, 수업 방식','원장'],
+      ['5월','소규모 학부모 간담회','수업 적응, 태블릿 수업, 숙제와 보고서 의견','원장'],
+      ['8~9월','2학기 설명회','상반기 결과, 2학기 학습 계획, 중등 대비','원장'],
+      ['11월','다음 연도 준비 간담회','만족도, 개선 요구, 다음 해 프로그램 의견','원장']
+    ])
+  );
+
+  // 월별 메모 입력 (편집 가능)
+  html+=gs('📝 월별 간담회 메모 및 계획',
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
+      var isNow=m===curMo;
+      return '<div style="background:'+(isNow?'#eff6ff':'var(--surface2)')+';border:1px solid '+(isNow?'var(--navy)':'var(--border)')+';border-radius:8px;padding:8px">'
+        +'<div style="font-size:11px;font-weight:700;color:'+(isNow?'var(--navy)':'var(--txt2)')+';margin-bottom:4px">'+m+'월'+(isNow?' ◀ 이번 달':'')+' </div>'
+        +'<textarea class="fi" id="pm-annual-'+m+'" rows="2" style="font-size:11px;resize:vertical" placeholder="행사 계획 또는 메모">'+(saved['m'+m]||'')+'</textarea>'
+        +'</div>';
+    }).join('')
+    +'</div>'
+  );
+
+  html+=gs('✅ 행사 준비 타임라인',
+    '<div style="font-size:12px;line-height:2;color:var(--txt2)">'
+    +'<div style="font-weight:700;color:var(--navy);margin-bottom:6px">행사 기준 준비 일정</div>'
+    +'<div>📌 <strong>행사 4주 전</strong> — 행사 날짜·장소 확정, 안내문 초안 작성</div>'
+    +'<div>📌 <strong>행사 3주 전</strong> — 준비 회의 진행, 역할 분담, 자료 수집 시작</div>'
+    +'<div>📌 <strong>행사 2주 전</strong> — 학부모 안내, 신청 접수, 자료 완성</div>'
+    +'<div>📌 <strong>행사 1주 전</strong> — 최종 리허설, 참석 확인, 질문 예상 답변 점검</div>'
+    +'<div>📌 <strong>행사 당일</strong> — 진행, 의견 기록, 설문 수집</div>'
+    +'<div>📌 <strong>행사 후 48시간</strong> — 감사 메시지, 내용 요약, 후속 조치 확정</div>'
+    +'</div>'
+  );
+
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function saveParentMeetingAnnual(){
+  if(!_wmData)_wmData={};
+  if(!_wmData.parentMeetingAnnual)_wmData.parentMeetingAnnual={};
+  for(var m=1;m<=12;m++){
+    var el=document.getElementById('pm-annual-'+m);
+    if(el)_wmData.parentMeetingAnnual['m'+m]=el.value;
+  }
+  _wmSave();
+  toast('✅ 간담회 연간 계획 저장됨');
 }
 function toggleWeeklyTimetable(){
   var panel=document.getElementById('sch-panel-weekly');
