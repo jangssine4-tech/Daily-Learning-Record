@@ -3262,6 +3262,10 @@ function renderSchedule(){
   var dp=$('schedule-date-pick');if(dp&&!dp.value)dp.value=todayISO();
   var todayStr=_scheduleDate||todayISO();
   var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&m.makeupStatus==='scheduled';});
+  // 결석일이 오늘인 보강 학생도 시간표에 결석 카드로 표시
+  var todayAbsentMakeups=makeups.filter(function(m){
+    return m.absentDate===todayStr&&m.makeupDate!==todayStr;
+  });
   if(!DAYS.includes(dayName)&&todayMakeups.length===0){$('schedule-list').innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">'+dateLabel+' · 수업이 없는 날입니다</div></div>';return;}
   function timeToMin(t){if(!t)return 9999;var m2=t.match(/(\d{1,2}):(\d{2})/);return m2?parseInt(m2[1])*60+parseInt(m2[2]):9999;}
   function pad(n){return String(n).padStart(2,'0');}
@@ -3361,6 +3365,29 @@ function renderSchedule(){
     byPeriod[pKey].students.push({...s,_isMakeup:true,_makeupTime:mt,_makeupId:m.id});
     if(mt&&mt<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=mt;
   });
+  // 결석일이 오늘인 보강 학생 → 원래 수업 시간대에 결석 카드로 표시
+  todayAbsentMakeups.forEach(function(m){
+    var s=students.find(function(x){return x.id===m.studentId;});
+    if(!s)return;
+    // 이미 todayStudents에 있으면 결석 report로 처리됨 — 중복 추가 안 함
+    if(todayStudentIds.has(s.id))return;
+    // 해당 학생의 오늘 요일 수업 시간으로 배치
+    var pData=(s.periods||{})[dayName];
+    var sTime=(pData&&typeof pData==='object')?pData.time||'':'';
+    var pNum=0;
+    if(sTime&&customPeriods.length>0){
+      var tMin2=timeToMin(sTime);
+      customPeriods.forEach(function(cp){
+        var cpStart=timeToMin(cp.time);
+        var cpEnd=cp.endTime?timeToMin(cp.endTime):cpStart+60;
+        if(tMin2>=cpStart&&tMin2<cpEnd)pNum=cp.period;
+      });
+    }
+    var pKey2=pNum?String(pNum):'미설정';
+    if(!byPeriod[pKey2])byPeriod[pKey2]={pNum:pNum,students:[],firstTime:'99:99'};
+    byPeriod[pKey2].students.push(Object.assign({},s,{_absentMakeup:true,_makeupId:m.id}));
+    if(sTime&&sTime<byPeriod[pKey2].firstTime)byPeriod[pKey2].firstTime=sTime;
+  });
   var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;var na=parseInt(a),nb=parseInt(b);var aSpec=na<0,bSpec=nb<0;if(aSpec&&!bSpec)return -1;if(!aSpec&&bSpec)return 1;if(aSpec&&bSpec)return Math.abs(na)-Math.abs(nb);return na-nb;});
   if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';return;}
   var html='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0 12px;font-size:11px;color:var(--txt2);align-items:center">'
@@ -3418,6 +3445,7 @@ function renderSchedule(){
         var pTime2=s._isMakeup?(s._makeupTime||''):(s._specialTime!==undefined&&s._specialTime!==''?s._specialTime:(_pData3&&typeof _pData3==='object'?_pData3.time||'':''));
         var rep;
         if(s._isMakeup){rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.makeupId===s._makeupId;});}
+        else if(s._absentMakeup){rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.absent;});}
         else{var _cst=pTime2;rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&!r.makeupId&&(r.sessionTime||'')==_cst;});}
         var done=rep&&!rep.absent&&!rep.earlyLeave;
         var absent=rep&&rep.absent;
@@ -5051,9 +5079,18 @@ async function deleteMakeupEntry(){
 
 async function autoCreateAbsentReport(studentId,dateStr){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
-  var existRep=reports.find(function(r){return r.studentId===studentId&&r.date===dateStr;});
+  // 해당 날짜의 요일 이름으로 수업 시간 가져오기
+  var d=new Date(dateStr+'T12:00:00');
+  var dayNames=['일','월','화','수','목','금','토'];
+  var dn=dayNames[d.getDay()];
+  var pData=(s.periods||{})[dn];
+  var sessionTime=(pData&&typeof pData==='object')?pData.time||'':'';
+  // 같은 날짜 + sessionTime 일치하는 report 찾기
+  var existRep=reports.find(function(r){
+    return r.studentId===studentId&&r.date===dateStr&&(r.sessionTime||'')===(sessionTime||'');
+  });
   if(!existRep){
-    var newRep={studentId:studentId,studentName:s.name,classId:s.classId||'',date:dateStr,teacher:s.teacher||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:true,earlyLeave:false,absentReason:'보강 예정',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s))||'',evalItems:{},praise:[],autoCreated:true,createdAt:new Date().toISOString()};
+    var newRep={studentId:studentId,studentName:s.name,classId:s.classId||'',date:dateStr,sessionTime:sessionTime,teacher:s.teacher||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:true,earlyLeave:false,absentReason:'보강 예정',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s))||'',evalItems:{},praise:[],autoCreated:true,createdAt:new Date().toISOString()};
     var ref=await db.collection('reports').add(newRep);
     reports.push({...newRep,id:ref.id});
   } else if(!existRep.absent){
