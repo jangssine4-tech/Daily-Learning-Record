@@ -5079,23 +5079,32 @@ async function deleteMakeupEntry(){
 
 async function autoCreateAbsentReport(studentId,dateStr){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
-  // 해당 날짜의 요일 이름으로 수업 시간 가져오기
   var d=new Date(dateStr+'T12:00:00');
   var dayNames=['일','월','화','수','목','금','토'];
   var dn=dayNames[d.getDay()];
+
+  // 해당 요일의 모든 수업 시간 수집 (본수업 + 특강 + 오른쪽 패널)
+  var sessionTimes=[];
   var pData=(s.periods||{})[dn];
-  var sessionTime=(pData&&typeof pData==='object')?pData.time||'':'';
-  // 같은 날짜 + sessionTime 일치하는 report 찾기
-  var existRep=reports.find(function(r){
-    return r.studentId===studentId&&r.date===dateStr&&(r.sessionTime||'')===(sessionTime||'');
-  });
-  if(!existRep){
-    var newRep={studentId:studentId,studentName:s.name,classId:s.classId||'',date:dateStr,sessionTime:sessionTime,teacher:s.teacher||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:true,earlyLeave:false,absentReason:'보강 예정',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s))||'',evalItems:{},praise:[],autoCreated:true,createdAt:new Date().toISOString()};
-    var ref=await db.collection('reports').add(newRep);
-    reports.push({...newRep,id:ref.id});
-  } else if(!existRep.absent){
-    await db.collection('reports').doc(existRep.id).update({absent:true,absentReason:'보강 예정',updatedAt:new Date().toISOString()});
-    existRep.absent=true;
+  if(pData&&typeof pData==='object'&&pData.time) sessionTimes.push(pData.time);
+  var spData=(s.specialPeriods||{})[dn];
+  if(spData&&spData.time) sessionTimes.push(spData.time);
+  // 세션 타임이 없으면 빈 문자열로 1개 처리
+  if(!sessionTimes.length) sessionTimes.push('');
+
+  for(var i=0;i<sessionTimes.length;i++){
+    var sessionTime=sessionTimes[i];
+    var existRep=reports.find(function(r){
+      return r.studentId===studentId&&r.date===dateStr&&(r.sessionTime||'')===(sessionTime||'');
+    });
+    if(!existRep){
+      var newRep={studentId:studentId,studentName:s.name,classId:s.classId||'',date:dateStr,sessionTime:sessionTime,teacher:s.teacher||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:true,earlyLeave:false,absentReason:'보강 예정',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s))||'',evalItems:{},praise:[],autoCreated:true,createdAt:new Date().toISOString()};
+      var ref=await db.collection('reports').add(newRep);
+      reports.push(Object.assign({},newRep,{id:ref.id}));
+    }else if(!existRep.absent){
+      await db.collection('reports').doc(existRep.id).update({absent:true,absentReason:'보강 예정',updatedAt:new Date().toISOString()});
+      existRep.absent=true;
+    }
   }
 }
 
