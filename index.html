@@ -3286,7 +3286,7 @@ function renderSchedule(){
     if(pTime&&pTime<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=pTime;
   });
 
-  // 특강 학생 추가 (specialPeriods에 오늘 요일이 있는 학생)
+  // 특강/추가 본수업 학생 추가 (specialPeriods에 오늘 요일이 있는 학생)
   var todayStudentIds=new Set(todayStudents.map(function(s){return s.id;}));
   students.filter(function(s){
     var st=s.status||'재원';
@@ -3295,7 +3295,8 @@ function renderSchedule(){
   }).forEach(function(s){
     var sp=s.specialPeriods[dayName];
     var spTime=sp.time||'';
-    var spPeriod=sp.period!==undefined?sp.period:-1; // 특강 1 기본값
+    var spPeriod=sp.period!==undefined?sp.period:-1;
+    var isSpecialType=(s.extraClassType||'special')==='special'; // ← 핵심: 본수업이면 특강 배지 안 붙임
     // 본수업으로 이미 추가된 학생은 특강으로 중복 추가 안 함
     // (단, 특강 시간대가 다르면 별도 카드)
     var pNum=spPeriod;
@@ -3310,7 +3311,7 @@ function renderSchedule(){
     }
     var pKey=String(pNum);
     if(!byPeriod[pKey])byPeriod[pKey]={pNum:pNum,students:[],firstTime:'99:99'};
-    byPeriod[pKey].students.push(Object.assign({},s,{_isSpecialClass:true,_specialTime:spTime}));
+    byPeriod[pKey].students.push(Object.assign({},s,{_isSpecialClass:isSpecialType,_specialTime:spTime}));
     if(spTime&&spTime<byPeriod[pKey].firstTime)byPeriod[pKey].firstTime=spTime;
   });
   todayMakeups.forEach(function(m){
