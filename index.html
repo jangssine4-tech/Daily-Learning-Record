@@ -5026,7 +5026,15 @@ async function saveMakeupUnified(){
     toast('✅ 저장 완료');
   }
   closeM('makeup');
-  renderMakeupCalendar();renderSchedule();
+  renderMakeupCalendar();
+  if(mode==='new'){
+    // 시간표 날짜가 결석일로 설정된 상태에서 먼저 렌더링 후 이동
+    goto('schedule');
+    switchSchTab('today');
+    setTimeout(function(){renderSchedule();},100); // goto 후 DOM 전환 완료 후 렌더
+  }else{
+    renderSchedule();
+  }
   loading(false);saveCacheDebounced();
 }
 
@@ -5038,12 +5046,6 @@ async function deleteMakeupEntry(){
   makeups=makeups.filter(function(m){return m.id!==id;});
   closeM('makeup');
   renderMakeupCalendar();
-  renderSchedule();
-  // 보강 신규 등록 시 시간표 페이지로 이동해서 결석 확인
-  if(mode==='new'||!id){
-    goto('schedule');
-    switchSchTab('today');
-  }
   loading(false);saveCacheDebounced();toast('🗑 삭제 완료');
 }
 
