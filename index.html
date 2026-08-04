@@ -3270,8 +3270,15 @@ function renderSchedule(){
   function timeToMin(t){if(!t)return 9999;var m2=t.match(/(\d{1,2}):(\d{2})/);return m2?parseInt(m2[1])*60+parseInt(m2[2]):9999;}
   function pad(n){return String(n).padStart(2,'0');}
   var byPeriod={};
-  // Pre-filter students for today
-  var todayStudents=students.filter(function(s){var st=s.status||'재원';return(st==='재원'||st==='신규')&&(s.days||[]).includes(dayName);});
+  // Pre-filter students for today — periods[dayName]에 실제 시간이 있는 학생만
+  var todayStudents=students.filter(function(s){
+    var st=s.status||'재원';
+    if(st!=='재원'&&st!=='신규')return false;
+    if(!(s.days||[]).includes(dayName))return false;
+    // 해당 요일 본수업 시간이 실제로 설정돼 있어야 함
+    var pData=(s.periods||{})[dayName];
+    return pData&&typeof pData==='object'&&pData.time;
+  });
   todayStudents.forEach(function(s){
     var pData=(s.periods||{})[dayName];var pNum=0,pTime='';
     if(pData&&typeof pData==='object'){pTime=pData.time||'';}
@@ -8460,12 +8467,25 @@ function _mfmRenderStep2(overlay){
 
   // 주차별 섹션
   weeks.forEach(function(w,wi){
-    var weekLabel=w.weekNum?w.weekNum+'주차':w.title;
+    var weekLabel;
+    if(_mfm_state.templateKey){
+      var selG=(_opGuides||[]).find(function(g){return g.id===_mfm_state.templateKey;});
+      if(selG&&selG.type==='repeat'){
+        weekLabel=selG.repeatRule&&/[월화수목금토일]/.test(selG.repeatRule)
+          ?selG.repeatRule+' — '+w.title
+          :'🔄 매주 반복 업무 — '+w.title;
+      }else{
+        weekLabel=(w.weekNum||wi+1)+'주차 — '+w.title;
+      }
+    }else{
+      weekLabel=(w.weekNum||wi+1)+'주차 — '+w.title;
+    }
     html+='<div style="background:var(--surface2);border:1.5px solid '+(w.enabled?'var(--navy)':'var(--border)')+';border-radius:10px;padding:12px;margin-bottom:10px">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
       +'<input type="checkbox"'+(w.enabled?' checked':'')+' onchange="_mfmToggleWeek('+wi+',this.checked)" style="width:16px;height:16px;accent-color:var(--navy)">'
       +'<div style="flex:1">'
-      +'<input class="fi" style="font-size:12px;font-weight:700;margin-bottom:2px" value="'+w.title+'" onblur="_mfmEditWeekTitle('+wi+',this.value)" placeholder="주차 목표">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:2px">'+weekLabel+'</div>'
+      +'<input class="fi" style="font-size:11px;color:var(--txt3)" value="'+w.title+'" onblur="_mfmEditWeekTitle('+wi+',this.value)" placeholder="주차 목표">'
       +'<div style="font-size:10px;color:var(--txt3)">'+getWeekDateRange(w.weekNum||wi+1)+'</div>'
       +'</div></div>'
       +'<div id="mfm-week-tasks-'+wi+'">';
@@ -10607,7 +10627,13 @@ function renderRefGuides(){
       listHTML+='<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;margin-top:4px">📅 주차별 업무 흐름</div>';
       sel.weeks.forEach(function(w){
         listHTML+='<div style="background:var(--surface2);border-radius:10px;padding:10px 12px;margin-bottom:8px">'
-          +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">'+(w.weekNum?w.weekNum+'주차 — ':'')+w.title+'</div>'
+          +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">'
+          +(sel.type==='repeat'
+            ?(sel.repeatRule&&/[월화수목금토일]/.test(sel.repeatRule)
+              ? sel.repeatRule+' — '+w.title   // 옵션 C: 요일 있으면 규칙 포함
+              : '🔄 매주 반복 업무 — '+w.title) // 옵션 A: 요일 없으면 매주 반복
+            :(w.weekNum?w.weekNum+'주차 — ':'') +w.title) // 프로젝트형: 기존 주차 표시
+          +'</div>'
           +'<ul style="margin:0;padding-left:16px;font-size:12px;line-height:1.8">'
           +(w.tasks||'').split('\n').filter(Boolean).map(function(t){return'<li>'+t+'</li>';}).join('')
           +'</ul></div>';
