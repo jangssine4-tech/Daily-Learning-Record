@@ -3261,7 +3261,7 @@ function renderSchedule(){
   $('schedule-day-title').textContent=dateLabel+' · '+dayNames[dow===0?6:dow-1]+'요일';
   var dp=$('schedule-date-pick');if(dp&&!dp.value)dp.value=todayISO();
   var todayStr=_scheduleDate||todayISO();
-  var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&m.makeupStatus==='scheduled';});
+  var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&(m.makeupStatus==='scheduled'||m.makeupStatus==='done');});
   // 결석일이 오늘인 보강 학생도 시간표에 결석 카드로 표시
   var todayAbsentMakeups=makeups.filter(function(m){
     return m.absentDate===todayStr&&m.makeupDate!==todayStr;
@@ -3480,7 +3480,7 @@ function renderSchedule(){
         var isBook=(window._cardBadges||{})['bk_'+s.id];
         html+='<div class="s-card-name" data-student-id="'+s.id+'">'+s.name
           +(s._isSpecialClass?'<span style="position:absolute;top:-5px;right:-5px;width:24px;height:24px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2" title="특강">특</span>':'')
-          +(s._isMakeup?'<span style="color:#e74c3c;font-size:10px;font-weight:700;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>':'')
+          +(s._isMakeup?(function(){var mk=makeups.find(function(m){return m.id===s._makeupId;});var isDone=mk&&mk.makeupStatus==='done';return isDone?'<span style="color:#16a34a;font-size:10px;font-weight:700;background:#f0fdf4;padding:1px 6px;border-radius:8px;border:1px solid #bbf7d0">보강완료</span>':'<span style="color:#e74c3c;font-size:10px;font-weight:700;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>';})()):'')
           +(dispTime?'<span style="color:var(--mint);font-weight:600;margin-left:5px">'+dispTime+'</span>':'')
           +'<span style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')">관찰</span>'
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #60a5fa;background:'+(isTablet?'#3b82f6;color:#fff':'#eff6ff;color:#1e40af')+'" onclick="event.stopPropagation();toggleCardTag(\'tbl_'+s.id+'\',this)">T</span>'
@@ -4093,8 +4093,8 @@ function updateDictationDropdown(level,currentVal){
   // Populate both options 0~30
   var totalOpts='<option value="">-</option>';
   var correctOpts='<option value="">-</option>';
-  for(var t=1;t<=50;t++)totalOpts+='<option value="'+t+'">'+t+'</option>';
-  for(var c=0;c<=50;c++)correctOpts+='<option value="'+c+'">'+c+'</option>';
+  for(var t=1;t<=100;t++)totalOpts+='<option value="'+t+'">'+t+'</option>';
+  for(var c=0;c<=100;c++)correctOpts+='<option value="'+c+'">'+c+'</option>';
   totalSel.innerHTML=totalOpts;
   correctSel.innerHTML=correctOpts;
   var defaultTotal=getDictationCount(level);
