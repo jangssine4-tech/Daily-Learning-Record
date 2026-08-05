@@ -337,13 +337,15 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </div>
 <div class="view" id="view-dashboard">
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
-    <button class="rev-tab active" id="dtab-board" onclick="switchDashTab('board')" style="font-size:16px;font-weight:700">오늘의 업무</button>
-    <button class="rev-tab" id="dtab-crm" onclick="switchDashTab('crm')" style="font-size:16px;font-weight:700">상담</button>
-    <button class="rev-tab" id="dtab-mk" onclick="switchDashTab('mk')" style="font-size:16px;font-weight:700">마케팅 · 홍보</button>
-    <button class="rev-tab" id="dtab-calendar" onclick="switchDashTab('calendar')" style="font-size:16px;font-weight:700">연간 학사일정</button>
-    <button class="rev-tab" id="dtab-conditions" onclick="switchDashTab('conditions')" style="font-size:16px;font-weight:700">자동 분류 조건</button>
+    <button class="rev-tab active" id="dtab-board"      onclick="switchDashTab('board')"      style="font-size:16px;font-weight:700">오늘의 업무</button>
+    <button class="rev-tab"        id="dtab-monthly"    onclick="switchDashTab('monthly')"    style="font-size:16px;font-weight:700">월간 중점 선정</button>
+    <button class="rev-tab"        id="dtab-crm"        onclick="switchDashTab('crm')"        style="font-size:16px;font-weight:700">상담</button>
+    <button class="rev-tab"        id="dtab-mk"         onclick="switchDashTab('mk')"         style="font-size:16px;font-weight:700">마케팅 · 홍보</button>
+    <button class="rev-tab"        id="dtab-calendar"   onclick="switchDashTab('calendar')"   style="font-size:16px;font-weight:700">연간 학사일정</button>
+    <button class="rev-tab"        id="dtab-conditions" onclick="switchDashTab('conditions')" style="font-size:16px;font-weight:700">자동 분류 조건</button>
   </div>
   <div id="dash-panel-board" style="display:flex;gap:0;height:calc(100vh - 100px);overflow:hidden">
+  <div id="dash-panel-monthly" style="display:none" class="cp"><div id="dash-monthly-area"></div></div>
     <!-- 왼쪽: 업무 목록 -->
     <div style="flex:1;overflow-y:auto;padding:12px;border-right:1px solid var(--border)">
       <div id="dashboard-board-area"></div>
@@ -2625,17 +2627,161 @@ function _wtAddPlanCard(ts, day, cellDiv) {
 
 
 function switchDashTab(tab){
-  ['board','crm','mk','calendar','conditions'].forEach(function(t){
+  ['board','monthly','crm','mk','calendar','conditions'].forEach(function(t){
     var btn=$('dtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('dash-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
   });
   if(tab==='board')renderDashBoard();
+  else if(tab==='monthly')renderDashMonthly();
   else if(tab==='crm'){initCrmDateSelector();renderCrmDailyInto('dashboard-area');}
   else if(tab==='mk'){loadMpPlans().then(function(){renderMkTodayPage('dashboard-mk-area');});}
   else if(tab==='calendar'){renderAcademicCalendar();}
   else if(tab==='conditions'){loadCrmConditions().then(function(){_renderCrmConditionsUI($('crm-conditions-area'));});}
 }
 function renderDashboard(){switchDashTab('board');}
+
+function renderDashMonthly(){
+  var el=$('dash-monthly-area');if(!el)return;
+  var now=new Date();
+  var yr=now.getFullYear();
+  var mo=now.getMonth()+1;
+  var moStr=String(mo).padStart(2,'0');
+  var nextMo=String(mo===12?1:mo+1).padStart(2,'0');
+  var nextYr=mo===12?yr+1:yr;
+  var thisMonStart=yr+'-'+moStr+'-01';
+  var thisMonEnd=nextYr+'-'+nextMo+'-01';
+  var today=todayISO();
+
+  function card(title,color,content,link){
+    var linkBtn=link?'<button onclick="'+link.fn+'" style="font-size:11px;color:'+color+';background:none;border:1px solid '+color+'44;border-radius:6px;padding:2px 8px;cursor:pointer;flex-shrink:0">'+link.label+' →</button>':'';
+    return '<div style="background:var(--surface);border:1.5px solid '+color+'33;border-radius:12px;margin-bottom:12px;overflow:hidden">'
+      +'<div style="background:'+color+'15;padding:8px 14px;display:flex;align-items:center;gap:8px">'
+      +'<div style="font-size:13px;font-weight:800;color:'+color+'">'+title+'</div>'
+      +linkBtn
+      +'</div>'
+      +'<div style="padding:12px 14px">'+content+'</div>'
+      +'</div>';
+  }
+
+  // ① 이번 달 학사일정
+  var evts=(_academicCalendar&&_academicCalendar.events)||[];
+  var thisMonEvts=evts.filter(function(e){
+    var ps=e.prepStartDate,ed=e.date;
+    return (ps&&ps>=thisMonStart&&ps<thisMonEnd)||(ed&&ed>=thisMonStart&&ed<thisMonEnd);
+  }).sort(function(a,b){return a.date>b.date?1:-1;});
+  var calHTML='';
+  if(thisMonEvts.length){
+    thisMonEvts.forEach(function(e){
+      var diff=Math.round((new Date(e.date)-now)/(1000*60*60*24));
+      var dday=diff>0?'<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:4px;margin-left:4px">D-'+diff+'</span>':diff===0?'<span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;margin-left:4px">오늘</span>':'<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:1px 6px;border-radius:4px;margin-left:4px">완료</span>';
+      var isPrepOnly=e.prepStartDate&&e.prepStartDate>=thisMonStart&&e.date>=thisMonEnd;
+      calHTML+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:11px;color:var(--txt3);flex-shrink:0">'+e.date.slice(5)+'</span>'
+        +'<span style="font-size:12px;flex:1;color:var(--txt)">'+e.title+(isPrepOnly?' <span style="font-size:10px;color:#7c3aed">[준비 시작]</span>':'')+'</span>'
+        +dday+'</div>';
+    });
+  }else{
+    calHTML='<div style="font-size:12px;color:var(--txt3)">이번 달 관련 학사일정이 없습니다</div>';
+  }
+
+  // ② 목표 달성률
+  var goalHTML='';
+  if(_goalTargets&&_goalTargets[yr]){
+    var gt=_goalTargets[yr];
+    var curRev=0;var curTotal=0;
+    try{
+      var revData=_revenueData||{};
+      for(var m=1;m<=mo;m++){var mk=yr+'-'+String(m).padStart(2,'0');if(revData[mk])curRev+=revData[mk];}
+    }catch(e){}
+    var recentStudents=(students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';}).length;
+    var revTarget=gt.targetRev||0;
+    var revPct=revTarget?Math.round(curRev/revTarget*100):0;
+    var stuTarget=gt.targetTotal||0;
+    var stuPct=stuTarget?Math.round(recentStudents/stuTarget*100):0;
+    function pctBar(label,cur,target,pct,unit){
+      var col=pct>=100?'#16a34a':pct>=70?'#2563eb':pct>=50?'#d97706':'#dc2626';
+      return '<div style="margin-bottom:8px">'
+        +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'
+        +'<span style="color:var(--txt2)">'+label+'</span>'
+        +'<span style="font-weight:700;color:'+col+'">'+pct+'% <span style="font-size:10px;color:var(--txt3)">('+cur+(unit||'')+ ' / '+target+(unit||'')+')</span></span>'
+        +'</div>'
+        +'<div style="background:var(--surface2);border-radius:4px;height:6px">'
+        +'<div style="background:'+col+';width:'+Math.min(pct,100)+'%;height:6px;border-radius:4px;transition:width .3s"></div>'
+        +'</div></div>';
+    }
+    goalHTML+=pctBar('목표 매출',Math.round(curRev/10000)+'만',Math.round(revTarget/10000)+'만',revPct,'');
+    goalHTML+=pctBar('목표 재원생',recentStudents,stuTarget,stuPct,'명');
+  }else{
+    goalHTML='<div style="font-size:12px;color:var(--txt3)">목표 관리에서 연간 목표를 먼저 설정해 주세요</div>';
+  }
+
+  // ③ 전월 미완료
+  var overdueTasks=(_dbTasks||[]).filter(function(t){
+    return t.dueDate&&t.dueDate<today&&t.status!=='완료'&&!(t.id&&t.id.startsWith('__'));
+  });
+  var overdueHTML='';
+  if(overdueTasks.length){
+    overdueTasks.slice(0,5).forEach(function(t){
+      var diff2=Math.round((new Date(today)-new Date(t.dueDate))/(1000*60*60*24));
+      overdueHTML+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;flex-shrink:0">'+diff2+'일 지연</span>'
+        +'<span style="font-size:12px;flex:1;color:var(--txt)">'+t.name+'</span>'
+        +'</div>';
+    });
+    if(overdueTasks.length>5)overdueHTML+='<div style="font-size:11px;color:var(--txt3);margin-top:4px">외 '+(overdueTasks.length-5)+'건 더 있음</div>';
+  }else{
+    overdueHTML='<div style="font-size:12px;color:#16a34a;font-weight:600">지연 업무가 없습니다 ✅</div>';
+  }
+
+  // ④ 참고 플랜 링크
+  var planLinks=[
+    {label:'오늘 회의 — 연간 계획',fn:"goto('meeting');setTimeout(function(){switchWMTab('annual')},100)"},
+    {label:'학부모 간담회 — 연간 계획',fn:"goto('meeting-page');setTimeout(function(){switchMeetingTab('annual')},100)"},
+    {label:'학부모 간담회 — 월간 계획',fn:"goto('meeting-page');setTimeout(function(){switchMeetingTab('monthly')},100)"},
+    {label:'블로그 플랜',fn:"goto('mk-blog');setTimeout(function(){switchOnlinePromoTab('blog');switchMkBlogTab('plan')},100)"},
+    {label:'인스타 플랜',fn:"goto('mk-blog');setTimeout(function(){switchOnlinePromoTab('insta');switchChTab('insta','plan')},100)"},
+    {label:'당근 플랜',fn:"goto('mk-blog');setTimeout(function(){switchOnlinePromoTab('danggeun');switchChTab('danggeun','plan')},100)"},
+    {label:'카톡 플랜',fn:"goto('mk-blog');setTimeout(function(){switchOnlinePromoTab('kakao');switchChTab('kakao','plan')},100)"},
+    {label:'네이버 플레이스 플랜',fn:"goto('mk-blog');setTimeout(function(){switchOnlinePromoTab('naver');switchChTab('naver','plan')},100)"},
+  ];
+  var planHTML='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  planLinks.forEach(function(l){
+    planHTML+='<button onclick="'+l.fn+'" style="font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--txt2);cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\'var(--navy)\';this.style.color=\'var(--navy)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--txt2)\'">'+l.label+' →</button>';
+  });
+  planHTML+='</div>';
+
+  // ⑤ 현재 이달의 중점 업무
+  var focusTasks=(_dbTasks||[]).filter(function(t){
+    return t.taskType==='이달의 중점'&&!(t.id&&t.id.startsWith('__'));
+  });
+  var focusHTML='';
+  if(focusTasks.length){
+    focusTasks.forEach(function(t){
+      var isDone=t.status==='완료';
+      focusHTML+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+        +'<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleFocusTask(\'monthly\',\''+t.id+'\')" style="width:15px;height:15px;accent-color:var(--mint);cursor:pointer">'
+        +'<span style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'" onclick="openDbTaskModal(\''+t.id+'\')">'+t.name+'</span>'
+        +'<span style="font-size:10px;color:var(--txt3)">~'+t.dueDate.slice(5)+'</span>'
+        +'</div>';
+    });
+  }else{
+    focusHTML='<div style="font-size:12px;color:var(--txt3);text-align:center;padding:10px">아직 등록된 이달의 중점 업무가 없습니다</div>';
+  }
+  focusHTML+='<div style="margin-top:8px"><button class="btn btn-navy btn-sm" onclick="openMonthlyFocusModal()">+ 이달의 중점 업무 추가</button></div>';
+
+  // 렌더링
+  el.innerHTML='<div style="max-width:740px;padding:4px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">'+yr+'년 '+mo+'월 월간 중점 업무 선정</div>'
+    +'<div style="font-size:11px;color:var(--txt3)">4가지 기준을 확인하고 이번 달 중점 업무를 선정하세요</div>'
+    +'</div>'
+    +card('① 이번 달 학사일정','#3b82f6',calHTML,{label:'학사일정 전체 보기',fn:"switchDashTab('calendar')"})
+    +card('② 목표 달성률','#10b981',goalHTML,{label:'목표 관리',fn:"goto('goals')"})
+    +card('③ 참고할 플랜','#f59e0b',planHTML)
+    +card('④ 전월 미완료 업무','#ef4444',overdueHTML)
+    +card('🎯 이달의 중점 업무','#7c3aed',focusHTML,{label:'중점 추진 탭',fn:"_dbView='focus';_renderDashBoardUI($('dashboard-board-area'));switchDashTab('board')"})
+    +'</div>';
+}
 function renderCrmDaily(){
   renderCrmDailyInto('crm-daily-area');
 }
