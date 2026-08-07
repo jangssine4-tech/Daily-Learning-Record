@@ -10630,6 +10630,16 @@ function _renderAcademicCalendarUI(el){
   html+='</div></div>';
   el.innerHTML=html;
 }
+function _acalSyncDate(){
+  var yr=new Date().getFullYear();
+  var mo=$('acal-month');var day=$('acal-day');var hidden=$('acal-date');
+  if(mo&&day&&hidden){
+    var dateStr=yr+'-'+mo.value+'-'+day.value;
+    hidden.value=dateStr;
+    var en=$('acal-date-end');
+    if(en&&en.value&&en.value<dateStr)en.value=dateStr;
+  }
+}
 function openAcalAddModal(editId){
   var editEvt=editId?(_academicCalendar.events||[]).find(function(e){return e.id===editId;}):null;
   var now=new Date();
@@ -10640,7 +10650,18 @@ function openAcalAddModal(editId){
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
   var e=editEvt||{};
   overlay.innerHTML='<div class="ms" style="max-width:400px"><div class="mh"></div><div class="mt">📆 학사일정 '+(editId?'편집':'추가')+'</div>'
-    +'<div class="field"><div class="fl">행사일 <span style="color:var(--red)">*</span></div><input type="date" class="fi" id="acal-date" value="'+(e.date||todayVal)+'" onchange="var en=document.getElementById(\'acal-date-end\');if(en.value&&en.value<this.value)en.value=this.value;"></div>'
+    +'<div class="field"><div class="fl">행사일 <span style="color:var(--red)">*</span></div><div style="display:flex;gap:8px;align-items:center">'
+    +(function(){
+      var d=e.date?new Date(e.date):new Date();
+      var mo=e.date?String(d.getMonth()+1).padStart(2,'0'):String(new Date().getMonth()+1).padStart(2,'0');
+      var day=e.date?String(d.getDate()).padStart(2,'0'):String(new Date().getDate()).padStart(2,'0');
+      var moOpts='';for(var m=1;m<=12;m++){var mv=String(m).padStart(2,'0');moOpts+='<option value="'+mv+'"'+(mv===mo?' selected':'')+'>'+m+'월</option>';}
+      var dayOpts='';for(var dd=1;dd<=31;dd++){var dv=String(dd).padStart(2,'0');dayOpts+='<option value="'+dv+'"'+(dv===day?' selected':'')+'>'+dd+'일</option>';}
+      return '<select class="fi" id="acal-month" style="flex:1" onchange="_acalSyncDate()">'+moOpts+'</select>'
+        +'<select class="fi" id="acal-day" style="flex:1" onchange="_acalSyncDate()">'+dayOpts+'</select>'
+        +'<input type="hidden" id="acal-date" value="'+(e.date||todayVal)+'">';
+    })()
+    +'</div></div>'
     +'<div class="field"><div class="fl">종료 날짜 <span style="font-size:10px;color:var(--txt3)">(기간 일정)</span></div><input type="date" class="fi" id="acal-date-end" value="'+(e.endDate||'')+'" placeholder="비워두면 당일 일정"></div>'
     +'<div class="field"><div class="fl">준비 시작일 <span style="font-size:10px;color:var(--txt3)">(이달 관련 일정 판단 기준)</span></div><input type="date" class="fi" id="acal-prep-start" value="'+(e.prepStartDate||'')+'"></div>'
     +'<div class="field"><div class="fl">제목 <span style="color:var(--red)">*</span></div><input class="fi" id="acal-title" placeholder="예: TOSEL 정기시험" value="'+(e.title||'')+'"></div>'
@@ -10814,7 +10835,7 @@ function getCrmThreshold(id){
   return null;
 }
 // ══ GOALS ══
-function switchGoalsTab(tab){currentGoalsTab=tab;['annual','monthly','memo'].forEach(function(t){$('gtab-'+t).classList.toggle('active',t===tab);});$('goals-annual-area').style.display=tab==='annual'?'':'none';$('goals-monthly-area').style.display=tab==='monthly'?'':'none';$('goals-memo-area').style.display=tab==='memo'?'':'none';var moSel=$('goals-month');if(moSel)moSel.style.display=tab!=='annual'?'':'none';renderGoalsView();}
+function switchGoalsTab(tab){currentGoalsTab=tab;['annual','monthly','memo'].forEach(function(t){$('gtab-'+t).classList.toggle('active',t===tab);});$('goals-annual-area').style.display=tab==='annual'?'':'none';$('goals-monthly-area').style.display=tab==='monthly'?'':'none';$('goals-memo-area').style.display=tab==='memo'?'':'none';var moSel=$('goals-month');if(moSel)moSel.style.display=tab==='monthly'?'':'none';renderGoalsView();}
 function renderGoalsView(){var yr=parseInt($('goals-year')?.value)||new Date().getFullYear();var mo=parseInt($('goals-month')?.value)||new Date().getMonth()+1;if(currentGoalsTab==='annual')renderRevGoals(yr);else if(currentGoalsTab==='monthly')renderMonthlyGoals(yr,mo);else if(currentGoalsTab==='memo')renderRevMemo(yr);}
 
 function renderRevGoals(yr){
@@ -10860,10 +10881,78 @@ function renderMonthlyGoals(yr,mo){
 }
 function renderRevMemo(yr){
   var el=$('goals-memo-area');if(!el)return;
-  var tbodyHTML='';for(var n=1;n<=12;n++){tbodyHTML+='<tr><td style="font-weight:700;text-align:center">'+n+'월</td><td><input class="fi" style="font-size:12px" id="rmemo-issue-'+n+'" placeholder="주요 이슈" onblur="saveRevMemo('+yr+','+n+')"></td><td><input class="fi" style="font-size:12px" id="rmemo-note-'+n+'" placeholder="원장 메모" onblur="saveRevMemo('+yr+','+n+')"></td><td><input class="fi" style="font-size:12px" id="rmemo-plan-'+n+'" placeholder="다음달 계획" onblur="saveRevMemo('+yr+','+n+')"></td></tr>';}
-  el.innerHTML='<div class="expense-section"><h4>📝 '+yr+'년 월별 메모</h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:600px"><thead><tr><th style="width:50px">월</th><th>주요 이슈</th><th>원장 메모</th><th>다음달 계획</th></tr></thead><tbody>'+tbodyHTML+'</tbody></table></div></div>';
+  var tbodyHTML='';
+  for(var n=1;n<=12;n++){
+    tbodyHTML+='<tr><td style="font-weight:700;text-align:center">'+n+'월</td>'
+      +'<td><input class="fi" style="font-size:12px" id="rmemo-issue-'+n+'" placeholder="주요 이슈" onblur="saveRevMemo('+yr+','+n+')"></td>'
+      +'<td><input class="fi" style="font-size:12px" id="rmemo-note-'+n+'" placeholder="원장 메모" onblur="saveRevMemo('+yr+','+n+')"></td>'
+      +'<td><input class="fi" style="font-size:12px" id="rmemo-plan-'+n+'" placeholder="다음달 계획" onblur="saveRevMemo('+yr+','+n+')"></td></tr>';
+  }
+  el.innerHTML='<div class="expense-section">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    +'<h4 style="margin:0">'+yr+'년 월별 메모</h4>'
+    +'<button class="btn btn-outline btn-sm" onclick="openMemoGuide()" style="font-size:12px">작성 가이드</button>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:600px">'
+    +'<thead><tr><th style="width:50px">월</th><th>주요 이슈</th><th>원장 메모</th><th>다음달 계획</th></tr></thead>'
+    +'<tbody>'+tbodyHTML+'</tbody></table></div></div>';
   loadRevMemos(yr);
 }
+
+function openMemoGuide(){
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+
+  var guide=(_opGuides||[]).find(function(g){return g.id==='g_goals_manual';});
+  var sectionsHTML='';
+  if(guide&&guide.sections&&guide.sections.length){
+    guide.sections.forEach(function(s){
+      sectionsHTML+='<div style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:10px">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">'+s.title+'</div>'
+        +'<div style="font-size:12px;color:var(--txt2);white-space:pre-line;line-height:1.9">'+s.content+'</div>'
+        +'</div>';
+    });
+  }else{
+    sectionsHTML=''
+      +'<div style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:10px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">📝 작성 항목</div>'
+      +'<div style="font-size:12px;color:var(--txt2);line-height:2">'
+      +'<b>주요 이슈:</b> 이달의 핵심 현황<br>'
+      +'예) 신규 등록 3명, 퇴원 1명, 상담 8건<br><br>'
+      +'<b>원장 메모:</b> 집중 영역, 특이사항, 의사결정<br>'
+      +'예) 블로그 콘텐츠 부족 → 9월 집중 보완<br><br>'
+      +'<b>다음달 계획:</b> 보완할 점, 이월 사항, 집중 목표<br>'
+      +'예) 2학기 신규 모집, 학부모 간담회 준비'
+      +'</div></div>'
+      +'<div style="background:#eff6ff;border-radius:10px;padding:12px;margin-bottom:10px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">🔗 이달의 중점 업무 선정과 연결</div>'
+      +'<div style="font-size:12px;color:var(--txt2);line-height:2">'
+      +'① 월말에 월별 메모 작성<br>'
+      +'② 다음달 초 오늘 할 일(계획) → 월간 중점 선정 탭<br>'
+      +'③ <b>② 연간·월간 목표 칸</b> → 달성 현황 참고<br>'
+      +'④ <b>④ 현황·미완료 칸</b> → 보완 사항 입력<br>'
+      +'⑤ 중점 업무 선정 → 운영안 연결 → 주차별 업무 확정'
+      +'</div></div>'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:12px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">📅 월간 루틴</div>'
+      +'<div style="font-size:12px;color:var(--txt2);line-height:2">'
+      +'<b>매월 1일:</b> 목표·메모 확인 후 중점 업무 선정<br>'
+      +'<b>매월 15일:</b> 달성률 중간 점검<br>'
+      +'<b>매월 말일:</b> 월별 메모 작성 (이슈·메모·다음달 계획)'
+      +'</div></div>';
+  }
+
+  overlay.innerHTML='<div class="ms" style="max-width:460px;max-height:88vh;overflow-y:auto">'
+    +'<div class="mh"></div>'
+    +'<div class="mt">월별 메모 작성 가이드</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">월별 메모를 어떻게 작성하고 활용하면 좋은지 안내해 드려요.</div>'
+    +sectionsHTML
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
+}
+
 async function loadRevMemos(yr){try{var doc=await db.collection('revMemos').doc(String(yr)).get();if(!doc||!doc.exists)return;var data=doc.data();for(var i=1;i<=12;i++){var m=data['m'+i]||{};var issue=$('rmemo-issue-'+i);var note=$('rmemo-note-'+i);var plan=$('rmemo-plan-'+i);if(issue)issue.value=m.issue||'';if(note)note.value=m.note||'';if(plan)plan.value=m.plan||'';}}catch(e){}}
 async function saveRevMemo(yr){var data={};for(var i=1;i<=12;i++){var issue=$('rmemo-issue-'+i);var note=$('rmemo-note-'+i);var plan=$('rmemo-plan-'+i);data['m'+i]={issue:issue?issue.value:'',note:note?note.value:'',plan:plan?plan.value:''};}data.updatedAt=new Date().toISOString();await db.collection('revMemos').doc(String(yr)).set(data);toast('✅ 메모 저장됨');}
 async function loadGoalTargets(yr){try{var doc=await db.collection('goalTargets').doc(String(yr)).get();if(doc&&doc.exists)_goalTargets[yr]=doc.data();}catch(e){}}
