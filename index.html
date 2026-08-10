@@ -5374,8 +5374,13 @@ async function saveMakeupUnified(){
     var data={studentId:sId,studentName:s.name,absentDate:absentDate,absentReason:mkNote||'결석',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
     var ref=await db.collection('makeups').add(data);
     makeups.push({id:ref.id,...data});
-    // 결석일 기준으로 자동 결석 처리
+    // 결석일 기준으로 자동 결석 처리 (실제 사유 전달)
     await autoCreateAbsentReport(sId,absentDate,ref.id);
+    // 기존에 잘못된 사유로 저장된 report 결석으로 통일
+    reports.filter(function(r){return r.studentId===sId&&r.date===absentDate&&r.absent&&r.absentReason!=='결석';}).forEach(function(r){
+      r.absentReason='결석';
+      db.collection('reports').doc(r.id).update({absentReason:'결석'});
+    });
     // 시간표 날짜를 결석일로 이동해서 카드에 결석 표시
     _scheduleDate=absentDate;
     var datePick=$('schedule-date-pick');
@@ -5418,9 +5423,7 @@ async function autoCreateAbsentReport(studentId,dateStr,makeupId){
   var dayNames=['일','월','화','수','목','금','토'];
   var dn=dayNames[d.getDay()];
 
-  // 보강 계획표의 실제 결석 사유 가져오기
-  var mkEntry=makeupId?makeups.find(function(m){return m.id===makeupId;}):null;
-  var absentReason=(mkEntry&&mkEntry.absentNote)?mkEntry.absentNote:(mkEntry&&mkEntry.makeupNote)?mkEntry.makeupNote:'결석';
+  var absentReason='결석';
 
   // 해당 요일의 모든 수업 시간 수집
   var sessionTimes=[];
