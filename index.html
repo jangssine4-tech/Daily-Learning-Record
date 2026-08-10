@@ -2234,7 +2234,7 @@ function renderWriteFlowPanel(studentId){
   // Recent 5 lessons
   if(sReps.length){
     html+='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">최근 수업 흐름</div>'
-      +'<div style="display:grid;grid-template-columns:36px 48px 64px 36px 72px;gap:2px;font-size:9px;font-weight:700;color:var(--txt3);padding-bottom:3px;border-bottom:2px solid var(--border);margin-bottom:3px"><span>날짜</span><span>복습</span><span>태도</span><span>Quiz</span><span>받아쓰기</span></div>';
+      +'<div style="display:grid;grid-template-columns:36px 48px 28px 28px 60px 32px 70px;gap:2px;font-size:9px;font-weight:700;color:var(--txt3);padding-bottom:3px;border-bottom:2px solid var(--border);margin-bottom:3px"><span>날짜</span><span>복습</span><span>교재</span><span>영상</span><span>태도</span><span>Quiz</span><span>받아쓰기</span></div>';
     sReps.slice(0,8).forEach(function(r){
       var testLabel=r.absent?'-':(r.reviewTest||'-');
       var testColor=r.absent?'var(--txt3)':r.reviewTest==='매우잘함'||r.reviewTest==='잘함'?'#16a34a':r.reviewTest==='부진'?'#dc2626':'var(--txt)';
@@ -2242,25 +2242,35 @@ function renderWriteFlowPanel(studentId){
       if(r.absent){_attTop='결석';}
       else if(r.attitude){
         var _av=r.attitude;
-        if(_av==='매우 우수'||_av.includes('매우'))_attTop='⭐매우 우수';
-        else if(_av==='우수'||(!_av.includes('매우')&&_av==='우수'))_attTop='✅우수';
-        else if(_av==='수업 방해'||_av.includes('방해'))_attTop='🚨수업 방해';
-        else if(_av==='산만함'||_av.includes('산만'))_attTop='⚠️산만함';
-        // If stored value is a sub-item, find parent level
+        if(_av==='매우 우수'||_av.includes('매우'))_attTop='⭐매우우수';
+        else if(_av==='우수')_attTop='✅우수';
+        else if(_av==='수업 방해'||_av.includes('방해'))_attTop='🚨방해';
+        else if(_av==='산만함'||_av.includes('산만'))_attTop='⚠️산만';
         else{
           var _found=false;
-          for(var _lv in _ATTITUDE_ITEMS){if(_ATTITUDE_ITEMS[_lv].indexOf(_av)>=0){_attTop=_lv.substring(0,6);_found=true;break;}}
-          if(!_found)_attTop=_av.substring(0,6);
+          for(var _lv in _ATTITUDE_ITEMS){if(_ATTITUDE_ITEMS[_lv].indexOf(_av)>=0){_attTop=_lv.substring(0,5);_found=true;break;}}
+          if(!_found)_attTop=_av.substring(0,5);
         }
-      } else {_attTop='-';}
-      var attEmoji=_attTop;
-      var attColor=r.absent?'#dc2626':r.attitude&&(r.attitude.includes('산만')||r.attitude.includes('방해'))?'#dc2626':r.attitude&&(r.attitude&&(r.attitude.includes('매우')||r.attitude.includes('우수')))?'#16a34a':'var(--txt)';
+      }else{_attTop='-';}
+      var attColor=r.absent?'#dc2626':r.attitude&&(r.attitude.includes('산만')||r.attitude.includes('방해'))?'#dc2626':r.attitude&&(r.attitude.includes('매우')||r.attitude.includes('우수'))?'#16a34a':'var(--txt)';
       var quizLabel=r.dailyQuiz||'-';
-      var dictLabel='-';if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictLabel=pct+'점('+dm[1]+'/'+dm[2]+')';}else dictLabel=r.dictation;}
-      html+='<div style="display:grid;grid-template-columns:36px 48px 64px 36px 72px;gap:2px;font-size:9px;padding:3px 0;border-bottom:1px solid var(--border)">'
+      var dictLabel='-';
+      if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictLabel=pct+'%';}else dictLabel=r.dictation;}
+      function hwIcon(val){
+        if(r.absent)return '<span style="color:var(--txt3)">-</span>';
+        if(!val||val===''||val==='-')return '<span style="color:var(--txt3)">-</span>';
+        if(val==='제출'||val==='O'||val==='o')return '<span style="color:#16a34a;font-weight:700">O</span>';
+        if(val==='미제출'||val==='X'||val==='x')return '<span style="color:#dc2626;font-weight:700">X</span>';
+        return '<span style="color:#d97706;font-weight:700">△</span>';
+      }
+      var hwBook=r.homeworkBook||(typeof splitHw==='function'?splitHw(r.homework||'').book:'')||'';
+      var hwVideo=r.hwVideo||(typeof splitHw==='function'?splitHw(r.homework||'').video:'')||'';
+      html+='<div style="display:grid;grid-template-columns:36px 48px 28px 28px 60px 32px 70px;gap:2px;font-size:9px;padding:3px 0;border-bottom:1px solid var(--border)">'
         +'<span style="color:var(--txt3)">'+r.date.substring(5)+'</span>'
         +'<span style="color:'+testColor+'">'+testLabel+'</span>'
-        +'<span style="color:'+attColor+'">'+attEmoji+'</span>'
+        +hwIcon(hwBook)
+        +hwIcon(hwVideo)
+        +'<span style="color:'+attColor+'">'+_attTop+'</span>'
         +'<span style="color:var(--txt)">'+quizLabel+'</span>'
         +'<span style="color:var(--txt)">'+dictLabel+'</span>'
         +'</div>';
@@ -4594,6 +4604,19 @@ function onReportLevelChange(){
   var foundModule=getEvalModuleForLevel(newLevel);
   if(foundModule)renderEvalArea(foundModule,window._evalState||{});
   else{var area=$('eval-area');if(area)area.innerHTML='';}
+
+  // 단계 변경 시 학생 정보도 자동 업데이트
+  if(s&&newLevel&&newLevel!==s.level){
+    s.level=newLevel;
+    db.collection('students').doc(s.id).update({
+      level:newLevel,
+      updatedAt:new Date().toISOString()
+    }).then(function(){
+      toast('단계 변경 저장됨: '+newLevel);
+    }).catch(function(e){
+      console.error('단계 저장 오류',e);
+    });
+  }
 }
 function renderEvalArea(moduleId,savedItems){
   window._currentEvalModule=moduleId;
