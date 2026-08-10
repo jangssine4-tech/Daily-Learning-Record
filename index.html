@@ -3702,13 +3702,34 @@ function renderSchedule(){
   // Non-scheduled students (active but not coming today)
   var scheduledIds=new Set(todayStudents.map(function(s){return s.id;}));
   var notToday=allActive.filter(function(s){return!scheduledIds.has(s.id);});
-  if(notToday.length){
+
+  // 오늘 결석 처리된 학생 (시간표에 있지만 결석)
+  var absentToday=allActive.filter(function(s){
+    if(!scheduledIds.has(s.id))return false;
+    var rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.absent;});
+    return !!rep;
+  });
+
+  // 통합: 수업 없는 학생 + 결석 학생
+  var allNotPresent=notToday.concat(absentToday);
+
+  if(allNotPresent.length){
     html+='<div style="background:#f8fafc;border:1px dashed var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px">'
-      +'<div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:6px">📋 오늘 수업 없는 학생 ('+notToday.length+'명)</div>'
+      +'<div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:6px">오늘 수업 없는 학생 ('+allNotPresent.length+'명)</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:4px">';
+
+    // 수업 없는 학생 먼저 (이름순)
     notToday.sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).forEach(function(s){
       html+='<span style="font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:10px;color:var(--txt2)">'+s.name+'</span>';
     });
+
+    // 결석 학생 오른쪽에 (사유 포함)
+    absentToday.sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).forEach(function(s){
+      var rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.absent;});
+      var reason=rep&&rep.absentReason?rep.absentReason:'결석';
+      html+='<span style="font-size:11px;background:#fee2e2;padding:2px 8px;border-radius:10px;color:#dc2626">'+s.name+'('+reason+')</span>';
+    });
+
     html+='</div></div>';
   }
   // Load memos for speech bubbles (deduplicate by ID)
