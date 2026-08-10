@@ -3727,7 +3727,7 @@ function renderSchedule(){
     absentToday.sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).forEach(function(s){
       var rep=reports.find(function(r){return r.studentId===s.id&&r.date===todayStr&&r.absent;});
       var reason=rep&&rep.absentReason?rep.absentReason:'결석';
-      html+='<span style="font-size:11px;background:#fee2e2;padding:2px 8px;border-radius:10px;color:#dc2626">'+s.name+'('+reason+')</span>';
+      html+='<span style="font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:10px;color:var(--txt2)">'+s.name+'('+reason+')</span>';
     });
 
     html+='</div></div>';
@@ -5375,7 +5375,7 @@ async function saveMakeupUnified(){
     var ref=await db.collection('makeups').add(data);
     makeups.push({id:ref.id,...data});
     // 결석일 기준으로 자동 결석 처리
-    await autoCreateAbsentReport(sId,absentDate);
+    await autoCreateAbsentReport(sId,absentDate,ref.id);
     // 시간표 날짜를 결석일로 이동해서 카드에 결석 표시
     _scheduleDate=absentDate;
     var datePick=$('schedule-date-pick');
@@ -5399,6 +5399,51 @@ async function saveMakeupUnified(){
     renderSchedule();
   }
   loading(false);saveCacheDebounced();
+}
+
+async function deleteMakeupEntry(){
+  var id=$('mk-id').value;if(!id)return;
+  if(!confirm('보강 등록을 삭제할까요?'))return;
+  loading(true);
+  await db.collection('makeups').doc(id).delete();
+  makeups=makeups.filter(function(m){return m.id!==id;});
+  closeM('makeup');
+  renderMakeupCalendar();
+  loading(false);saveCacheDebounced();toast('🗑 삭제 완료');
+}
+
+async function autoCreateAbsentReport(studentId,dateStr,makeupId){
+  var s=students.find(function(x){return x.id===studentId;});if(!s)return;
+  var d=new Date(dateStr+'T12:00:00');
+  var dayNames=['일','월','화','수','목','금','토'];
+  var dn=dayNames[d.getDay()];
+
+  // 보강 계획표의 실제 결석 사유 가져오기
+  var mkEntry=makeupId?makeups.find(function(m){return m.id===makeupId;}):null;
+  var absentReason=(mkEntry&&mkEntry.absentNote)?mkEntry.absentNote:(mkEntry&&mkEntry.makeupNote)?mkEntry.makeupNote:'결석';
+
+  // 해당 요일의 모든 수업 시간 수집
+  var sessionTimes=[];
+  var pData=(s.periods||{})[dn];
+  if(pData&&typeof pData==='object'&&pData.time)sessionTimes.push(pData.time);
+  var spData=(s.specialPeriods||{})[dn];
+  if(spData&&spData.time)sessionTimes.push(spData.time);
+  if(!sessionTimes.length)sessionTimes.push('');
+
+  for(var i=0;i<sessionTimes.length;i++){
+    var st=sessionTimes[i];
+    var existRep=reports.find(function(r){
+      return r.studentId===studentId&&r.date===dateStr&&(r.sessionTime||'')===(st||'');
+    });
+    if(!existRep){
+      var newRep={studentId:studentId,studentName:s.name,classId:s.classId||'',date:dateStr,sessionTime:st,teacher:s.teacher||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:true,earlyLeave:false,absentReason:absentReason,reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s))||'',evalItems:{},praise:[],autoCreated:true,createdAt:new Date().toISOString()};
+      var ref=await db.collection('reports').add(newRep);
+      reports.push(Object.assign({},newRep,{id:ref.id}));
+    }else if(!existRep.absent){
+      await db.collection('reports').doc(existRep.id).update({absent:true,absentReason:absentReason,updatedAt:new Date().toISOString()});
+      existRep.absent=true;existRep.absentReason=absentReason;
+    }
+  }
 }
 
 async function deleteMakeupEntry(){
