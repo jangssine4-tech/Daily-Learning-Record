@@ -6510,10 +6510,8 @@ function renderRevMonthly(yr,mo){
     var isManual=(manualExp!==undefined&&manualExp!==null&&manualExp!=='');
     // 미수금
     var unpaidAmt=paid?Math.max(0,dispExpected-paidAmt):dispExpected;
-    // 수납상태
-    var payStatus=paid?(paidAmt>=dispExpected?'완납':'부분납'):'미납';
-    var statusColor=payStatus==='완납'?'#16a34a':payStatus==='부분납'?'#d97706':'#dc2626';
-    var statusBg=payStatus==='완납'?'#f0fdf4':payStatus==='부분납'?'#fffbeb':'#fef2f2';
+    // 미납 여부 (행 배경색용)
+    var isMiNap=unpaidAmt>0&&!paid||(paid&&paidAmt<dispExpected);
 
     totalExpected+=dispExpected;totalPaid+=paidAmt;totalUnpaid+=unpaidAmt;
     var c='text-align:center;font-size:11px;padding:6px 8px';
@@ -6526,14 +6524,10 @@ function renderRevMonthly(yr,mo){
         +'+'+extraTotal.toLocaleString()+'원 ▾</button>';
     }else{extraBtn='-';}
 
-    var c='text-align:center;font-size:11px;padding:6px 8px';
-    var statusColor=payStatus==='완납'?'#16a34a':payStatus==='부분납'?'#d97706':'#dc2626';
-    var statusBg=payStatus==='완납'?'#f0fdf4':payStatus==='부분납'?'#fffbeb':'#fef2f2';
-
     // 미납일수 계산
     var unpaidDaysStr='';
-    if(payStatus!=='완납'&&unpaidAmt>0){
-      var dueDay=5; // 납부기한 매월 5일
+    if(unpaidAmt>0){
+      var dueDay=5;
       var dueDate=new Date(yr,mo-1,dueDay);
       var today2=new Date();
       if(today2>dueDate){
@@ -6542,16 +6536,7 @@ function renderRevMonthly(yr,mo){
       }
     }
 
-    // 납부예정액 상세 계산 정보
-    var detailInfo='기본교육비: '+(tuitionFee?tuitionFee.toLocaleString()+'원':'-')
-      +'\\n교재비: '+(textbookFee?textbookFee.toLocaleString()+'원':'-')
-      +'\\n부교재비: '+(subMatFee?subMatFee.toLocaleString()+'원':'-')
-      +'\\n할인: '+(discountAmt?'-'+discountAmt.toLocaleString()+'원':'없음')
-      +'\\n월 수업 시수: '+dispMh+'시간'
-      +(extra1Type&&extra1Amt?'\\n'+extra1Type+': '+extra1Amt.toLocaleString()+'원':'')
-      +(extra2Type&&extra2Amt?'\\n'+extra2Type+': '+extra2Amt.toLocaleString()+'원':'');
-
-    return '<tr style="'+(payStatus==='미납'?'background:#fff8f8':'')+'">'
+    return '<tr style="'+(unpaidAmt>0?'background:#fff8f8':'')+'">'
       +'<td style="'+c+'">'+rowNum+++'</td>'
       +'<td style="'+c+';font-weight:700;cursor:pointer" onclick="openRevenueModal(\''+(lastRev&&lastRev.id?lastRev.id:'')+'\',\''+s.id+'\','+yr+','+mo+')">'+s.name+'</td>'
       +'<td style="'+c+'">'+( s.grade||'-')+'</td>'
@@ -6760,12 +6745,6 @@ function saveExpectedDetailModal(studentId,yr,mo,overlay){
   }
 }
 
-function _showExpectedDetail(btn,studentId,detailInfo){
-  openExpectedDetailModal(studentId,
-    parseInt($('rev-year').value),
-    parseInt($('rev-month').value)
-  );
-}
 function _showExtraDetail(btn,t1,a1,t2,a2){
   var existing=document.getElementById('extra-detail-popup');
   if(existing){existing.remove();return;}
@@ -6827,8 +6806,19 @@ function editExpectedAmt(td,studentId,yr,mo,current){
   if(td.querySelector('input'))return;
   _editingExpected=true;
   setTimeout(function(){_editingExpected=false;},500);
-  td.innerHTML='<input type="number" style="width:70px;font-size:11px;padding:2px 4px;border:1px solid var(--blue);border-radius:4px" value="'+current+'" onclick="event.stopPropagation()" onblur="saveExpectedAmt(\''+studentId+'\',this.value,'+yr+','+mo+')" onkeydown="if(event.key===\'Enter\')this.blur()">';
-  td.querySelector('input').focus();
+  var orig=current;
+  td.innerHTML='<input type="number" style="width:70px;font-size:11px;padding:2px 4px;border:1px solid var(--blue);border-radius:4px" value="'+current+'" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\')this.blur()">';
+  var inp=td.querySelector('input');
+  inp.focus();
+  inp.onblur=function(){
+    var newVal=parseInt(this.value)||0;
+    if(newVal===parseInt(orig)){
+      // 값이 바뀌지 않았으면 원래 표시로 복원
+      renderRevMonthly(yr,mo);
+    }else{
+      saveExpectedAmt(studentId,newVal,yr,mo);
+    }
+  };
 }
 function editMonthlyHours(td,studentId,yr,mo,current){
   if(td.querySelector('input'))return;
