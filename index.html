@@ -2184,7 +2184,10 @@ function goto(view){
   else if(view==='blog-plan'){renderBlogPlan();}
   else if(view==='marketing'){initMkSelects();switchMktTab(_mkTab||'calendar');renderMarketing();}
   else if(view==='portfolio'){var pfSel=$('pf-student');if(pfSel){var prevVal=pfSel.value;pfSel.innerHTML='<option value="">학생 선택</option>';students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).sort(function(a,b){return a.name>b.name?1:-1;}).forEach(function(s){pfSel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';});if(prevVal)pfSel.value=prevVal;;switchPfTab(_pfTab||'newcon');}}
-  else if(view==='admin'){try{renderUsers();}catch(e){var ea=$('users-list');if(ea)ea.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}}
+  else if(view==='admin'){
+    if(!currentUser||currentUser.role!=='admin'){toast('관리자만 접근할 수 있어요');return;}
+    try{renderUsers();}catch(e){var ea=$('users-list');if(ea)ea.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}
+  }
   else if(view==='settings'){loadPeriods().then(function(){try{renderPeriodSettings();}catch(e){var ep=$('period-settings');if(ep)ep.innerHTML='<div style="color:red">오류:'+e.message+'</div>';}});try{loadKakaoConfigUI();}catch(e){}}
   else if(view==='board'){renderDashBoard();}
   else if(view==='dashboard'){switchDashTab('monthly');}
@@ -13341,14 +13344,15 @@ function renderChecklistOverview(){
   });
 }
 function renderUsers(){
-  try{var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.adminDeleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong>'+(u.engName?' <span style="font-size:11px;color:var(--blue)">('+u.engName+')</span>':'')+'</td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>')+'</td><td><button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button></td></tr>';}).join('');  }catch(e){console.error('renderUsers 오류:',e);var _ea=document.getElementById('users-list');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
+  try{var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.adminDeleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}var isCurrentAdmin=currentUser&&currentUser.role==='admin';tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong>'+(u.engName?' <span style="font-size:11px;color:var(--blue)">('+u.engName+')</span>':'')+'</td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>':'<span style="font-size:11px;color:var(--txt3)">-</span>'))+'</td><td>'+(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button>':'<span style="font-size:11px;color:var(--txt3)">-</span>')+'</td></tr>';}).join('');}catch(e){console.error('renderUsers 오류:',e);var _ea=document.getElementById('users-list');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
 }
-function openUserModal(id){var u=id?users.find(function(x){return x.id===id;}):null;$('u-id-key').value=id||'';$('u-name').value=u?u.name||'':'';$('u-engname').value=u?u.engName||'':'';$('u-role').value=u?u.role||'teacher':'teacher';$('u-id').value=u?u.loginId||'':'';$('u-pw').value='';$('u-phone').value=u?u.phone||'':'';if(u&&u.ssn){try{$('u-ssn').value=atob(u.ssn);}catch(e){$('u-ssn').value='';}}else{$('u-ssn').value='';}$('u-ssn').type='password';$('u-address').value=u?u.address||'':'';$('u-del-wrap').style.display=id?'block':'none';$('modal-user').style.display='flex';}
+function openUserModal(id){if(!currentUser||currentUser.role!=='admin'){toast('관리자만 접근할 수 있어요');return;}var u=id?users.find(function(x){return x.id===id;}):null;$('u-id-key').value=id||'';$('u-name').value=u?u.name||'':'';$('u-engname').value=u?u.engName||'':'';$('u-role').value=u?u.role||'teacher':'teacher';$('u-id').value=u?u.loginId||'':'';$('u-pw').value='';$('u-phone').value=u?u.phone||'':'';if(u&&u.ssn){try{$('u-ssn').value=atob(u.ssn);}catch(e){$('u-ssn').value='';}}else{$('u-ssn').value='';}$('u-ssn').type='password';$('u-address').value=u?u.address||'':'';$('u-del-wrap').style.display=id?'block':'none';$('modal-user').style.display='flex';}
 async function saveUser(){var name=$('u-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}var loginId=$('u-id').value.trim();if(!loginId){toast('⚠️ 아이디 필수');return;}loading(true);var data={name:name,engName:$('u-engname').value.trim(),role:$('u-role').value,loginId:loginId,phone:$('u-phone').value.trim(),address:$('u-address').value.trim(),updatedAt:new Date().toISOString()};var ssnVal=$('u-ssn').value;if(ssnVal&&ssnVal!=='******'){data.ssn=btoa(ssnVal);}var pw=$('u-pw').value;if(pw)data.password=pw;var id=$('u-id-key').value;if(id)await db.collection('users').doc(id).update(data);else{data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}await loadUsers();renderUsers();_fullyPopulated=false;closeM('user');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
 async function deleteUser(){var id=$('u-id-key').value;if(!id||!confirm('관리자 페이지에서 삭제합니다. 강사 페이지에는 영향이 없습니다.\n삭제하시겠습니까?'))return;loading(true);await db.collection('users').doc(id).update({adminDeleted:true,adminDeletedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===id;});if(u)u.adminDeleted=true;await loadUsers();renderUsers();closeM('user');loading(false);saveCacheDebounced();toast('🗑 관리자 페이지에서 삭제됨');}
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
 function toggleSubPerms(parentId,checked){document.querySelectorAll('.sub-perm-'+parentId+' input[type=checkbox]').forEach(function(cb){cb.checked=checked;});}
 function openMenuPermModal(userId){
+  if(!currentUser||currentUser.role!=='admin'){toast('관리자만 접근할 수 있어요');return;}
   var u=users.find(function(x){return x.id===userId;});
   if(!u){toast('사용자를 찾을 수 없어요');return;}
   var perms=u.menuPerms||{};
@@ -13357,7 +13361,6 @@ function openMenuPermModal(userId){
   overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
   var secHTML='';
   _menuStruct.forEach(function(sec){
-    if(sec.sec==='시스템')return; // 시스템 메뉴는 교사에게 항상 숨김
     secHTML+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin:10px 0 4px">'+sec.sec+'</div>';
     sec.items.forEach(function(m){
       var chk=perms[m.id]!==false;
