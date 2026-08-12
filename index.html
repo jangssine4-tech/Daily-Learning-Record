@@ -700,10 +700,10 @@ var _dbView='today';
 var _dbAreaFilter='';
 var _dbStatusFilter='';
 var _dbPriorityFilter='';
-var _DB_AREAS=['수업 관리','학생 관리','학부모 소통','홍보','경영 관리','시스템'];
+var _DB_AREAS=['수업 관리','학생 관리','학부모 소통','홍보','경영 관리','세금','시스템'];
 var _DB_CYCLES=['반복없음','매일','매주','매월','매년'];
 var _dbEditId=null;
-var _DB_AREA_ICONS={'수업 관리':'📚','학생 관리':'👨‍🎓','학부모 소통':'👨‍👩‍👧','홍보':'📣','경영 관리':'📊','시스템':'⚙️'};
+var _DB_AREA_ICONS={'수업 관리':'📚','학생 관리':'👨‍🎓','학부모 소통':'👨‍👩‍👧','홍보':'📣','경영 관리':'📊','세금':'🧾','시스템':'⚙️'};
 var _DB_PRIORITIES=['긴급','중요','일반'];
 var _DB_PRIORITY_SHORT={'긴급':'🔴','중요':'🟡','일반':'🟢'};
 var _DB_PRIORITY_COLORS={'긴급':'#dc2626','중요':'#d97706','일반':'#16a34a'};
@@ -8789,8 +8789,16 @@ var _specialPrograms=['Phonics 기초반','Phonics 속성반','TOSEL 정기 시�
 
 function loadDashBoard(){
   if(_dbTasks)return Promise.resolve();
-  return db.collection('config').doc('dashBoardV2').get().then(function(d){
-    _dbTasks = d.exists ? (d.data().tasks||[]) : [];
+  return Promise.all([
+    db.collection('config').doc('dashBoardV2').get(),
+    db.collection('dashBoardV2').get()
+  ]).then(function(results){
+    var configTasks=results[0].exists?(results[0].data().tasks||[]):[];
+    var colTasks=results[1].docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    // 중복 제거: 컬렉션 문서 id가 config 배열에도 있으면 컬렉션 우선
+    var colIds=colTasks.map(function(t){return t.id;});
+    var filteredConfig=configTasks.filter(function(t){return !colIds.includes(t.id);});
+    _dbTasks=filteredConfig.concat(colTasks);
   }).catch(function(){_dbTasks=[];});
 }
 function saveDashBoard(){
@@ -9846,7 +9854,7 @@ function _renderDbWeekView(now){
 // ── 영역별 뷰 ────────────────────────────────────
 function _renderDbAreaView(){
   var areas=_dbAreaFilter?[_dbAreaFilter]:_DB_AREAS;
-  var allTasks=_dbFiltered(_dbGeneralTasks(_dbTasks||[]));
+  var allTasks=_dbFiltered((_dbTasks||[]).filter(function(t){return !t.id||!t.id.startsWith('__');}));
   var html='';
   areas.forEach(function(area){
     var items=allTasks.filter(function(t){return t.area===area;});
