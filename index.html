@@ -13348,6 +13348,44 @@ async function saveUser(){var name=$('u-name').value.trim();if(!name){toast('⚠
 async function deleteUser(){var id=$('u-id-key').value;if(!id||!confirm('관리자 페이지에서 삭제합니다. 강사 페이지에는 영향이 없습니다.\n삭제하시겠습니까?'))return;loading(true);await db.collection('users').doc(id).update({adminDeleted:true,adminDeletedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===id;});if(u)u.adminDeleted=true;await loadUsers();renderUsers();closeM('user');loading(false);saveCacheDebounced();toast('🗑 관리자 페이지에서 삭제됨');}
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
 function toggleSubPerms(parentId,checked){document.querySelectorAll('.sub-perm-'+parentId+' input[type=checkbox]').forEach(function(cb){cb.checked=checked;});}
+function openMenuPermModal(userId){
+  var u=users.find(function(x){return x.id===userId;});
+  if(!u){toast('사용자를 찾을 수 없어요');return;}
+  var perms=u.menuPerms||{};
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
+  var secHTML='';
+  _menuStruct.forEach(function(sec){
+    if(sec.sec==='시스템')return; // 시스템 메뉴는 교사에게 항상 숨김
+    secHTML+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin:10px 0 4px">'+sec.sec+'</div>';
+    sec.items.forEach(function(m){
+      var chk=perms[m.id]!==false;
+      secHTML+='<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px">'
+        +'<input type="checkbox" id="perm-'+m.id+'"'+(chk?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'
+        +m.label+'</label>';
+      if(m.subs){
+        m.subs.forEach(function(sub){
+          var schk=perms[sub.id]!==false;
+          secHTML+='<label style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 20px;cursor:pointer;font-size:12px;color:var(--txt2)">'
+            +'<input type="checkbox" id="perm-'+sub.id+'"'+(schk?' checked':'')+' style="width:13px;height:13px;accent-color:var(--navy)">'
+            +sub.label+'</label>';
+        });
+      }
+    });
+  });
+  overlay.innerHTML='<div class="ms" style="max-width:360px;max-height:90vh;overflow-y:auto">'
+    +'<div class="mh"></div>'
+    +'<div class="mt">메뉴 권한 — '+u.name+'</div>'
+    +'<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">체크된 항목만 해당 교사에게 표시됩니다</div>'
+    +secHTML
+    +'<div style="height:12px"></div>'
+    +'<button class="btn btn-navy btn-block" id="perm-save-btn">저장</button>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('perm-save-btn').onclick=function(){saveMenuPerms(userId,overlay);};
+}
 async function saveMenuPerms(userId,overlay){loading(true);var perms={};_menuStruct.forEach(function(sec){sec.items.forEach(function(m){var el=document.getElementById('perm-'+m.id);perms[m.id]=el?el.checked:true;if(m.subs)m.subs.forEach(function(sub){var sel=document.getElementById('perm-'+sub.id);perms[sub.id]=sel?sel.checked:true;});});});await db.collection('userPerms').doc(userId).set({menuPerms:perms,updatedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===userId;});if(u)u.menuPerms=perms;if(overlay)overlay.remove();loading(false);toast('✅ 권한 저장됨');}
 
 // ══ SETTINGS ══
