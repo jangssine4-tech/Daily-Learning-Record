@@ -2205,9 +2205,15 @@ function goto(view){
   else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){var yr2=new Date().getFullYear();loadGoalTargets(yr2).then(function(){renderGoalsView();});}else renderGoalsView();}
   else if(view==='acal'){
     var acalEl=$('acal-main-area');
-    if(acalEl)_renderAcademicCalendarUI(acalEl);
+    if(!acalEl)return;
+    acalEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+    loadAcademicCalendar(function(){
+      _renderAcademicCalendarUI(acalEl);
+    });
   }
-  else if(view==='plans'){renderPlansView();}
+  else if(view==='plans'){
+    loadPlans().then(function(){renderPlansView();});
+  }
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
 
