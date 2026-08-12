@@ -344,11 +344,10 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
     <button class="rev-tab active" id="dtab-monthly"    onclick="switchDashTab('monthly')"    style="font-size:15px;font-weight:700">월간 중점 선정</button>
     <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
-    <button class="rev-tab"        id="dtab-crm"        onclick="switchDashTab('crm')"        style="font-size:15px;font-weight:700">상담</button>
+    <button class="rev-tab" id="dtab-crm" onclick="switchDashTab('crm')" style="font-size:15px;font-weight:700">상담</button>
     <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
-    <button class="rev-tab"        id="dtab-mk"         onclick="switchDashTab('mk')"         style="font-size:15px;font-weight:700">마케팅 · 홍보</button>
-    <button class="rev-tab"        id="dtab-calendar"   onclick="switchDashTab('calendar')"   style="font-size:15px;font-weight:700">연간 학사일정</button>
-    <button class="rev-tab"        id="dtab-conditions" onclick="switchDashTab('conditions')" style="font-size:15px;font-weight:700">자동 분류 조건</button>
+    <button class="rev-tab" id="dtab-mk" onclick="switchDashTab('mk')" style="font-size:15px;font-weight:700">마케팅 · 홍보</button>
+    <button class="rev-tab" id="dtab-conditions" onclick="switchDashTab('conditions')" style="font-size:15px;font-weight:700">자동 분류 조건</button>
   </div>
   <div id="dash-panel-board" style="display:none;gap:0;height:calc(100vh - 100px);overflow:hidden">
     <!-- 왼쪽: 업무 목록 -->
@@ -2204,7 +2203,10 @@ function goto(view){
     }
   }
   else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){var yr2=new Date().getFullYear();loadGoalTargets(yr2).then(function(){renderGoalsView();});}else renderGoalsView();}
-  else if(view==='acal'){_renderAcademicCalendarUI($('acal-main-area'));}
+  else if(view==='acal'){
+    var acalEl=$('acal-main-area');
+    if(acalEl)_renderAcademicCalendarUI(acalEl);
+  }
   else if(view==='plans'){renderPlansView();}
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
@@ -2739,16 +2741,15 @@ function _wtAddPlanCard(ts, day, cellDiv) {
 
 
 function switchDashTab(tab){
-  ['monthly','crm','mk','calendar','conditions'].forEach(function(t){
+  if(tab==='calendar'){goto('acal');return;}
+  ['monthly','crm','mk','conditions'].forEach(function(t){
     var btn=$('dtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('dash-panel-'+t);if(pn)pn.style.display=t===tab?(t==='monthly'?'block':''):'none';
   });
-  // board 패널은 항상 숨김
   var boardPanel=$('dash-panel-board');if(boardPanel)boardPanel.style.display='none';
   if(tab==='monthly')renderDashMonthly();
   else if(tab==='crm'){initCrmDateSelector();renderCrmDailyInto('dashboard-area');}
   else if(tab==='mk'){loadMpPlans().then(function(){if(!_opGuidesLoaded){loadOpGuides(function(){renderMkTodayPage('dashboard-mk-area');});}else{renderMkTodayPage('dashboard-mk-area');}});}
-  else if(tab==='calendar'){renderAcademicCalendar();}
   else if(tab==='conditions'){loadCrmConditions().then(function(){_renderCrmConditionsUI($('crm-conditions-area'));});}
 }
 function renderDashboard(){switchDashTab('board');}
@@ -2948,7 +2949,7 @@ function renderDashMonthly(){
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">'+yr+'년 '+mo+'월 월간 중점 업무 선정</div>'
     +'<div style="font-size:11px;color:var(--txt3)">4가지 기준을 확인하고 이번 달 중점 업무를 선정하세요</div>'
     +'</div>'
-    +card('① 이번 달 학사일정','#3b82f6',calHTML,{label:'학사일정 전체 보기',fn:"switchDashTab('calendar')"})
+    +card('① 이번 달 학사일정','#3b82f6',calHTML,{label:'학사일정 전체 보기',fn:"goto('acal')"})
     +card('② 목표 달성률','#10b981',goalHTML,{label:'목표 관리',fn:"goto('goals')"})
     +card('③ 참고할 플랜','#f59e0b',planHTML)
     +card('④ 전월 미완료 업무','#ef4444',overdueHTML)
@@ -11518,7 +11519,7 @@ function _renderAcademicCalendarUI(el){
   var yrOpts='';for(var y=2024;y<=2030;y++)yrOpts+='<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';
   var html='<div style="max-width:900px;padding:14px">'
     +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">'
-    +'<select class="fi" style="width:90px" onchange="window._acalYr=parseInt(this.value);_renderAcademicCalendarUI(document.getElementById(\'dashboard-calendar-area\'))">'+yrOpts+'</select>'
+    +'<select class="fi" style="width:90px" onchange="window._acalYr=parseInt(this.value);_renderAcademicCalendarUI(document.getElementById(\''+el.id+'\'))">'+yrOpts+'</select>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
     +cats.map(function(cat){return'<span style="font-size:11px;font-weight:700;background:'+catColors[cat]+'22;color:'+catColors[cat]+';padding:2px 8px;border-radius:6px;border:1px solid '+catColors[cat]+'">'+cat+'</span>';}).join('')
     +'</div>'
