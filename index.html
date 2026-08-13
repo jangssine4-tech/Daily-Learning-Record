@@ -390,8 +390,8 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab"        id="pftab-done"      onclick="setPlansFilter('완료')"   style="font-size:13px">완료</button>
     <button class="rev-tab"        id="pftab-hold"      onclick="setPlansFilter('보류')"   style="font-size:13px">보류</button>
     <div style="margin-left:auto;padding:0 10px;display:flex;align-items:center;gap:6px">
-      <select id="plans-year-filter" class="fi" style="font-size:12px;width:80px" onchange="renderPlansList()">
-        <option value="">전체 연도</option>
+      <select id="plans-year-filter" class="fi" style="font-size:12px;width:90px" onchange="renderPlansList()">
+        <option value="">전체</option>
         <option value="2024">2024년</option>
         <option value="2025">2025년</option>
         <option value="2026">2026년</option>
@@ -11530,43 +11530,45 @@ function _openAcalMonthModal(yr,mo){
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
 
-  var evtsHTML=evts.length?evts.map(function(e){
-    var col=catColors[e.cat]||'#94a3b8';
-    var dateStr=e.acalType==='repeat'?'🔄 반복':
-      (e.endDate&&e.endDate!==e.date?e.date.slice(5)+' ~ '+e.endDate.slice(5):e.date.slice(5));
-    var managers=[e.manager,e.manager2].filter(Boolean).join(' · ');
-    return'<div style="border:1px solid var(--border);border-left:4px solid '+col+';border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" data-evtid="'+e.id+'" onclick="this.closest(\'.mo\').remove();openAcalDetail(this.dataset.evtid)">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-      +'<span style="font-size:10px;font-weight:700;background:'+col+'22;color:'+col+';padding:1px 6px;border-radius:6px">'+( e.cat||'-')+'</span>'
-      +(e.completed?'<span style="font-size:10px;color:#16a34a;font-weight:700">✅ 완료</span>':'')
-      +'</div>'
-      +'<div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:4px">'+e.title+'</div>'
-      +'<div style="font-size:11px;color:var(--txt3)">'+dateStr+(managers?' · '+managers:'')+(e.note?' · '+e.note:'')+'</div>'
-      // 연결 플랜
-      +(function(){
-        var linkedPlans=(_plans||[]).filter(function(p){return p.acalId===e.id;});
-        if(!linkedPlans.length)return '';
-        return'<div style="margin-top:6px">'+linkedPlans.map(function(p){
+  function buildModal(){
+    var evtsHTML=evts.length?evts.map(function(e){
+      var col=catColors[e.cat]||'#94a3b8';
+      var dateStr=e.acalType==='repeat'?'🔄 반복':
+        (e.endDate&&e.endDate!==e.date?e.date.slice(5)+' ~ '+e.endDate.slice(5):e.date.slice(5));
+      var managers=[e.manager,e.manager2].filter(Boolean).join(' · ');
+      var linkedPlans=(_plans||[]).filter(function(p){return p.acalId===e.id;});
+      var plansHTML=linkedPlans.length?'<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">'
+        +linkedPlans.map(function(p){
           var done=(p.tasks||[]).filter(function(t){return t.done;}).length;
           var total=(p.tasks||[]).length;
           var pct=total>0?Math.round(done/total*100):0;
-          return'<div style="font-size:11px;color:var(--blue)">📋 '+p.name+' ('+pct+'%)</div>';
-        }).join('')+'</div>';
-      })()
+          var sc={'진행 중':'#2563eb','예정':'#94a3b8','완료':'#16a34a','보류':'#d97706'}[p.status||'예정']||'#94a3b8';
+          return'<div style="font-size:11px;display:flex;align-items:center;gap:6px"><span style="color:'+sc+'">📋</span><span style="color:var(--txt2)">'+p.name+'</span>'+(total>0?'<span style="color:'+sc+';font-weight:700">'+pct+'%</span>':'')+'</div>';
+        }).join('')+'</div>':'';
+      return'<div style="border:1px solid var(--border);border-left:4px solid '+col+';border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" data-evtid="'+e.id+'" onclick="this.closest(\'.mo\').remove();openAcalDetail(this.dataset.evtid)">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+        +'<span style="font-size:10px;font-weight:700;background:'+col+'22;color:'+col+';padding:1px 6px;border-radius:6px">'+(e.cat||'-')+'</span>'
+        +(e.completed?'<span style="font-size:10px;color:#16a34a;font-weight:700">✅ 완료</span>':'')
+        +'</div>'
+        +'<div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:4px">'+e.title+'</div>'
+        +'<div style="font-size:11px;color:var(--txt3)">'+dateStr+(managers?' · '+managers:'')+(e.note?' · '+e.note:'')+'</div>'
+        +plansHTML
+        +'</div>';
+    }).join('')
+    :'<div style="text-align:center;padding:20px;color:var(--txt3)">이번 달 등록된 일정이 없어요</div>';
+    overlay.innerHTML='<div class="ms" style="max-width:440px;max-height:90vh;overflow-y:auto">'
+      +'<div class="mh"></div>'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+      +'<div class="mt" style="margin:0">'+yr+'년 '+months[mo-1]+'</div>'
+      +'<button class="btn btn-navy btn-sm" onclick="this.closest(\'.mo\').remove();openAcalAddModal()">+ 일정 추가</button>'
+      +'</div>'
+      +evtsHTML
+      +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
       +'</div>';
-  }).join('')
-  :'<div style="text-align:center;padding:20px;color:var(--txt3)">이번 달 등록된 일정이 없어요</div>';
-
-  overlay.innerHTML='<div class="ms" style="max-width:440px;max-height:90vh;overflow-y:auto">'
-    +'<div class="mh"></div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
-    +'<div class="mt" style="margin:0">'+yr+'년 '+months[mo-1]+'</div>'
-    +'<button class="btn btn-navy btn-sm" onclick="this.closest(\'.mo\').remove();openAcalAddModal()">+ 일정 추가</button>'
-    +'</div>'
-    +evtsHTML
-    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
-    +'</div>';
-  document.body.appendChild(overlay);
+    document.body.appendChild(overlay);
+  }
+  if(!_plans||!_plans.length){loadPlans().then(buildModal);}
+  else{buildModal();}
 }
 
 function openAcalGuide(){
