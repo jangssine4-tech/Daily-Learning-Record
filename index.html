@@ -10755,44 +10755,43 @@ function _renderParentMeetingGuide(el){
 // ── 상담 기록 탭 ──────────────────────────────────
 function _renderMeetingConsult(el){
   if(!el)return;
-  // 간담회·설명회 관련 상담 기록 (consultations에서 type이 간담회 관련인 것)
-  var meetingConsults=(consultations||[]).filter(function(c){
-    return c.type==='간담회 상담'||c.type==='설명회 상담'||c.type==='간담회'||c.type==='설명회';
-  }).sort(function(a,b){return (b.date||'')>(a.date||'')?1:-1;});
-
-  var html='<div style="max-width:700px;padding:14px">';
-  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">간담회 상담 기록</div>'
-    +'<button class="btn btn-navy btn-sm" onclick="_openMeetingConsultModal()">+ 상담 기록 추가</button>'
-    +'</div>';
-
-  if(!meetingConsults.length){
-    html+='<div style="text-align:center;padding:40px;color:var(--txt3)">'
-      +'<div style="font-size:36px;margin-bottom:10px">📋</div>'
-      +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">등록된 상담 기록이 없어요</div>'
-      +'<div style="font-size:12px">간담회·설명회 참석 후 상담 내용을 기록해 보세요</div>'
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+  db.collection('meetingConsults').orderBy('date','desc').get().then(function(snap){
+    var meetingConsults=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    var html='<div style="max-width:700px;padding:14px">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+      +'<div style="font-size:16px;font-weight:800;color:var(--navy)">간담회 상담 기록</div>'
+      +'<button class="btn btn-navy btn-sm" onclick="_openMeetingConsultModal()">+ 상담 기록 추가</button>'
       +'</div>';
-  }else{
-    meetingConsults.forEach(function(c){
-      var statusColor=c.status==='완료'?'#16a34a':c.status==='진행 중'?'#2563eb':'#94a3b8';
-      html+='<div class="card" style="padding:14px;margin-bottom:10px">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
-        +'<div>'
-        +'<div style="font-size:13px;font-weight:700">'+( c.studentName||c.parentName||'-')+'</div>'
-        +'<div style="font-size:11px;color:var(--txt3)">'+( c.date||'-')+' · '+(c.type||'-')+' · 담당: '+(c.teacher||'-')+'</div>'
-        +'</div>'
-        +'<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:'+statusColor+'22;color:'+statusColor+'">'+( c.status||'예정')+'</span>'
-        +'</div>'
-        +(c.content?'<div style="font-size:12px;color:var(--txt2);margin-bottom:6px">'+c.content+'</div>':'')
-        +(c.result?'<div style="font-size:11px;color:var(--blue)">→ '+c.result+'</div>':'')
-        +'<div style="display:flex;gap:6px;margin-top:8px">'
-        +'<button class="btn btn-outline btn-xs" onclick="_openMeetingConsultModal(\''+c.id+'\')">수정</button>'
-        +'</div>'
+    if(!meetingConsults.length){
+      html+='<div style="text-align:center;padding:40px;color:var(--txt3)">'
+        +'<div style="font-size:36px;margin-bottom:10px">📋</div>'
+        +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">등록된 상담 기록이 없어요</div>'
+        +'<div style="font-size:12px">간담회·설명회 참석 후 상담 내용을 기록해 보세요</div>'
         +'</div>';
-    });
-  }
-  html+='</div>';
-  el.innerHTML=html;
+    }else{
+      meetingConsults.forEach(function(c){
+        var statusColor=c.status==='완료'?'#16a34a':c.status==='진행 중'?'#2563eb':'#94a3b8';
+        html+='<div class="card" style="padding:14px;margin-bottom:10px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+          +'<div>'
+          +'<div style="font-size:13px;font-weight:700">'+(c.studentName||c.parentName||'-')+'</div>'
+          +'<div style="font-size:11px;color:var(--txt3)">'+(c.date||'-')+' · '+(c.type||'-')+' · 담당: '+(c.teacher||'-')+'</div>'
+          +'</div>'
+          +'<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:'+statusColor+'22;color:'+statusColor+'">'+(c.status||'예정')+'</span>'
+          +'</div>'
+          +(c.content?'<div style="font-size:12px;color:var(--txt2);margin-bottom:6px">'+c.content+'</div>':'')
+          +(c.result?'<div style="font-size:11px;color:var(--blue)">→ '+c.result+'</div>':'')
+          +'<div style="margin-top:8px">'
+          +'<button class="btn btn-outline btn-xs" data-cid="'+c.id+'" onclick="_openMeetingConsultModal(this.dataset.cid)">수정</button>'
+          +'</div></div>';
+      });
+    }
+    html+='</div>';
+    el.innerHTML=html;
+  }).catch(function(){
+    el.innerHTML='<div style="padding:20px;color:var(--txt3)">데이터 로드 실패</div>';
+  });
 }
 
 function _openMeetingConsultModal(id){
@@ -10873,10 +10872,10 @@ function _saveMeetingConsult(id,overlay){
 // ── 참석자 관리 탭 ────────────────────────────────
 function _renderMeetingAttendees(el){
   if(!el)return;
-  // 연간 학사일정에서 간담회·설명회 행사 목록
-  var calEvts=((_academicCalendar&&_academicCalendar.events)||[])
-    .filter(function(e){return ['간담회','설명회'].includes(e.cat);})
-    .sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
+  loadAcademicCalendar(function(){
+    var calEvts=((_academicCalendar&&_academicCalendar.events)||[])
+      .filter(function(e){return ['간담회','설명회'].includes(e.cat);})
+      .sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
 
   var html='<div style="max-width:700px;padding:14px">';
   html+='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">간담회·설명회 참석자 관리</div>';
@@ -10928,6 +10927,7 @@ function _renderMeetingAttendees(el){
   }
   html+='</div>';
   el.innerHTML=html;
+  }); // loadAcademicCalendar callback end
 }
 
 function _addAttendee(evtId){
@@ -11633,8 +11633,125 @@ function confirmAcalAdd(overlay,editId){
 // ── 플랜 관리 ─────────────────────────────────────────
 var _plans=[];
 
+function loadPlans(){
+  return db.collection('plans').orderBy('createdAt','desc').get().then(function(snap){
+    _plans=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+  }).catch(function(){_plans=[];});
+}
+
+
 var _plansFilter='전체';
 var _selectedPlanId=null;
+
+function _migrateMeetingDataToPlans(){
+  // config/workMeetingData에서 기존 간담회 데이터 로드 후 플랜으로 변환
+  toast('기존 데이터를 불러오는 중...');
+  db.collection('config').doc('workMeetingData').get().then(function(d){
+    if(!d.exists){toast('가져올 데이터가 없어요');return;}
+    var wm=d.data();
+    var prep=wm.parentMeetingPrep||{};
+    var annual=wm.parentMeetingAnnual||{};
+    var calEvts=((_academicCalendar&&_academicCalendar.events)||[]).filter(function(e){
+      return ['간담회','설명회'].includes(e.cat);
+    });
+
+    var promises=[];
+    var count=0;
+
+    // 1. 간담회 준비 데이터 → 플랜으로 변환
+    Object.keys(prep).forEach(function(evtId){
+      var p=prep[evtId];
+      if(!p||!Object.keys(p).length)return;
+      var evt=calEvts.find(function(e){return e.id===evtId;});
+      var planName=evt?evt.title+' 준비 플랜':'간담회 준비 플랜';
+
+      // 이미 같은 이름의 플랜이 있으면 스킵
+      if(_plans.find(function(pl){return pl.name===planName;}))return;
+
+      // 메모 내용 구성
+      var notes=[];
+      if(p.message)notes.push('핵심 메시지: '+p.message);
+      if(p.attendMemo)notes.push('참석자 메모: '+p.attendMemo);
+      if(p.qa&&p.qa.length){
+        notes.push('예상 Q&A:');
+        p.qa.forEach(function(qa,i){
+          if(qa.q)notes.push('  Q'+(i+1)+': '+qa.q+(qa.a?'\n  A: '+qa.a:''));
+        });
+      }
+
+      // 체크리스트 → 실행업무
+      var tasks=[];
+      if(p.docs&&p.docs.length){
+        p.docs.forEach(function(d){tasks.push({name:d,date:evt&&evt.date||'',manager:'원장',priority:'보통',done:true});});
+      }
+      // 기본 실행업무
+      ['핵심 메시지 확정','발표 자료 준비','참석자 안내','간담회 진행','후속 조치'].forEach(function(task){
+        if(!tasks.find(function(t){return t.name===task;})){
+          tasks.push({name:task,date:evt&&evt.date||'',manager:'원장',priority:'보통',done:false});
+        }
+      });
+
+      var newPlan={
+        id:Date.now().toString(36)+'_'+count,
+        name:planName,
+        area:'학부모 소통',
+        dday:evt&&evt.date||'',
+        manager:'원장',
+        status:'완료',
+        acalId:evtId,
+        tasks:tasks,
+        notes:notes.join('\n'),
+        createdAt:new Date().toISOString(),
+        migratedFrom:'parentMeetingPrep'
+      };
+      count++;
+      promises.push(
+        db.collection('plans').add(newPlan).then(function(ref){
+          newPlan.id=ref.id;
+          _plans.push(newPlan);
+        })
+      );
+    });
+
+    // 2. 월간 계획 메모 → 플랜 메모로 통합
+    var annualNotes=[];
+    Object.keys(annual).forEach(function(key){
+      if(annual[key])annualNotes.push(key.replace('m','')+'월: '+annual[key]);
+    });
+    if(annualNotes.length){
+      var annualPlan={
+        id:Date.now().toString(36)+'_annual',
+        name:'학부모 간담회 월간 계획 (이전 데이터)',
+        area:'학부모 소통',
+        dday:'',manager:'원장',status:'완료',
+        tasks:[],
+        notes:annualNotes.join('\n'),
+        createdAt:new Date().toISOString(),
+        migratedFrom:'parentMeetingAnnual'
+      };
+      if(!_plans.find(function(p){return p.name===annualPlan.name;})){
+        promises.push(
+          db.collection('plans').add(annualPlan).then(function(ref){
+            annualPlan.id=ref.id;
+            _plans.push(annualPlan);
+          })
+        );
+      }
+    }
+
+    Promise.all(promises).then(function(){
+      if(count===0&&!annualNotes.length){
+        toast('가져올 데이터가 없거나 이미 이전됐어요');
+      }else{
+        toast('✅ '+count+'개 플랜으로 가져왔어요!');
+        if(_plans.length>0)_selectedPlanId=_plans[0].id;
+        renderPlansView();
+      }
+    });
+  }).catch(function(e){
+    toast('데이터 로드 실패: '+e.message);
+  });
+}
 
 function setPlansFilter(filter){
   _plansFilter=filter;
@@ -11660,7 +11777,8 @@ function renderPlansView(){
     if(detailEl)detailEl.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--txt3)">'
       +'<div style="font-size:48px;margin-bottom:12px">📋</div>'
       +'<div style="font-size:15px;font-weight:700;margin-bottom:8px">플랜을 선택하거나 새로 등록하세요</div>'
-      +'<button class="btn btn-navy" onclick="openNewPlanModal()">+ 새 플랜 등록</button>'
+      +'<button class="btn btn-navy" style="margin-bottom:8px" onclick="openNewPlanModal()">+ 새 플랜 등록</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="_migrateMeetingDataToPlans()">📥 기존 간담회 데이터 가져오기</button>'
       +'</div>';
   }
 }
@@ -11755,6 +11873,12 @@ function renderPlanDetail(planId){
     +'<div id="pd-bar-'+planId+'" style="background:'+statusColor+';border-radius:4px;height:8px;transition:width .3s;width:'+pct+'%"></div>'
     +'</div>'
     +'<div id="pd-txt-'+planId+'" style="font-size:12px;color:var(--txt3);margin-bottom:16px">'+done+' / '+total+'개 완료 ('+pct+'%)</div>'
+
+    // 메모 (마이그레이션 데이터 포함)
+    +(plan.notes?'<div style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:10px;margin-bottom:10px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">메모</div>'
+      +'<div style="font-size:12px;color:var(--txt2);white-space:pre-wrap;line-height:1.7">'+plan.notes+'</div>'
+      +'</div>':'')
 
     // 실행업무
     +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">실행업무</div>'
