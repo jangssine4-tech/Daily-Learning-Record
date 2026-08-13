@@ -2822,7 +2822,7 @@ function renderDashMonthly(){
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
     Promise.all([
       loadDashBoard(),
-      new Promise(function(res){if(_academicCalendar){res();}else{loadAcademicCalendar(res);}})
+      loadAcademicCalendar()
     ]).then(function(){_dashMonthlyLoading=false;renderDashMonthly();})
       .catch(function(e){_dashMonthlyLoading=false;console.error('renderDashMonthly 로드 오류:',e);});
     return;
@@ -2850,11 +2850,17 @@ function renderDashMonthly(){
   }
 
   // ① 이번 달 학사일정
+  if(!_academicCalendar){_academicCalendar={events:[]};}
   var evts=(_academicCalendar&&_academicCalendar.events)||[];
   var thisMonEvts=evts.filter(function(e){
     var ps=e.prepStartDate,ed=e.date;
+    if(!ed)return false;
+    // 매년 반복(annualRepeat): 원래 연도와 무관하게 이번 달과 월이 같으면 표시
+    if(e.annualRepeat&&e.acalType!=='repeat'){
+      return ed.slice(5,7)===moStr;
+    }
     return (ps&&ps>=thisMonStart&&ps<thisMonEnd)||(ed&&ed>=thisMonStart&&ed<thisMonEnd);
-  }).sort(function(a,b){return a.date>b.date?1:-1;});
+  }).sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
   var calHTML='';
   var catColors={'설명회':'#f87171','간담회':'#fb923c','특강':'#fbbf24','외부시험':'#4ade80','홍보캠페인':'#60a5fa','상담':'#a78bfa','내부 운영':'#94a3b8'};
   if(thisMonEvts.length){
@@ -11550,12 +11556,17 @@ function _renderWMGuide(el){
 
 var _academicCalendar=null;
 function loadAcademicCalendar(cb){
-  if(_academicCalendar){if(cb)cb();return;}
-  db.collection('config').doc('academicCalendar').get().then(function(d){
-    _academicCalendar=d.exists?d.data():{events:[]};
-    if(!_academicCalendar.events)_academicCalendar.events=[];
-    if(cb)cb();
-  }).catch(function(){_academicCalendar={events:[]};if(cb)cb();});
+  // Promise 반환 + 콜백 동시 지원
+  var p;
+  if(_academicCalendar){p=Promise.resolve();}
+  else{
+    p=db.collection('config').doc('academicCalendar').get().then(function(d){
+      _academicCalendar=d.exists?d.data():{events:[]};
+      if(!_academicCalendar.events)_academicCalendar.events=[];
+    }).catch(function(){_academicCalendar={events:[]};});
+  }
+  if(cb){p.then(cb).catch(cb);}
+  return p;
 }
 
 function saveAcademicCalendar(){
