@@ -2888,7 +2888,18 @@ function renderDashMonthly(){
         +dday+linkBtn+'</div>';
     });
   }else{
-    calHTML='<div style="font-size:12px;color:var(--txt3)">이번 달 관련 학사일정이 없습니다</div>';
+    // 진단 정보: 실제 저장된 데이터 확인용
+    var allEvts=(_academicCalendar&&_academicCalendar.events)||[];
+    var diagLines=[];
+    diagLines.push('전체 일정 수: '+allEvts.length+'건');
+    diagLines.push('이번 달 범위: '+thisMonStart+' ~ '+thisMonEnd);
+    if(allEvts.length>0){
+      allEvts.slice(0,5).forEach(function(e){
+        diagLines.push('• '+e.title+' | date:'+e.date+(e.prepStartDate?' | prep:'+e.prepStartDate:'')+(e.annualRepeat?' | 매년반복':''));
+      });
+      if(allEvts.length>5)diagLines.push('… 외 '+(allEvts.length-5)+'건');
+    }
+    calHTML='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">이번 달 관련 학사일정이 없습니다</div>'      +'<details style="font-size:11px;color:var(--txt3)"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">🔍 데이터 진단 보기</summary>'      +'<div style="margin-top:6px;background:var(--surface2);border-radius:8px;padding:8px 10px;line-height:1.8">'      +diagLines.map(function(l){return'<div>'+l+'</div>';}).join('')      +'</div></details>';
   }
   var goalHTML='';
   if(_goalTargets&&_goalTargets[yr]){
