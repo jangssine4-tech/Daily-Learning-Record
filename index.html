@@ -10798,12 +10798,25 @@ function _renderMeetingConsult(el){
 }
 
 function _openMeetingConsultModal(id){
-  var c=id?(consultations||[]).find(function(x){return x.id===id;}):null;
+  var c=null;
+  if(id){
+    // meetingConsults 컬렉션에서 직접 로드
+    db.collection('meetingConsults').doc(id).get().then(function(d){
+      if(d.exists)c=Object.assign({id:d.id},d.data());
+      _buildMeetingConsultModal(c,id);
+    }).catch(function(){_buildMeetingConsultModal(null,null);});
+    return;
+  }
+  _buildMeetingConsultModal(null,null);
+}
+
+function _buildMeetingConsultModal(c,id){
+  var activeList=(students||[]).filter(function(s){return (s.status||'재원')==='재원'||(s.status||'')==='신규';});
   var overlay=document.createElement('div');
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
   var studentOpts='<option value="">학생/학부모 선택</option>'
-    +activeStudents.map(function(s){return'<option value="'+s.name+'"'+(s.name===(c&&c.studentName)?' selected':'')+'>'+s.name+'</option>';}).join('');
+    +activeList.map(function(s){return'<option value="'+s.name+'"'+(s.name===(c&&c.studentName)?' selected':'')+'>'+s.name+'</option>';}).join('');
   overlay.innerHTML='<div class="ms" style="max-width:440px;max-height:92vh;overflow-y:auto">'
     +'<div class="mh"></div><div class="mt">'+(id?'상담 기록 수정':'간담회 상담 기록 추가')+'</div>'
     +'<div class="r2">'
@@ -10837,7 +10850,6 @@ function _openMeetingConsultModal(id){
     if(delBtn)delBtn.onclick=function(){
       if(!confirm('삭제할까요?'))return;
       db.collection('meetingConsults').doc(id).delete().then(function(){
-        if(consultations)consultations=consultations.filter(function(x){return x.id!==id;});
         overlay.remove();
         _renderMeetingConsult(document.getElementById('meeting-page-area'));
         toast('삭제됐어요');
