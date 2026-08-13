@@ -2820,9 +2820,11 @@ function renderDashMonthly(){
     if(_dashMonthlyLoading)return;
     _dashMonthlyLoading=true;
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+    // _academicCalendar 강제 재로드 (캐시 무시)
+    _academicCalendar=null;
     Promise.all([
       loadDashBoard(),
-      loadAcademicCalendar()
+      loadAcademicCalendar(null,true)
     ]).then(function(){_dashMonthlyLoading=false;renderDashMonthly();})
       .catch(function(e){_dashMonthlyLoading=false;console.error('renderDashMonthly 로드 오류:',e);});
     return;
@@ -2899,7 +2901,7 @@ function renderDashMonthly(){
       });
       if(allEvts.length>5)diagLines.push('… 외 '+(allEvts.length-5)+'건');
     }
-    calHTML='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">이번 달 관련 학사일정이 없습니다</div>'      +'<details style="font-size:11px;color:var(--txt3)"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">🔍 데이터 진단 보기</summary>'      +'<div style="margin-top:6px;background:var(--surface2);border-radius:8px;padding:8px 10px;line-height:1.8">'      +diagLines.map(function(l){return'<div>'+l+'</div>';}).join('')      +'</div></details>';
+    calHTML='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">이번 달 관련 학사일정이 없습니다</div>'      +'<details style="font-size:11px;color:var(--txt3)"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">🔍 데이터 진단 보기</summary>'      +'<div style="margin-top:6px;background:var(--surface2);border-radius:8px;padding:8px 10px;line-height:1.8">'      +diagLines.map(function(l){return'<div>'+l+'</div>';}).join('')      +'<div style="margin-top:8px"><button onclick="_diagAcalFirestore()" style="font-size:11px;padding:4px 10px;border-radius:6px;background:var(--navy);color:#fff;border:none;cursor:pointer">Firestore 원본 직접 조회</button></div>'      +'<div id="acal-diag-result" style="margin-top:6px;font-size:10px;word-break:break-all;line-height:1.6"></div>'      +'</div></details>';
   }
   var goalHTML='';
   if(_goalTargets&&_goalTargets[yr]){
@@ -8869,17 +8871,24 @@ function loadDashBoard(forceReload){
   ]).then(function(results){
     var configTasks=results[0].exists?(results[0].data().tasks||[]):[];
     var colTasks=results[1].docs.map(function(d){return Object.assign({id:d.id},d.data());});
-    // 중복 제거: 컬렉션 문서 id가 config 배열에도 있으면 컬렉션 우선
+    // 컬렉션 문서가 config 배열에도 있으면 컬렉션 우선 (더 최신)
     var colIds=colTasks.map(function(t){return t.id;});
     var filteredConfig=configTasks.filter(function(t){return t.id&&!colIds.includes(t.id);});
-    _dbTasks=filteredConfig.concat(colTasks);
+    var merged=filteredConfig.concat(colTasks);
+    // config가 비어있고 컬렉션에 데이터가 있으면 config 복구 저장
+    if(configTasks.length===0&&colTasks.length>0){
+      console.log('loadDashBoard: config 비어있음, 컬렉션에서 복구 중...');
+      db.collection('config').doc('dashBoardV2').set({tasks:merged},{merge:false}).catch(function(){});
+    }
+    _dbTasks=merged;
   }).catch(function(e){console.error('loadDashBoard 오류:',e);_dbTasks=_dbTasks||[];});
 }
 function saveDashBoard(){
-  // config doc에 전체 배열 저장 (주 저장소)
-  db.collection('config').doc('dashBoardV2').set({tasks:_dbTasks||[]},{merge:false}).catch(function(e){console.error('saveDashBoard 오류:',e);});
-  // 컬렉션 방식으로 저장된 task(id가 'task_' 로 시작하지 않는 Firestore auto-id)도 동기화
-  (_dbTasks||[]).forEach(function(t){
+  // _dbTasks가 로드되지 않은 상태(null)면 절대 저장하지 않음 — 빈 배열로 덮어쓰기 방지
+  if(_dbTasks===null){console.warn('saveDashBoard: _dbTasks 미로드 상태, 저장 건너뜀');return;}
+  db.collection('config').doc('dashBoardV2').set({tasks:_dbTasks},{merge:false}).catch(function(e){console.error('saveDashBoard 오류:',e);});
+  // Firestore 컬렉션 방식(auto-id) task도 동기화
+  _dbTasks.forEach(function(t){
     if(t.id&&!t.id.startsWith('task_')&&!t.id.startsWith('rr_')&&!t.id.startsWith('__')){
       db.collection('dashBoardV2').doc(t.id).set(t,{merge:true}).catch(function(){});
     }
@@ -8890,9 +8899,8 @@ function renderDashBoard(){
   el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
   loadFocusTasks();
   loadPlans();
-  // 탭 재진입 시 항상 최신 데이터 로드
-  _dbTasks=null;
-  loadDashBoard().then(function(){
+  // 탭 재진입 시 강제 재로드 (null 초기화 없이 forceReload 사용)
+  loadDashBoard(true).then(function(){
     try{_renderDashBoardUI(el);}
     catch(e){
       console.error('renderDashBoard 오류:',e);
@@ -11566,22 +11574,53 @@ function _renderWMGuide(el){
 
 
 var _academicCalendar=null;
-function loadAcademicCalendar(cb){
+function loadAcademicCalendar(cb,forceReload){
   // Promise 반환 + 콜백 동시 지원
   var p;
-  if(_academicCalendar){p=Promise.resolve();}
+  if(_academicCalendar&&!forceReload){p=Promise.resolve();}
   else{
     p=db.collection('config').doc('academicCalendar').get().then(function(d){
-      _academicCalendar=d.exists?d.data():{events:[]};
-      if(!_academicCalendar.events)_academicCalendar.events=[];
-    }).catch(function(){_academicCalendar={events:[]};});
+      if(d.exists){
+        var raw=d.data();
+        // events가 최상위 배열인 경우와 {events:[]} 래핑 경우 모두 처리
+        if(Array.isArray(raw)){
+          _academicCalendar={events:raw};
+        } else {
+          _academicCalendar=raw;
+          if(!_academicCalendar.events)_academicCalendar.events=[];
+        }
+      } else {
+        _academicCalendar={events:[]};
+      }
+    }).catch(function(e){console.error('loadAcademicCalendar 오류:',e);if(!_academicCalendar)_academicCalendar={events:[]};});
   }
-  if(cb){p.then(cb).catch(cb);}
+  if(cb){p.then(cb).catch(function(){if(cb)cb();});}
   return p;
 }
 
 function saveAcademicCalendar(){
   db.collection('config').doc('academicCalendar').set(_academicCalendar).catch(function(){});
+}
+
+// 진단: Firestore academicCalendar 원본 직접 조회
+function _diagAcalFirestore(){
+  var el=document.getElementById('acal-diag-result');
+  if(el)el.innerHTML='조회 중...';
+  db.collection('config').doc('academicCalendar').get().then(function(d){
+    if(!d.exists){if(el)el.innerHTML='❌ Firestore에 academicCalendar 문서 없음';return;}
+    var raw=d.data();
+    var evts=Array.isArray(raw)?raw:(raw.events||[]);
+    var lines=['✅ Firestore 원본 — 전체 '+evts.length+'건'];
+    evts.slice(0,8).forEach(function(e){
+      lines.push('• '+e.title+' | date:'+e.date+(e.cat?' | '+e.cat:''));
+    });
+    if(evts.length>8)lines.push('… 외 '+(evts.length-8)+'건');
+    if(el)el.innerHTML=lines.join('<br>');
+    // 캐시 강제 갱신
+    _academicCalendar=Array.isArray(raw)?{events:raw}:raw;
+    if(!_academicCalendar.events)_academicCalendar.events=[];
+    renderDashMonthly();
+  }).catch(function(e){if(el)el.innerHTML='❌ 오류: '+e.message;});
 }
 
 function _renderAcademicCalendarUI(el){
