@@ -409,6 +409,9 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
     <button class="rev-tab"        id="mtab-guide"     onclick="switchMeetingTab('guide')"     style="font-size:15px;font-weight:700">운영안</button>
     <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
+    <button class="rev-tab"        id="mtab-monthly"   onclick="switchMeetingTab('monthly')"   style="font-size:15px;font-weight:700">월간 계획</button>
+    <button class="rev-tab"        id="mtab-detail"    onclick="switchMeetingTab('detail')"    style="font-size:15px;font-weight:700">간담회 준비</button>
+    <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
     <button class="rev-tab"        id="mtab-consult"   onclick="switchMeetingTab('consult')"   style="font-size:15px;font-weight:700">상담 기록</button>
     <button class="rev-tab"        id="mtab-attendees" onclick="switchMeetingTab('attendees')" style="font-size:15px;font-weight:700">참석자 관리</button>
   </div>
@@ -10400,9 +10403,8 @@ function switchWMTab(tab){
 
 var _meetingPageTab='annual';
 function switchMeetingTab(tab){
-  if(tab==='monthly'||tab==='detail')tab='annual';
   _meetingPageTab=tab;
-  ['annual','guide','consult','attendees'].forEach(function(t){
+  ['annual','guide','monthly','detail','consult','attendees'].forEach(function(t){
     var b=document.getElementById('mtab-'+t);
     if(b)b.classList.toggle('active',t===tab);
   });
@@ -10413,6 +10415,8 @@ function _renderMeetingPagePanel(){
   if(!el)return;
   if(_meetingPageTab==='annual')_renderParentMeetingAnnual(el);
   else if(_meetingPageTab==='guide')_renderParentMeetingGuide(el);
+  else if(_meetingPageTab==='monthly')_renderParentMeetingMonthly(el);
+  else if(_meetingPageTab==='detail')_renderParentMeetingDetail(el);
   else if(_meetingPageTab==='consult')_renderMeetingConsult(el);
   else if(_meetingPageTab==='attendees')_renderMeetingAttendees(el);
   else _renderParentMeetingAnnual(el);
@@ -11715,112 +11719,66 @@ var _plansFilter='전체';
 var _selectedPlanId=null;
 
 function _migrateMeetingDataToPlans(){
-  // config/workMeetingData에서 기존 간담회 데이터 로드 후 플랜으로 변환
-  toast('기존 데이터를 불러오는 중...');
-  db.collection('config').doc('workMeetingData').get().then(function(d){
-    if(!d.exists){toast('가져올 데이터가 없어요');return;}
-    var wm=d.data();
-    var prep=wm.parentMeetingPrep||{};
-    var annual=wm.parentMeetingAnnual||{};
-    var calEvts=((_academicCalendar&&_academicCalendar.events)||[]).filter(function(e){
-      return ['간담회','설명회'].includes(e.cat);
-    });
+  toast('데이터를 확인하는 중...');
+  // _wmData와 _academicCalendar 모두 로드 후 실행
+  var loadWm=new Promise(function(resolve){
+    if(_wmData){resolve();return;}
+    db.collection('config').doc('workMeetingData').get().then(function(d){
+      _wmData=d.exists?d.data():{};resolve();
+    }).catch(function(){_wmData={};resolve();});
+  });
+  loadAcademicCalendar(function(){
+    loadWm.then(function(){
+      var prep=(_wmData&&_wmData.parentMeetingPrep)||{};
+      var annual=(_wmData&&_wmData.parentMeetingAnnual)||{};
+      var calEvts=((_academicCalendar&&_academicCalendar.events)||[]).filter(function(e){
+        return ['간담회','설명회'].includes(e.cat);
+      });
+      var promises=[];var count=0;
 
-    var promises=[];
-    var count=0;
-
-    // 1. 간담회 준비 데이터 → 플랜으로 변환
-    Object.keys(prep).forEach(function(evtId){
-      var p=prep[evtId];
-      if(!p||!Object.keys(p).length)return;
-      var evt=calEvts.find(function(e){return e.id===evtId;});
-      var planName=evt?evt.title+' 준비 플랜':'간담회 준비 플랜';
-
-      // 이미 같은 이름의 플랜이 있으면 스킵
-      if(_plans.find(function(pl){return pl.name===planName;}))return;
-
-      // 메모 내용 구성
-      var notes=[];
-      if(p.message)notes.push('핵심 메시지: '+p.message);
-      if(p.attendMemo)notes.push('참석자 메모: '+p.attendMemo);
-      if(p.qa&&p.qa.length){
-        notes.push('예상 Q&A:');
-        p.qa.forEach(function(qa,i){
-          if(qa.q)notes.push('  Q'+(i+1)+': '+qa.q+(qa.a?'\n  A: '+qa.a:''));
-        });
-      }
-
-      // 체크리스트 → 실행업무
-      var tasks=[];
-      if(p.docs&&p.docs.length){
-        p.docs.forEach(function(d){tasks.push({name:d,date:evt&&evt.date||'',manager:'원장',priority:'보통',done:true});});
-      }
-      // 기본 실행업무
-      ['핵심 메시지 확정','발표 자료 준비','참석자 안내','간담회 진행','후속 조치'].forEach(function(task){
-        if(!tasks.find(function(t){return t.name===task;})){
-          tasks.push({name:task,date:evt&&evt.date||'',manager:'원장',priority:'보통',done:false});
+      // 간담회 준비 데이터 → 플랜으로 변환
+      Object.keys(prep).forEach(function(evtId){
+        var p=prep[evtId];
+        if(!p||!Object.keys(p).length)return;
+        var evt=calEvts.find(function(e){return e.id===evtId;});
+        var planName=evt?evt.title+' 준비 플랜':'간담회 준비 플랜 ('+evtId.slice(-4)+')';
+        if(_plans.find(function(pl){return pl.name===planName;}))return;
+        var notes=[];
+        if(p.message)notes.push('핵심 메시지:\n'+p.message);
+        if(p.attendMemo)notes.push('참석자 메모:\n'+p.attendMemo);
+        if(p.qa&&p.qa.length){
+          var qaText=p.qa.filter(function(qa){return qa.q;}).map(function(qa,i){
+            return 'Q'+(i+1)+': '+qa.q+(qa.a?'\nA: '+qa.a:'');
+          }).join('\n');
+          if(qaText)notes.push('예상 Q&A:\n'+qaText);
         }
+        var tasks=[];
+        if(p.docs&&p.docs.length){
+          p.docs.forEach(function(doc){if(doc)tasks.push({name:doc,date:evt&&evt.date||'',manager:'원장',priority:'보통',done:true});});
+        }
+        var newPlan={name:planName,area:'학부모 소통',dday:evt&&evt.date||'',manager:'원장',status:'완료',acalId:evt&&evt.id||'',tasks:tasks,notes:notes.join('\n\n'),createdAt:new Date().toISOString()};
+        count++;
+        promises.push(db.collection('plans').add(newPlan).then(function(ref){newPlan.id=ref.id;_plans.push(newPlan);}));
       });
 
-      var newPlan={
-        id:Date.now().toString(36)+'_'+count,
-        name:planName,
-        area:'학부모 소통',
-        dday:evt&&evt.date||'',
-        manager:'원장',
-        status:'완료',
-        acalId:evtId,
-        tasks:tasks,
-        notes:notes.join('\n'),
-        createdAt:new Date().toISOString(),
-        migratedFrom:'parentMeetingPrep'
-      };
-      count++;
-      promises.push(
-        db.collection('plans').add(newPlan).then(function(ref){
-          newPlan.id=ref.id;
-          _plans.push(newPlan);
-        })
-      );
-    });
-
-    // 2. 월간 계획 메모 → 플랜 메모로 통합
-    var annualNotes=[];
-    Object.keys(annual).forEach(function(key){
-      if(annual[key])annualNotes.push(key.replace('m','')+'월: '+annual[key]);
-    });
-    if(annualNotes.length){
-      var annualPlan={
-        id:Date.now().toString(36)+'_annual',
-        name:'학부모 간담회 월간 계획 (이전 데이터)',
-        area:'학부모 소통',
-        dday:'',manager:'원장',status:'완료',
-        tasks:[],
-        notes:annualNotes.join('\n'),
-        createdAt:new Date().toISOString(),
-        migratedFrom:'parentMeetingAnnual'
-      };
-      if(!_plans.find(function(p){return p.name===annualPlan.name;})){
-        promises.push(
-          db.collection('plans').add(annualPlan).then(function(ref){
-            annualPlan.id=ref.id;
-            _plans.push(annualPlan);
-          })
-        );
+      // 월간 계획 메모 → 플랜으로 변환
+      var annualNotes=Object.keys(annual).filter(function(k){return annual[k];}).map(function(k){return k.replace('m','')+'월: '+annual[k];});
+      if(annualNotes.length&&!_plans.find(function(p){return p.name==='학부모 간담회 월간 계획 (이전 데이터)';})){
+        var annualPlan={name:'학부모 간담회 월간 계획 (이전 데이터)',area:'학부모 소통',dday:'',manager:'원장',status:'완료',tasks:[],notes:annualNotes.join('\n'),createdAt:new Date().toISOString()};
+        count++;
+        promises.push(db.collection('plans').add(annualPlan).then(function(ref){annualPlan.id=ref.id;_plans.push(annualPlan);}));
       }
-    }
 
-    Promise.all(promises).then(function(){
-      if(count===0&&!annualNotes.length){
-        toast('가져올 데이터가 없거나 이미 이전됐어요');
-      }else{
+      if(!promises.length){
+        toast('가져올 데이터가 없어요.\n월간 계획·간담회 준비 탭에서 먼저 내용을 확인해 주세요.');
+        return;
+      }
+      Promise.all(promises).then(function(){
         toast('✅ '+count+'개 플랜으로 가져왔어요!');
         if(_plans.length>0)_selectedPlanId=_plans[0].id;
         renderPlansView();
-      }
+      });
     });
-  }).catch(function(e){
-    toast('데이터 로드 실패: '+e.message);
   });
 }
 
