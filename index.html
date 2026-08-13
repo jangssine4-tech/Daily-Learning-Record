@@ -389,7 +389,14 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab"        id="pftab-scheduled" onclick="setPlansFilter('예정')"   style="font-size:13px">예정</button>
     <button class="rev-tab"        id="pftab-done"      onclick="setPlansFilter('완료')"   style="font-size:13px">완료</button>
     <button class="rev-tab"        id="pftab-hold"      onclick="setPlansFilter('보류')"   style="font-size:13px">보류</button>
-    <div style="margin-left:auto;padding:0 10px">
+    <div style="margin-left:auto;padding:0 10px;display:flex;align-items:center;gap:6px">
+      <select id="plans-year-filter" class="fi" style="font-size:12px;width:80px" onchange="renderPlansList()">
+        <option value="">전체 연도</option>
+        <option value="2024">2024년</option>
+        <option value="2025">2025년</option>
+        <option value="2026">2026년</option>
+        <option value="2027">2027년</option>
+      </select>
       <button class="btn btn-outline btn-xs" onclick="_migrateMeetingDataToPlans()" title="기존 간담회 데이터 가져오기">📥 데이터 가져오기</button>
     </div>
   </div>
@@ -11814,9 +11821,15 @@ function renderPlansView(){
 
 function renderPlansList(){
   var listEl=$('plans-list-col');if(!listEl)return;
+  var yrFilter=($('plans-year-filter')||{}).value||'';
   var filtered=_plans.filter(function(p){
-    if(_plansFilter==='전체')return true;
-    return (p.status||'예정')===_plansFilter;
+    if(_plansFilter!=='전체'&&(p.status||'예정')!==_plansFilter)return false;
+    if(yrFilter&&p.dday&&!p.dday.startsWith(yrFilter))return false;
+    if(yrFilter&&!p.dday){
+      var cy=(p.createdAt||'').slice(0,4);
+      if(cy&&cy!==yrFilter)return false;
+    }
+    return true;
   }).sort(function(a,b){
     // 진행 중 → 예정 → 완료 → 보류 순
     var order={'진행 중':0,'예정':1,'완료':2,'보류':3};
@@ -11895,7 +11908,7 @@ function renderPlanDetail(planId){
     +'</div>'
 
     // 연결 학사일정
-    +(linkedAcal?'<div style="font-size:11px;background:#dbeafe;color:#1d4ed8;padding:4px 10px;border-radius:6px;margin-bottom:12px;cursor:pointer" onclick="goto(\'acal\')">📅 연결 학사일정: '+linkedAcal.title+' →</div>':'')
+    +(linkedAcal?'<div style="font-size:11px;background:#dbeafe;color:#1d4ed8;padding:4px 10px;border-radius:6px;margin-bottom:12px;cursor:pointer" data-acid="'+linkedAcal.id+'" onclick="goto(\'acal\');setTimeout(function(){openAcalDetail(document.querySelector(\'[data-evtid=\\\\\'\'+this.dataset.acid+\'\\\\\']\')&&this.dataset.acid||this.dataset.acid)}.bind(this),300)">📅 연결 학사일정: '+linkedAcal.title+' →</div>':'')
 
     // 진행률
     +'<div style="background:var(--border);border-radius:4px;height:8px;margin-bottom:4px">'
