@@ -2815,6 +2815,12 @@ var _origGoto=window.goto;
 
 function renderDashMonthly(){
   var el=$('dash-monthly-area');if(!el)return;
+  // _dbTasks 미로드 상태면 로드 후 재렌더링
+  if(!_dbTasks){
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+    loadDashBoard().then(function(){renderDashMonthly();});
+    return;
+  }
   var now=new Date();
   var yr=now.getFullYear();
   var mo=now.getMonth()+1;
@@ -11576,6 +11582,12 @@ function _renderAcademicCalendarUI(el){
     var evts=((_academicCalendar&&_academicCalendar.events)||[]).filter(function(e){
       if(!e.date)return false;
       if(e.acalType==='repeat'){return e.startMonth===String(mo).padStart(2,'0');}
+      // annualRepeat: 등록 연도 이후 매년 같은 달에 표시
+      if(e.annualRepeat&&e.acalType!=='repeat'){
+        var origYr=parseInt(e.date.slice(0,4));
+        var evtMo=e.date.slice(5,7);
+        if(yr>=origYr&&evtMo===String(mo).padStart(2,'0'))return true;
+      }
       return e.date.slice(0,7)===moStr||(e.endDate&&e.endDate.slice(0,7)===moStr);
     }).sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
     html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer" onclick="_openAcalMonthModal('+yr+','+mo+')">'
@@ -11587,7 +11599,7 @@ function _renderAcademicCalendarUI(el){
     else{
       evts.forEach(function(e){
         var col=catColors[e.cat]||'#94a3b8';
-        var dayStr=e.completed?'✅':e.acalType==='repeat'?'🔄':(e.date.slice(8));
+        var dayStr=e.completed?'✅':e.acalType==='repeat'?'🔄':e.annualRepeat?'🔁':(e.date.slice(8));
         var completeBadge=e.completed?'<span style="font-size:9px;background:#f0fdf4;color:#16a34a;border-radius:3px;padding:0 3px">완료</span>':'';
         html+='<div style="display:flex;align-items:center;gap:4px;padding:2px 4px;border-radius:5px;margin-bottom:2px;background:'+(e.completed?'#f0fdf4':col+'18')+';cursor:pointer" data-evtid="'+e.id+'" onclick="openAcalDetail(this.dataset.evtid)">'
           +'<span style="font-size:10px;font-weight:700;color:'+col+';min-width:24px;flex-shrink:0">'+dayStr+'</span>'
@@ -11693,18 +11705,30 @@ function openAcalAddModal(editId){
   var yr=window._acalYr||now.getFullYear();
   var e=editEvt||{};
   var isRepeat=e.acalType==='repeat';
+  var annualRepeat=e.annualRepeat||false;
+  var prepStartDate=e.prepStartDate||'';
   var startDate=e.date?e.date:(yr+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'));
   var endDate=e.endDate||startDate;
   var startMo=e.startMonth||String(now.getMonth()+1).padStart(2,'0');
   var cats=['설명회','간담회','특강','외부시험','홍보캠페인','상담','내부 운영'];
   var repeatRules=['없음','매주 월','매주 화','매주 수','매주 목','매주 금','매주 월·수·금','매주 화·금','매주 화·목','매월 첫째 주','매월 말일','매년'];
-  var teacherNames=(teachers||[]).map(function(t){return t.name||'';}).filter(Boolean);
-  var managerOpts='<option value=""'+(!(e.manager)?' selected':'')+'>없음</option>'
-    +'<option value="원장"'+((e.manager==='원장')?' selected':'')+'>원장</option>'
-    +teacherNames.map(function(n){return'<option value="'+n+'"'+(n===e.manager?' selected':'')+'>'+n+'</option>';}).join('');
-  var managerOpts2='<option value=""'+(!(e.manager2)?' selected':'')+'>없음</option>'
-    +'<option value="원장"'+((e.manager2==='원장')?' selected':'')+'>원장</option>'
-    +teacherNames.map(function(n){return'<option value="'+n+'"'+(n===e.manager2?' selected':'')+'>'+n+'</option>';}).join('');
+  // 관리자 페이지 users 기반 담당자 목록 — 이름 변경 시 자동 반영
+  var activeStaff=(users||[]).filter(function(u){
+    return (u.role==='teacher'||u.role==='admin')&&!u.adminDeleted&&(u.name||'').trim();
+  }).sort(function(a,b){
+    var ra=a.role==='admin'?0:1,rb=b.role==='admin'?0:1;
+    return ra!==rb?ra-rb:(a.name||'').localeCompare(b.name||'','ko');
+  });
+  function buildManagerOpts(selected){
+    var opts='<option value=""'+(selected?'':' selected')+'>없음</option>';
+    activeStaff.forEach(function(u){
+      var label=(u.role==='admin')?(u.name+' (원장)'):u.name;
+      opts+='<option value="'+u.name+'"'+(u.name===selected?' selected':'')+'>'+label+'</option>';
+    });
+    return opts;
+  }
+  var managerOpts=buildManagerOpts(e.manager||'');
+  var managerOpts2=buildManagerOpts(e.manager2||'');
   var overlay=document.createElement('div');
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
@@ -11723,14 +11747,7 @@ function openAcalAddModal(editId){
     +'<select class="fi" id="acal-manager" style="flex:1">'+managerOpts+'</select>'
     +'<select class="fi" id="acal-manager2" style="flex:1">'+managerOpts2+'</select>'
     +'</div></div>'
-    +'<div id="acal-project-fields" style="display:'+(isRepeat?'none':'')+'}">'
-    +'<div class="field"><div class="fl">실행 기간</div>'
-    +'<div style="display:flex;align-items:center;gap:6px">'
-    +'<input type="date" class="fi" id="acal-date" value="'+startDate+'" style="flex:1">'
-    +'<span style="color:var(--txt3);font-size:12px">~</span>'
-    +'<input type="date" class="fi" id="acal-date-end" value="'+endDate+'" style="flex:1">'
-    +'</div></div>'
-    +'</div>'
+    +'<div id="acal-project-fields" style="display:'+(isRepeat?'none':'')+'}">'    +'<div class="field"><div class="fl">실행 기간</div>'    +'<div style="display:flex;align-items:center;gap:6px">'    +'<input type="date" class="fi" id="acal-date" value="'+startDate+'" style="flex:1">'    +'<span style="color:var(--txt3);font-size:12px">~</span>'    +'<input type="date" class="fi" id="acal-date-end" value="'+endDate+'" style="flex:1">'    +'</div></div>'    +'<div class="field">'    +'<div class="fl">준비 시작일 <span style="font-size:10px;color:var(--txt3);font-weight:400">(선택 — 월간 중점 선정에 미리 표시됩니다)</span></div>'    +'<input type="date" class="fi" id="acal-prep-start" value="'+prepStartDate+'">'    +'</div>'    +'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;margin-bottom:10px">'    +'<input type="checkbox" id="acal-annual-repeat"'+(annualRepeat?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy);cursor:pointer">'    +'<label for="acal-annual-repeat" style="font-size:13px;cursor:pointer;flex:1">매년 이 시기에 반복 <span style="font-size:11px;color:var(--txt3)">— 다음 해 같은 달에 자동 표시</span></label>'    +'</div>'    +'</div>'
     +'<div id="acal-repeat-fields" style="display:'+(isRepeat?'':'none')+'}">'
     +'<div style="display:flex;gap:6px">'
     +'<div class="field" style="flex:1"><div class="fl">시작 월</div>'
@@ -11775,8 +11792,12 @@ function confirmAcalAdd(overlay,editId){
   if(acalType==='project'){
     var date=($('acal-date')||{}).value||'';
     var dateEnd=($('acal-date-end')||{}).value||'';
+    var prepStart=($('acal-prep-start')||{}).value||'';
+    var annualRep=document.getElementById('acal-annual-repeat');
     evt.date=date||(yr+'-01-01');
     if(dateEnd&&dateEnd!==date)evt.endDate=dateEnd;
+    if(prepStart)evt.prepStartDate=prepStart; else delete evt.prepStartDate;
+    evt.annualRepeat=annualRep?annualRep.checked:false;
     evt.repeatRule='';
   }else{
     var startMonth=($('acal-start-month')||{}).value||'01';
@@ -12105,8 +12126,19 @@ function openNewPlanModal(editPlan){
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
   var areaOpts=_DB_AREAS.map(function(a){return'<option value="'+a+'"'+(a===(p.area||'')?' selected':'')+'>'+(_DB_AREA_ICONS[a]||'')+' '+a+'</option>';}).join('');
-  var managerOpts='<option value="">없음</option><option value="원장"'+((p.manager||'')==='원장'?' selected':'')+'>원장</option>'
-    +(teachers||[]).map(function(t){return'<option value="'+t.name+'"'+(t.name===p.manager?' selected':'')+'>'+t.name+'</option>';}).join('');
+  var managerOpts=(function(selected){
+    var activeStaff2=(users||[]).filter(function(u){
+      return (u.role==='teacher'||u.role==='admin')&&!u.adminDeleted&&(u.name||'').trim();
+    }).sort(function(a,b){
+      return (a.role==='admin'?0:1)-(b.role==='admin'?0:1)||(a.name||'').localeCompare(b.name||'','ko');
+    });
+    var opts='<option value=""'+(selected?'':' selected')+'>없음</option>';
+    activeStaff2.forEach(function(u){
+      var label=(u.role==='admin')?(u.name+' (원장)'):u.name;
+      opts+='<option value="'+u.name+'"'+(u.name===selected?' selected':'')+'>'+label+'</option>';
+    });
+    return opts;
+  })(p.manager||'');
   var acalOpts='<option value="">연결 안 함</option>'
     +((_academicCalendar&&_academicCalendar.events)||[]).filter(function(e){return e.acalType==='project';}).map(function(e){return'<option value="'+e.id+'"'+(e.id===p.acalId?' selected':'')+'>'+e.title+'</option>';}).join('');
 
@@ -12276,8 +12308,12 @@ function confirmAcalAdd(overlay,editId){
   if(acalType==='project'){
     var date=($('acal-date')||{}).value||'';
     var dateEnd=($('acal-date-end')||{}).value||'';
+    var prepStart=($('acal-prep-start')||{}).value||'';
+    var annualRep=document.getElementById('acal-annual-repeat');
     evt.date=date||(yr+'-01-01');
     if(dateEnd&&dateEnd!==date)evt.endDate=dateEnd;
+    if(prepStart)evt.prepStartDate=prepStart; else delete evt.prepStartDate;
+    evt.annualRepeat=annualRep?annualRep.checked:false;
     evt.repeatRule='';
   }else{
     var startMonth=($('acal-start-month')||{}).value||'01';
@@ -12327,7 +12363,9 @@ function openAcalDetail(evtId){
     +'<div class="mh"></div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">'+( e.cat||'-')+' · '+dateStr+'</div>'
     +'<div class="mt" style="margin-bottom:4px">'+e.title+'</div>'
-    +((e.manager||e.manager2)?'<div style="font-size:12px;color:var(--txt3);margin-bottom:12px">담당: '+[e.manager,e.manager2].filter(Boolean).join(' · ')+'</div>':'')
+    +((e.manager||e.manager2)?'<div style="font-size:12px;color:var(--txt3);margin-bottom:6px">담당: '+[e.manager,e.manager2].filter(Boolean).join(' · ')+'</div>':'')
+    +(e.prepStartDate?'<div style="font-size:11px;color:#7c3aed;margin-bottom:6px">📋 준비 시작일: '+e.prepStartDate.slice(5)+'</div>':'')
+    +(e.annualRepeat?'<div style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:10px;margin-bottom:10px">🔁 매년 반복</div>':'<div style="height:4px"></div>')
     +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">연결 플랜</div>'
     +plansHTML
     +'<div style="display:flex;gap:8px;margin-top:16px">'
@@ -13863,7 +13901,45 @@ function renderUsers(){
   try{var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.adminDeleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}var isCurrentAdmin=currentUser&&currentUser.role==='admin';tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong>'+(u.engName?' <span style="font-size:11px;color:var(--blue)">('+u.engName+')</span>':'')+'</td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>':'<span style="font-size:11px;color:var(--txt3)">-</span>'))+'</td><td>'+(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button>':'<span style="font-size:11px;color:var(--txt3)">-</span>')+'</td></tr>';}).join('');}catch(e){console.error('renderUsers 오류:',e);var _ea=document.getElementById('users-list');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
 }
 function openUserModal(id){if(!currentUser||currentUser.role!=='admin'){toast('관리자만 접근할 수 있어요');return;}var u=id?users.find(function(x){return x.id===id;}):null;$('u-id-key').value=id||'';$('u-name').value=u?u.name||'':'';$('u-engname').value=u?u.engName||'':'';$('u-role').value=u?u.role||'teacher':'teacher';$('u-id').value=u?u.loginId||'':'';$('u-pw').value='';$('u-phone').value=u?u.phone||'':'';if(u&&u.ssn){try{$('u-ssn').value=atob(u.ssn);}catch(e){$('u-ssn').value='';}}else{$('u-ssn').value='';}$('u-ssn').type='password';$('u-address').value=u?u.address||'':'';$('u-del-wrap').style.display=id?'block':'none';$('modal-user').style.display='flex';}
-async function saveUser(){var name=$('u-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}var loginId=$('u-id').value.trim();if(!loginId){toast('⚠️ 아이디 필수');return;}loading(true);var data={name:name,engName:$('u-engname').value.trim(),role:$('u-role').value,loginId:loginId,phone:$('u-phone').value.trim(),address:$('u-address').value.trim(),updatedAt:new Date().toISOString()};var ssnVal=$('u-ssn').value;if(ssnVal&&ssnVal!=='******'){data.ssn=btoa(ssnVal);}var pw=$('u-pw').value;if(pw)data.password=pw;var id=$('u-id-key').value;if(id)await db.collection('users').doc(id).update(data);else{data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}await loadUsers();renderUsers();_fullyPopulated=false;closeM('user');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
+async function saveUser(){
+  var name=$('u-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}
+  var loginId=$('u-id').value.trim();if(!loginId){toast('⚠️ 아이디 필수');return;}
+  loading(true);
+  var data={name:name,engName:$('u-engname').value.trim(),role:$('u-role').value,loginId:loginId,phone:$('u-phone').value.trim(),address:$('u-address').value.trim(),updatedAt:new Date().toISOString()};
+  var ssnVal=$('u-ssn').value;if(ssnVal&&ssnVal!=='******'){data.ssn=btoa(ssnVal);}
+  var pw=$('u-pw').value;if(pw)data.password=pw;
+  var id=$('u-id-key').value;
+  // 이름 변경 감지 — 기존 이름 저장
+  var oldName='';
+  if(id){var existingU=users.find(function(x){return x.id===id;});if(existingU)oldName=existingU.name||'';}
+  if(id)await db.collection('users').doc(id).update(data);
+  else{data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}
+  // 이름이 바뀐 경우 학사일정 담당자 일괄 업데이트
+  if(id&&oldName&&oldName!==name){
+    await _syncManagerNameInAcal(oldName,name);
+  }
+  await loadUsers();renderUsers();_fullyPopulated=false;closeM('user');loading(false);saveCacheDebounced();toast('✅ 저장됨');
+}
+
+// 학사일정 전체에서 oldName → newName 으로 담당자 교체 후 저장
+async function _syncManagerNameInAcal(oldName,newName){
+  try{
+    if(!_academicCalendar){
+      var d=await db.collection('config').doc('academicCalendar').get();
+      _academicCalendar=d.exists?d.data():{events:[]};
+      if(!_academicCalendar.events)_academicCalendar.events=[];
+    }
+    var changed=false;
+    (_academicCalendar.events||[]).forEach(function(e){
+      if(e.manager===oldName){e.manager=newName;changed=true;}
+      if(e.manager2===oldName){e.manager2=newName;changed=true;}
+    });
+    if(changed){
+      saveAcademicCalendar();
+      toast('📅 학사일정 담당자 이름도 업데이트됐어요 ('+oldName+' → '+newName+')');
+    }
+  }catch(err){console.error('_syncManagerNameInAcal 오류:',err);}
+}
 async function deleteUser(){var id=$('u-id-key').value;if(!id||!confirm('관리자 페이지에서 삭제합니다. 강사 페이지에는 영향이 없습니다.\n삭제하시겠습니까?'))return;loading(true);await db.collection('users').doc(id).update({adminDeleted:true,adminDeletedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===id;});if(u)u.adminDeleted=true;await loadUsers();renderUsers();closeM('user');loading(false);saveCacheDebounced();toast('🗑 관리자 페이지에서 삭제됨');}
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
 function toggleSubPerms(parentId,checked){document.querySelectorAll('.sub-perm-'+parentId+' input[type=checkbox]').forEach(function(cb){cb.checked=checked;});}
