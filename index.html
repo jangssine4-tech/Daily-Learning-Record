@@ -2236,8 +2236,31 @@ function goto(view){
     var acalEl=$('acal-main-area');
     if(!acalEl)return;
     acalEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
-    loadAcademicCalendar(function(){
+    // 항상 Firestore에서 새로 읽기
+    _academicCalendar=null;
+    db.collection('config').doc('academicCalendar').get().then(function(d){
+      if(d.exists){
+        var raw=d.data();
+        // Firestore 구조 진단
+        var keys=Object.keys(raw);
+        console.log('[academicCalendar] keys:',keys,'events count:',(raw.events||[]).length,'total keys:',keys.length);
+        // events 배열이 있으면 그대로, 없으면 최상위 필드들을 events로 변환 시도
+        if(raw.events&&Array.isArray(raw.events)){
+          _academicCalendar=raw;
+        } else if(Array.isArray(raw)){
+          _academicCalendar={events:raw};
+        } else {
+          // events 키가 없는 경우 — 최상위 객체 자체가 달력 데이터일 수 있음
+          _academicCalendar=raw;
+          if(!_academicCalendar.events)_academicCalendar.events=[];
+        }
+      } else {
+        _academicCalendar={events:[]};
+      }
       _renderAcademicCalendarUI(acalEl);
+    }).catch(function(e){
+      console.error('academicCalendar 로드 오류:',e);
+      acalEl.innerHTML='<div style="padding:20px;color:red">학사일정 로드 오류: '+e.message+'</div>';
     });
   }
   else if(view==='plans'){
@@ -2782,7 +2805,7 @@ function switchDashTab(tab){
     var pn=$('dash-panel-'+t);if(pn)pn.style.display=t===tab?(t==='monthly'?'block':''):'none';
   });
   var boardPanel=$('dash-panel-board');if(boardPanel)boardPanel.style.display='none';
-  if(tab==='monthly'){_academicCalendar=null;renderDashMonthly();}
+  if(tab==='monthly'){renderDashMonthly();}
   else if(tab==='crm'){initCrmDateSelector();renderCrmDailyInto('dashboard-area');}
   else if(tab==='mk'){loadMpPlans().then(function(){if(!_opGuidesLoaded){loadOpGuides(function(){renderMkTodayPage('dashboard-mk-area');});}else{renderMkTodayPage('dashboard-mk-area');}});}
   else if(tab==='conditions'){loadCrmConditions().then(function(){_renderCrmConditionsUI($('crm-conditions-area'));});}
@@ -2820,8 +2843,6 @@ function renderDashMonthly(){
     if(_dashMonthlyLoading)return;
     _dashMonthlyLoading=true;
     el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
-    // _academicCalendar 강제 재로드 (캐시 무시)
-    _academicCalendar=null;
     Promise.all([
       loadDashBoard(),
       loadAcademicCalendar(null,true)
