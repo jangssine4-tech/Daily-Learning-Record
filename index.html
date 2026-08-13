@@ -8890,30 +8890,60 @@ function loadDashBoard(forceReload){
     db.collection('config').doc('dashBoardV2').get(),
     db.collection('dashBoardV2').get()
   ]).then(function(results){
-    var configTasks=results[0].exists?(results[0].data().tasks||[]):[];
+    var configDoc=results[0];
     var colTasks=results[1].docs.map(function(d){return Object.assign({id:d.id},d.data());});
-    // 컬렉션 문서가 config 배열에도 있으면 컬렉션 우선 (더 최신)
-    var colIds=colTasks.map(function(t){return t.id;});
-    var filteredConfig=configTasks.filter(function(t){return t.id&&!colIds.includes(t.id);});
-    var merged=filteredConfig.concat(colTasks);
-    // config가 비어있고 컬렉션에 데이터가 있으면 config 복구 저장
-    if(configTasks.length===0&&colTasks.length>0){
-      console.log('loadDashBoard: config 비어있음, 컬렉션에서 복구 중...');
-      db.collection('config').doc('dashBoardV2').set({tasks:merged},{merge:false}).catch(function(){});
+    var configTasks=configDoc.exists?(configDoc.data().tasks||[]):[];
+    // config 배열에만 있는 task → 컬렉션으로 마이그레이션
+    var colIds=new Set(colTasks.map(function(t){return t.id;}));
+    var toMigrate=configTasks.filter(function(t){return t.id&&!t.id.startsWith('__')&&!colIds.has(t.id);});
+    if(toMigrate.length>0){
+      console.log('loadDashBoard: config 배열 task '+toMigrate.length+'건 → 컬렉션 마이그레이션');
+      var batch=db.batch();
+      toMigrate.forEach(function(t){
+        batch.set(db.collection('dashBoardV2').doc(t.id),t);
+      });
+      batch.commit().then(function(){
+        // 마이그레이션 완료 후 config 배열 비우기
+        db.collection('config').doc('dashBoardV2').set({tasks:[],_migrated:true,_migratedAt:new Date().toISOString()},{merge:false}).catch(function(){});
+        console.log('loadDashBoard: 마이그레이션 완료');
+      }).catch(function(e){console.error('마이그레이션 오류:',e);});
     }
-    _dbTasks=merged;
+    // autoDone 특수 항목 복원
+    var autoDoneMap=(configDoc.exists&&configDoc.data().autoDone)||{};
+    if(Object.keys(autoDoneMap).length>0){
+      var adObj={id:'__autoDone',_map:autoDoneMap};
+      _dbTasks=colTasks.concat([adObj]);
+    } else {
+      _dbTasks=colTasks;
+    }
   }).catch(function(e){console.error('loadDashBoard 오류:',e);_dbTasks=_dbTasks||[];});
 }
 function saveDashBoard(){
-  // _dbTasks가 로드되지 않은 상태(null)면 절대 저장하지 않음 — 빈 배열로 덮어쓰기 방지
+  // _dbTasks 미로드 상태면 저장 금지 — 빈 배열 덮어쓰기 방지
   if(_dbTasks===null){console.warn('saveDashBoard: _dbTasks 미로드 상태, 저장 건너뜀');return;}
-  db.collection('config').doc('dashBoardV2').set({tasks:_dbTasks},{merge:false}).catch(function(e){console.error('saveDashBoard 오류:',e);});
-  // Firestore 컬렉션 방식(auto-id) task도 동기화
-  _dbTasks.forEach(function(t){
-    if(t.id&&!t.id.startsWith('task_')&&!t.id.startsWith('rr_')&&!t.id.startsWith('__')){
-      db.collection('dashBoardV2').doc(t.id).set(t,{merge:true}).catch(function(){});
-    }
+  // 컬렉션 전용 저장 — config 배열 덮어쓰기 완전 폐기
+  // 모든 task를 dashBoardV2/{id} 개별 문서로 저장 (batch)
+  var toSave=_dbTasks.filter(function(t){return t.id&&!t.id.startsWith('__');});
+  if(toSave.length===0)return;
+  var batch=db.batch();
+  toSave.forEach(function(t){
+    batch.set(db.collection('dashBoardV2').doc(t.id),t);
   });
+  batch.commit().catch(function(e){console.error('saveDashBoard batch 오류:',e);});
+}
+
+// 특정 task 하나만 저장 (편집/상태변경 시 사용 — 더 효율적)
+function saveTask(id){
+  if(!_dbTasks)return;
+  var t=_dbTasks.find(function(x){return x.id===id;});
+  if(!t||!t.id||t.id.startsWith('__'))return;
+  db.collection('dashBoardV2').doc(t.id).set(t).catch(function(e){console.error('saveTask 오류:',e);});
+}
+
+// task 삭제
+function deleteTask(id){
+  if(!id||id.startsWith('__'))return;
+  db.collection('dashBoardV2').doc(id).delete().catch(function(e){console.error('deleteTask 오류:',e);});
 }
 function renderDashBoard(){
   var el=$('dashboard-board-area');if(!el)return;
@@ -9171,13 +9201,13 @@ function toggleFocusTask(type,id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(t){
     t.status=t.status==='완료'?'대기':'완료';
-    saveDashBoard();
+    saveTask(id);
     _renderDashBoardUI($('dashboard-board-area'));
   }
 }
 function deleteFocusTask(type,id){
   _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==id;});
-  saveDashBoard();
+  deleteTask(id);
   _renderDashBoardUI($('dashboard-board-area'));
 }
 function _renderTodayTaskSection(){
@@ -9674,7 +9704,12 @@ function _mfmConfirm(){
     });
   }
 
-  saveDashBoard();
+  // 새로 추가된 task들을 컬렉션에 저장
+  var batch=db.batch();
+  (_dbTasks||[]).filter(function(t){return t.id&&!t.id.startsWith('__');}).forEach(function(t){
+    batch.set(db.collection('dashBoardV2').doc(t.id),t);
+  });
+  batch.commit().catch(function(e){console.error('saveMonthlyFocus batch 오류:',e);});
   var overlay=document.getElementById('mfm-overlay');if(overlay)overlay.remove();
   _renderDashBoardUI($('dashboard-board-area'));
   toast('✅ 이달의 중점 업무와 주차별 업무가 등록됐어요!');
@@ -9710,11 +9745,12 @@ function openTodayTaskModal(){
 }
 function toggleTodayTask(id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
-  if(t){t.status=t.status==='완료'?'대기':'완료';saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));}
+  if(t){t.status=t.status==='완료'?'대기':'완료';saveTask(id);_renderDashBoardUI($('dashboard-board-area'));}
 }
 function deleteTodayTask(id){
   _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==id;});
-  saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
+  deleteTask(id);
+  _renderDashBoardUI($('dashboard-board-area'));
 }
 var _todayDragSrcId=null;
 function todayDragStart(e,id){
@@ -9735,7 +9771,8 @@ function todayDragDrop(e,tgtId){
   var moved=todayItems.splice(si,1)[0];
   todayItems.splice(ti,0,moved);
   _dbTasks=others.concat(todayItems);
-  saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
+  todayItems.forEach(function(t,i){t._order=i;saveTask(t.id);});
+  _renderDashBoardUI($('dashboard-board-area'));
   _todayDragSrcId=null;
 }
 
@@ -9933,7 +9970,11 @@ function _focusDragReorder(type,srcId,tgtId){
   var moved=focusItems.splice(srcIdx,1)[0];
   focusItems.splice(tgtIdx,0,moved);
   _dbTasks=others.concat(focusItems);
-  saveDashBoard();
+  // 순서 변경된 focus items만 저장
+  focusItems.forEach(function(t,i){
+    t._order=i;
+    saveTask(t.id);
+  });
   _renderDashBoardUI($('dashboard-board-area'));
 }
 
@@ -10159,14 +10200,15 @@ function _dbTaskRow(t,hideAreaBadge){
 function _dbUpdateStatus(id,status){
   if(!_dbTasks)return;
   var t=_dbTasks.find(function(x){return x.id===id;});
-  if(t){t.status=status;saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));}
+  if(t){t.status=status;saveTask(id);_renderDashBoardUI($('dashboard-board-area'));}
 }
 
 // ── 삭제 ─────────────────────────────────────────
 function _dbDeleteTask(id){
   if(!confirm('이 업무를 삭제할까요?'))return;
   _dbTasks=(_dbTasks||[]).filter(function(t){return t.id!==id;});
-  saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
+  deleteTask(id);
+  _renderDashBoardUI($('dashboard-board-area'));
 }
 
 // ── 자동 알림 체크 ────────────────────────────────
@@ -10178,7 +10220,9 @@ function _dbToggleAutoTask(date,label,checked){
   if(!adObj){adObj={id:key,_map:{}};_dbTasks.push(adObj);}
   if(!adObj._map)adObj._map={};
   adObj._map[date+'_'+label]=checked;
-  saveDashBoard();_renderDashBoardUI($('dashboard-board-area'));
+  // __autoDone 특수 항목은 config에 별도 보관
+  db.collection('config').doc('dashBoardV2').set({autoDone:adObj._map},{merge:true}).catch(function(){});
+  _renderDashBoardUI($('dashboard-board-area'));
 }
 
 // ── 업무 추가/편집 모달 ───────────────────────────
@@ -10272,7 +10316,9 @@ function _dbSaveTaskModal(id){
   }else{
     _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,taskType:taskType,priority:priority,dueDate:dueDate,parentTask:parentTask,status:'대기',cycle:'반복없음',memo:'',createdAt:todayISO()});
   }
-  saveDashBoard();
+  // 신규/수정 모두 해당 task만 저장
+  var savedId=id||(_dbTasks[_dbTasks.length-1]&&_dbTasks[_dbTasks.length-1].id);
+  if(savedId)saveTask(savedId); else saveDashBoard();
   var m=document.getElementById('db-task-modal');if(m)m.remove();
   _renderDashBoardUI($('dashboard-board-area'));
 }
