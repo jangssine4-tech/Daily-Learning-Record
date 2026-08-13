@@ -8831,8 +8831,8 @@ function saveTaxDocs(){
 // ══ SPECIAL CLASS ══
 var _specialPrograms=['Phonics 기초반','Phonics 속성반','TOSEL 정기 시험','TOSEL VOCA 올림피아드','문법 강화반','구문 독해 기초반','구문 독해 기본반','중등 심화반'];
 
-function loadDashBoard(){
-  if(_dbTasks)return Promise.resolve();
+function loadDashBoard(forceReload){
+  if(_dbTasks&&!forceReload)return Promise.resolve();
   return Promise.all([
     db.collection('config').doc('dashBoardV2').get(),
     db.collection('dashBoardV2').get()
@@ -8841,18 +8841,27 @@ function loadDashBoard(){
     var colTasks=results[1].docs.map(function(d){return Object.assign({id:d.id},d.data());});
     // 중복 제거: 컬렉션 문서 id가 config 배열에도 있으면 컬렉션 우선
     var colIds=colTasks.map(function(t){return t.id;});
-    var filteredConfig=configTasks.filter(function(t){return !colIds.includes(t.id);});
+    var filteredConfig=configTasks.filter(function(t){return t.id&&!colIds.includes(t.id);});
     _dbTasks=filteredConfig.concat(colTasks);
-  }).catch(function(){_dbTasks=[];});
+  }).catch(function(e){console.error('loadDashBoard 오류:',e);_dbTasks=_dbTasks||[];});
 }
 function saveDashBoard(){
-  db.collection('config').doc('dashBoardV2').set({tasks:_dbTasks},{merge:false}).catch(function(){});
+  // config doc에 전체 배열 저장 (주 저장소)
+  db.collection('config').doc('dashBoardV2').set({tasks:_dbTasks||[]},{merge:false}).catch(function(e){console.error('saveDashBoard 오류:',e);});
+  // 컬렉션 방식으로 저장된 task(id가 'task_' 로 시작하지 않는 Firestore auto-id)도 동기화
+  (_dbTasks||[]).forEach(function(t){
+    if(t.id&&!t.id.startsWith('task_')&&!t.id.startsWith('rr_')&&!t.id.startsWith('__')){
+      db.collection('dashBoardV2').doc(t.id).set(t,{merge:true}).catch(function(){});
+    }
+  });
 }
 function renderDashBoard(){
   var el=$('dashboard-board-area');if(!el)return;
   el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
   loadFocusTasks();
   loadPlans();
+  // 탭 재진입 시 항상 최신 데이터 로드
+  _dbTasks=null;
   loadDashBoard().then(function(){
     try{_renderDashBoardUI(el);}
     catch(e){
@@ -9139,9 +9148,9 @@ function _renderTodayTaskSection(){
     r+='<span style="cursor:grab;color:var(--txt3);font-size:14px;user-select:none">⠿</span>';
     r+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleTodayTask(\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
     if(badge)r+=badge;
+    if(t.area)r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
     r+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
     if(t.dueDate&&t.dueDate!==today)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">~'+t.dueDate.slice(5)+'</span>';
-    if(t.area)r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
     r+='<button onclick="deleteTodayTask(\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;line-height:1;padding:0 4px;flex-shrink:0">×</button>';
     r+='</div>';
     return r;
@@ -9988,6 +9997,52 @@ function _renderDbWeekView(now){
     html+='</div>';
   }
   html+='</div></div>';
+
+  // ── 이번 주 중점 추진 (방안 A: 주간 탭 병합) ──
+  var weekFocusItems=_dbFocusTasks('weekly');
+  var weekFocusDone=weekFocusItems.filter(function(t){return t.status==='완료';}).length;
+  html+='<div style="border:1px solid #c4b5fd;border-radius:12px;overflow:hidden;margin-top:10px">';
+  html+='<div style="background:#f5f3ff;padding:8px 14px;display:flex;align-items:center;gap:8px">';
+  html+='<span style="font-size:13px;font-weight:800;color:#6d28d9">🎯 이번 주 중점 추진</span>';
+  if(weekFocusItems.length){
+    html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+weekFocusDone+'/'+weekFocusItems.length+' 완료</span>';
+    html+='<button class="btn btn-xs" style="margin-left:4px;background:#7c3aed;color:#fff" onclick="openDbTaskModal(null,null,\'이번 주 중점\')">＋ 추가</button>';
+  }else{
+    html+='<button class="btn btn-xs" style="margin-left:auto;background:#7c3aed;color:#fff" onclick="openDbTaskModal(null,null,\'이번 주 중점\')">＋ 추가</button>';
+  }
+  html+='</div>';
+  html+='<div style="padding:8px 14px;background:var(--surface)">';
+  if(weekFocusItems.length){
+    weekFocusItems.forEach(function(t){
+      var isDone=t.status==='완료';
+      var subTasks=t.subTasks||[];
+      var subDone=subTasks.filter(function(s){return s.done;}).length;
+      var subTotal=subTasks.length;
+      var subPct=subTotal>0?Math.round(subDone/subTotal*100):0;
+      html+='<div style="padding:6px 0;border-bottom:1px solid var(--border)">';
+      html+='<div style="display:flex;align-items:center;gap:8px">';
+      html+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleFocusTask(\'weekly\',\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#7c3aed">';
+      if(t.area)html+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;flex-shrink:0">'+t.area+'</span>';
+      html+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+      if(subTotal>0){var pctColor=subPct===100?'#16a34a':subPct>=50?'#d97706':'#6b7280';html+='<span style="font-size:10px;font-weight:700;color:'+pctColor+'">'+subPct+'%</span>';}
+      html+='<button onclick="openDbTaskModal(\''+t.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--txt3);padding:0 2px">✏️</button>';
+      html+='<button onclick="deleteFocusTask(\'weekly\',\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button>';
+      html+='</div>';
+      if(subTotal>0){
+        var barColor=subPct===100?'#16a34a':subPct>=50?'#d97706':'#3b82f6';
+        html+='<div style="margin:4px 0 4px 24px"><div style="background:var(--surface2);border-radius:4px;height:4px;margin-bottom:4px"><div style="background:'+barColor+';width:'+subPct+'%;height:4px;border-radius:4px"></div></div>';
+        subTasks.forEach(function(st,si){
+          html+='<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><input type="checkbox"'+(st.done?' checked':'')+' onchange="_toggleSubTask(\''+t.id+'\','+si+',this.checked,\'weekly\')" style="width:13px;height:13px;cursor:pointer;accent-color:#7c3aed;flex-shrink:0"><span style="font-size:11px;'+(st.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt2)')+'">'+st.name+'</span></div>';
+        });
+        html+='</div>';
+      }
+      html+='</div>';
+    });
+  }else{
+    html+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">이번 주 중점 업무가 없습니다<br><span style="font-size:11px">＋ 추가 또는 이달의 중점 업무에서 주차별 업무를 등록하면 자동으로 표시됩니다</span></div>';
+  }
+  html+='</div></div>';
+
   return html;
 }
 
