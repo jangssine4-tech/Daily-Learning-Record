@@ -2863,8 +2863,8 @@ function renderDashMonthly(){
         linkBtn='<button data-acid="'+e.id+'" onclick="event.stopPropagation();var _ev=(_academicCalendar.events||[]).find(function(x){return x.id===this.dataset.acid;}.bind(this));if(_ev)_acalCreateFocusTask(_ev);" style="font-size:9px;padding:1px 6px;border-radius:4px;background:#7c3aed;color:#fff;border:none;cursor:pointer;flex-shrink:0">+ 중점업무</button>';
       }
       calHTML+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="font-size:11px;font-weight:600;color:var(--txt2);flex-shrink:0">'+(isCompleted?'✅':e.date.slice(5))+'</span>'
         +catBadge
-        +'<span style="font-size:11px;color:var(--txt3);flex-shrink:0">'+(isCompleted?'✅':e.date.slice(5))+'</span>'
         +'<span style="font-size:12px;flex:1;color:'+(isCompleted?'var(--txt3)':'var(--txt)')+'">'+e.title+(isPrepOnly?' <span style="font-size:10px;color:#7c3aed">[준비 시작]</span>':'')+'</span>'
         +dday+linkBtn+'</div>';
     });
@@ -9122,7 +9122,7 @@ function _renderTodayTaskSection(){
   });
 
   var todayItems=(_dbTasks||[]).filter(function(t){
-    return t.dueDate===today&&(!t.taskType||t.taskType==='일반 업무')&&!(t.id&&t.id.startsWith('__'));
+    return t.dueDate===today&&!(t.id&&t.id.startsWith('__'));
   });
   var overdueItems=allGeneral.filter(function(t){return t.dueDate&&t.dueDate<today;});
   var prepItems=allGeneral.filter(function(t){return t.dueDate&&t.dueDate>today&&t.dueDate<=prep3End;});
@@ -9174,7 +9174,12 @@ function _renderTodayTaskSection(){
   }
   h+='</div><div style="padding:8px 14px;background:var(--surface)">';
   if(todayItems.length){
-    todayItems.forEach(function(t){h+=taskRow(t,'');});
+    todayItems.forEach(function(t){
+      var typeBadge='';
+      if(t.taskType==='이달의 중점')typeBadge='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#dbeafe;color:#1d4ed8;flex-shrink:0">🎯 이달</span>';
+      else if(t.taskType==='이번 주 중점')typeBadge='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#ede9fe;color:#6d28d9;flex-shrink:0">📅 주간</span>';
+      h+=taskRow(t,typeBadge);
+    });
   }else{
     h+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">오늘 등록된 업무가 없습니다<br><span style="font-size:11px">＋ 추가 버튼 또는 업무 기한을 오늘로 설정하면 자동으로 표시됩니다</span></div>';
   }
@@ -10110,10 +10115,19 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate){
   // 상위 업무
   var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';
   var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);
-  (_dbTasks||[]).filter(function(x){return x.id!==id;}).forEach(function(x){
-    var op=document.createElement('option');op.value=x.id;op.textContent=x.name.substring(0,30);
-    if(t&&t.parentTask===x.id)op.selected=true;ptSel.appendChild(op);
+  var parentCandidates=(_dbTasks||[]).filter(function(x){
+    return x.id!==id&&(x.taskType==='이달의 중점'||x.taskType==='이번 주 중점');
   });
+  if(parentCandidates.length===0){
+    var noOpt=document.createElement('option');noOpt.value='';noOpt.textContent='(등록된 중점 업무 없음)';noOpt.disabled=true;ptSel.appendChild(noOpt);
+  }else{
+    parentCandidates.forEach(function(x){
+      var op=document.createElement('option');op.value=x.id;
+      var typeLabel=x.taskType==='이달의 중점'?'[이달] ':'[주간] ';
+      op.textContent=typeLabel+x.name.substring(0,28);
+      if(t&&t.parentTask===x.id)op.selected=true;ptSel.appendChild(op);
+    });
+  }
   var ptw=document.createElement('div');ptw.style.marginBottom='16px';ptw.appendChild(mkLbl('상위 업무'));ptw.appendChild(ptSel);box.appendChild(ptw);
   // 버튼
   var br=document.createElement('div');br.style.cssText='display:flex;gap:8px';
