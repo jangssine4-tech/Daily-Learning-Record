@@ -2843,18 +2843,27 @@ function renderDashMonthly(){
     return (ps&&ps>=thisMonStart&&ps<thisMonEnd)||(ed&&ed>=thisMonStart&&ed<thisMonEnd);
   }).sort(function(a,b){return a.date>b.date?1:-1;});
   var calHTML='';
+  var catColors={'설명회':'#3b82f6','간담회':'#1d4ed8','특강':'#22c55e','외부시험':'#8b5cf6','홍보캠페인':'#f59e0b','상담':'#ef4444','내부 운영':'#94a3b8'};
   if(thisMonEvts.length){
     thisMonEvts.forEach(function(e){
       var diff=Math.round((new Date(e.date)-now)/(1000*60*60*24));
       var dday=diff>0?'<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:4px;margin-left:4px">D-'+diff+'</span>':diff===0?'<span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;margin-left:4px">오늘</span>':'<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:1px 6px;border-radius:4px;margin-left:4px">완료</span>';
       var isPrepOnly=e.prepStartDate&&e.prepStartDate>=thisMonStart&&e.date>=thisMonEnd;
       var isCompleted=e.completed;
-      var alreadyLinked=(_dbTasks||[]).some(function(t){return t.acalId===e.id&&t.taskType==='이달의 중점';});
-      var linkBtn=!isCompleted&&!alreadyLinked
-        ?'<button data-acid="'+e.id+'" onclick="var _ev=(_academicCalendar.events||[]).find(function(x){return x.id===this.dataset.acid;}.bind(this));if(_ev)_acalCreateFocusTask(_ev);" style="font-size:9px;padding:1px 6px;border-radius:4px;background:#7c3aed;color:#fff;border:none;cursor:pointer;flex-shrink:0">+ 중점업무</button>'
-        :alreadyLinked?'<span style="font-size:9px;color:#16a34a;flex-shrink:0">✅ 등록됨</span>'
-        :'<span style="font-size:9px;color:#16a34a;flex-shrink:0">✅ 완료</span>';
-      calHTML+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+      var catCol=catColors[e.cat]||'#94a3b8';
+      var catBadge=e.cat?'<span style="font-size:9px;font-weight:700;background:'+catCol+'22;color:'+catCol+';padding:1px 5px;border-radius:4px;border:1px solid '+catCol+'33;flex-shrink:0">'+e.cat+'</span>':'';
+      var linkedTask=(_dbTasks||[]).find(function(t){return t.acalId===e.id&&t.taskType==='이달의 중점';});
+      var alreadyLinked=!!linkedTask;
+      var linkBtn;
+      if(isCompleted){
+        linkBtn='<span style="font-size:9px;color:#16a34a;flex-shrink:0">✅ 완료</span>';
+      }else if(alreadyLinked){
+        linkBtn='<button data-tid="'+linkedTask.id+'" onclick="event.stopPropagation();_unlinkFocusTask(this.dataset.tid)" style="font-size:9px;padding:1px 6px;border-radius:4px;background:#f0fdf4;color:#16a34a;border:1px solid #16a34a;cursor:pointer;flex-shrink:0">✅ 등록됨</button>';
+      }else{
+        linkBtn='<button data-acid="'+e.id+'" onclick="event.stopPropagation();var _ev=(_academicCalendar.events||[]).find(function(x){return x.id===this.dataset.acid;}.bind(this));if(_ev)_acalCreateFocusTask(_ev);" style="font-size:9px;padding:1px 6px;border-radius:4px;background:#7c3aed;color:#fff;border:none;cursor:pointer;flex-shrink:0">+ 중점업무</button>';
+      }
+      calHTML+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">'
+        +catBadge
         +'<span style="font-size:11px;color:var(--txt3);flex-shrink:0">'+(isCompleted?'✅':e.date.slice(5))+'</span>'
         +'<span style="font-size:12px;flex:1;color:'+(isCompleted?'var(--txt3)':'var(--txt)')+'">'+e.title+(isPrepOnly?' <span style="font-size:10px;color:#7c3aed">[준비 시작]</span>':'')+'</span>'
         +dday+linkBtn+'</div>';
@@ -2862,8 +2871,6 @@ function renderDashMonthly(){
   }else{
     calHTML='<div style="font-size:12px;color:var(--txt3)">이번 달 관련 학사일정이 없습니다</div>';
   }
-
-  // ② 목표 달성률
   var goalHTML='';
   if(_goalTargets&&_goalTargets[yr]){
     var gt=_goalTargets[yr];
@@ -9787,12 +9794,14 @@ function _markAcalComplete(acalId){
 }
 
 function _acalCreateFocusTask(acalEvt){
+  // 이미 등록된 경우 해지
+  var existing=(_dbTasks||[]).find(function(t){return t.acalId===acalEvt.id&&t.taskType==='이달의 중점';});
+  if(existing){_unlinkFocusTask(existing.id);return;}
   // 학사일정 항목으로부터 이달의 중점 업무 생성
   var now=new Date();
   var yr=now.getFullYear();
   var mo=now.getMonth()+1;
   var dueDate=acalEvt.endDate||acalEvt.date||(yr+'-'+String(mo).padStart(2,'0')+'-28');
-
   var newTask={
     name:acalEvt.title,
     taskType:'이달의 중점',
@@ -9804,7 +9813,6 @@ function _acalCreateFocusTask(acalEvt){
     progress:0,
     createdAt:new Date().toISOString()
   };
-
   db.collection('dashBoardV2').add(newTask).then(function(ref){
     newTask.id=ref.id;
     if(!_dbTasks)_dbTasks=[];
@@ -9816,6 +9824,16 @@ function _acalCreateFocusTask(acalEvt){
   }).catch(function(e){
     console.error('중점 업무 등록 오류',e);
   });
+}
+function _unlinkFocusTask(taskId){
+  if(!confirm('이달의 중점 업무 등록을 해제할까요?'))return;
+  db.collection('dashBoardV2').doc(taskId).delete().then(function(){
+    _dbTasks=(_dbTasks||[]).filter(function(t){return t.id!==taskId;});
+    toast('중점 업무 등록이 해제됐어요');
+    var boardEl=$('dashboard-board-area');
+    if(boardEl)_renderDashBoardUI(boardEl);
+    renderDashMonthly();
+  }).catch(function(e){toast('해제 실패: '+e.message);});
 }
 function focusDragStart(e,id){
   _focusDragSrcId=id;
