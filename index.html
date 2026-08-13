@@ -383,12 +383,15 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="btn btn-navy btn-sm" onclick="openNewPlanModal()">+ 새 플랜</button>
   </div>
   <!-- 상태 필터 -->
-  <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto" id="plans-filter-bar">
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:0;overflow-x:auto;align-items:center" id="plans-filter-bar">
     <button class="rev-tab active" id="pftab-all"       onclick="setPlansFilter('전체')"   style="font-size:13px">전체</button>
     <button class="rev-tab"        id="pftab-ongoing"   onclick="setPlansFilter('진행 중')" style="font-size:13px">진행 중</button>
     <button class="rev-tab"        id="pftab-scheduled" onclick="setPlansFilter('예정')"   style="font-size:13px">예정</button>
     <button class="rev-tab"        id="pftab-done"      onclick="setPlansFilter('완료')"   style="font-size:13px">완료</button>
     <button class="rev-tab"        id="pftab-hold"      onclick="setPlansFilter('보류')"   style="font-size:13px">보류</button>
+    <div style="margin-left:auto;padding:0 10px">
+      <button class="btn btn-outline btn-xs" onclick="_migrateMeetingDataToPlans()" title="기존 간담회 데이터 가져오기">📥 데이터 가져오기</button>
+    </div>
   </div>
   <!-- 2분할 레이아웃 -->
   <div style="display:flex;height:calc(100vh - 160px);overflow:hidden">
@@ -11465,8 +11468,11 @@ function _renderAcademicCalendarUI(el){
       if(e.acalType==='repeat'){return e.startMonth===String(mo).padStart(2,'0');}
       return e.date.slice(0,7)===moStr||(e.endDate&&e.endDate.slice(0,7)===moStr);
     }).sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
-    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px">'
-      +'<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:6px">'+mLabel+'</div>';
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer" onclick="_openAcalMonthModal('+yr+','+mo+')">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+      +'<div style="font-size:13px;font-weight:800;color:var(--navy)">'+mLabel+'</div>'
+      +(evts.length?'<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:8px">'+evts.length+'건</span>':'')
+      +'</div>';
     if(!evts.length){html+='<div style="font-size:11px;color:var(--txt3)">-</div>';}
     else{
       evts.forEach(function(e){
@@ -11485,6 +11491,59 @@ function _renderAcademicCalendarUI(el){
   });
   html+='</div></div>';
   el.innerHTML=html;
+}
+
+function _openAcalMonthModal(yr,mo){
+  var months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  var moStr=yr+'-'+String(mo).padStart(2,'0');
+  var catColors={'설명회':'#3b82f6','간담회':'#1d4ed8','특강':'#22c55e','외부시험':'#8b5cf6','홍보캠페인':'#f59e0b','상담':'#ef4444','내부 운영':'#94a3b8'};
+  var evts=((_academicCalendar&&_academicCalendar.events)||[]).filter(function(e){
+    if(!e.date)return false;
+    if(e.acalType==='repeat')return e.startMonth===String(mo).padStart(2,'0');
+    return e.date.slice(0,7)===moStr||(e.endDate&&e.endDate.slice(0,7)===moStr);
+  }).sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
+
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
+
+  var evtsHTML=evts.length?evts.map(function(e){
+    var col=catColors[e.cat]||'#94a3b8';
+    var dateStr=e.acalType==='repeat'?'🔄 반복':
+      (e.endDate&&e.endDate!==e.date?e.date.slice(5)+' ~ '+e.endDate.slice(5):e.date.slice(5));
+    var managers=[e.manager,e.manager2].filter(Boolean).join(' · ');
+    return'<div style="border:1px solid var(--border);border-left:4px solid '+col+';border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" data-evtid="'+e.id+'" onclick="this.closest(\'.mo\').remove();openAcalDetail(this.dataset.evtid)">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      +'<span style="font-size:10px;font-weight:700;background:'+col+'22;color:'+col+';padding:1px 6px;border-radius:6px">'+( e.cat||'-')+'</span>'
+      +(e.completed?'<span style="font-size:10px;color:#16a34a;font-weight:700">✅ 완료</span>':'')
+      +'</div>'
+      +'<div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:4px">'+e.title+'</div>'
+      +'<div style="font-size:11px;color:var(--txt3)">'+dateStr+(managers?' · '+managers:'')+(e.note?' · '+e.note:'')+'</div>'
+      // 연결 플랜
+      +(function(){
+        var linkedPlans=(_plans||[]).filter(function(p){return p.acalId===e.id;});
+        if(!linkedPlans.length)return '';
+        return'<div style="margin-top:6px">'+linkedPlans.map(function(p){
+          var done=(p.tasks||[]).filter(function(t){return t.done;}).length;
+          var total=(p.tasks||[]).length;
+          var pct=total>0?Math.round(done/total*100):0;
+          return'<div style="font-size:11px;color:var(--blue)">📋 '+p.name+' ('+pct+'%)</div>';
+        }).join('')+'</div>';
+      })()
+      +'</div>';
+  }).join('')
+  :'<div style="text-align:center;padding:20px;color:var(--txt3)">이번 달 등록된 일정이 없어요</div>';
+
+  overlay.innerHTML='<div class="ms" style="max-width:440px;max-height:90vh;overflow-y:auto">'
+    +'<div class="mh"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div class="mt" style="margin:0">'+yr+'년 '+months[mo-1]+'</div>'
+    +'<button class="btn btn-navy btn-sm" onclick="this.closest(\'.mo\').remove();openAcalAddModal()">+ 일정 추가</button>'
+    +'</div>'
+    +evtsHTML
+    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
 }
 
 function openAcalGuide(){
