@@ -426,9 +426,9 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 </div>
 <div class="view" id="view-goals">
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;flex-shrink:0">
-    <button class="rev-tab active" id="gtab-annual" onclick="switchGoalsTab('annual')" style="font-size:13px;font-weight:700">📊 연간 목표</button>
-    <button class="rev-tab" id="gtab-monthly" onclick="switchGoalsTab('monthly')" style="font-size:13px;font-weight:700">📅 월간 목표</button>
-    <button class="rev-tab" id="gtab-memo" onclick="switchGoalsTab('memo')" style="font-size:13px;font-weight:700">📝 월별 메모</button>
+    <button class="rev-tab active" id="gtab-annual" onclick="switchGoalsTab('annual')" style="font-size:13px;font-weight:700">연간 목표</button>
+    <button class="rev-tab" id="gtab-monthly" onclick="switchGoalsTab('monthly')" style="font-size:13px;font-weight:700">월간 목표</button>
+    <button class="rev-tab" id="gtab-memo" onclick="switchGoalsTab('memo')" style="font-size:13px;font-weight:700">월별 메모</button>
     <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 12px">
       <select class="fi" style="width:82px;font-size:12px;padding:4px 6px" id="goals-year" onchange="renderGoalsView()"></select>
       <select class="fi" id="goals-month" style="width:66px;font-size:12px;padding:4px 6px;display:none" onchange="renderGoalsView()"></select>
@@ -8862,10 +8862,10 @@ function renderRevSummary(yr){
   var cumRevArr2=[];var cumNetArr=[];
   monthData.forEach(function(d,i){if(!isFuture(i)&&hasD(i)){cumRev+=d.totalRev;cumNet+=d.net;}cumRevArr2.push(cumRev);cumNetArr.push(cumNet);});
   var revRowsHTML='<tr><td>수강료 수입</td>'+monthData.map(function(d,i){return cellR(i,d.totalRev?d.totalRev.toLocaleString()+'원':'₩0','color:var(--mint);font-weight:600');}).join('')+'</tr>'
-    +'<tr style="background:#f0fdf4"><td style="font-weight:700;color:#065f46">📈 수강료 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td></td>';return'<td style="text-align:right;color:#065f46;font-weight:700;font-size:11px">'+cumRevArr2[i].toLocaleString()+'원</td>';}).join('')+'</tr>'
     +'<tr><td>지출 합계</td>'+monthData.map(function(d,i){return cellR(i,d.totalExp?d.totalExp.toLocaleString()+'원':'₩0','color:var(--red)');}).join('')+'</tr>'
     +'<tr style="background:var(--surface2)"><td style="font-weight:700">순수익</td>'+monthData.map(function(d,i){return cellR(i,d.net.toLocaleString()+'원',d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700');}).join('')+'</tr>'
-    +'<tr style="background:#eff6ff"><td style="font-weight:700;color:#1e3a8a">💰 순익 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td></td>';var cv=cumNetArr[i];return'<td style="text-align:right;font-weight:700;font-size:11px;color:'+(cv>=0?'#1e3a8a':'var(--red)')+'">'+cv.toLocaleString()+'원</td>';}).join('')+'</tr>';
+    +'<tr style="background:#e8f4fd;border-top:2px solid var(--navy)"><td style="font-weight:700;color:#1e3a8a;border-top:2px solid var(--navy)">수강료 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td style="border-top:2px solid var(--navy)"></td>';return'<td style="border-top:2px solid var(--navy);text-align:right;color:#1e3a8a;font-weight:700;font-size:11px">'+cumRevArr2[i].toLocaleString()+'원</td>';}).join('')+'</tr>'
+    +'<tr style="background:#e8f4fd"><td style="font-weight:700;color:#1e3a8a">순익 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td></td>';var cv=cumNetArr[i];return'<td style="text-align:right;font-weight:700;font-size:11px;color:'+(cv>=0?'#1e3a8a':'var(--red)')+'">'+cv.toLocaleString()+'원</td>';}).join('')+'</tr>';
   el.innerHTML='<div class="expense-section"><h4>💰 매출 현황 ('+yr+'년)</h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px"><thead><tr><th>항목</th>'+mTHR+'</tr></thead><tbody>'+revRowsHTML+'</tbody></table></div></div><div class="expense-section"><h4>👥 원생 현황</h4><div style="text-align:center;padding:10px;color:var(--txt3)">재원 '+activeStudents2.length+'명 · 신규 '+(students||[]).filter(function(s){return s.status==='신규';}).length+'명 · 퇴원 '+(students||[]).filter(function(s){return s.status==='퇴원';}).length+'명 · 휴원 '+(students||[]).filter(function(s){return s.status==='휴원';}).length+'명</div></div>';
   // 경영 자비스 분석
   var curMo2=new Date().getMonth()+1;var curYr2=new Date().getFullYear();
@@ -12854,14 +12854,11 @@ function renderRevGoals(yr){
     +'<td style="text-align:center">'+totalBadge+'</td>'
     +'</tr>';
 
-  var elapsed=yr===now.getFullYear()?'('+now.getMonth()+'개월 경과 · 연간 '+elapsedPct+'% 진행)':'';
-  var avgNote=avgPerStudent>0?'<span style="margin-left:8px;font-size:11px;color:var(--txt3)">1인 평균 '+avgPerStudent.toLocaleString()+'원 기준</span>':'';
-
-  el.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-    +'<div>'
-    +'<div style="font-size:18px;font-weight:800;color:var(--navy)">📊 '+yr+'년 연간 목표 현황'+avgNote+'</div>'
-    +'<div style="font-size:12px;color:var(--txt3);margin-top:2px">'+elapsed+'</div>'
-    +'</div>'
+  el.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    +'<div style="font-size:18px;font-weight:800;color:var(--navy)">'+yr+'년 연간 목표 현황</div>'
+    +'<select class="fi" style="width:82px;font-size:12px;padding:4px 6px;flex-shrink:0" onchange="var v=parseInt(this.value);var sel=document.getElementById(\'goals-year\');if(sel)sel.value=v;renderRevGoals(v);">'
+    +[yr-1,yr,yr+1].map(function(y){return'<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';}).join('')
+    +'</select>'
     +'</div>'
     +'<table class="rev-tbl" style="font-size:13px;width:100%">'
     +'<thead><tr style="background:var(--navy);color:#fff">'
