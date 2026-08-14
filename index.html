@@ -5560,26 +5560,41 @@ function renderMakeupCalendar(){
         var isToday=dateStr===todayStr;var holiday=isHoliday(yr,mo,cellDate);var isRed=isSun2||holiday!=null;
         dateLbl='<div style="font-size:10px;font-weight:700;color:'+(isRed?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+';margin-bottom:3px'+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" title="'+(holiday||'')+'">'+cellDate+(holiday?'🔴':'')+'</div>';
         var _chipSeen={};
+        function fmtDate(d){var mm=parseInt(d.slice(5,7)),dd=parseInt(d.slice(8));return mm!==(mo+1)?mm+'.'+dd:String(dd);}
+        // 이 칸에 표시할 모든 보강 기록 수집
+        var cellChips=[];
         monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){
           if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
-          var isDone=m.makeupStatus==='done';
-          var isScheduled=m.makeupStatus==='scheduled'&&m.makeupDate;
-          var cls3=isDone?'done':isScheduled?'has-plan':'';
-          var hint='';
-          function fmtDate(d){var mm=parseInt(d.slice(5,7)),dd=parseInt(d.slice(8));return parseInt(d.slice(5,7))!==(mo+1)?mm+'.'+dd:String(dd);}
-          if(isDone&&m.makeupDate){hint='<span class="mk-hint mk-hint-date mk-hint-done">✓'+fmtDate(m.makeupDate)+'</span>';}
-          else if(isScheduled){hint='<span class="mk-hint mk-hint-date mk-hint-plan">→'+fmtDate(m.makeupDate)+'</span>';}
-          chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+hint+'</div>';
+          cellChips.push({m:m,isAbsentCell:true});
         });
         makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){
           if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
-          var cls3=m.makeupStatus==='done'?'done':'scheduled';
-          var timeHint=(m.makeupStatus!=='done'&&m.makeupTime)?'<span class="mk-hint mk-hint-time">'+fmt12h(m.makeupTime)+'</span>':'';
-          var absentMm=m.absentDate?parseInt(m.absentDate.slice(5,7)):0;
-          var absentDd=m.absentDate?parseInt(m.absentDate.slice(8)):0;
-          var absentLabel=absentMm!==(mo+1)?absentMm+'.'+absentDd:String(absentDd);
-          var absentHint=m.absentDate?'<span class="mk-hint mk-hint-date mk-hint-scheduled">↑'+absentLabel+'</span>':'';
-          chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+timeHint+absentHint+'</div>';
+          cellChips.push({m:m,isAbsentCell:false});
+        });
+        // 정렬: 미정(0) → 예정(1) → 완료(2)
+        cellChips.sort(function(a,b){
+          var order={pending:0,scheduled:1,done:2};
+          return (order[a.m.makeupStatus]||0)-(order[b.m.makeupStatus]||0);
+        });
+        cellChips.forEach(function(item){
+          var m=item.m,isAbsentCell=item.isAbsentCell;
+          if(isAbsentCell){
+            var isDone=m.makeupStatus==='done';
+            var isScheduled=m.makeupStatus==='scheduled'&&m.makeupDate;
+            var cls3=isDone?'done':isScheduled?'has-plan':'';
+            var hint='';
+            if(isDone&&m.makeupDate){hint='<span class="mk-hint mk-hint-date mk-hint-done">✓'+fmtDate(m.makeupDate)+'</span>';}
+            else if(isScheduled){hint='<span class="mk-hint mk-hint-date mk-hint-plan">→'+fmtDate(m.makeupDate)+'</span>';}
+            chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+hint+'</div>';
+          } else {
+            var cls3=m.makeupStatus==='done'?'done':'scheduled';
+            var timeHint=(m.makeupStatus!=='done'&&m.makeupTime)?'<span class="mk-hint mk-hint-time">'+fmt12h(m.makeupTime)+'</span>':'';
+            var absentMm=m.absentDate?parseInt(m.absentDate.slice(5,7)):0;
+            var absentDd=m.absentDate?parseInt(m.absentDate.slice(8)):0;
+            var absentLabel=absentMm!==(mo+1)?absentMm+'.'+absentDd:String(absentDd);
+            var absentHint=m.absentDate?'<span class="mk-hint mk-hint-date mk-hint-scheduled">↑'+absentLabel+'</span>':'';
+            chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+timeHint+absentHint+'</div>';
+          }
         });
       }
       var _cellAttr=cellDate?'data-date="'+dateStr+'" style="cursor:pointer"':'';
