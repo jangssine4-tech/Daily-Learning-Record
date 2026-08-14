@@ -12818,14 +12818,38 @@ function renderRevGoals(yr){
     var color=getColor(pct,elapsedPct,hasTarget);
     var tgtStr=isRev?(hasTarget?target.toLocaleString()+'원':'-'):(hasTarget?target+'명':'-');
     var curStr=isRev?current.toLocaleString()+'원':current+'명';
-    var bar=hasTarget&&!isAuto?'<div style="background:var(--border);border-radius:4px;height:5px;width:120px;display:inline-block;vertical-align:middle;margin-right:6px"><div style="background:'+color+';height:5px;border-radius:4px;width:'+Math.min(pct,100)+'%;transition:width .3s"></div></div>':'';
-    var pctStr=hasTarget&&!isAuto?'<span style="font-size:12px;font-weight:700;color:'+color+'">'+pct+'%</span>':'';
+    var bar=hasTarget&&!isAuto?'<div style="background:var(--border);border-radius:4px;height:5px;width:100px;display:inline-block;vertical-align:middle;margin-right:4px"><div style="background:'+color+';height:5px;border-radius:4px;width:'+Math.min(pct,100)+'%;transition:width .3s"></div></div>':'';
+    var pctStr=hasTarget&&!isAuto?'<span style="font-size:11px;font-weight:700;color:'+color+'">'+pct+'%</span>':'';
     var badge=getBadge(pct,elapsedPct,hasTarget,isAuto);
-    var rowBg=isSub?'background:#f8fafc':'';
-    var labelStyle=isSub?'padding-left:20px;color:var(--txt2);font-size:13px':'font-weight:600;font-size:14px';
-    return'<tr style="'+rowBg+'">'      +'<td style="'+labelStyle+'">'+label+(isAuto?' <span style="font-size:10px;color:var(--txt3);font-weight:400">(합산)</span>':'')+'</td>'      +'<td style="text-align:center;font-size:13px;color:var(--txt2)">'+tgtStr+'</td>'      +'<td style="text-align:center;font-weight:700;font-size:14px;color:'+color+'">'+curStr+'</td>'      +'<td style="text-align:center">'+bar+pctStr+'</td>'      +'<td style="text-align:center">'+badge+'</td>'      +'</tr>';
+    // 신규 등록생: 소계 헤더 스타일
+    if(isAuto){
+      return'<tr style="background:var(--surface2);border-top:2px solid var(--border)">'
+        +'<td style="font-size:13px;font-weight:700;color:var(--navy);padding-left:12px">'+label+'</td>'
+        +'<td style="text-align:center;font-size:12px;color:var(--txt3)">'+tgtStr+'</td>'
+        +'<td style="text-align:center;font-size:13px;font-weight:700;color:var(--navy)">'+curStr+'</td>'
+        +'<td style="text-align:center"></td>'
+        +'<td style="text-align:center"></td>'
+        +'</tr>';
+    }
+    // 하위 행(유치부~고등부)
+    if(isSub){
+      return'<tr style="background:#fafbfc">'
+        +'<td style="padding-left:22px;font-size:12px;color:var(--txt3)">▸ '+label+'</td>'
+        +'<td style="text-align:center;font-size:12px;color:var(--txt3)">'+tgtStr+'</td>'
+        +'<td style="text-align:center;font-size:12px;font-weight:600;color:'+color+'">'+curStr+'</td>'
+        +'<td style="text-align:center">'+bar+pctStr+'</td>'
+        +'<td style="text-align:center">'+badge+'</td>'
+        +'</tr>';
+    }
+    // 일반 행(연간 매출, 재원생 수)
+    return'<tr>'
+      +'<td style="font-size:13px;font-weight:600;padding-left:12px">'+label+'</td>'
+      +'<td style="text-align:center;font-size:13px;color:var(--txt2)">'+tgtStr+'</td>'
+      +'<td style="text-align:center;font-weight:700;font-size:14px;color:'+color+'">'+curStr+'</td>'
+      +'<td style="text-align:center">'+bar+pctStr+'</td>'
+      +'<td style="text-align:center">'+badge+'</td>'
+      +'</tr>';
   }
-
   var rows='';
   rows+=makeRow('연간 매출',gt.targetRev||0,yearRev,true,false,false);
   rows+=makeRow('재원생 수',gt.targetTotal||0,active.length,false,false,false);
