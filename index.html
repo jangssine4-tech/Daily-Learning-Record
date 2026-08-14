@@ -2229,7 +2229,15 @@ function goto(view){
   if(view!=='schedule') ensureFullPopulate();
   if(view==='checklist'){renderChecklist();}
   else if(view==='meeting'){renderMeetingPage();}
-  else if(view==='schedule'){loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});renderScheduleNotes();}
+  else if(view==='schedule'){
+    // 보강 저장 직후 이동이 아닌 일반 진입이면 오늘로 리셋
+    if(!window._scheduleFromMakeup){
+      _scheduleDate=null;
+      var dp=$('schedule-date-pick');if(dp)dp.value=todayISO();
+    }
+    window._scheduleFromMakeup=false;
+    loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});renderScheduleNotes();
+  }
   else if(view==='write'){if(typeof renderWriteReport==='function')renderWriteReport();}
   else if(view==='history'){loadReports().then(renderHistory);}
   else if(view==='students'){
@@ -5779,10 +5787,10 @@ async function saveMakeupUnified(){
   closeM('makeup');
   renderMakeupCalendar();
   if(mode==='new'){
-    // 시간표 날짜가 결석일로 설정된 상태에서 먼저 렌더링 후 이동
+    window._scheduleFromMakeup=true; // 보강 저장 후 이동임을 표시
     goto('schedule');
     switchSchTab('today');
-    setTimeout(function(){renderSchedule();},100); // goto 후 DOM 전환 완료 후 렌더
+    setTimeout(function(){renderSchedule();},100);
   }else{
     renderSchedule();
   }
