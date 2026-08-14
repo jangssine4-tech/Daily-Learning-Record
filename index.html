@@ -5539,7 +5539,13 @@ function nextMakeupMonth(){makeupViewMonth++;if(makeupViewMonth>11){makeupViewMo
 function renderMakeupCalendar(){
   var yr=makeupViewYear,mo=makeupViewMonth;$('makeup-month-nav').textContent=yr+'년 '+(mo+1)+'월';$('makeup-month-label').textContent=yr+'년 '+(mo+1)+'월';
   var firstDay=new Date(yr,mo,1).getDay();var lastDate=new Date(yr,mo+1,0).getDate();var todayStr=todayISO();
-  var monthMakeups=makeups.filter(function(m){if(!m.absentDate)return false;var d=new Date(m.absentDate);return d.getFullYear()===yr&&d.getMonth()===mo;});
+  var monthMakeups=makeups.filter(function(m){
+    if(!m.absentDate)return false;
+    var d=new Date(m.absentDate);
+    var absentInMonth=d.getFullYear()===yr&&d.getMonth()===mo;
+    var makeupInMonth=m.makeupDate&&(function(){var d2=new Date(m.makeupDate);return d2.getFullYear()===yr&&d2.getMonth()===mo;}());
+    return absentInMonth||makeupInMonth;
+  });
   var dayLabels=['주','월','화','수','목','금','토','일'];
   var html='<div style="display:grid;grid-template-columns:44px repeat(7,1fr);border:1px solid var(--border2);border-radius:var(--r-lg);overflow:hidden;min-width:560px">';
   dayLabels.forEach(function(l){var isSun=l==='일',isSat=l==='토';html+='<div style="background:var(--surface2);font-size:11px;font-weight:700;color:'+(isSun?'var(--red)':isSat?'var(--blue)':'var(--txt2)')+';padding:7px 4px;text-align:center;border-bottom:1px solid var(--border);border-right:1px solid var(--border)">'+l+'</div>';});
@@ -5555,20 +5561,24 @@ function renderMakeupCalendar(){
         dateLbl='<div style="font-size:10px;font-weight:700;color:'+(isRed?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+';margin-bottom:3px'+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" title="'+(holiday||'')+'">'+cellDate+(holiday?'🔴':'')+'</div>';
         var _chipSeen={};
         monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){
-          if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;
+          if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
           var isDone=m.makeupStatus==='done';
           var isScheduled=m.makeupStatus==='scheduled'&&m.makeupDate;
           var cls3=isDone?'done':isScheduled?'has-plan':'';
           var hint='';
-          if(isDone&&m.makeupDate){hint='<span class="mk-hint mk-hint-date mk-hint-done">✓'+parseInt(m.makeupDate.slice(8))+'</span>';}
-          else if(isScheduled){hint='<span class="mk-hint mk-hint-date mk-hint-plan">→'+parseInt(m.makeupDate.slice(8))+'</span>';}
+          function fmtDate(d){var mm=parseInt(d.slice(5,7)),dd=parseInt(d.slice(8));return parseInt(d.slice(5,7))!==(mo+1)?mm+'.'+dd:String(dd);}
+          if(isDone&&m.makeupDate){hint='<span class="mk-hint mk-hint-date mk-hint-done">✓'+fmtDate(m.makeupDate)+'</span>';}
+          else if(isScheduled){hint='<span class="mk-hint mk-hint-date mk-hint-plan">→'+fmtDate(m.makeupDate)+'</span>';}
           chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+hint+'</div>';
         });
         makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){
-          if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;
+          if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
           var cls3=m.makeupStatus==='done'?'done':'scheduled';
           var timeHint=(m.makeupStatus!=='done'&&m.makeupTime)?'<span class="mk-hint mk-hint-time">'+fmt12h(m.makeupTime)+'</span>':'';
-          var absentHint=m.absentDate?'<span class="mk-hint mk-hint-date mk-hint-scheduled">↑'+parseInt(m.absentDate.slice(8))+'</span>':'';
+          var absentMm=m.absentDate?parseInt(m.absentDate.slice(5,7)):0;
+          var absentDd=m.absentDate?parseInt(m.absentDate.slice(8)):0;
+          var absentLabel=absentMm!==(mo+1)?absentMm+'.'+absentDd:String(absentDd);
+          var absentHint=m.absentDate?'<span class="mk-hint mk-hint-date mk-hint-scheduled">↑'+absentLabel+'</span>':'';
           chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+timeHint+absentHint+'</div>';
         });
       }
@@ -5584,7 +5594,7 @@ function renderMakeupCalendar(){
     +'<span class="makeup-chip" style="pointer-events:none">이름</span><span style="color:var(--txt3)">결석·미정</span>'
     +'<span class="makeup-chip has-plan" style="pointer-events:none">이름<span class="mk-hint mk-hint-date mk-hint-plan" style="pointer-events:none">→15</span></span><span style="color:var(--txt3)">결석·보강예정</span>'
     +'<span class="makeup-chip done" style="pointer-events:none">이름<span class="mk-hint mk-hint-date mk-hint-done" style="pointer-events:none">✓15</span></span><span style="color:var(--txt3)">결석·보강완료</span>'
-    +'<span class="makeup-chip scheduled" style="pointer-events:none;border-style:dashed">이름<span class="mk-hint mk-hint-time" style="pointer-events:none">2:00</span><span class="mk-hint mk-hint-date mk-hint-scheduled" style="pointer-events:none">↑12</span></span><span style="color:var(--txt3)">보강일칸(점선)</span>'
+    +'<span class="makeup-chip scheduled" style="pointer-events:none;border-style:dashed">이름<span class="mk-hint mk-hint-time" style="pointer-events:none">2:00</span><span class="mk-hint mk-hint-date mk-hint-scheduled" style="pointer-events:none">↑7.12</span></span><span style="color:var(--txt3)">보강일칸(점선)</span>'
     +'<span style="color:var(--txt3);font-size:10px;margin-left:4px">📌 날짜 칸을 탭하면 보강 등록</span>'
     +'</div>';
   $('makeup-calendar').innerHTML=legend+html;
