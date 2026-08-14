@@ -170,7 +170,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .makeup-chip.scheduled{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
 .makeup-chip.done{background:#dcfce7;border-color:#86efac;color:#166534;text-decoration:line-through}
 .makeup-chip.has-plan{background:#fefce8;border-color:#fbbf24;color:#92400e}
-.makeup-chip .mk-hint{font-size:9px;opacity:.8;margin-left:3px;flex-shrink:0}
+.makeup-chip .mk-hint{font-size:9px;opacity:.8;margin-left:3px;flex-shrink:0;pointer-events:none}
 .day-pill{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border2);font-size:12px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--surface)}
 .day-pill.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -5528,9 +5528,9 @@ function renderMakeupCalendar(){
         makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){
           if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;
           var cls3=m.makeupStatus==='done'?'done':'scheduled';
+          var timeHint=m.makeupTime?'<span class="mk-hint">'+fmt12h(m.makeupTime)+'</span>':'';
           var absentHint=m.absentDate?'<span class="mk-hint">↑'+parseInt(m.absentDate.slice(8))+'일</span>':'';
-          var timeHint=m.makeupTime?'<span class="mk-hint"> '+fmt12h(m.makeupTime)+'</span>':'';
-          chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+absentHint+timeHint+'</div>';
+          chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+timeHint+absentHint+'</div>';
         });
       }
       var _cellAttr=cellDate?'data-date="'+dateStr+'" style="cursor:pointer"':'';
@@ -5539,10 +5539,20 @@ function renderMakeupCalendar(){
     }
     weekNum++;if(date>lastDate)break;
   }
-  html+='</div>';$('makeup-calendar').innerHTML=html;
+  html+='</div>';
+  var legend='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 2px 14px;font-size:11px;color:var(--txt2)">'
+    +'<span style="font-weight:700;color:var(--navy);margin-right:2px">배지 읽는 법</span>'
+    +'<span class="makeup-chip" style="pointer-events:none">이름</span><span style="color:var(--txt3)">결석·미정</span>'
+    +'<span class="makeup-chip has-plan" style="pointer-events:none">이름<span class="mk-hint" style="pointer-events:none">→15일</span></span><span style="color:var(--txt3)">결석·보강예정</span>'
+    +'<span class="makeup-chip done" style="pointer-events:none">이름<span class="mk-hint" style="pointer-events:none">✓15일</span></span><span style="color:var(--txt3)">결석·보강완료</span>'
+    +'<span class="makeup-chip scheduled" style="pointer-events:none;border-style:dashed">이름<span class="mk-hint" style="pointer-events:none">2:00</span><span class="mk-hint" style="pointer-events:none">↑12일</span></span><span style="color:var(--txt3)">보강일칸(점선)</span>'
+    +'<span style="color:var(--txt3);font-size:10px;margin-left:4px">📌 날짜 칸을 탭하면 보강 등록</span>'
+    +'</div>';
+  $('makeup-calendar').innerHTML=legend+html;
   $('makeup-calendar').onclick=function(e){
     var chip=e.target.closest('.makeup-chip');
-    if(chip)return; // 칩 클릭은 칩 자체 onclick이 처리
+    if(chip&&chip.style.pointerEvents==='none')return; // 범례 칩 무시
+    if(chip)return; // 실제 칩 클릭은 칩 onclick이 처리
     var cell=e.target.closest('.makeup-cal-cell');
     if(cell&&cell.dataset.date)openMakeupUnifiedNew(cell.dataset.date);
   };
