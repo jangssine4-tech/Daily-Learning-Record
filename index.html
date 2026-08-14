@@ -5562,7 +5562,6 @@ function renderMakeupCalendar(){
 // 보강 통합 모달
 // ══════════════════════════════════════════
 function _openMakeupModal(){
-  // 기존 인스턴스 제거
   var prev=document.getElementById('modal-makeup');if(prev)prev.remove();
   var timeOpts='';['10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30','21:00','21:30','22:00','22:30'].forEach(function(t){timeOpts+='<option value="'+t+'">'+t+'</option>';});
   var overlay=document.createElement('div');
@@ -5571,7 +5570,7 @@ function _openMakeupModal(){
   overlay.innerHTML='<div class="ms"><div class="mh"></div>'
     +'<div class="mt" id="mk-title">보강 관리</div>'
     +'<input type="hidden" id="mk-id"><input type="hidden" id="mk-mode" value="edit"><input type="hidden" id="mk-absent-date">'
-    +'<div id="mk-student-row" style="display:none" class="field"><div class="fl">결석 학생</div><select class="fi" id="mk-student-select"><option value="">학생 선택</option></select></div>'
+    +'<div id="mk-student-row" style="display:none" class="field"><div class="fl">결석 학생</div><select class="fi" id="mk-student-select" onchange="_mkUpdateNotifyMsg()"><option value="">학생 선택</option></select></div>'
     +'<div id="mk-info" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px"><div style="font-size:15px;font-weight:700;color:var(--navy)" id="mk-info-name"></div><div style="font-size:12px;color:var(--txt3);margin-top:2px" id="mk-info-date"></div></div>'
     +'<input type="hidden" id="mk-status" value="pending">'
     +'<div class="field"><div class="fl">결석 사유</div><select class="fi" id="mk-note"><option value="">결석 사유 선택</option><option value="개인 사정">개인 사정</option><option value="병결">병결</option><option value="학교 행사">학교 행사</option><option value="여행">여행</option><option value="기타">기타</option></select></div>'
@@ -5588,11 +5587,61 @@ function _openMakeupModal(){
     +'<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="mk-result-status" id="mkrs-done" value="done" onchange="onMkStatusChange()"> 완료 ✅</label>'
     +'</div></div>'
     +'<div id="mk-result-memo-wrap" style="display:none" class="field"><div class="fl">보강 결과 메모</div><textarea class="fi" id="mk-result-memo" rows="2" placeholder="보강 수업 내용, 특이사항 등"></textarea></div>'
-    +'<div style="display:flex;align-items:center;gap:8px;margin:10px 0 6px"><input type="checkbox" id="mk-notify-parent" style="width:16px;height:16px;accent-color:var(--mint)"><label for="mk-notify-parent" style="font-size:12px;color:var(--txt2)">보강 등록 후 학부모에게 안내하기</label></div>'
-    +'<div style="height:8px"></div>'
+    // ── 결석 알림 발송 통합 섹션 ──
+    +'<div style="border-top:1px solid var(--border);margin:12px 0 10px"></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+    +'<input type="checkbox" id="mk-notify-parent" style="width:16px;height:16px;accent-color:var(--mint)" onchange="_mkToggleNotify(this.checked)">'
+    +'<label for="mk-notify-parent" style="font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">📱 결석 알림 발송</label>'
+    +'</div>'
+    +'<div id="mk-notify-area" style="display:none;background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:10px">'
+    +'<div id="mk-notify-student-info" style="font-size:12px;color:var(--txt3);margin-bottom:8px"></div>'
+    +'<div class="fl" style="margin-bottom:4px">발송 메시지</div>'
+    +'<textarea class="fi" id="mk-notify-msg" rows="6" style="font-size:12px;line-height:1.6;margin-bottom:8px"></textarea>'
+    +'<div style="display:flex;flex-direction:column;gap:6px">'
+    +'<button class="btn btn-kakao btn-block" onclick="_mkCopyMsg()">📋 메시지 복사</button>'
+    +'<button class="btn btn-navy btn-block" onclick="_mkCopyMsg();window.open(\'kakaotalk://\',\'_self\')">💬 복사 후 카카오톡 열기</button>'
+    +'</div>'
+    +'<div id="mk-notify-no-url" style="display:none;font-size:11px;color:var(--gold);margin-top:8px;text-align:center">⚠️ 설정 > 카카오 채널 설정에서 보강 예약 링크를 먼저 등록하세요.</div>'
+    +'</div>'
+    +'<div style="height:6px"></div>'
     +'<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-red btn-sm" id="mk-del-btn" onclick="deleteMakeupEntry()" style="flex:0 0 auto">삭제</button><button class="btn btn-outline btn-sm" onclick="closeM(\'makeup\')" style="flex:1">취소</button><button class="btn btn-green btn-sm" onclick="saveMakeupUnified()" style="flex:2">저장</button></div>'
     +'</div>';
   document.body.appendChild(overlay);
+}
+function _mkToggleNotify(checked){
+  var area=$('mk-notify-area');if(!area)return;
+  area.style.display=checked?'block':'none';
+  if(checked)_mkUpdateNotifyMsg();
+}
+function _mkUpdateNotifyMsg(){
+  var cb=$('mk-notify-parent');if(!cb||!cb.checked)return;
+  var kc=window._kakaoConfig||{};
+  var bookingUrl=kc.bookingUrl||'';
+  var noUrlEl=$('mk-notify-no-url');if(noUrlEl)noUrlEl.style.display=bookingUrl?'none':'block';
+  // 학생 정보 가져오기 — 신규등록(학생선택) vs 기존건(mk-info-name)
+  var sName='',sPhone='';
+  var sel=$('mk-student-select');
+  if(sel&&sel.style.display!=='none'&&sel.value){
+    var s=students.find(function(x){return x.id===sel.value;});
+    if(s){sName=s.name;sPhone=s.phoneMom||'';}
+  } else {
+    sName=($('mk-info-name')||{}).textContent||'';
+    // 기존 건: makeups에서 studentId로 조회
+    var mkId=($('mk-id')||{}).value||'';
+    if(mkId){var mk=makeups.find(function(x){return x.id===mkId;});if(mk){var ss=students.find(function(x){return x.id===mk.studentId;});if(ss){sName=ss.name;sPhone=ss.phoneMom||'';}}}
+  }
+  var infoEl=$('mk-notify-student-info');
+  if(infoEl)infoEl.innerHTML='<span style="font-weight:700;color:var(--navy)">'+sName+'</span>'+(sPhone?' &nbsp;·&nbsp; 학부모 연락처: '+sPhone:'<span style="color:#dc2626"> &nbsp;(학생을 먼저 선택하세요)</span>');
+  if(!sName){var ta=$('mk-notify-msg');if(ta)ta.value='';return;}
+  var today=new Date();
+  var dateStr=today.getFullYear()+'년 '+String(today.getMonth()+1).padStart(2,'0')+'월 '+String(today.getDate()).padStart(2,'0')+'일';
+  var template=kc.absentMsg||'안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';
+  var msg=template.replace(/\{이름\}/g,sName).replace(/\{날짜\}/g,dateStr).replace(/\{링크\}/g,bookingUrl||'(링크 미설정)');
+  var ta=$('mk-notify-msg');if(ta)ta.value=msg;
+}
+function _mkCopyMsg(){
+  var ta=$('mk-notify-msg');
+  if(ta){navigator.clipboard.writeText(ta.value);toast('📋 메시지가 복사되었습니다. 카카오톡에 붙여넣기 하세요!');}
 }
 function onMkStatusChange(){
   var val=document.querySelector('input[name="mk-result-status"]:checked')?.value||'pending';
