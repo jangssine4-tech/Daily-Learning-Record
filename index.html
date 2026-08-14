@@ -429,10 +429,6 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <button class="rev-tab active" id="gtab-annual" onclick="switchGoalsTab('annual')" style="font-size:16px;font-weight:700">연간 목표</button>
     <button class="rev-tab" id="gtab-monthly" onclick="switchGoalsTab('monthly')" style="font-size:16px;font-weight:700">월간 목표</button>
     <button class="rev-tab" id="gtab-memo" onclick="switchGoalsTab('memo')" style="font-size:16px;font-weight:700">월별 메모</button>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 12px">
-      <select class="fi" style="width:82px;font-size:12px;padding:4px 6px" id="goals-year" onchange="renderGoalsView()"></select>
-      <select class="fi" id="goals-month" style="width:66px;font-size:12px;padding:4px 6px;display:none" onchange="renderGoalsView()"></select>
-    </div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:16px">
     <div id="goals-annual-area"></div>
@@ -12788,10 +12784,9 @@ function switchGoalsTab(tab){
     var btn=$('gtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var area=$('goals-'+t+'-area');if(area)area.style.display=t===tab?'':'none';
   });
-  var moSel=$('goals-month');if(moSel)moSel.style.display=tab==='monthly'?'':'none';
   renderGoalsView();
 }
-function renderGoalsView(){var yr=parseInt($('goals-year')?.value)||new Date().getFullYear();var mo=parseInt($('goals-month')?.value)||new Date().getMonth()+1;if(currentGoalsTab==='annual')renderRevGoals(yr);else if(currentGoalsTab==='monthly')renderMonthlyGoals(yr,mo);else if(currentGoalsTab==='memo')renderGoalsMemo(yr,mo);}
+function renderGoalsView(){var yr=parseInt(($('goals-year')||{}).value)||new Date().getFullYear();var mo=parseInt(($('goals-month')||{}).value)||new Date().getMonth()+1;if(currentGoalsTab==='annual')renderRevGoals(yr);else if(currentGoalsTab==='monthly')renderMonthlyGoals(yr,mo);else if(currentGoalsTab==='memo')renderGoalsMemo(yr,mo);}
 
 function renderRevGoals(yr){
   var el=$('goals-annual-area');if(!el)return;
@@ -12855,10 +12850,10 @@ function renderRevGoals(yr){
     +'</tr>';
 
   el.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">'+yr+'년 연간 목표 현황</div>'
-    +'<select class="fi" style="width:82px;font-size:12px;padding:4px 6px;flex-shrink:0" onchange="var v=parseInt(this.value);var sel=document.getElementById(\'goals-year\');if(sel)sel.value=v;renderRevGoals(v);">'
+    +'<select class="fi" style="width:82px;font-size:16px;font-weight:800;padding:2px 6px;color:var(--navy);border:none;background:transparent;cursor:pointer" id="goals-year" onchange="var v=parseInt(this.value);renderRevGoals(v);">'
     +[yr-1,yr,yr+1].map(function(y){return'<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';}).join('')
     +'</select>'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">연간 목표 현황</div>'
     +'</div>'
     +'<table class="rev-tbl" style="font-size:13px;width:100%">'
     +'<thead><tr style="background:var(--navy);color:#fff">'
@@ -12966,8 +12961,14 @@ function renderMonthlyGoals(yr,mo){
     +'</tr>';
 
   el.innerHTML=''
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">'+yr+'년 '+moStr+' 월간 목표</div>'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px">'
+    +'<select class="fi" style="width:82px;font-size:16px;font-weight:800;padding:2px 6px;color:var(--navy);border:none;background:transparent;cursor:pointer" id="goals-year" onchange="var v=parseInt(this.value);var m=parseInt(document.getElementById(\'goals-month\').value);renderMonthlyGoals(v,m);">'
+    +[yr-1,yr,yr+1].map(function(y){return'<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';}).join('')
+    +'</select>'
+    +'<select class="fi" style="width:66px;font-size:16px;font-weight:800;padding:2px 6px;color:var(--navy);border:none;background:transparent;cursor:pointer" id="goals-month" onchange="var m=parseInt(this.value);var v=parseInt(document.getElementById(\'goals-year\').value);renderMonthlyGoals(v,m);">'
+    +Array.from({length:12},function(_,i){return'<option value="'+(i+1)+'"'+(i+1===mo?' selected':'')+'>'+(i+1)+'월</option>';}).join('')
+    +'</select>'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">월간 목표</div>'
     +'</div>'
     +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">'
     +metricCard('이달 매출',moRev,monthTarget,true,'#2563eb')
@@ -13020,8 +13021,14 @@ function renderGoalsMemo(yr,mo){
   var memoKey='memo_'+String(mo).padStart(2,'0');
   var memo=gt[memoKey]||{issue:'',note:'',next:''};
   el.innerHTML=''
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">'+yr+'년 '+moStr+' 메모</div>'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px">'
+    +'<select class="fi" style="width:82px;font-size:16px;font-weight:800;padding:2px 6px;color:var(--navy);border:none;background:transparent;cursor:pointer" id="goals-year" onchange="var v=parseInt(this.value);var m=parseInt(document.getElementById(\'goals-month\').value);renderGoalsMemo(v,m);">'
+    +[yr-1,yr,yr+1].map(function(y){return'<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';}).join('')
+    +'</select>'
+    +'<select class="fi" style="width:66px;font-size:16px;font-weight:800;padding:2px 6px;color:var(--navy);border:none;background:transparent;cursor:pointer" id="goals-month" onchange="var m=parseInt(this.value);var v=parseInt(document.getElementById(\'goals-year\').value);renderGoalsMemo(v,m);">'
+    +Array.from({length:12},function(_,i){return'<option value="'+(i+1)+'"'+(i+1===mo?' selected':'')+'>'+(i+1)+'월</option>';}).join('')
+    +'</select>'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">월별 메모</div>'
     +'</div>'
     +'<div style="display:flex;flex-direction:column;gap:12px">'
     +'<div><div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">📌 주요 이슈</div>'
