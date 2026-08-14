@@ -3910,15 +3910,21 @@ function renderSchedule(){
     var s=students.find(function(x){return x.id===m.studentId;});
     if(!s)return;
     var mt=m.makeupTime||'';
-    var _mkp=String(m.makeupPeriod||'');
+    var _mkp=String(m.makeupPeriod||'').trim();
     var pNum=0;
     if(_mkp==='special1'){pNum=-1;if(!mt)mt='10:00';}
     else if(_mkp==='special2'){pNum=-2;if(!mt)mt='11:00';}
     else if(_mkp==='special3'){pNum=-3;if(!mt)mt='12:00';}
-    else pNum=parseInt(_mkp)||0;
+    else if(_mkp&&_mkp!=='0')pNum=parseInt(_mkp)||0;
+    // 교시도 시간도 없으면 미설정으로 바로 처리
+    if(!pNum&&!mt){
+      var pKey='미설정';
+      if(!byPeriod[pKey])byPeriod[pKey]={pNum:0,students:[],firstTime:'99:99'};
+      byPeriod[pKey].students.push({...s,_isMakeup:true,_makeupTime:'',_makeupId:m.id,_makeupDone:m.makeupStatus==='done'});
+      return;
+    }
     if(!pNum&&mt){
       var tMin=timeToMin(mt);
-      // Try matching customPeriods first
       if(customPeriods.length>0){
         customPeriods.forEach(function(cp){
           var cpStart=timeToMin(cp.time);
@@ -3926,7 +3932,6 @@ function renderSchedule(){
           if(tMin>=cpStart&&tMin<cpEnd)pNum=cp.period;
         });
       }
-      // If no customPeriod match, find the closest existing period group by time
       if(!pNum){
         var bestDiff=9999;
         Object.keys(byPeriod).forEach(function(pk){
@@ -3938,7 +3943,6 @@ function renderSchedule(){
           }
         });
       }
-      // If still no match, find nearest customPeriod
       if(!pNum&&customPeriods.length>0){
         var bestDiff2=9999;
         customPeriods.forEach(function(cp){
@@ -5560,7 +5564,7 @@ function renderMakeupCalendar(){
         var isToday=dateStr===todayStr;var holiday=isHoliday(yr,mo,cellDate);var isRed=isSun2||holiday!=null;
         dateLbl='<div style="font-size:10px;font-weight:700;color:'+(isRed?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+';margin-bottom:3px'+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" title="'+(holiday||'')+'">'+cellDate+(holiday?'🔴':'')+'</div>';
         var _chipSeen={};
-        function fmtDate(d){var mm=parseInt(d.slice(5,7)),dd=parseInt(d.slice(8));return mm!==(mo+1)?mm+'.'+dd:String(dd);}
+        function fmtDate(d){var mm=parseInt(d.slice(5,7)),dd=parseInt(d.slice(8));return mm+'.'+dd;}
         // 이 칸에 표시할 모든 보강 기록 수집
         var cellChips=[];
         monthMakeups.filter(function(m){return m.absentDate===dateStr;}).forEach(function(m){
