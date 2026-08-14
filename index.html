@@ -237,7 +237,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 <nav id="sidebar">
   <div class="sb-logo"><span>english<em>eye</em></span></div>
   <div class="sb-sec">계획 관리</div>
-  <div class="sb-item" id="snav-goals" onclick="goto('goals')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>목표 관리</div>
+  <div class="sb-item" id="snav-goals" onclick="goto('goals')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>성장 목표 관리</div>
   <div class="sb-item" id="snav-acal" onclick="goto('acal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>연간 학사일정</div>
   <div class="sb-item" id="snav-plans" onclick="goto('plans')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>플랜 관리</div>
   <div class="sb-item" id="snav-dashboard" onclick="goto('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>이달의 계획</div>
@@ -12947,9 +12947,13 @@ function renderRevGoals(yr){
   var elapsedPct=Math.round(elapsedMo/12*100);
   var active=students.filter(function(s){return['재원','신규'].includes(s.status||'재원');});
   var gt=(_goalTargets&&_goalTargets[yr])||{};
-  var targetRev=gt.targetRev||0;
+  var targetRev=parseInt(gt.targetRev)||0;
+  var avgFee=parseInt(gt.avgFee)||0;         // 1인 월평균 교육비
+  var churnRate=parseFloat(gt.churnRate)||0; // 예상 퇴원율 (%)
+  var convReg=parseFloat(gt.convReg)||0;     // 상담→등록 전환율 (%)
+  var convInq=parseFloat(gt.convInq)||0;     // 문의→상담 전환율 (%)
 
-  // 월별 데이터 계산
+  // ── 월별 매출·재원생 데이터 계산 ──
   var monthData=Array.from({length:12},function(_,i){
     var mo=i+1;
     var revs=revenues.filter(function(r2){
@@ -12958,78 +12962,154 @@ function renderRevGoals(yr){
       var d=new Date(r2.paidDate);return d.getFullYear()===yr&&d.getMonth()+1===mo;
     });
     var totalRev=revs.reduce(function(s,r2){return s+(parseInt(r2.amount)||0);},0);
-    var hasData=revs.length>0;
-    return{mo:mo,totalRev:totalRev,hasData:hasData};
+    // 신규·퇴원 집계
+    var newStu=students.filter(function(s){
+      var d=new Date(s.startDate||s.createdAt||'');
+      return d.getFullYear()===yr&&d.getMonth()+1===mo;
+    }).length;
+    var outStu=students.filter(function(s){
+      if(s.status!=='퇴원')return false;
+      var d=new Date(s.endDate||s.updatedAt||'');
+      return d.getFullYear()===yr&&d.getMonth()+1===mo;
+    }).length;
+    return{mo:mo,totalRev:totalRev,hasData:revs.length>0,newStu:newStu,outStu:outStu};
   });
-
-  // 연간 누적 매출
   var yearRev=monthData.reduce(function(s,d){return s+d.totalRev;},0);
-  // 1인 평균 (가장 최근 데이터 있는 달 기준)
-  var avgMo=yr===curYr?curMo:12;
-  var moRevs=revenues.filter(function(r2){if(r2.isManualMeta)return false;return r2.revYear===yr&&r2.revMonth===avgMo&&(parseInt(r2.amount)||0)>0;});
-  var paidIds=new Set(moRevs.map(function(r2){return r2.studentId;}));
-  var avgPerStudent=paidIds.size>0?Math.round(moRevs.reduce(function(s,r2){return s+(parseInt(r2.amount)||0);},0)/paidIds.size):0;
-  var autoTargetStudents=(targetRev>0&&avgPerStudent>0)?Math.ceil(targetRev/12/avgPerStudent):0;
-  var totalTarget=autoTargetStudents||gt.targetTotal||0;
 
-  // 색상/배지 헬퍼
-  function getColor(pct,elapsed,hasTarget){if(!hasTarget)return'var(--txt3)';if(pct>=100)return'#16a34a';if(pct>=elapsed)return'#d97706';return'#dc2626';}
-  function getBadge(pct,elapsed,hasTarget){
-    if(!hasTarget)return'<span style="font-size:11px;color:var(--txt3)">목표 미설정</span>';
+  // ── 역산 계산 ──
+  var needAvgStu=0,needMonthlyRev=0,needNewPerMo=0,needConsult=0,needInquiry=0,projYearEnd=0;
+  if(targetRev>0&&avgFee>0){
+    needMonthlyRev=Math.round(targetRev/12);
+    needAvgStu=Math.ceil(needMonthlyRev/avgFee);
+    var gap=Math.max(0,needAvgStu-active.length);
+    var churnPerMo=Math.ceil(active.length*(churnRate/100));
+    needNewPerMo=gap+churnPerMo;
+    if(convReg>0)needConsult=Math.ceil(needNewPerMo/(convReg/100));
+    if(convInq>0&&convReg>0)needInquiry=Math.ceil(needConsult/(convInq/100));
+  }
+  // 연말 예상 매출 (현재 추세 × 12/경과월)
+  if(elapsedMo>0)projYearEnd=Math.round(yearRev/elapsedMo*12);
+
+  // ── 색상/배지 헬퍼 ──
+  function getColor(pct,elapsed,hasT){if(!hasT)return'var(--txt3)';if(pct>=100)return'#16a34a';if(pct>=elapsed)return'#d97706';return'#dc2626';}
+  function getBadge(pct,elapsed,hasT){
+    if(!hasT)return'<span style="font-size:11px;color:var(--txt3)">목표 미설정</span>';
     if(pct>=100)return'<span style="background:#dcfce7;color:#16a34a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">✅ 달성</span>';
     if(pct>=elapsed)return'<span style="background:#fef3c7;color:#d97706;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">⏳ 순항</span>';
     return'<span style="background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">🔴 주의</span>';
   }
   function bar(pct,color){return'<div style="background:var(--border);border-radius:4px;height:6px;width:100%;margin-top:6px"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%;transition:width .4s"></div></div>';}
+  function fi(label,id,val,placeholder,type){
+    return'<div style="margin-bottom:12px">'
+      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">'+label+'</div>'
+      +'<input type="'+(type||'number')+'" id="'+id+'" class="fi" value="'+(val||'')+'" placeholder="'+placeholder+'"'
+      +' style="font-size:13px;height:36px;box-sizing:border-box;width:100%"'
+      +' onchange="_saveGoalSettings('+yr+')">'
+      +'</div>';
+  }
 
-  // 연간 매출 달성률
   var revPct=targetRev>0?Math.round(yearRev/targetRev*100):0;
   var revColor=getColor(revPct,elapsedPct,targetRev>0);
-  var stuPct=totalTarget>0?Math.round(active.length/totalTarget*100):0;
-  var stuColor=getColor(stuPct,elapsedPct,totalTarget>0);
+  var projPct=targetRev>0?Math.round(projYearEnd/targetRev*100):0;
 
-  // ── 상단: 연도 선택 + 목표 설정 카드 ──
-  var topHtml='<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
-    +'<select class="fi" style="width:90px" id="goals-year" onchange="var v=parseInt(this.value);renderRevGoals(v);">'
+  // ── 헤더 ──
+  var topHtml='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">'
+    +'<div style="display:flex;align-items:center;gap:10px">'
+    +'<select class="fi" style="width:90px" id="goals-year" onchange="renderRevGoals(parseInt(this.value))">'
     +[yr-1,yr,yr+1].map(function(y){return'<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';}).join('')
     +'</select>'
-    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">연간 목표 현황</div>'
+    +'<div style="font-size:16px;font-weight:800;color:var(--navy)">성장 목표 관리</div>'
     +'</div>'
+    +'<button class="btn btn-outline btn-sm" onclick="_toggleGoalSettings('+yr+')" id="goal-settings-btn">⚙️ 목표 설정</button>'
+    +'</div>';
 
-  // ── 중단: 요약 카드 2개 ──
-  var summaryHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">'
-    // 매출 카드
-    +'<div style="background:var(--surface);border:2px solid '+(revPct>=100?'#86efac':targetRev>0?'var(--border)':'var(--border)')+';border-radius:14px;padding:16px">'
-    +'<div style="font-size:12px;color:var(--txt3);margin-bottom:6px">연간 매출 목표</div>'
-    +'<div id="goal-rev-cell" style="font-size:22px;font-weight:800;color:var(--navy);cursor:pointer" onclick="_editRevGoal('+yr+')" title="클릭하여 편집">'+(targetRev>0?targetRev.toLocaleString()+'원':'<span style="font-size:14px;color:var(--blue)">클릭하여 입력</span>')+'</div>'
-    +'<div style="margin-top:10px;font-size:13px;color:var(--txt2)">누적 실매출 <strong style="color:'+revColor+'">'+yearRev.toLocaleString()+'원</strong></div>'
-    +(targetRev>0?bar(revPct,revColor)+'<div style="display:flex;justify-content:space-between;margin-top:4px"><span style="font-size:11px;color:var(--txt3)">'+elapsedMo+'개월 경과 ('+elapsedPct+'%)</span><span style="font-size:12px;font-weight:700;color:'+revColor+'">'+revPct+'%</span></div>'+'<div style="margin-top:8px">'+getBadge(revPct,elapsedPct,targetRev>0)+'</div>':'')
+  // ── 목표 설정 폼 (토글) ──
+  var settingsHtml='<div id="goal-settings-panel" style="display:none;background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:20px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:14px">⚙️ 목표 설정 — 아래 5가지만 입력하면 나머지가 자동 계산됩니다</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">'
+    +fi('① 연간 매출 목표 (원)','gs-targetRev',targetRev,'예: 160000000')
+    +fi('② 학생 1인 월평균 교육비 (원)','gs-avgFee',avgFee,'예: 200000')
+    +fi('③ 예상 월 퇴원율 (%)','gs-churnRate',churnRate,'예: 3')
+    +fi('④ 상담→등록 전환율 (%)','gs-convReg',convReg,'예: 50')
+    +fi('⑤ 문의→상담 전환율 (%)','gs-convInq',convInq,'예: 70')
     +'</div>'
-    // 재원생 카드
-    +'<div style="background:var(--surface);border:2px solid '+(stuPct>=100?'#86efac':'var(--border)')+';border-radius:14px;padding:16px">'
-    +'<div style="font-size:12px;color:var(--txt3);margin-bottom:6px">재원생 목표'+(autoTargetStudents>0?' <span style="font-size:10px">(자동계산)</span>':'')+'</div>'
-    +'<div style="font-size:22px;font-weight:800;color:var(--navy)">'+(totalTarget>0?totalTarget+'명':'-')+'</div>'
-    +'<div style="margin-top:10px;font-size:13px;color:var(--txt2)">현재 재원생 <strong style="color:'+stuColor+'">'+active.length+'명</strong></div>'
-    +(totalTarget>0?bar(stuPct,stuColor)+'<div style="display:flex;justify-content:space-between;margin-top:4px"><span style="font-size:11px;color:var(--txt3)">목표까지 '+(totalTarget-active.length>0?totalTarget-active.length+'명':'달성!')+'</span><span style="font-size:12px;font-weight:700;color:'+stuColor+'">'+stuPct+'%</span></div>'+'<div style="margin-top:8px">'+getBadge(stuPct,elapsedPct,totalTarget>0)+'</div>':'')
+    +'<button class="btn btn-navy btn-sm" style="width:100%" onclick="_saveGoalSettings('+yr+')">💾 저장</button>'
+    +'</div>';
+
+  // ── 핵심 카드 3개 ──
+  var cardsHtml='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">'
+    // 1. 연간 매출
+    +'<div style="background:var(--surface);border:2px solid '+(revPct>=100?'#86efac':'var(--border)')+';border-radius:14px;padding:14px">'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">연간 매출 달성률</div>'
+    +'<div style="font-size:20px;font-weight:800;color:'+revColor+'">'+(targetRev>0?revPct+'%':'-')+'</div>'
+    +'<div style="font-size:11px;color:var(--txt2);margin-top:4px">실매출 <b>'+yearRev.toLocaleString()+'</b>원</div>'
+    +'<div style="font-size:11px;color:var(--txt2)">목표 <b>'+(targetRev>0?targetRev.toLocaleString():'-')+'</b>원</div>'
+    +(targetRev>0?bar(revPct,revColor):'')
+    +'<div style="margin-top:6px">'+getBadge(revPct,elapsedPct,targetRev>0)+'</div>'
+    +'</div>'
+    // 2. 재원생
+    +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">현재 재원생</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--navy)">'+active.length+'명</div>'
+    +'<div style="font-size:11px;color:var(--txt2);margin-top:4px">필요 평균 <b>'+(needAvgStu||'-')+'</b>명</div>'
+    +'<div style="font-size:11px;color:var(--txt2)">차이 <b style="color:'+(active.length>=needAvgStu?'#16a34a':'#dc2626')+'">'+(needAvgStu?((active.length-needAvgStu>=0?'+':'')+(active.length-needAvgStu)+'명'):'-')+'</b></div>'
+    +(needAvgStu>0?bar(Math.round(active.length/needAvgStu*100),'#2563eb'):'')
+    +'</div>'
+    // 3. 연말 예상
+    +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">연말 예상 매출</div>'
+    +'<div style="font-size:20px;font-weight:800;color:'+(projPct>=100?'#16a34a':projPct>=80?'#d97706':'#dc2626')+'">'+(elapsedMo>0?projYearEnd.toLocaleString()+'원':'-')+'</div>'
+    +'<div style="font-size:11px;color:var(--txt2);margin-top:4px">현재 추세 유지 시</div>'
+    +'<div style="font-size:11px;color:var(--txt2)">목표 대비 <b>'+(targetRev>0?projPct+'%':'-')+'</b></div>'
+    +(targetRev>0&&elapsedMo>0?bar(projPct,projPct>=100?'#16a34a':projPct>=80?'#d97706':'#dc2626'):'')
     +'</div>'
     +'</div>';
 
-  // ── 하단: 월별 실적 테이블 ──
+  // ── 역산 결과 패널 ──
+  var simHtml='';
+  if(targetRev>0&&avgFee>0){
+    simHtml='<div style="background:linear-gradient(135deg,#eff6ff,#e0f2fe);border:1px solid #93c5fd;border-radius:14px;padding:16px;margin-bottom:20px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px">📐 목표 달성을 위한 역산 결과</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+      +['<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">월 목표 매출</div><div style="font-size:16px;font-weight:800;color:var(--navy)">'+(needMonthlyRev?needMonthlyRev.toLocaleString()+'원':'-')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">필요 평균 재원생</div><div style="font-size:16px;font-weight:800;color:var(--navy)">'+(needAvgStu?needAvgStu+'명':'-')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">월 신규 필요</div><div style="font-size:16px;font-weight:800;color:#d97706">'+(needNewPerMo?needNewPerMo+'명':'-')+'</div><div style="font-size:9px;color:var(--txt3)">(퇴원 보전 포함)</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">필요 상담 수/월</div><div style="font-size:16px;font-weight:800;color:#2563eb">'+(convReg>0?needConsult+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convReg>0?'전환율 '+convReg+'%':'전환율 미입력')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">필요 문의 수/월</div><div style="font-size:16px;font-weight:800;color:#7c3aed">'+(convInq>0?needInquiry+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convInq>0?'전환율 '+convInq+'%':'전환율 미입력')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">예상 월 퇴원</div><div style="font-size:16px;font-weight:800;color:#dc2626">'+(churnRate>0?Math.ceil(active.length*(churnRate/100))+'명':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(churnRate>0?churnRate+'% 기준':'퇴원율 미입력')+'</div></div>'
+      ].join('')
+      +'</div>'
+      +'</div>';
+  }else{
+    simHtml='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:20px;text-align:center;color:var(--txt3);font-size:13px">'
+      +'⚙️ 목표 설정에서 연간 매출 목표와 1인 월평균 교육비를 입력하면 역산 결과가 자동으로 계산됩니다.'
+      +'</div>';
+  }
+
+  // ── 월별 실적 테이블 ──
   var moTgt=targetRev>0?Math.round(targetRev/12):0;
-  var monthRows='';
-  var cumRev=0;
+  var cumRev=0,monthRows='';
   monthData.forEach(function(d){
     var isFuture=yr===curYr&&d.mo>curMo;
-    if(isFuture){monthRows+='<tr style="opacity:.35"><td style="text-align:center;color:var(--txt3)">'+(d.mo)+'월</td><td style="text-align:right;color:var(--txt3)">'+(moTgt?moTgt.toLocaleString()+'원':'-')+'</td><td style="text-align:right">-</td><td style="text-align:center">-</td><td style="text-align:right">-</td></tr>';return;}
-    cumRev+=d.totalRev;
-    var moPct=moTgt>0?Math.round(d.totalRev/moTgt*100):null;
-    var moColor=moPct===null?'var(--txt3)':moPct>=100?'#16a34a':moPct>=80?'#d97706':'#dc2626';
     var isThisMo=yr===curYr&&d.mo===curMo;
+    if(isFuture){
+      monthRows+='<tr style="opacity:.3"><td style="text-align:center">'+d.mo+'월</td>'
+        +'<td style="text-align:right">'+(moTgt?moTgt.toLocaleString()+'원':'-')+'</td>'
+        +'<td colspan="5" style="text-align:center;color:var(--txt3)">-</td></tr>';
+      return;
+    }
+    cumRev+=d.totalRev;
+    var moPct=moTgt>0&&d.hasData?Math.round(d.totalRev/moTgt*100):null;
+    var moColor=moPct===null?'var(--txt3)':moPct>=100?'#16a34a':moPct>=80?'#d97706':'#dc2626';
+    var net=d.newStu-d.outStu;
     monthRows+='<tr style="'+(isThisMo?'background:#eff6ff;font-weight:700':'')+'">'
-      +'<td style="text-align:center;font-weight:600;color:'+(isThisMo?'var(--navy)':'var(--txt2)')+'">'+(d.mo)+'월'+(isThisMo?' 📍':'')+'</td>'
+      +'<td style="text-align:center;color:'+(isThisMo?'var(--navy)':'var(--txt2)')+';font-weight:600">'+d.mo+'월'+(isThisMo?' 📍':'')+'</td>'
       +'<td style="text-align:right;color:var(--txt3)">'+(moTgt?moTgt.toLocaleString()+'원':'-')+'</td>'
       +'<td style="text-align:right;color:var(--txt2)">'+(d.hasData?d.totalRev.toLocaleString()+'원':'-')+'</td>'
-      +'<td style="text-align:center">'+(moPct!==null&&d.hasData?'<span style="font-size:11px;font-weight:700;color:'+moColor+'">'+moPct+'%</span>':'-')+'</td>'
+      +'<td style="text-align:center">'+(moPct!==null?'<span style="font-size:11px;font-weight:700;color:'+moColor+'">'+moPct+'%</span>':'-')+'</td>'
+      +'<td style="text-align:center;color:#16a34a;font-weight:600">'+(d.newStu>0?'+'+d.newStu:'–')+'</td>'
+      +'<td style="text-align:center;color:#dc2626;font-weight:600">'+(d.outStu>0?'-'+d.outStu:'–')+'</td>'
+      +'<td style="text-align:center;font-weight:700;color:'+(net>0?'#16a34a':net<0?'#dc2626':'var(--txt3)')+'">'+(net>0?'+':'')+net+'</td>'
       +'<td style="text-align:right;color:var(--navy);font-weight:600">'+(d.hasData||cumRev>0?cumRev.toLocaleString()+'원':'-')+'</td>'
       +'</tr>';
   });
@@ -13041,37 +13121,43 @@ function renderRevGoals(yr){
     +'<th style="text-align:right;padding:8px">월 목표</th>'
     +'<th style="text-align:right;padding:8px">실매출</th>'
     +'<th style="text-align:center;padding:8px">달성률</th>'
+    +'<th style="text-align:center;padding:8px">신규</th>'
+    +'<th style="text-align:center;padding:8px">퇴원</th>'
+    +'<th style="text-align:center;padding:8px">순증</th>'
     +'<th style="text-align:right;padding:8px">누적</th>'
     +'</tr></thead>'
     +'<tbody>'+monthRows+'</tbody>'
-    +'</table></div>'
-    +'<div style="margin-top:10px;font-size:11px;color:var(--txt3);padding:8px 12px;background:var(--surface2);border-radius:8px">'
-    +'✏️ 연간 매출 목표를 클릭하면 편집할 수 있습니다. 재원생 목표는 매출 목표 ÷ (1인 평균 × 12)로 자동 계산됩니다.'
-    +'</div>';
+    +'</table></div>';
 
-  el.innerHTML=topHtml+summaryHtml+tableHtml;
+  el.innerHTML=topHtml+settingsHtml+cardsHtml+simHtml+tableHtml;
 }
 
 // 연간 매출 인라인 편집 함수
-function _editRevGoal(yr){
-  var gt=(_goalTargets&&_goalTargets[yr])||{};
-  var cell=document.getElementById('goal-rev-cell');
-  if(!cell)return;
-  var cur=gt.targetRev||0;
-  cell.innerHTML='<input type="number" id="goal-rev-input" value="'+cur+'" style="width:120px;font-size:13px;text-align:center;border:2px solid var(--navy);border-radius:6px;padding:2px 6px" onclick="event.stopPropagation()">';
-  var inp=document.getElementById('goal-rev-input');
-  if(inp){inp.focus();inp.select();}
-  function save(){
-    var val=parseInt((document.getElementById('goal-rev-input')||{}).value)||0;
-    if(!_goalTargets)_goalTargets={};
-    if(!_goalTargets[yr])_goalTargets[yr]={};
-    _goalTargets[yr].targetRev=val;
-    db.collection('goalTargets').doc(String(yr)).set(_goalTargets[yr],{merge:true}).catch(function(){});
-    toast('✅ 저장됨');
+function _toggleGoalSettings(yr){
+  var panel=$('goal-settings-panel');
+  if(!panel)return;
+  var open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  var btn=$('goal-settings-btn');
+  if(btn)btn.textContent=open?'✕ 닫기':'⚙️ 목표 설정';
+}
+async function _saveGoalSettings(yr){
+  var get=function(id){return document.getElementById(id);};
+  var vals={
+    targetRev:parseInt((get('gs-targetRev')||{}).value)||0,
+    avgFee:parseInt((get('gs-avgFee')||{}).value)||0,
+    churnRate:parseFloat((get('gs-churnRate')||{}).value)||0,
+    convReg:parseFloat((get('gs-convReg')||{}).value)||0,
+    convInq:parseFloat((get('gs-convInq')||{}).value)||0
+  };
+  if(!_goalTargets)_goalTargets={};
+  if(!_goalTargets[yr])_goalTargets[yr]={};
+  Object.assign(_goalTargets[yr],vals);
+  try{
+    await db.collection('goalTargets').doc(String(yr)).set(_goalTargets[yr],{merge:true});
+    toast('✅ 목표 저장됨');
     renderRevGoals(yr);
-  }
-  cell.querySelector('input').addEventListener('keydown',function(e){if(e.key==='Enter')save();if(e.key==='Escape')renderRevGoals(yr);});
-  cell.querySelector('input').addEventListener('blur',save);
+  }catch(e){toast('❌ 저장 오류: '+e.message);}
 }
 
 
