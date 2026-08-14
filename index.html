@@ -12787,6 +12787,43 @@ function getCrmThreshold(id){
   }
   return null;
 }
+var _goalTargets=null;
+
+async function loadGoalTargets(yr){
+  if(_goalTargets&&_goalTargets[yr])return;
+  if(!_goalTargets)_goalTargets={};
+  try{
+    var d=await db.collection('goalTargets').doc(String(yr)).get();
+    _goalTargets[yr]=d.exists?d.data():{};
+  }catch(e){_goalTargets[yr]={};}
+}
+
+// 연간 매출 인라인 편집
+function _editRevGoal(yr){
+  var cell=document.getElementById('goal-rev-cell');
+  if(!cell)return;
+  var gt=(_goalTargets&&_goalTargets[yr])||{};
+  var cur=gt.targetRev||0;
+  cell.innerHTML='<input type="number" id="goal-rev-input" value="'+cur+'" style="width:120px;font-size:13px;text-align:center;border:2px solid var(--navy);border-radius:6px;padding:2px 6px" onclick="event.stopPropagation()">';
+  var inp=document.getElementById('goal-rev-input');
+  if(inp){inp.focus();inp.select();}
+  function save(){
+    var val=parseInt((document.getElementById('goal-rev-input')||{}).value)||0;
+    if(!_goalTargets)_goalTargets={};
+    if(!_goalTargets[yr])_goalTargets[yr]={};
+    _goalTargets[yr].targetRev=val;
+    db.collection('goalTargets').doc(String(yr)).set(_goalTargets[yr],{merge:true}).catch(function(){});
+    toast('✅ 저장됨');
+    renderRevGoals(yr);
+  }
+  var inp2=document.getElementById('goal-rev-input');
+  if(inp2){
+    inp2.addEventListener('keydown',function(e){if(e.key==='Enter')save();if(e.key==='Escape')renderRevGoals(yr);});
+    inp2.addEventListener('blur',save);
+  }
+}
+
+
 // 연간 목표 페이지 내 연도 드롭다운 동기화
 function _syncGoalsYear(yr){
   var sel=$('goals-year');if(sel)sel.value=yr;
@@ -12807,6 +12844,11 @@ function renderGoalsView(){var yr=parseInt($('goals-year')?.value)||new Date().g
 
 function renderRevGoals(yr){
   var el=$('goals-annual-area');if(!el)return;
+  if(!_goalTargets||!_goalTargets[yr]){
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+    loadGoalTargets(yr).then(function(){renderRevGoals(yr);});
+    return;
+  }
   var now=new Date();
   var elapsedPct=yr===now.getFullYear()?Math.round((now.getMonth()+1)/12*100):100;
   var active=students.filter(function(s){return['재원','신규'].includes(s.status||'재원');});
@@ -12892,6 +12934,11 @@ function renderRevGoals(yr){
 
 function renderMonthlyGoals(yr,mo){
   var el=$('goals-monthly-area');if(!el)return;
+  if(!_goalTargets||!_goalTargets[yr]){
+    el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
+    loadGoalTargets(yr).then(function(){renderMonthlyGoals(yr,mo);});
+    return;
+  }
   var moStr=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'][mo-1];
   var active=students.filter(function(s){return['재원','신규'].includes(s.status||'재원');});
   var gt=(_goalTargets&&_goalTargets[yr])||{};
