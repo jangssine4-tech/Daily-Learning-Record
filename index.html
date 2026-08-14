@@ -8855,7 +8855,17 @@ function renderRevSummary(yr){
   var isFuture=function(i){return(yr>curYrNow)||(yr===curYrNow&&i>curMoNow);};var hasD=function(i){return monthData[i].hasData;};
   var cellR=function(i,val,style){if(isFuture(i)||!hasD(i))return'<td></td>';return'<td style="text-align:right;'+(style||'')+'">'+val+'</td>';};
   var mTHR=months.map(function(m){return'<th style="text-align:right;min-width:52px">'+m+'</th>';}).join('');
-  var revRowsHTML='<tr><td>수강료 수입</td>'+monthData.map(function(d,i){return cellR(i,d.totalRev?d.totalRev.toLocaleString()+'원':'₩0','color:var(--mint);font-weight:600');}).join('')+'</tr><tr><td>지출 합계</td>'+monthData.map(function(d,i){return cellR(i,d.totalExp?d.totalExp.toLocaleString()+'원':'₩0','color:var(--red)');}).join('')+'</tr><tr style="background:var(--surface2)"><td style="font-weight:700">순수익</td>'+monthData.map(function(d,i){return cellR(i,d.net.toLocaleString()+'원',d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700');}).join('')+'</tr>';
+  // 누적 합계 계산
+  var cumRev=0,cumNet=0;
+  var cumRevArr=monthData.map(function(d,i){if(!isFuture(i)&&hasD(i)){cumRev+=d.totalRev;}return cumRev;});
+  cumRev=0;cumNet=0;
+  var cumRevArr2=[];var cumNetArr=[];
+  monthData.forEach(function(d,i){if(!isFuture(i)&&hasD(i)){cumRev+=d.totalRev;cumNet+=d.net;}cumRevArr2.push(cumRev);cumNetArr.push(cumNet);});
+  var revRowsHTML='<tr><td>수강료 수입</td>'+monthData.map(function(d,i){return cellR(i,d.totalRev?d.totalRev.toLocaleString()+'원':'₩0','color:var(--mint);font-weight:600');}).join('')+'</tr>'
+    +'<tr style="background:#f0fdf4"><td style="font-weight:700;color:#065f46">📈 수강료 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td></td>';return'<td style="text-align:right;color:#065f46;font-weight:700;font-size:11px">'+cumRevArr2[i].toLocaleString()+'원</td>';}).join('')+'</tr>'
+    +'<tr><td>지출 합계</td>'+monthData.map(function(d,i){return cellR(i,d.totalExp?d.totalExp.toLocaleString()+'원':'₩0','color:var(--red)');}).join('')+'</tr>'
+    +'<tr style="background:var(--surface2)"><td style="font-weight:700">순수익</td>'+monthData.map(function(d,i){return cellR(i,d.net.toLocaleString()+'원',d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700');}).join('')+'</tr>'
+    +'<tr style="background:#eff6ff"><td style="font-weight:700;color:#1e3a8a">💰 순익 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td></td>';var cv=cumNetArr[i];return'<td style="text-align:right;font-weight:700;font-size:11px;color:'+(cv>=0?'#1e3a8a':'var(--red)')+'">'+cv.toLocaleString()+'원</td>';}).join('')+'</tr>';
   el.innerHTML='<div class="expense-section"><h4>💰 매출 현황 ('+yr+'년)</h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px"><thead><tr><th>항목</th>'+mTHR+'</tr></thead><tbody>'+revRowsHTML+'</tbody></table></div></div><div class="expense-section"><h4>👥 원생 현황</h4><div style="text-align:center;padding:10px;color:var(--txt3)">재원 '+activeStudents2.length+'명 · 신규 '+(students||[]).filter(function(s){return s.status==='신규';}).length+'명 · 퇴원 '+(students||[]).filter(function(s){return s.status==='퇴원';}).length+'명 · 휴원 '+(students||[]).filter(function(s){return s.status==='휴원';}).length+'명</div></div>';
   // 경영 자비스 분석
   var curMo2=new Date().getMonth()+1;var curYr2=new Date().getFullYear();
