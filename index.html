@@ -11791,7 +11791,6 @@ function _renderAcademicCalendarUI(el){
     +'</div>'
     +'<div style="margin-left:auto;display:flex;gap:6px">'
     +'<button class="btn btn-outline btn-sm" onclick="openAcalGuide()">작성 가이드</button>'
-    +'<button class="btn btn-navy btn-sm" onclick="openAcalAddModal()">+ 일정 추가</button>'
     +'</div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
@@ -11878,7 +11877,7 @@ function _openAcalMonthModal(yr,mo){
       +'<div class="mh"></div>'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
       +'<div class="mt" style="margin:0">'+yr+'년 '+months[mo-1]+'</div>'
-      +'<button class="btn btn-navy btn-sm" onclick="this.closest(\'.mo\').remove();openAcalAddModal()">+ 일정 추가</button>'
+      +'<button class="btn btn-navy btn-sm" onclick="this.closest(\'.mo\').remove();openAcalAddModal(null,'+mo+')">+ 일정 추가</button>'
       +'</div>'
       +evtsHTML
       +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
@@ -11918,20 +11917,19 @@ function openAcalGuide(){
   document.body.appendChild(overlay);
 }
 
-function openAcalAddModal(editId){
+function openAcalAddModal(editId,defaultMo){
   var editEvt=editId?(_academicCalendar&&_academicCalendar.events||[]).find(function(e){return e.id===editId;}):null;
   var now=new Date();
   var yr=window._acalYr||now.getFullYear();
   var e=editEvt||{};
-  var isRepeat=e.acalType==='repeat';
   var annualRepeat=e.annualRepeat||false;
   var prepStartDate=e.prepStartDate||'';
-  var startDate=e.date?e.date:(yr+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'));
+  var repeatRule=e.repeatRule||'';
+  var mo=defaultMo||now.getMonth()+1;
+  var startDate=e.date?e.date:(yr+'-'+String(mo).padStart(2,'0')+'-01');
   var endDate=e.endDate||startDate;
-  var startMo=e.startMonth||String(now.getMonth()+1).padStart(2,'0');
   var cats=['설명회','간담회','특강','외부시험','홍보캠페인','상담','내부 운영'];
   var repeatRules=['없음','매주 월','매주 화','매주 수','매주 목','매주 금','매주 월·수·금','매주 화·금','매주 화·목','매월 첫째 주','매월 말일','매년'];
-  // 관리자 페이지 users 기반 담당자 목록 — 이름 변경 시 자동 반영
   var activeStaff=(users||[]).filter(function(u){
     return (u.role==='teacher'||u.role==='admin')&&!u.adminDeleted&&(u.name||'').trim();
   }).sort(function(a,b){
@@ -11954,11 +11952,6 @@ function openAcalAddModal(editId){
   var html='<div class="ms" style="max-width:400px;max-height:92vh;overflow-y:auto">'
     +'<div class="mh"></div>'
     +'<div class="mt">'+(editId?'학사일정 수정':'학사일정 추가')+'</div>'
-    +'<div class="field"><div class="fl">유형</div>'
-    +'<div style="display:flex;gap:12px">'
-    +'<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="acal-type" value="project"'+(isRepeat?'':' checked')+' onchange="_acalTypeChange(this.value)"> 프로젝트형</label>'
-    +'<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="acal-type" value="repeat"'+(isRepeat?' checked':'')+' onchange="_acalTypeChange(this.value)"> 반복형</label>'
-    +'</div></div>'
     +'<div class="field"><div class="fl">구분</div><select class="fi" id="acal-cat">'+cats.map(function(c){return'<option value="'+c+'"'+(c===e.cat?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>'
     +'<div class="field"><div class="fl">제목 *</div><input class="fi" id="acal-title" placeholder="예: 2학기 학부모 설명회" value="'+(e.title||'')+'"></div>'
     +'<div class="field"><div class="fl">담당자</div>'
@@ -11966,40 +11959,33 @@ function openAcalAddModal(editId){
     +'<select class="fi" id="acal-manager" style="flex:1">'+managerOpts+'</select>'
     +'<select class="fi" id="acal-manager2" style="flex:1">'+managerOpts2+'</select>'
     +'</div></div>'
-    +'<div id="acal-project-fields" style="display:'+(isRepeat?'none':'block')+'">'    +'<div class="field"><div class="fl">실행 기간</div>'    +'<div style="display:flex;align-items:center;gap:6px">'    +'<input type="date" class="fi" id="acal-date" value="'+startDate+'" style="flex:1">'    +'<span style="color:var(--txt3);font-size:12px">~</span>'    +'<input type="date" class="fi" id="acal-date-end" value="'+endDate+'" style="flex:1">'    +'</div></div>'    +'<div class="field">'    +'<div class="fl">준비 시작일 <span style="font-size:10px;color:var(--txt3);font-weight:400">(선택 — 이달의 계획에 미리 표시됩니다)</span></div>'    +'<input type="date" class="fi" id="acal-prep-start" value="'+prepStartDate+'">'    +'</div>'    +'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;margin-bottom:10px">'    +'<input type="checkbox" id="acal-annual-repeat"'+(annualRepeat?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy);cursor:pointer">'    +'<label for="acal-annual-repeat" style="font-size:13px;cursor:pointer;flex:1">매년 이 시기에 반복 <span style="font-size:11px;color:var(--txt3)">— 다음 해 같은 달에 자동 표시</span></label>'    +'</div>'    +'</div>'
-    +'<div id="acal-repeat-fields" style="display:'+(isRepeat?'block':'none')+'">'
-    +'<div style="display:flex;gap:6px">'
-    +'<div class="field" style="flex:1"><div class="fl">시작 월</div>'
-    +'<select class="fi" id="acal-start-month" style="flex:1">'
-    +(function(){var h='';for(var m=1;m<=12;m++){var mv=String(m).padStart(2,'0');h+='<option value="'+mv+'"'+(mv===startMo?' selected':'')+'>'+m+'월</option>';}return h;})()
+    +'<div class="field"><div class="fl">실행 기간</div>'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<input type="date" class="fi" id="acal-date" value="'+startDate+'" style="flex:1">'
+    +'<span style="color:var(--txt3);font-size:12px">~</span>'
+    +'<input type="date" class="fi" id="acal-date-end" value="'+endDate+'" style="flex:1">'
+    +'</div></div>'
+    +'<div class="field"><div class="fl">준비 시작일 <span style="font-size:10px;color:var(--txt3);font-weight:400">(선택)</span></div>'
+    +'<input type="date" class="fi" id="acal-prep-start" value="'+prepStartDate+'"></div>'
+    +'<div class="field"><div class="fl">반복 규칙 <span style="font-size:10px;color:var(--txt3);font-weight:400">(선택)</span></div>'
+    +'<select class="fi" id="acal-repeat-rule">'
+    +repeatRules.map(function(r){return'<option value="'+r+'"'+(r===(repeatRule||'없음')?' selected':'')+'>'+r+'</option>';}).join('')
     +'</select></div>'
-    +'<div class="field" style="flex:1"><div class="fl">반복 규칙</div>'
-    +'<select class="fi" id="acal-repeat-rule" style="flex:1">'
-    +repeatRules.map(function(r){return'<option value="'+r+'"'+(r===(e.repeatRule||'없음')?' selected':'')+'>'+r+'</option>';}).join('')
-    +'</select></div>'
-    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;padding:0 2px;margin-bottom:12px">'
+    +'<input type="checkbox" id="acal-annual-repeat"'+(annualRepeat?' checked':'')+' style="width:14px;height:14px;accent-color:var(--navy);cursor:pointer;flex-shrink:0">'
+    +'<label for="acal-annual-repeat" style="font-size:12px;color:var(--txt2);cursor:pointer">매년 이 시기에 반복</label>'
     +'</div>'
     +'<div class="field"><div class="fl">메모</div><input class="fi" id="acal-note" placeholder="(선택)" value="'+(e.note||'')+'"></div>'
     +'<button class="btn btn-navy btn-block" id="acal-confirm-btn">저장</button>'
-    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest('.mo').remove()">취소</button>'
     +'</div>';
   overlay.innerHTML=html;
   document.body.appendChild(overlay);
   document.getElementById('acal-confirm-btn').onclick=function(){confirmAcalAdd(overlay,editId);};
 }
 
-function _acalTypeChange(val){
-  var pf=document.getElementById('acal-project-fields');
-  var rf=document.getElementById('acal-repeat-fields');
-  if(pf)pf.style.display=val==='project'?'':'none';
-  if(rf)rf.style.display=val==='repeat'?'':'none';
-  var btn=document.getElementById('acal-confirm-btn');
-  if(btn)btn.textContent='저장';
-}
 
 function confirmAcalAdd(overlay,editId){
-  var typeEl=document.querySelector('input[name="acal-type"]:checked');
-  var acalType=typeEl?typeEl.value:'project';
   var title=($('acal-title')||{}).value||'';
   var cat=($('acal-cat')||{}).value||'';
   var manager=($('acal-manager')||{}).value||'';
@@ -12007,24 +11993,26 @@ function confirmAcalAdd(overlay,editId){
   var note=($('acal-note')||{}).value||'';
   if(!title.trim()){toast('제목을 입력하세요');return;}
   var yr=window._acalYr||new Date().getFullYear();
-  var evt={id:editId||Date.now().toString(36),acalType:acalType,title:title,cat:cat,manager:manager,manager2:manager2,note:note};
-  if(acalType==='project'){
-    var date=($('acal-date')||{}).value||'';
-    var dateEnd=($('acal-date-end')||{}).value||'';
-    var prepStart=($('acal-prep-start')||{}).value||'';
-    var annualRep=document.getElementById('acal-annual-repeat');
-    evt.date=date||(yr+'-01-01');
-    if(dateEnd&&dateEnd!==date)evt.endDate=dateEnd;
-    if(prepStart)evt.prepStartDate=prepStart; else delete evt.prepStartDate;
-    evt.annualRepeat=annualRep?annualRep.checked:false;
-    evt.repeatRule='';
-  }else{
-    var startMonth=($('acal-start-month')||{}).value||'01';
-    var repeatRule=($('acal-repeat-rule')||{}).value||'';
-    evt.date=yr+'-'+startMonth+'-01';
-    evt.startMonth=startMonth;
-    evt.repeatRule=repeatRule==='없음'?'':repeatRule;
-  }
+  var date=($('acal-date')||{}).value||'';
+  var dateEnd=($('acal-date-end')||{}).value||'';
+  var prepStart=($('acal-prep-start')||{}).value||'';
+  var repeatRuleVal=(($('acal-repeat-rule')||{}).value||'없음');
+  var annualRep=document.getElementById('acal-annual-repeat');
+  var hasRepeat=repeatRuleVal&&repeatRuleVal!=='없음';
+  // acalType: 반복 규칙이 있으면 repeat, 없으면 project
+  var acalType=hasRepeat?'repeat':'project';
+  var startMo=date?date.slice(5,7):String(new Date().getMonth()+1).padStart(2,'0');
+  var evt={
+    id:editId||Date.now().toString(36),
+    acalType:acalType,
+    title:title,cat:cat,manager:manager,manager2:manager2,note:note,
+    date:date||(yr+'-'+startMo+'-01'),
+    startMonth:startMo,
+    repeatRule:hasRepeat?repeatRuleVal:'',
+    annualRepeat:annualRep?annualRep.checked:false
+  };
+  if(dateEnd&&dateEnd!==date)evt.endDate=dateEnd; else delete evt.endDate;
+  if(prepStart)evt.prepStartDate=prepStart; else delete evt.prepStartDate;
   if(!_academicCalendar)_academicCalendar={events:[]};
   if(editId){
     var idx=_academicCalendar.events.findIndex(function(e){return e.id===editId;});
@@ -12036,7 +12024,9 @@ function confirmAcalAdd(overlay,editId){
   saveAcademicCalendar();
   overlay.remove();
   var acalEl=$('acal-main-area');
-  if(acalEl&&acalEl.innerHTML!=='')_renderAcademicCalendarUI(acalEl);
+  if(acalEl)_renderAcademicCalendarUI(acalEl);
+  var _calEl2=$('dashboard-calendar-area');
+  if(_calEl2)_renderAcademicCalendarUI(_calEl2);
   toast('저장됐어요');
 }
 
@@ -12514,8 +12504,6 @@ function _acalParsePlan(){
   toast(tasks.length+'개 업무가 생성될 예정이에요');
 }
 function confirmAcalAdd(overlay,editId){
-  var typeEl=document.querySelector('input[name="acal-type"]:checked');
-  var acalType=typeEl?typeEl.value:'project';
   var title=($('acal-title')||{}).value||'';
   var cat=($('acal-cat')||{}).value||'';
   var manager=($('acal-manager')||{}).value||'';
@@ -12523,24 +12511,25 @@ function confirmAcalAdd(overlay,editId){
   var note=($('acal-note')||{}).value||'';
   if(!title.trim()){toast('제목을 입력하세요');return;}
   var yr=window._acalYr||new Date().getFullYear();
-  var evt={id:editId||Date.now().toString(36),acalType:acalType,title:title,cat:cat,manager:manager,manager2:manager2,note:note};
-  if(acalType==='project'){
-    var date=($('acal-date')||{}).value||'';
-    var dateEnd=($('acal-date-end')||{}).value||'';
-    var prepStart=($('acal-prep-start')||{}).value||'';
-    var annualRep=document.getElementById('acal-annual-repeat');
-    evt.date=date||(yr+'-01-01');
-    if(dateEnd&&dateEnd!==date)evt.endDate=dateEnd;
-    if(prepStart)evt.prepStartDate=prepStart; else delete evt.prepStartDate;
-    evt.annualRepeat=annualRep?annualRep.checked:false;
-    evt.repeatRule='';
-  }else{
-    var startMonth=($('acal-start-month')||{}).value||'01';
-    var repeatRule=($('acal-repeat-rule')||{}).value||'';
-    evt.date=yr+'-'+startMonth+'-01';
-    evt.startMonth=startMonth;
-    evt.repeatRule=repeatRule==='없음'?'':repeatRule;
-  }
+  var date=($('acal-date')||{}).value||'';
+  var dateEnd=($('acal-date-end')||{}).value||'';
+  var prepStart=($('acal-prep-start')||{}).value||'';
+  var repeatRuleVal=(($('acal-repeat-rule')||{}).value||'없음');
+  var annualRep=document.getElementById('acal-annual-repeat');
+  var hasRepeat=repeatRuleVal&&repeatRuleVal!=='없음';
+  var acalType=hasRepeat?'repeat':'project';
+  var startMo=date?date.slice(5,7):String(new Date().getMonth()+1).padStart(2,'0');
+  var evt={
+    id:editId||Date.now().toString(36),
+    acalType:acalType,
+    title:title,cat:cat,manager:manager,manager2:manager2,note:note,
+    date:date||(yr+'-'+startMo+'-01'),
+    startMonth:startMo,
+    repeatRule:hasRepeat?repeatRuleVal:'',
+    annualRepeat:annualRep?annualRep.checked:false
+  };
+  if(dateEnd&&dateEnd!==date)evt.endDate=dateEnd; else delete evt.endDate;
+  if(prepStart)evt.prepStartDate=prepStart; else delete evt.prepStartDate;
   if(!_academicCalendar)_academicCalendar={events:[]};
   if(editId){
     var idx=_academicCalendar.events.findIndex(function(e){return e.id===editId;});
@@ -12550,6 +12539,8 @@ function confirmAcalAdd(overlay,editId){
     _academicCalendar.events.push(evt);
   }
   saveAcademicCalendar();overlay.remove();
+  var acalMain=$('acal-main-area');
+  if(acalMain)_renderAcademicCalendarUI(acalMain);
   var _calEl=$('dashboard-calendar-area');
   if(_calEl)_renderAcademicCalendarUI(_calEl);
   toast('저장됐어요');
@@ -12578,21 +12569,30 @@ function openAcalDetail(evtId){
         +'</div>';
     }).join('')
     :'<div style="font-size:12px;color:var(--txt3);padding:8px 0">연결된 플랜 없음</div>';
+  var catCol={'설명회':'#f87171','간담회':'#fb923c','특강':'#fbbf24','외부시험':'#4ade80','홍보캠페인':'#60a5fa','상담':'#a78bfa','내부 운영':'#94a3b8'}[e.cat]||'#94a3b8';
   overlay.innerHTML='<div class="ms" style="max-width:360px">'
     +'<div class="mh"></div>'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">'+( e.cat||'-')+' · '+dateStr+'</div>'
-    +'<div class="mt" style="margin-bottom:4px">'+e.title+'</div>'
-    +((e.manager||e.manager2)?'<div style="font-size:12px;color:var(--txt3);margin-bottom:6px">담당: '+[e.manager,e.manager2].filter(Boolean).join(' · ')+'</div>':'')
-    +(e.prepStartDate?'<div style="font-size:11px;color:#7c3aed;margin-bottom:6px">📋 준비 시작일: '+e.prepStartDate.slice(5)+'</div>':'')
-    +(e.annualRepeat?'<div style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:10px;margin-bottom:10px">🔁 매년 반복</div>':'<div style="height:4px"></div>')
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'
+    +'<span style="font-size:10px;font-weight:700;background:'+catCol+';color:#fff;padding:2px 8px;border-radius:20px">'+(e.cat||'-')+'</span>'
+    +((e.manager||e.manager2)?'<span style="font-size:11px;color:var(--txt3)">담당: '+[e.manager,e.manager2].filter(Boolean).join(' · ')+'</span>':'')
+    +'</div>'
+    +'<div class="mt" style="margin-bottom:12px">'+e.title+'</div>'
+    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:6px">'
+    +(e.prepStartDate?'<div style="font-size:12px;color:var(--txt2)">준비 시작일 <span style="font-weight:700;color:var(--navy)">'+e.prepStartDate.slice(5)+'</span></div>':'')
+    +'<div style="font-size:12px;color:var(--txt2)">실행 기간 <span style="font-weight:700;color:var(--navy)">'+dateStr+'</span></div>'
+    +(e.repeatRule?'<div style="font-size:12px;color:var(--txt2)">반복 <span style="font-weight:700;color:var(--navy)">'+e.repeatRule+'</span></div>':'')
+    +(e.annualRepeat?'<div style="font-size:12px;color:var(--txt2)">매년 반복</div>':'')
+    +'</div>'
+    +'<div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:8px">'
     +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">연결 플랜</div>'
     +plansHTML
-    +'<div style="display:flex;gap:8px;margin-top:16px">'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:4px">'
     +'<button class="btn btn-outline" style="flex:1" id="acal-detail-edit-btn">일정 수정</button>'
     +'<button class="btn btn-navy" style="flex:1" id="acal-detail-plan-btn">플랜 연결</button>'
     +'</div>'
     +'<div style="height:8px"></div>'
-    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
+    +'<button class="btn btn-outline btn-block" onclick="this.closest('.mo').remove()">닫기</button>'
     +'</div>';
   document.body.appendChild(overlay);
   document.getElementById('acal-detail-edit-btn').onclick=function(){overlay.remove();openAcalAddModal(evtId);};
@@ -12649,6 +12649,8 @@ function removeAcalEvent(id){
   if(!_academicCalendar)return;
   _academicCalendar.events=(_academicCalendar.events||[]).filter(function(e){return e.id!==id;});
   saveAcademicCalendar();
+  var acalMain=$('acal-main-area');
+  if(acalMain)_renderAcademicCalendarUI(acalMain);
   var _calEl2=$('dashboard-calendar-area');
   if(_calEl2)_renderAcademicCalendarUI(_calEl2);
 }
