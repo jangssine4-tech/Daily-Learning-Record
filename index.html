@@ -170,7 +170,12 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .makeup-chip.scheduled{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
 .makeup-chip.done{background:#dcfce7;border-color:#86efac;color:#166534;text-decoration:line-through}
 .makeup-chip.has-plan{background:#fefce8;border-color:#fbbf24;color:#92400e}
-.makeup-chip .mk-hint{font-size:9px;opacity:.9;margin-left:3px;flex-shrink:0;pointer-events:none;display:inline-flex;align-items:center;justify-content:center;background:rgba(0,0,0,.08);border-radius:50px;padding:1px 5px;font-weight:700;letter-spacing:-.3px}
+.makeup-chip .mk-hint{font-size:9px;margin-left:3px;flex-shrink:0;pointer-events:none;font-weight:700;letter-spacing:-.3px}
+.makeup-chip .mk-hint-date{display:inline-flex;align-items:center;justify-content:center;border-radius:50px;padding:1px 4px}
+.makeup-chip .mk-hint-plan{background:#f59e0b;color:#fff}
+.makeup-chip .mk-hint-done{background:#16a34a;color:#fff}
+.makeup-chip .mk-hint-scheduled{background:#2563eb;color:#fff}
+.makeup-chip .mk-hint-time{opacity:.75}
 .day-pill{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border2);font-size:12px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--surface)}
 .day-pill.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -808,7 +813,34 @@ function getStudentLevelAtMonth(s,yr,mo){
   }
   return matched?(matched.customLevel||matched.level||''):getStudentLevel(s);
 }
-function isHoliday(yr,mo,d){var h={'0101':'신정','0301':'삼일절','0505':'어린이날','0606':'현충일','0815':'광복절','1003':'개천절','1009':'한글날','1225':'성탄절'};return h[String(mo+1).padStart(2,'0')+String(d).padStart(2,'0')]||null;}
+function isHoliday(yr,mo,d){
+  // mo는 0-based
+  var mm=String(mo+1).padStart(2,'0'),dd=String(d).padStart(2,'0'),key=mm+dd;
+  // 고정 법정 공휴일
+  var fixed={'0101':'신정','0301':'삼일절','0505':'어린이날','0606':'현충일','0815':'광복절','1003':'개천절','1009':'한글날','1225':'성탄절'};
+  if(fixed[key])return fixed[key];
+  // 음력 기반 공휴일 (양력 변환 테이블 — 2024~2028)
+  var lunar={
+    2024:{'0209':'설날 전날','0210':'설날','0211':'설날 다음날','0212':'대체공휴일(설날)','0501':'석가탄신일','0917':'추석 전날','0918':'추석','0919':'추석 다음날'},
+    2025:{'0128':'설날 전날','0129':'설날','0130':'설날 다음날','0505':'석가탄신일(대체)','0506':'어린이날(대체)','1003':'추석 전날','1005':'추석','1006':'추석 다음날','1007':'대체공휴일(추석)'},
+    2026:{'0216':'설날 전날','0217':'설날','0218':'설날 다음날','0524':'석가탄신일','0505':'어린이날','1005':'추석 전날','1006':'추석','1007':'추석 다음날'},
+    2027:{'0205':'설날 전날','0206':'설날','0208':'설날 다음날','0209':'대체공휴일(설날)','0515':'석가탄신일','0924':'추석 전날','0925':'추석','0926':'추석 다음날'},
+    2028:{'0126':'설날 전날','0127':'설날','0128':'설날 다음날','0502':'석가탄신일','1002':'추석 전날','1003':'추석','1004':'추석 다음날'}
+  };
+  if(lunar[yr]&&lunar[yr][key])return lunar[yr][key];
+  // 대체공휴일: 고정 공휴일이 일요일이면 월요일, 토요일이면 월요일(어린이날만)
+  var fixedDates=[[1,1],[3,1],[5,5],[6,6],[8,15],[10,3],[10,9],[12,25]];
+  var fixedNames={0101:'신정',0301:'삼일절',0505:'어린이날',0606:'현충일',0815:'광복절',1003:'개천절',1009:'한글날',1225:'성탄절'};
+  for(var i=0;i<fixedDates.length;i++){
+    var fm=fixedDates[i][0],fd=fixedDates[i][1];
+    var dow=new Date(yr,fm-1,fd).getDay(); // 0=일,6=토
+    var subKey=null;
+    if(dow===0){subKey=String(fm).padStart(2,'0')+String(fd+1).padStart(2,'0');} // 일→월
+    else if(dow===6&&fm===5&&fd===5){subKey='0506';} // 어린이날 토→월
+    if(subKey&&subKey===key)return'대체공휴일('+fixedNames[parseInt(String(fm).padStart(2,'0')+String(fd).padStart(2,'0'))]+')';
+  }
+  return null;
+}
 
 // Firebase init
 function getCfg(){try{return JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){return null;}}
@@ -5521,15 +5553,15 @@ function renderMakeupCalendar(){
           var isScheduled=m.makeupStatus==='scheduled'&&m.makeupDate;
           var cls3=isDone?'done':isScheduled?'has-plan':'';
           var hint='';
-          if(isDone&&m.makeupDate){hint='<span class="mk-hint">✓'+parseInt(m.makeupDate.slice(8))+'일</span>';}
-          else if(isScheduled){hint='<span class="mk-hint">→'+parseInt(m.makeupDate.slice(8))+'일</span>';}
+          if(isDone&&m.makeupDate){hint='<span class="mk-hint mk-hint-date mk-hint-done">✓'+parseInt(m.makeupDate.slice(8))+'</span>';}
+          else if(isScheduled){hint='<span class="mk-hint mk-hint-date mk-hint-plan">→'+parseInt(m.makeupDate.slice(8))+'</span>';}
           chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+hint+'</div>';
         });
         makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){
           if(_chipSeen[m.studentId])return;_chipSeen[m.studentId]=true;
           var cls3=m.makeupStatus==='done'?'done':'scheduled';
-          var timeHint=(m.makeupStatus!=='done'&&m.makeupTime)?'<span class="mk-hint">'+fmt12h(m.makeupTime)+'</span>':'';
-          var absentHint=m.absentDate?'<span class="mk-hint">↑'+parseInt(m.absentDate.slice(8))+'일</span>':'';
+          var timeHint=(m.makeupStatus!=='done'&&m.makeupTime)?'<span class="mk-hint mk-hint-time">'+fmt12h(m.makeupTime)+'</span>':'';
+          var absentHint=m.absentDate?'<span class="mk-hint mk-hint-date mk-hint-scheduled">↑'+parseInt(m.absentDate.slice(8))+'</span>':'';
           chips+='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')" style="border-style:dashed">'+m.studentName+timeHint+absentHint+'</div>';
         });
       }
@@ -5543,9 +5575,9 @@ function renderMakeupCalendar(){
   var legend='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 2px 14px;font-size:11px;color:var(--txt2)">'
     +'<span style="font-weight:700;color:var(--navy);margin-right:2px">배지 읽는 법</span>'
     +'<span class="makeup-chip" style="pointer-events:none">이름</span><span style="color:var(--txt3)">결석·미정</span>'
-    +'<span class="makeup-chip has-plan" style="pointer-events:none">이름<span class="mk-hint" style="pointer-events:none">→15일</span></span><span style="color:var(--txt3)">결석·보강예정</span>'
-    +'<span class="makeup-chip done" style="pointer-events:none">이름<span class="mk-hint" style="pointer-events:none">✓15일</span></span><span style="color:var(--txt3)">결석·보강완료</span>'
-    +'<span class="makeup-chip scheduled" style="pointer-events:none;border-style:dashed">이름<span class="mk-hint" style="pointer-events:none">2:00</span><span class="mk-hint" style="pointer-events:none">↑12일</span></span><span style="color:var(--txt3)">보강일칸(점선)</span>'
+    +'<span class="makeup-chip has-plan" style="pointer-events:none">이름<span class="mk-hint mk-hint-date mk-hint-plan" style="pointer-events:none">→15</span></span><span style="color:var(--txt3)">결석·보강예정</span>'
+    +'<span class="makeup-chip done" style="pointer-events:none">이름<span class="mk-hint mk-hint-date mk-hint-done" style="pointer-events:none">✓15</span></span><span style="color:var(--txt3)">결석·보강완료</span>'
+    +'<span class="makeup-chip scheduled" style="pointer-events:none;border-style:dashed">이름<span class="mk-hint mk-hint-time" style="pointer-events:none">2:00</span><span class="mk-hint mk-hint-date mk-hint-scheduled" style="pointer-events:none">↑12</span></span><span style="color:var(--txt3)">보강일칸(점선)</span>'
     +'<span style="color:var(--txt3);font-size:10px;margin-left:4px">📌 날짜 칸을 탭하면 보강 등록</span>'
     +'</div>';
   $('makeup-calendar').innerHTML=legend+html;
