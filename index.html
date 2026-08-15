@@ -5762,6 +5762,7 @@ function openMakeupUnifiedNew(dateStr){
 }
 
 async function saveMakeupUnified(){
+  if(window._mkSaving)return;window._mkSaving=true;
   var id=$('mk-id').value;
   var mode=$('mk-mode').value||'edit';
   var mkDate=$('mk-date').value;
@@ -5776,8 +5777,8 @@ async function saveMakeupUnified(){
   loading(true);
   if(mode==='new'||!id){
     var sId=($('mk-student-select')||{}).value;
-    if(!sId){toast('⚠️ 학생을 선택하세요');loading(false);return;}
-    var s=students.find(function(x){return x.id===sId;});if(!s){loading(false);return;}
+    if(!sId){toast('⚠️ 학생을 선택하세요');loading(false);window._mkSaving=false;return;}
+    var s=students.find(function(x){return x.id===sId;});if(!s){loading(false);window._mkSaving=false;return;}
     // 결석일 = 클릭한 요일 (mk-absent-date), 보강 예정일 = mk-date
     var absentDate=$('mk-absent-date').value||'';
     var data={studentId:sId,studentName:s.name,absentDate:absentDate,absentReason:mkNote||'보강',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
@@ -5812,7 +5813,7 @@ async function saveMakeupUnified(){
   }else if(mode!=='new'){
     renderSchedule();
   }
-  loading(false);saveCacheDebounced();
+  loading(false);window._mkSaving=false;saveCacheDebounced();
 }
 async function autoCreateAbsentReport(studentId,dateStr,makeupId){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
