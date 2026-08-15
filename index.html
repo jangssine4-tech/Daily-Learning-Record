@@ -5537,9 +5537,7 @@ function renderMakeupCalendar(){
   var yr=makeupViewYear,mo=makeupViewMonth;$('makeup-month-nav').textContent=yr+'년 '+(mo+1)+'월';$('makeup-month-label').textContent=yr+'년 '+(mo+1)+'월';
   var firstDay=new Date(yr,mo,1).getDay();var lastDate=new Date(yr,mo+1,0).getDate();var todayStr=todayISO();
   var monthMakeups=makeups.filter(function(m){
-    if(!m.absentDate)return false;
-    var d=new Date(m.absentDate);
-    var absentInMonth=d.getFullYear()===yr&&d.getMonth()===mo;
+    var absentInMonth=m.absentDate&&(function(){var d=new Date(m.absentDate);return d.getFullYear()===yr&&d.getMonth()===mo;}());
     var makeupInMonth=m.makeupDate&&(function(){var d2=new Date(m.makeupDate);return d2.getFullYear()===yr&&d2.getMonth()===mo;}());
     return absentInMonth||makeupInMonth;
   });
@@ -5786,7 +5784,7 @@ async function saveMakeupUnified(){
     var ref=await db.collection('makeups').add(data);
     makeups.push({id:ref.id,...data});
     // 결석일 기준으로 자동 결석 처리 (실제 사유 전달)
-    await autoCreateAbsentReport(sId,absentDate,ref.id);
+    if(absentDate)await autoCreateAbsentReport(sId,absentDate,ref.id);
     // 기존에 잘못된 사유로 저장된 report 결석으로 통일
     reports.filter(function(r){return r.studentId===sId&&r.date===absentDate&&r.absent&&r.absentReason!=='결석';}).forEach(function(r){
       r.absentReason='결석';
