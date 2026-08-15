@@ -5564,7 +5564,7 @@ function renderMakeupCalendar(){
           if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
           cellChips.push({m:m,isAbsentCell:true});
         });
-        makeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){
+        monthMakeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){
           if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
           cellChips.push({m:m,isAbsentCell:false});
         });
@@ -5627,17 +5627,20 @@ function _openMakeupModal(){
   overlay.onclick=function(e){if(e.target===overlay)closeM('makeup');};
   overlay.innerHTML='<div class="ms"><div class="mh"></div>'
     +'<div class="mt" id="mk-title">보강 관리</div>'
-    +'<input type="hidden" id="mk-id"><input type="hidden" id="mk-mode" value="edit"><input type="hidden" id="mk-absent-date">'
-    +'<div id="mk-student-row" style="display:none" class="field"><div class="fl">결석 학생</div><select class="fi" id="mk-student-select" onchange="_mkUpdateNotifyMsg()"><option value="">학생 선택</option></select></div>'
+    +'<input type="hidden" id="mk-id"><input type="hidden" id="mk-mode" value="edit">'
+    +'<div id="mk-student-row" style="display:none" class="field"><div class="fl">보강 학생</div><select class="fi" id="mk-student-select" onchange="_mkUpdateNotifyMsg()"><option value="">학생 선택</option></select></div>'
     +'<div id="mk-info" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px"><div style="font-size:15px;font-weight:700;color:var(--navy)" id="mk-info-name"></div><div style="font-size:12px;color:var(--txt3);margin-top:2px" id="mk-info-date"></div></div>'
     +'<input type="hidden" id="mk-status" value="pending">'
-    +'<div class="field"><div class="fl">결석 사유</div><select class="fi" id="mk-note"><option value="">결석 사유 선택</option><option value="개인 사정">개인 사정</option><option value="병결">병결</option><option value="학교 행사">학교 행사</option><option value="여행">여행</option><option value="기타">기타</option></select></div>'
-    +'<div class="field"><div class="fl">보강할 수업 내용</div><textarea class="fi" id="mk-content" rows="2" placeholder="예: JOY 2 Unit 5, 스토리 듣기 및 워크북 8~10쪽"></textarea></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<div style="flex:1"><div class="fl">결석일</div><input type="date" class="fi" id="mk-absent-date" style="height:36px;box-sizing:border-box;width:100%"></div>'
+    +'<div style="flex:1"><div class="fl">결석 사유</div><select class="fi" id="mk-note" style="height:36px;box-sizing:border-box;width:100%"><option value="">선택</option><option value="보강">보강</option><option value="개인 사정">개인 사정</option><option value="병결">병결</option><option value="학교 행사">학교 행사</option><option value="여행">여행</option><option value="기타">기타</option></select></div>'
+    +'</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:10px">'
     +'<div style="flex:2"><div class="fl">보강 예정일</div><input type="date" class="fi" id="mk-date" style="height:36px;box-sizing:border-box;width:100%"></div>'
     +'<div style="flex:1"><div class="fl">교시</div><select class="fi" id="mk-period" onchange="onMkPeriodChange()" style="font-size:12px;height:36px;box-sizing:border-box;width:100%"><option value="">교시</option><option value="special1">특강 1</option><option value="special2">특강 2</option><option value="special3">특강 3</option><option value="1">1교시</option><option value="2">2교시</option><option value="3">3교시</option><option value="4">4교시</option><option value="5">5교시</option><option value="6">6교시</option><option value="7">7교시</option></select></div>'
     +'<div style="flex:1"><div class="fl">수업 시간</div><select class="fi" id="mk-time" style="font-size:12px;height:36px;box-sizing:border-box;width:100%">'+timeOpts+'</select></div>'
     +'</div>'
+    +'<div class="field"><div class="fl">보강할 수업 내용</div><textarea class="fi" id="mk-content" rows="2" placeholder="예: JOY 2 Unit 5, 스토리 듣기 및 워크북 8~10쪽"></textarea></div>'
     +'<div style="border-top:1px solid var(--border);margin:10px 0 12px"></div>'
     +'<div class="field"><div class="fl">보강 상태</div><div style="display:flex;gap:8px;margin-top:4px">'
     +'<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="mk-result-status" id="mkrs-pending" value="pending" onchange="onMkStatusChange()"> 미처리</label>'
@@ -5645,7 +5648,6 @@ function _openMakeupModal(){
     +'<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="mk-result-status" id="mkrs-done" value="done" onchange="onMkStatusChange()"> 완료 ✅</label>'
     +'</div></div>'
     +'<div id="mk-result-memo-wrap" style="display:none" class="field"><div class="fl">보강 결과 메모</div><textarea class="fi" id="mk-result-memo" rows="2" placeholder="보강 수업 내용, 특이사항 등"></textarea></div>'
-    // ── 결석 알림 발송 통합 섹션 ──
     +'<div style="border-top:1px solid var(--border);margin:12px 0 10px"></div>'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
     +'<input type="checkbox" id="mk-notify-parent" style="width:16px;height:16px;accent-color:var(--mint)" onchange="_mkToggleNotify(this.checked)">'
@@ -5711,17 +5713,17 @@ function _setMkStatus(val){
   if(el){el.checked=true;onMkStatusChange();}
 }
 
-// 기존 보강 건 열기
 function openMakeupUnified(id){
   var m=makeups.find(function(x){return x.id===id;});if(!m)return;
-  _openMakeupModal(); // 먼저 DOM 생성
+  _openMakeupModal();
   $('mk-title').textContent='보강 관리';
   $('mk-id').value=id;
   $('mk-mode').value='edit';
   var mkSR=$('mk-student-row');if(mkSR)mkSR.style.display='none';
   var mkInfo=$('mk-info');if(mkInfo)mkInfo.style.display='block';
   var mkName=$('mk-info-name');if(mkName)mkName.textContent=m.studentName;
-  var mkDate=$('mk-info-date');if(mkDate)mkDate.textContent='결석일 '+m.absentDate;
+  var mkInfoDate=$('mk-info-date');if(mkInfoDate)mkInfoDate.style.display='none';
+  $('mk-absent-date').value=m.absentDate||'';
   $('mk-note').value=m.makeupNote||'';
   $('mk-content').value=m.makeupContent||m.makeupNote||'';
   $('mk-date').value=m.makeupDate||'';
@@ -5734,12 +5736,12 @@ function openMakeupUnified(id){
 
 // 새 보강 등록 (날짜 칸 클릭)
 function openMakeupUnifiedNew(dateStr){
-  _openMakeupModal(); // 먼저 DOM 생성
+  _openMakeupModal();
   $('mk-title').textContent='보강 등록';
   $('mk-id').value='';
   $('mk-mode').value='new';
-  var absentHidden=$('mk-absent-date');
-  if(absentHidden)absentHidden.value=dateStr||todayISO();
+  $('mk-absent-date').value=dateStr||todayISO();
+  $('mk-note').value='보강';
   var mkSR=$('mk-student-row');
   if(mkSR){
     mkSR.style.display='';
@@ -5752,7 +5754,6 @@ function openMakeupUnifiedNew(dateStr){
     }
   }
   var mkInfo=$('mk-info');if(mkInfo)mkInfo.style.display='none';
-  $('mk-note').value='';
   $('mk-content').value='';
   $('mk-date').value='';
   populateMkPeriod('');
@@ -5780,7 +5781,7 @@ async function saveMakeupUnified(){
     if(!sId){toast('⚠️ 학생을 선택하세요');loading(false);return;}
     var s=students.find(function(x){return x.id===sId;});if(!s){loading(false);return;}
     // 결석일 = 클릭한 요일 (mk-absent-date), 보강 예정일 = mk-date
-    var absentDate=($('mk-absent-date')||{}).value||todayISO();
+    var absentDate=$('mk-absent-date').value||todayISO();
     var data={studentId:sId,studentName:s.name,absentDate:absentDate,absentReason:mkNote||'결석',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
     var ref=await db.collection('makeups').add(data);
     makeups.push({id:ref.id,...data});
@@ -5797,7 +5798,7 @@ async function saveMakeupUnified(){
     if(datePick)datePick.value=absentDate;
     toast('✅ 보강 등록 완료 — '+absentDate+' 결석 처리됨 (시간표에서 확인하세요)');
   } else {
-    var updateData={makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:mkStatus==='done'?'보강 ⭕':'',makeupResultMemo:mkResultMemo,updatedAt:new Date().toISOString()};
+    var updateData={absentDate:$('mk-absent-date').value||undefined,makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:mkStatus==='done'?'보강 ⭕':'',makeupResultMemo:mkResultMemo,updatedAt:new Date().toISOString()};
     await db.collection('makeups').doc(id).update(updateData);
     var idx=makeups.findIndex(function(m){return m.id===id;});
     if(idx>=0)Object.assign(makeups[idx],updateData);
