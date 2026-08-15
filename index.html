@@ -5779,24 +5779,24 @@ async function saveMakeupUnified(){
     if(!sId){toast('⚠️ 학생을 선택하세요');loading(false);return;}
     var s=students.find(function(x){return x.id===sId;});if(!s){loading(false);return;}
     // 결석일 = 클릭한 요일 (mk-absent-date), 보강 예정일 = mk-date
-    var absentDate=$('mk-absent-date').value||todayISO();
-    var data={studentId:sId,studentName:s.name,absentDate:absentDate,absentReason:mkNote||'결석',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
+    var absentDate=$('mk-absent-date').value||'';
+    var data={studentId:sId,studentName:s.name,absentDate:absentDate,absentReason:mkNote||'보강',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
     var ref=await db.collection('makeups').add(data);
     makeups.push({id:ref.id,...data});
-    // 결석일 기준으로 자동 결석 처리 (실제 사유 전달)
-    if(absentDate)await autoCreateAbsentReport(sId,absentDate,ref.id);
-    // 기존에 잘못된 사유로 저장된 report 결석으로 통일
-    reports.filter(function(r){return r.studentId===sId&&r.date===absentDate&&r.absent&&r.absentReason!=='결석';}).forEach(function(r){
-      r.absentReason='결석';
-      db.collection('reports').doc(r.id).update({absentReason:'결석'});
-    });
-    // 시간표 날짜를 결석일로 이동해서 카드에 결석 표시
-    _scheduleDate=absentDate;
-    var datePick=$('schedule-date-pick');
-    if(datePick)datePick.value=absentDate;
-    toast('✅ 보강 등록 완료 — '+absentDate+' 결석 처리됨 (시간표에서 확인하세요)');
-  } else {
-    var updateData={absentDate:$('mk-absent-date').value||undefined,makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:mkStatus==='done'?'보강 ⭕':'',makeupResultMemo:mkResultMemo,updatedAt:new Date().toISOString()};
+    if(absentDate){
+      await autoCreateAbsentReport(sId,absentDate,ref.id);
+      reports.filter(function(r){return r.studentId===sId&&r.date===absentDate&&r.absent&&r.absentReason!=='결석';}).forEach(function(r){
+        r.absentReason='결석';
+        db.collection('reports').doc(r.id).update({absentReason:'결석'});
+      });
+      _scheduleDate=absentDate;
+      var datePick=$('schedule-date-pick');if(datePick)datePick.value=absentDate;
+      toast('✅ 보강 등록 완료 — '+absentDate+' 결석 처리됨');
+    }else{
+      toast('✅ 보강 등록 완료');
+    }
+  }else{
+    var updateData={absentDate:$('mk-absent-date').value||'',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:mkStatus==='done'?'보강 ⭕':'',makeupResultMemo:mkResultMemo,updatedAt:new Date().toISOString()};
     await db.collection('makeups').doc(id).update(updateData);
     var idx=makeups.findIndex(function(m){return m.id===id;});
     if(idx>=0)Object.assign(makeups[idx],updateData);
@@ -5804,28 +5804,16 @@ async function saveMakeupUnified(){
   }
   closeM('makeup');
   renderMakeupCalendar();
-  if(mode==='new'){
-    window._scheduleFromMakeup=true; // 보강 저장 후 이동임을 표시
+  if(mode==='new'&&$('mk-absent-date')&&$('mk-absent-date').value){
+    window._scheduleFromMakeup=true;
     goto('schedule');
     switchSchTab('today');
     setTimeout(function(){renderSchedule();},100);
-  }else{
+  }else if(mode!=='new'){
     renderSchedule();
   }
   loading(false);saveCacheDebounced();
 }
-
-async function deleteMakeupEntry(){
-  var id=$('mk-id').value;if(!id)return;
-  if(!confirm('보강 등록을 삭제할까요?'))return;
-  loading(true);
-  await db.collection('makeups').doc(id).delete();
-  makeups=makeups.filter(function(m){return m.id!==id;});
-  closeM('makeup');
-  renderMakeupCalendar();
-  loading(false);saveCacheDebounced();toast('🗑 삭제 완료');
-}
-
 async function autoCreateAbsentReport(studentId,dateStr,makeupId){
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
   var d=new Date(dateStr+'T12:00:00');
