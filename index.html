@@ -1836,7 +1836,7 @@ function renderMkNaverPage(){
   el.innerHTML=html;
 }
 function toggleBlogMenu(){} // stub - no longer needed
-function renderMkJarvis_stub(){} // stub
+
 function renderBlogStrategy(){
   var el=$('blog-strategy-area');if(!el)return;
   el.innerHTML='<div style="max-width:700px">'
@@ -9004,7 +9004,6 @@ function renderRevSummary(yr){
   var el=$('rev-summary-area');if(!el)return;
   var months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   var curMoNow=new Date().getMonth();var curYrNow=new Date().getFullYear();
-  var activeStudents2=students.filter(function(s){return['재원','신규'].includes(s.status||'재원');});
   var monthData=months.map(function(m,i){var mo=i+1;var revs=revenues.filter(function(r2){if(r2.isManualMeta)return false;if(r2.revYear&&r2.revMonth)return r2.revYear===yr&&r2.revMonth===mo;var d=new Date(r2.paidDate);return d.getFullYear()===yr&&d.getMonth()+1===mo;});var exps=expenses.filter(function(e2){if(e2.revYear&&e2.revMonth)return e2.revYear===yr&&e2.revMonth===mo;var d=new Date(e2.date||e2.createdAt);return d.getFullYear()===yr&&d.getMonth()+1===mo;});var totalRev=revs.reduce(function(s,r2){return s+(parseInt(r2.amount)||0);},0);var totalExp=exps.reduce(function(s,e2){return s+(parseInt(e2.amount)||0);},0);return{mo:mo,totalRev:totalRev,totalExp:totalExp,net:totalRev-totalExp,hasData:revs.length>0||exps.length>0};});
   var isFuture=function(i){return(yr>curYrNow)||(yr===curYrNow&&i>curMoNow);};var hasD=function(i){return monthData[i].hasData;};
   var cellR=function(i,val,style){if(isFuture(i)||!hasD(i))return'<td></td>';return'<td style="text-align:center;'+(style||'')+'">'+val+'</td>';};
@@ -9020,34 +9019,7 @@ function renderRevSummary(yr){
     +'<tr style="background:var(--surface2)"><td style="font-weight:700">순수익</td>'+monthData.map(function(d,i){return cellR(i,d.net.toLocaleString()+'원',d.net>=0?'color:var(--mint);font-weight:700':'color:var(--red);font-weight:700');}).join('')+'</tr>'
     +'<tr style="background:#e8f4fd;border-top:2px solid var(--navy)"><td style="font-weight:700;color:#1e3a8a;border-top:2px solid var(--navy)">수강료 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td style="border-top:2px solid var(--navy)"></td>';return'<td style="border-top:2px solid var(--navy);text-align:center;color:#1e3a8a;font-weight:700;font-size:11px">'+cumRevArr2[i].toLocaleString()+'원</td>';}).join('')+'</tr>'
     +'<tr style="background:#e8f4fd"><td style="font-weight:700;color:#1e3a8a">순익 누적</td>'+monthData.map(function(d,i){if(isFuture(i)||!hasD(i))return'<td></td>';var cv=cumNetArr[i];return'<td style="text-align:center;font-weight:700;font-size:11px;color:'+(cv>=0?'#1e3a8a':'var(--red)')+'">'+cv.toLocaleString()+'원</td>';}).join('')+'</tr>';
-  el.innerHTML='<div class="expense-section"><h4>💰 매출 현황 ('+yr+'년)</h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px"><thead><tr><th>항목</th>'+mTHR+'</tr></thead><tbody>'+revRowsHTML+'</tbody></table></div></div><div class="expense-section"><h4>👥 원생 현황</h4><div style="text-align:center;padding:10px;color:var(--txt3)">재원 '+activeStudents2.length+'명 · 신규 '+(students||[]).filter(function(s){return s.status==='신규';}).length+'명 · 퇴원 '+(students||[]).filter(function(s){return s.status==='퇴원';}).length+'명 · 휴원 '+(students||[]).filter(function(s){return s.status==='휴원';}).length+'명</div></div>';
-  // 경영 자비스 분석
-  var curMo2=new Date().getMonth()+1;var curYr2=new Date().getFullYear();
-  var mo2=(yr===curYr2)?curMo2:12;
-  var curMonthRev=monthData[mo2-1]?monthData[mo2-1].totalRev:0;
-  var prevMo2=mo2-1;var prevYr2=yr;if(prevMo2<1){prevMo2=12;prevYr2--;}
-  var prevRevs2=(revenues||[]).filter(function(r){if(r.isManualMeta)return false;var ry=r.revYear||new Date(r.paidDate).getFullYear();var rm=r.revMonth||new Date(r.paidDate).getMonth()+1;return ry===prevYr2&&rm===prevMo2;});
-  var prevTotal2=prevRevs2.reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
-  var analysis=[];
-  if(prevTotal2>0){
-    var diff2=curMonthRev-prevTotal2;var pct2=Math.round(diff2/prevTotal2*100);
-    if(diff2>0)analysis.push('📈 전월 대비 <b style="color:var(--mint)">+'+pct2+'%</b> ('+diff2.toLocaleString()+'원 증가)');
-    else if(diff2<0)analysis.push('📉 전월 대비 <b style="color:#dc2626">'+pct2+'%</b> ('+Math.abs(diff2).toLocaleString()+'원 감소)');
-    else analysis.push('📊 전월과 동일한 매출');
-  }
-  var unpaidCount2=activeStudents2.filter(function(s2){
-    var paid=(revenues||[]).some(function(r){return r.studentId===s2.id&&r.paidDate&&r.paidDate.substring(0,7)===yr+'-'+String(mo2).padStart(2,'0')&&parseInt(r.amount)>0;});
-    return!paid;
-  }).length;
-  if(unpaidCount2>0)analysis.push('💳 미납 학생 <b style="color:#dc2626">'+unpaidCount2+'명</b> — 수납 확인 필요');
-  var newStu2=activeStudents2.filter(function(s2){return s2.status==='신규';}).length;
-  if(newStu2>0)analysis.push('🆕 신규 학생 <b>'+newStu2+'명</b> 재원 중');
-  var yearRevTotal=monthData.reduce(function(s,d){return s+d.totalRev;},0);
-  var yearExpTotal=monthData.reduce(function(s,d){return s+d.totalExp;},0);
-  analysis.push('📊 '+yr+'년 총 매출 <b style="color:var(--mint)">'+yearRevTotal.toLocaleString()+'원</b> · 총 지출 <b style="color:#dc2626">'+yearExpTotal.toLocaleString()+'원</b> · 순수익 <b style="color:'+(yearRevTotal-yearExpTotal>=0?'var(--mint)':'#dc2626')+'">'+(yearRevTotal-yearExpTotal).toLocaleString()+'원</b>');
-  if(analysis.length){
-    el.innerHTML+='<div class="expense-section"><div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px"><div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px">🤖 경영 자비스 분석 ('+yr+'년 '+mo2+'월 기준)</div><div style="font-size:12px;line-height:1.8;color:var(--txt)">'+analysis.join('<br>')+'</div></div></div>';
-  }
+  el.innerHTML='<div class="expense-section"><h4>💰 매출 현황 ('+yr+'년)</h4><div style="overflow-x:auto"><table class="rev-tbl" style="min-width:800px"><thead><tr><th>항목</th>'+mTHR+'</tr></thead><tbody>'+revRowsHTML+'</tbody></table></div></div>';
 }
 function renderTaxArea(yr){
   var el=$('tax-area');if(!el)return;
