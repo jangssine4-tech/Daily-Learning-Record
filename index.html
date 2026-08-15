@@ -12992,7 +12992,7 @@ function renderRevGoals(yr){
   function bar(pct,color){return'<div style="background:var(--border);border-radius:4px;height:6px;width:100%;margin-top:6px"><div style="background:'+color+';height:6px;border-radius:4px;width:'+Math.min(pct,100)+'%;transition:width .4s"></div></div>';}
   function fi(label,id,val,placeholder,type){
     return'<div style="margin-bottom:12px">'
-      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">'+label+'</div>'
+      +'<div style="font-size:13px;color:var(--txt2);margin-bottom:4px;font-weight:600">'+label+'</div>'
       +'<input type="'+(type||'number')+'" id="'+id+'" class="fi" value="'+(val||'')+'" placeholder="'+placeholder+'"'
       +' style="font-size:13px;height:36px;box-sizing:border-box;width:100%"'
       +' onchange="_saveGoalSettings('+yr+')">'
@@ -13028,31 +13028,73 @@ function renderRevGoals(yr){
     +'</div>';
 
   // ── 핵심 카드 3개 ──
+  // ── 2단계: 이번 달 데이터 집계 ──
+  var moStr=curMo+'월';
+  var moNewStu=students.filter(function(s){var d=new Date(s.startDate||s.createdAt||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;}).length;
+  var moOutStu=students.filter(function(s){if(s.status!=='퇴원')return false;var d=new Date(s.endDate||s.updatedAt||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;}).length;
+  var moNet=moNewStu-moOutStu;
+  var moInquiry=(newConsults||[]).filter(function(nc){var d=new Date(nc.inquiryDate||nc.date||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;}).length;
+  var moConsult=(newConsults||[]).filter(function(nc){var d=new Date(nc.date||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo&&['상담 완료','체험 예정','체험 완료','등록 완료'].includes(nc.ncStatus);}).length;
+  var moReg=(newConsults||[]).filter(function(nc){var d=new Date(nc.date||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo&&nc.ncStatus==='등록 완료';}).length;
+  var moTasks=(_dbTasks||[]).filter(function(t){if(t.id&&t.id.startsWith('__'))return false;var d=new Date(t.dueDate||t.createdAt||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;});
+  var moTaskDone=moTasks.filter(function(t){return t.status==='완료';}).length;
+  var moTaskPct=moTasks.length>0?Math.round(moTaskDone/moTasks.length*100):null;
+
   var cardsHtml='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">'
     // 1. 연간 매출
     +'<div style="background:var(--surface);border:2px solid '+(revPct>=100?'#86efac':'var(--border)')+';border-radius:14px;padding:14px">'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">연간 매출 달성률</div>'
+    +'<div style="font-size:13px;color:var(--txt3);margin-bottom:4px">연간 매출 달성률</div>'
     +'<div style="font-size:20px;font-weight:800;color:'+revColor+'">'+(targetRev>0?revPct+'%':'-')+'</div>'
-    +'<div style="font-size:11px;color:var(--txt2);margin-top:4px">실매출 <b>'+yearRev.toLocaleString()+'</b>원</div>'
-    +'<div style="font-size:11px;color:var(--txt2)">목표 <b>'+(targetRev>0?targetRev.toLocaleString():'-')+'</b>원</div>'
+    +'<div style="font-size:13px;color:var(--txt2);margin-top:4px">실매출 <b>'+yearRev.toLocaleString()+'</b>원</div>'
+    +'<div style="font-size:13px;color:var(--txt2)">목표 <b>'+(targetRev>0?targetRev.toLocaleString():'-')+'</b>원</div>'
     +(targetRev>0?bar(revPct,revColor):'')
     +'<div style="margin-top:6px">'+getBadge(revPct,elapsedPct,targetRev>0)+'</div>'
     +'</div>'
     // 2. 재원생
     +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">현재 재원생</div>'
+    +'<div style="font-size:13px;color:var(--txt3);margin-bottom:4px">현재 재원생</div>'
     +'<div style="font-size:20px;font-weight:800;color:var(--navy)">'+active.length+'명</div>'
-    +'<div style="font-size:11px;color:var(--txt2);margin-top:4px">필요 평균 <b>'+(needAvgStu||'-')+'</b>명</div>'
-    +'<div style="font-size:11px;color:var(--txt2)">차이 <b style="color:'+(active.length>=needAvgStu?'#16a34a':'#dc2626')+'">'+(needAvgStu?((active.length-needAvgStu>=0?'+':'')+(active.length-needAvgStu)+'명'):'-')+'</b></div>'
+    +'<div style="font-size:13px;color:var(--txt2);margin-top:4px">필요 평균 <b>'+(needAvgStu||'-')+'</b>명</div>'
+    +'<div style="font-size:13px;color:var(--txt2)">차이 <b style="color:'+(needAvgStu&&active.length>=needAvgStu?'#16a34a':'#dc2626')+'">'+(needAvgStu?((active.length-needAvgStu>=0?'+':'')+(active.length-needAvgStu)+'명'):'-')+'</b></div>'
     +(needAvgStu>0?bar(Math.round(active.length/needAvgStu*100),'#2563eb'):'')
     +'</div>'
     // 3. 연말 예상
     +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">연말 예상 매출</div>'
+    +'<div style="font-size:13px;color:var(--txt3);margin-bottom:4px">연말 예상 매출</div>'
     +'<div style="font-size:20px;font-weight:800;color:'+(projPct>=100?'#16a34a':projPct>=80?'#d97706':'#dc2626')+'">'+(elapsedMo>0?projYearEnd.toLocaleString()+'원':'-')+'</div>'
-    +'<div style="font-size:11px;color:var(--txt2);margin-top:4px">현재 추세 유지 시</div>'
-    +'<div style="font-size:11px;color:var(--txt2)">목표 대비 <b>'+(targetRev>0?projPct+'%':'-')+'</b></div>'
+    +'<div style="font-size:13px;color:var(--txt2);margin-top:4px">현재 추세 유지 시</div>'
+    +'<div style="font-size:13px;color:var(--txt2)">목표 대비 <b>'+(targetRev>0?projPct+'%':'-')+'</b></div>'
     +(targetRev>0&&elapsedMo>0?bar(projPct,projPct>=100?'#16a34a':projPct>=80?'#d97706':'#dc2626'):'')
+    +'</div>'
+    +'</div>'
+    // 2단계 카드 3개
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">'
+    // 4. 이번 달 신규·퇴원·순증
+    +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
+    +'<div style="font-size:13px;color:var(--txt3);margin-bottom:8px">'+moStr+' 학생 변동</div>'
+    +'<div style="display:flex;justify-content:space-around;text-align:center">'
+    +'<div><div style="font-size:18px;font-weight:800;color:#16a34a">+'+moNewStu+'</div><div style="font-size:13px;color:var(--txt3)">신규</div></div>'
+    +'<div><div style="font-size:18px;font-weight:800;color:#dc2626">-'+moOutStu+'</div><div style="font-size:13px;color:var(--txt3)">퇴원</div></div>'
+    +'<div><div style="font-size:18px;font-weight:800;color:'+(moNet>0?'#16a34a':moNet<0?'#dc2626':'var(--txt2)')+'">'+(moNet>0?'+':'')+moNet+'</div><div style="font-size:13px;color:var(--txt3)">순증</div></div>'
+    +'</div>'
+    +'</div>'
+    // 5. 이번 달 문의·상담·등록
+    +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
+    +'<div style="font-size:13px;color:var(--txt3);margin-bottom:8px">'+moStr+' 모집 현황</div>'
+    +'<div style="display:flex;justify-content:space-around;text-align:center">'
+    +'<div><div style="font-size:18px;font-weight:800;color:#7c3aed">'+moInquiry+'</div><div style="font-size:13px;color:var(--txt3)">문의</div></div>'
+    +'<div><div style="font-size:18px;font-weight:800;color:#2563eb">'+moConsult+'</div><div style="font-size:13px;color:var(--txt3)">상담</div></div>'
+    +'<div><div style="font-size:18px;font-weight:800;color:#16a34a">'+moReg+'</div><div style="font-size:13px;color:var(--txt3)">등록</div></div>'
+    +'</div>'
+    +(needConsult>0?'<div style="font-size:12px;color:var(--txt3);text-align:center;margin-top:8px;border-top:1px solid var(--border);padding-top:6px">월 목표 상담 <b>'+needConsult+'건</b> 중 <b style="color:'+(moConsult>=needConsult?'#16a34a':'#dc2626')+'">'+moConsult+'건</b></div>':'')
+    +'</div>'
+    // 6. 할 일 완료율
+    +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
+    +'<div style="font-size:13px;color:var(--txt3);margin-bottom:4px">'+moStr+' 할 일 완료율</div>'
+    +'<div style="font-size:20px;font-weight:800;color:'+(moTaskPct===null?'var(--txt3)':moTaskPct>=80?'#16a34a':moTaskPct>=50?'#d97706':'#dc2626')+'">'+(moTaskPct!==null?moTaskPct+'%':'-')+'</div>'
+    +'<div style="font-size:13px;color:var(--txt2);margin-top:4px">'+(moTasks.length>0?moTaskDone+'건 완료 / '+moTasks.length+'건 전체':'이달 할 일 없음')+'</div>'
+    +(moTaskPct!==null?bar(moTaskPct,moTaskPct>=80?'#16a34a':moTaskPct>=50?'#d97706':'#dc2626'):'')
+    +'<div style="margin-top:6px;font-size:12px;color:var(--txt3);cursor:pointer" onclick="goto('board')">할 일 페이지로 →</div>'
     +'</div>'
     +'</div>';
 
@@ -13062,12 +13104,12 @@ function renderRevGoals(yr){
     simHtml='<div style="background:linear-gradient(135deg,#eff6ff,#e0f2fe);border:1px solid #93c5fd;border-radius:14px;padding:16px;margin-bottom:20px">'
       +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px">📐 목표 달성을 위한 역산 결과</div>'
       +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
-      +['<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">월 목표 매출</div><div style="font-size:16px;font-weight:800;color:var(--navy)">'+(needMonthlyRev?needMonthlyRev.toLocaleString()+'원':'-')+'</div></div>'
-      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">필요 평균 재원생</div><div style="font-size:16px;font-weight:800;color:var(--navy)">'+(needAvgStu?needAvgStu+'명':'-')+'</div></div>'
-      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">월 신규 필요</div><div style="font-size:16px;font-weight:800;color:#d97706">'+(needNewPerMo?needNewPerMo+'명':'-')+'</div><div style="font-size:9px;color:var(--txt3)">(퇴원 보전 포함)</div></div>'
-      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">필요 상담 수/월</div><div style="font-size:16px;font-weight:800;color:#2563eb">'+(convReg>0?needConsult+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convReg>0?'전환율 '+convReg+'%':'전환율 미입력')+'</div></div>'
-      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">필요 문의 수/월</div><div style="font-size:16px;font-weight:800;color:#7c3aed">'+(convInq>0?needInquiry+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convInq>0?'전환율 '+convInq+'%':'전환율 미입력')+'</div></div>'
-      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:10px;color:var(--txt3)">예상 월 퇴원</div><div style="font-size:16px;font-weight:800;color:#dc2626">'+(churnRate>0?Math.ceil(active.length*(churnRate/100))+'명':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(churnRate>0?churnRate+'% 기준':'퇴원율 미입력')+'</div></div>'
+      +['<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">월 목표 매출</div><div style="font-size:16px;font-weight:800;color:var(--navy)">'+(needMonthlyRev?needMonthlyRev.toLocaleString()+'원':'-')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">필요 평균 재원생</div><div style="font-size:16px;font-weight:800;color:var(--navy)">'+(needAvgStu?needAvgStu+'명':'-')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">월 신규 필요</div><div style="font-size:16px;font-weight:800;color:#d97706">'+(needNewPerMo?needNewPerMo+'명':'-')+'</div><div style="font-size:12px;color:var(--txt3)">(퇴원 보전 포함)</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">필요 상담 수/월</div><div style="font-size:16px;font-weight:800;color:#2563eb">'+(convReg>0?needConsult+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convReg>0?'전환율 '+convReg+'%':'전환율 미입력')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">필요 문의 수/월</div><div style="font-size:16px;font-weight:800;color:#7c3aed">'+(convInq>0?needInquiry+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convInq>0?'전환율 '+convInq+'%':'전환율 미입력')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">예상 월 퇴원</div><div style="font-size:16px;font-weight:800;color:#dc2626">'+(churnRate>0?Math.ceil(active.length*(churnRate/100))+'명':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(churnRate>0?churnRate+'% 기준':'퇴원율 미입력')+'</div></div>'
       ].join('')
       +'</div>'
       +'</div>';
@@ -13545,6 +13587,10 @@ function renderRefFees(){
       return tb?parseInt(tb.textbookFee)||0:0;
     }
 
+    // sortOrder 기준 정렬
+    tuitionItems.sort(function(a,b){return(a.sortOrder||0)-(b.sortOrder||0);});
+    textbookItems.sort(function(a,b){return(a.sortOrder||0)-(b.sortOrder||0);});
+
     // ── 인라인 입력 헬퍼 ──
     function numCell(val,cls){return'<td style="text-align:center;padding:2px"><input type="number" class="fi '+cls+'" value="'+(val||'')+'" style="width:84px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>';}
     function txtCell(val,cls,ph){return'<td style="padding:2px"><input type="text" class="fi '+cls+'" value="'+(val||'')+'" placeholder="'+(ph||'')+'" style="width:80px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>';}
@@ -13566,6 +13612,8 @@ function renderRefFees(){
           +'<td style="padding:2px"><input type="number" class="fi ri-w4" value="'+(w4||'')+'" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
           +'<td style="padding:2px"><input type="number" class="fi ri-w5" value="'+(w5||'')+'" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
           +'<td style="padding:2px;white-space:nowrap">'
+          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,-1)" title="위로">▲</button>'
+          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,1)" title="아래로">▼</button> '
           +'<button class="btn btn-navy btn-xs" onclick="_saveRefRow(this)">저장</button> '
           +'<button class="btn btn-red btn-xs" onclick="_delRefRow(this)">삭제</button>'
           +'</td></tr>';
@@ -13590,6 +13638,8 @@ function renderRefFees(){
           +'<td style="padding:2px"><input type="text" class="fi ri-level" value="'+(item.level||item.supMaterial||'')+'" placeholder="교재명" style="width:140px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
           +'<td style="padding:2px;text-align:right"><input type="number" class="fi ri-textbookfee" value="'+(item.textbookFee||'')+'" placeholder="교재비" style="width:90px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
           +'<td style="padding:2px;white-space:nowrap">'
+          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,-1)" title="위로">▲</button>'
+          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,1)" title="아래로">▼</button> '
           +'<button class="btn btn-navy btn-xs" onclick="_saveRefRow(this)">저장</button> '
           +'<button class="btn btn-red btn-xs" onclick="_delRefRow(this)">삭제</button>'
           +'</td></tr>';
@@ -14446,6 +14496,28 @@ function _calcBaseFee(inp){
     if(w5&&!w5.dataset.manual)w5.value=base;
   }
 }
+async function _moveRefRow(btn,dir){
+  var row=btn.closest('tr');if(!row)return;
+  var id=row.dataset.id;var type=row.dataset.type;
+  if(!id)return;
+  // 같은 타입의 항목 정렬된 목록
+  var items=refItems.filter(function(i){
+    return type==='tuition'?(i.refType==='tuition'||(!i.refType&&i.baseFee)):(i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial)));
+  }).sort(function(a,b){return(a.sortOrder||0)-(b.sortOrder||0);});
+  var idx=items.findIndex(function(i){return i.id===id;});
+  var swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=items.length)return;
+  // sortOrder 교환
+  var a=items[idx],b=items[swapIdx];
+  var ao=a.sortOrder||idx,bo=b.sortOrder||swapIdx;
+  loading(true);
+  try{
+    await db.collection('refItems').doc(a.id).update({sortOrder:bo});
+    await db.collection('refItems').doc(b.id).update({sortOrder:ao});
+    await loadRefItems();renderRefFees();
+  }catch(e){toast('❌ 오류: '+e.message);}
+  loading(false);saveCacheDebounced();
+}
 async function _saveRefRow(btn){
   var row=btn.closest('tr');if(!row)return;
   var id=row.dataset.id||'';
@@ -14471,7 +14543,11 @@ async function _saveRefRow(btn){
   loading(true);
   try{
     if(id)await db.collection('refItems').doc(id).update(data);
-    else await db.collection('refItems').add({...data,createdAt:new Date().toISOString()});
+    else{
+      var sameType=refItems.filter(function(i){return i.refType===type;});
+      data.sortOrder=sameType.length;
+      await db.collection('refItems').add({...data,createdAt:new Date().toISOString()});
+    }
     await loadRefItems();renderRefFees();toast('✅ 저장됨');
   }catch(e){toast('❌ 오류: '+e.message);}
   loading(false);saveCacheDebounced();
