@@ -13805,7 +13805,7 @@ function renderRefFees(){
 
     // ── 인라인 입력 헬퍼 ──
     // 드롭다운+직접입력 콤보 헬퍼
-    var TBFEE_OPTS=[14000,21080,31050,33000];
+    var TBFEE_OPTS=[14000,21080,23100,31050,33000];
 
     // 공통 select+직접입력 콤보 (교재비와 동일한 디자인)
     function refCombo(cls,val,opts,onChangeFn,isNum){
@@ -13826,7 +13826,7 @@ function renderRefFees(){
       return'<div style="display:flex;align-items:center;gap:2px;width:100%">'+sel+inp+backBtn+'</div>';
     }
 
-    var TBFEE_OPTS=[14000,21080,31050,33000];
+    var TBFEE_OPTS=[14000,21080,23100,31050,33000];
     var TUITION_OPTS=[180000,213000,240000,250000,320000,360000];
 
     var STAGE_OPTS=['초등 Phonics','초등 Basic','중등(초등)','중등(중등)','고등(중등)','고등(고등)'];
@@ -14786,11 +14786,29 @@ function _tbFeeBack(b,u){_refComboBack(b,u);}
 function _autoFillTbFee(inp){
   var row=inp.closest('tr');if(!row)return;
   var level=inp.value.trim();
-  var tbFeeInp=row.querySelector('.ri-textbookfee-ref');
-  if(!tbFeeInp||tbFeeInp.value)return;
+  var tbFeeInp=row.querySelector('input.ri-textbookfee-ref');
+  var tbFeeSel=row.querySelector('select.ri-textbookfee-ref');
+  // 교재비 표에서 해당 교재 조회
   var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
   var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
-  if(tb&&tb.textbookFee){tbFeeInp.value=tb.textbookFee;_calcBaseFee(tbFeeInp);}
+  if(tb&&tb.textbookFee){
+    var fee=String(tb.textbookFee);
+    // select에 해당 값 있으면 select 선택, 없으면 직접입력
+    if(tbFeeSel&&tbFeeSel.style.display!=='none'){
+      var opt=Array.from(tbFeeSel.options).find(function(o){return o.value===fee;});
+      if(opt){tbFeeSel.value=fee;}
+      else{
+        // 직접입력 모드로 전환
+        var uid=tbFeeSel.id.replace('-sel','');
+        _refComboChange(tbFeeSel,uid,'_calcBaseFee(this)');
+        if(tbFeeInp)tbFeeInp.value=fee;
+      }
+    } else if(tbFeeInp){
+      tbFeeInp.value=fee;
+    }
+  }
+  // 항상 기본 교육비 재계산
+  _calcBaseFee(inp);
 }
 function _calcBaseFee(inp){
   var row=inp.closest('tr');if(!row)return;
