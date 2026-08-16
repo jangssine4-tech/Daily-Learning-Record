@@ -6687,38 +6687,57 @@ function findRefItem(rawLevel, refType, studentGrade){
   var cat=getLevelCategory(rawLevel);
   var isT=refType==='tuition';
   var schoolLevel=getSchoolLevel(studentGrade||'');
-  function levelMatch(ri){
+  // sortOrder 순으로 정렬된 refItems
+  var sorted=refItems.slice().sort(function(a,b){return(a.sortOrder||0)-(b.sortOrder||0);});
+  function exactMatch(ri){
     var riL=(ri.level||'').trim();
-    return riL===rawLevel||riL===cat||rawLevel.indexOf(riL)===0||riL.indexOf(cat)===0||
-      (cat==='Basic'&&riL==='Basic')||(cat==='Grammar Plus'&&(riL==='Grammar Plus'||riL==='Grammar'))||
-      (cat==='First Grammar'&&(riL==='First Grammar'||riL==='Grammar'))||
-      (cat==='Prime'&&riL==='Prime')||(cat==='Advanced'&&riL==='Advanced')||
-      (cat==='Elite'&&riL==='Elite')||(cat==='중고등'&&riL==='중고등');
+    return riL===rawLevel||riL===cat;
+  }
+  function catMatch(ri){
+    var riL=(ri.level||'').trim();
+    if(cat==='Basic'&&riL==='Basic') return true;
+    if(cat==='Phonics'){
+      if(rawLevel.toLowerCase().indexOf('master')>=0) return riL==='Master Phonics';
+      return riL==='Phonics';
+    }
+    if(cat==='Grammar Plus'&&riL==='Grammar Plus') return true;
+    if(cat==='First Grammar'&&riL==='First Grammar') return true;
+    if(cat==='Prime'&&riL==='Prime') return true;
+    if(cat==='Advanced'&&riL==='Advanced') return true;
+    if(cat==='Elite'&&riL==='Elite') return true;
+    if(cat==='중고등'&&(riL==='중고등'||rawLevel.indexOf(riL)===0)) return true;
+    return false;
   }
   function stageMatch(ri){
     if(!schoolLevel||!ri.stage)return true;
     return ri.stage.indexOf(schoolLevel)>=0;
   }
+  function typeOkT(ri){return ri.refType==='tuition'||(!ri.refType&&ri.baseFee);}
+  function typeOkB(ri){return ri.refType==='textbook'||(!ri.refType&&(ri.textbookFee||ri.supMaterial));}
   if(isT){
-    // 교육비 기준 표에서 조회
-    function typeOkT(ri){return ri.refType==='tuition'||(!ri.refType&&ri.baseFee);}
-    var best=refItems.find(function(ri){return typeOkT(ri)&&levelMatch(ri)&&stageMatch(ri);});
-    return best||refItems.find(function(ri){return typeOkT(ri)&&levelMatch(ri);})||null;
+    // 1순위: 정확 매칭 + 학교급 매칭
+    var r=sorted.find(function(ri){return typeOkT(ri)&&exactMatch(ri)&&stageMatch(ri);});
+    if(r)return r;
+    // 2순위: 카테고리 매칭 + 학교급 매칭
+    r=sorted.find(function(ri){return typeOkT(ri)&&catMatch(ri)&&stageMatch(ri);});
+    if(r)return r;
+    // 3순위: 학교급 무시 정확 매칭
+    r=sorted.find(function(ri){return typeOkT(ri)&&exactMatch(ri);});
+    if(r)return r;
+    // 4순위: 학교급 무시 카테고리 매칭
+    return sorted.find(function(ri){return typeOkT(ri)&&catMatch(ri);})||null;
   } else {
-    // 교재비 조회: ① 교재비 기준 표 ② 교육비 기준 표의 textbookFeeRef 순으로 조회
-    function typeOkB(ri){return ri.refType==='textbook'||(!ri.refType&&(ri.textbookFee||ri.supMaterial));}
-    var tbBest=refItems.find(function(ri){return typeOkB(ri)&&levelMatch(ri)&&stageMatch(ri);});
-    if(tbBest)return tbBest;
-    var tbFallback=refItems.find(function(ri){return typeOkB(ri)&&levelMatch(ri);});
-    if(tbFallback)return tbFallback;
-    // 교재비 기준 표에 없으면 교육비 기준 표의 textbookFeeRef로 가상 객체 반환
-    function typeOkT2(ri){return ri.refType==='tuition'||(!ri.refType&&ri.baseFee);}
-    var tuitionItem=refItems.find(function(ri){return typeOkT2(ri)&&levelMatch(ri)&&stageMatch(ri);})
-      ||refItems.find(function(ri){return typeOkT2(ri)&&levelMatch(ri);});
-    if(tuitionItem&&(tuitionItem.textbookFeeRef||tuitionItem.textbookFee)){
-      // 교육비 기준 표 행을 textbook처럼 반환 (textbookFee 필드로 통일)
-      return{id:tuitionItem.id,level:tuitionItem.level,refType:'textbook',
-        textbookFee:parseInt(tuitionItem.textbookFeeRef)||parseInt(tuitionItem.textbookFee)||0};
+    // 교재비: 먼저 textbook 타입에서 조회
+    var r2=sorted.find(function(ri){return typeOkB(ri)&&(exactMatch(ri)||catMatch(ri))&&stageMatch(ri);});
+    if(r2)return r2;
+    r2=sorted.find(function(ri){return typeOkB(ri)&&(exactMatch(ri)||catMatch(ri));});
+    if(r2)return r2;
+    // 없으면 tuition 행의 textbookFeeRef 사용
+    var ti=sorted.find(function(ri){return typeOkT(ri)&&(exactMatch(ri)||catMatch(ri))&&stageMatch(ri);})
+      ||sorted.find(function(ri){return typeOkT(ri)&&(exactMatch(ri)||catMatch(ri));});
+    if(ti&&(ti.textbookFeeRef||ti.textbookFee)){
+      return{id:ti.id,level:ti.level,refType:'textbook',
+        textbookFee:parseInt(ti.textbookFeeRef)||parseInt(ti.textbookFee)||0};
     }
     return null;
   }
