@@ -5590,8 +5590,7 @@ function renderMakeupCalendar(){
       if(cellDate){
         var dateStr=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(cellDate).padStart(2,'0');
         var isToday=dateStr===todayStr;var holiday=isHoliday(yr,mo,cellDate);var isRed=isSun2||holiday!=null;
-        dateLbl='<div style="font-size:10px;font-weight:700;color:'+(isRed?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+';margin-bottom:3px'+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" title="'+(holiday||'')+'">'+cellDate+(holiday?'🔴':'')+'</div>';
-        var _chipSeen={};
+        dateLbl='<div style="font-size:10px;font-weight:700;color:'+(isRed?'var(--red)':isSat2?'var(--blue)':'var(--txt3)')+';margin-bottom:3px'+(isToday?';background:var(--mint);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;margin-left:auto;margin-right:auto':'')+'" title="'+(holiday||'')+'">'+cellDate+(holiday?'🔴':'')+'</div>';        var _chipSeen={};
         function fmtDate(d){var mm=parseInt(d.slice(5,7)),dd=parseInt(d.slice(8));return mm+'.'+dd;}
         // 이 칸에 표시할 모든 보강 기록 수집
         var cellChips=[];
@@ -13704,8 +13703,8 @@ function renderRefFees(){
       var selStyle='display:'+(isCustom?'none':'inline-block')+';width:100%;';
       var inpStyle='display:'+(isCustom?'inline-block':'none')+';width:calc(100% - 28px);';
       var optHtml='<option value="">선택</option>'+opts.map(function(o){
-        var sel2=isNum?(parseInt(val)===parseInt(o)):(String(val)===String(o));
-        return'<option value="'+o+'"'+(sel2?' selected':'')+'>'+o+'</option>';
+        var matched=isNum?(parseInt(val)===parseInt(o)&&parseInt(val)>0):(String(val)===String(o)&&val!=='');
+        return'<option value="'+o+'"'+(matched?' selected':'')+'>'+o+'</option>';
       }).join('')+'<option value="__direct__">직접 입력...</option>';
       var sel='<select id="'+uid+'-sel" class="ri-input '+cls+'" style="'+selStyle+'" onchange="_refComboChange(this,\''+uid+'\',\''+onChangeFn+'\')">'+optHtml+'</select>';
       var inp='<input id="'+uid+'-inp" '+(isNum?'type="number"':'type="text"')+' class="ri-input '+cls+'" style="'+inpStyle+'" value="'+(isCustom?val:'')+'" placeholder="직접 입력" '+(onChangeFn?'oninput="'+onChangeFn+'"':'')+' autocomplete="off">';
@@ -14740,23 +14739,30 @@ async function _saveRefRow(btn){
   var row=btn.closest('tr');if(!row)return;
   var id=row.dataset.id||'';
   var type=row.dataset.type||'tuition';
-  var level=(row.querySelector('.ri-level')||{}).value.trim();
-  if(!level){toast('⚠️ 단계명/교재명을 입력하세요');return;}
+  // select/input 콤보에서 실제 값 읽는 헬퍼
+  function readCombo(cls){
+    var sel=row.querySelector('select.'+cls);
+    var inp=row.querySelector('input.'+cls);
+    if(inp&&inp.style.display!=='none'&&inp.value.trim())return inp.value.trim();
+    if(sel&&sel.value&&sel.value!=='__direct__')return sel.value.trim();
+    if(inp&&inp.value.trim())return inp.value.trim();
+    return '';
+  }
+  function readComboNum(cls){
+    var sel=row.querySelector('select.'+cls);
+    var inp=row.querySelector('input.'+cls);
+    if(inp&&inp.style.display!=='none'&&inp.value)return parseInt(inp.value)||0;
+    if(sel&&sel.value&&sel.value!=='__direct__')return parseInt(sel.value)||0;
+    if(inp&&inp.value)return parseInt(inp.value)||0;
+    return 0;
+  }
+  var level=readCombo('ri-level');
+  if(!level){toast('⚠️ 교재명을 입력하세요');return;}
   var data={refType:type,level:level,updatedAt:new Date().toISOString()};
   if(type==='tuition'){
-    data.stage=(row.querySelector('.ri-stage')||{}).value.trim()||'';
-    var tuition=(function(){
-      var sel=row.querySelector('select.ri-tuition');
-      var inp=row.querySelector('input.ri-tuition');
-      if(sel&&sel.style.display!=='none'&&sel.value&&sel.value!=='__direct__')return parseInt(sel.value)||0;
-      return parseInt((inp||{}).value)||0;
-    })();
-    var tbFeeRef=parseInt((function(){
-      var sel=row.querySelector('select.ri-textbookfee-ref,select.ri-textbookfee');
-      var inp=row.querySelector('input.ri-textbookfee-ref,input.ri-textbookfee');
-      if(sel&&sel.style.display!=='none'&&sel.value&&sel.value!=='__direct__')return{value:sel.value};
-      return inp||{value:''};
-    })().value)||0;
+    data.stage=readCombo('ri-stage');
+    var tuition=readComboNum('ri-tuition');
+    var tbFeeRef=readComboNum('ri-textbookfee-ref');
     var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
     var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
     var tbFee=tbFeeRef||(tb?parseInt(tb.textbookFee)||0:0);
@@ -14768,12 +14774,7 @@ async function _saveRefRow(btn){
     data.feeW4=parseInt((row.querySelector('.ri-w4')||{}).value)||Math.round(base/20*16);
     data.feeW5=parseInt((row.querySelector('.ri-w5')||{}).value)||base;
   }else{
-    data.textbookFee=(function(){
-      var sel=row.querySelector('select.ri-textbookfee');
-      var inp=row.querySelector('input.ri-textbookfee');
-      if(sel&&sel.style.display!=='none'&&sel.value&&sel.value!=='__direct__')return parseInt(sel.value)||0;
-      return parseInt((inp||{}).value)||0;
-    })();
+    data.textbookFee=readComboNum('ri-textbookfee');
     data.supFee=0;data.supMaterial='';
   }
   loading(true);
