@@ -13183,7 +13183,82 @@ function renderRevGoals(yr){
     +'<tbody>'+monthRows+'</tbody>'
     +'</table></div>';
 
-  el.innerHTML=topHtml+settingsHtml+cardsHtml+simHtml+tableHtml;
+  // ── 자동 진단 메시지 ──
+  var diagMsgs=[];
+  // 1. 연말 예상 매출 진단
+  if(targetRev>0&&elapsedMo>0){
+    var shortfall=targetRev-projYearEnd;
+    if(projPct>=100){
+      diagMsgs.push({type:'good',msg:'현재 추세 유지 시 연간 목표 '+projPct+'% 달성 예상 — 순조롭게 진행 중입니다 👍'});
+    } else {
+      var moLeft=12-elapsedMo;
+      var needPerMo=moLeft>0?Math.ceil(shortfall/moLeft):0;
+      diagMsgs.push({type:'warn',msg:'현재 추세 유지 시 연말 '+projPct+'% 달성 예상 — 월 '+needPerMo.toLocaleString()+'원 추가 매출 필요'});
+    }
+  }
+  // 2. 재원생 진단
+  if(needAvgStu>0){
+    var stuGap=needAvgStu-active.length;
+    if(stuGap<=0){
+      diagMsgs.push({type:'good',msg:'재원생 '+active.length+'명으로 목표('+needAvgStu+'명) 달성 중입니다 ✅'});
+    } else {
+      var moLeft2=12-elapsedMo;
+      var needNetPerMo=moLeft2>0?Math.ceil(stuGap/moLeft2):stuGap;
+      diagMsgs.push({type:'warn',msg:'목표 재원생까지 '+stuGap+'명 부족 — 월 평균 '+needNetPerMo+'명 순증 필요'});
+    }
+  }
+  // 3. 이번 달 학생 변동 진단
+  if(moNewStu>0||moOutStu>0){
+    if(moNet>0){
+      diagMsgs.push({type:'good',msg:curMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순증 +'+moNet+'명'});
+    } else if(moNet===0){
+      diagMsgs.push({type:'info',msg:curMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순증 없음, 유지 관리 필요'});
+    } else {
+      diagMsgs.push({type:'bad',msg:curMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순감 '+moNet+'명, 퇴원 관리 필요'});
+    }
+  }
+  // 4. 문의·상담 진단
+  if(needInquiry>0){
+    if(moInquiry>=needInquiry){
+      diagMsgs.push({type:'good',msg:curMo+'월 문의 목표 '+needInquiry+'건 중 현재 '+moInquiry+'건 달성 ✅'});
+    } else {
+      diagMsgs.push({type:'warn',msg:curMo+'월 문의 목표 '+needInquiry+'건 중 현재 '+moInquiry+'건 — 홍보 활동 점검 필요'});
+    }
+  }
+  if(needConsult>0){
+    if(moConsult>=needConsult){
+      diagMsgs.push({type:'good',msg:curMo+'월 상담 목표 '+needConsult+'건 중 현재 '+moConsult+'건 달성 ✅'});
+    } else {
+      diagMsgs.push({type:'warn',msg:curMo+'월 상담 목표 '+needConsult+'건 중 현재 '+moConsult+'건 — 상담 유도 필요'});
+    }
+  }
+  // 5. 할 일 완료율 진단
+  if(moTaskPct!==null&&moTasks.length>=3){
+    if(moTaskPct<50){
+      diagMsgs.push({type:'bad',msg:curMo+'월 할 일 완료율 '+moTaskPct+'% — 업무 실행력 점검 필요'});
+    } else if(moTaskPct<80){
+      diagMsgs.push({type:'info',msg:curMo+'월 할 일 완료율 '+moTaskPct+'% — '+moTaskDone+'건/'+moTasks.length+'건 완료'});
+    }
+  }
+
+  var colorMap={good:'#16a34a',warn:'#d97706',bad:'#dc2626',info:'#2563eb'};
+  var bgMap={good:'#f0fdf4',warn:'#fefce8',bad:'#fff1f2',info:'#eff6ff'};
+  var borderMap={good:'#86efac',warn:'#fde047',bad:'#fca5a5',info:'#93c5fd'};
+  var iconMap={good:'✅',warn:'⚠️',bad:'🔴',info:'💡'};
+
+  var diagHtml=diagMsgs.length?
+    '<div style="margin-bottom:20px">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">🩺 자동 진단</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +diagMsgs.map(function(d){
+      return'<div style="background:'+bgMap[d.type]+';border:1px solid '+borderMap[d.type]+';border-radius:10px;padding:10px 14px;font-size:13px;color:'+colorMap[d.type]+';font-weight:600">'
+        +iconMap[d.type]+' '+d.msg
+        +'</div>';
+    }).join('')
+    +'</div></div>'
+    :'';
+
+  el.innerHTML=topHtml+settingsHtml+cardsHtml+simHtml+diagHtml+tableHtml;
 }
 
 // 연간 매출 인라인 편집 함수
