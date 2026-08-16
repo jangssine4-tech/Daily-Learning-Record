@@ -13697,11 +13697,15 @@ function renderRefFees(){
     // 공통 select+직접입력 콤보 (교재비와 동일한 디자인)
     function refCombo(cls,val,opts,onChangeFn,isNum){
       var uid='rc-'+Math.random().toString(36).slice(2,7);
-      var isCustom=val!==''&&val!==null&&val!==undefined&&opts.map(String).indexOf(String(val))===-1;
+      var isEmpty=val===''||val===null||val===undefined||val===0||val==='0';
+      var isCustom=!isEmpty&&(isNum
+        ?(opts.indexOf(parseInt(val))===-1&&opts.indexOf(Number(val))===-1)
+        :(opts.map(String).indexOf(String(val))===-1));
       var selStyle='display:'+(isCustom?'none':'inline-block')+';width:100%;';
       var inpStyle='display:'+(isCustom?'inline-block':'none')+';width:calc(100% - 28px);';
       var optHtml='<option value="">선택</option>'+opts.map(function(o){
-        return'<option value="'+o+'"'+(String(val)===String(o)?' selected':'')+'>'+o+'</option>';
+        var sel2=isNum?(parseInt(val)===parseInt(o)):(String(val)===String(o));
+        return'<option value="'+o+'"'+(sel2?' selected':'')+'>'+o+'</option>';
       }).join('')+'<option value="__direct__">직접 입력...</option>';
       var sel='<select id="'+uid+'-sel" class="ri-input '+cls+'" style="'+selStyle+'" onchange="_refComboChange(this,\''+uid+'\',\''+onChangeFn+'\')">'+optHtml+'</select>';
       var inp='<input id="'+uid+'-inp" '+(isNum?'type="number"':'type="text"')+' class="ri-input '+cls+'" style="'+inpStyle+'" value="'+(isCustom?val:'')+'" placeholder="직접 입력" '+(onChangeFn?'oninput="'+onChangeFn+'"':'')+' autocomplete="off">';
@@ -14679,15 +14683,26 @@ function _autoFillTbFee(inp){
 }
 function _calcBaseFee(inp){
   var row=inp.closest('tr');if(!row)return;
-  var tuition=parseInt((row.querySelector('.ri-tuition')||{}).value)||0;
-  var level=(row.querySelector('.ri-level')||{}).value||'';
-  // 행 내 교재비 입력값 우선, 없으면 교재비 표에서 조회
-  var tbFeeInput=row.querySelector('.ri-textbookfee-ref');
-  var tbFee=tbFeeInput&&tbFeeInput.value?parseInt(tbFeeInput.value)||0:0;
-  if(!tbFee&&level){
-    var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
-    var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
-    if(tb)tbFee=parseInt(tb.textbookFee)||0;
+  // select/input 중 보이는(활성) 값 읽는 헬퍼
+  function getComboVal(cls){
+    var sel=row.querySelector('select.'+cls);
+    var input=row.querySelector('input.'+cls);
+    if(sel&&sel.style.display!=='none'&&sel.value&&sel.value!=='__direct__')return parseInt(sel.value)||0;
+    if(input&&input.style.display!=='none')return parseInt(input.value)||0;
+    // 둘 다 없거나 display 속성 없는 경우
+    if(sel&&sel.value&&sel.value!=='__direct__')return parseInt(sel.value)||0;
+    if(input)return parseInt(input.value)||0;
+    return 0;
+  }
+  var tuition=getComboVal('ri-tuition');
+  var tbFee=getComboVal('ri-textbookfee-ref');
+  if(!tbFee){
+    var level=(row.querySelector('input.ri-level')||row.querySelector('select.ri-level')||{}).value||'';
+    if(level){
+      var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
+      var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
+      if(tb)tbFee=parseInt(tb.textbookFee)||0;
+    }
   }
   var base=tuition-tbFee;
   var disp=row.querySelector('.ri-base-display');
