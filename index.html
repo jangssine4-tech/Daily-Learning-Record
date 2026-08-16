@@ -13841,7 +13841,7 @@ function renderRefFees(){
       var stageList=[...new Set(tuitionItems.map(function(i){return i.stage||'';}))];
       var tRows=tuitionItems.map(function(item){
         var base=parseInt(item.baseFee)||0;
-        var tbFee=item.textbookFeeRef||getTbFee(item.level||'');
+        var tbFee=('textbookFeeRef' in item)?parseInt(item.textbookFeeRef)||0:getTbFee(item.level||'');
         var tuition=item.tuition||(base+tbFee);
         var w3=item.feeW3||Math.round(base/20*12);
         var w4=item.feeW4||Math.round(base/20*16);
@@ -14874,7 +14874,11 @@ async function _saveRefRow(btn){
     var tbFeeRef=readComboNum('ri-textbookfee-ref');
     var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
     var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
-    var tbFee=tbFeeRef||(tb?parseInt(tb.textbookFee)||0:0);
+    // tbFeeRef가 명시적으로 선택된 경우에만 사용, 아닐 때만 교재비 기준 표에서 참조
+    var tbFeeRefRaw=row.querySelector('select.ri-textbookfee-ref');
+    var tbFeeInpRaw=row.querySelector('input.ri-textbookfee-ref');
+    var hasTbFeeRef=(tbFeeRefRaw&&tbFeeRefRaw.style.display!=='none'&&tbFeeRefRaw.value&&tbFeeRefRaw.value!=='__direct__')||(tbFeeInpRaw&&tbFeeInpRaw.style.display!=='none'&&tbFeeInpRaw.value);
+    var tbFee=hasTbFeeRef?tbFeeRef:(tb?parseInt(tb.textbookFee)||0:0);
     var base=tuition-tbFee;
     data.tuition=tuition;
     data.textbookFeeRef=tbFeeRef;
