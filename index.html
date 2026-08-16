@@ -604,18 +604,18 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}align-items:cente
   <div class="expense-section">
     <h4>💰 교육비 기준 설정</h4>
     <div style="overflow-x:auto;width:100%;max-width:100%">
-      <table class="rev-tbl" style="min-width:880px;table-layout:auto">
+      <table class="rev-tbl" style="min-width:820px;table-layout:auto">
         <thead><tr>
-          <th style="width:24px"></th>
-          <th style="text-align:center;min-width:140px">단계</th>
-          <th style="text-align:center;min-width:120px">교재</th>
-          <th style="text-align:center;min-width:100px">교재비</th>
-          <th style="text-align:center;min-width:90px">수강료</th>
-          <th style="text-align:center;min-width:105px">기본 교육비<br><span style="font-size:9px;font-weight:400">(수강료−교재비)</span></th>
-          <th style="text-align:center;min-width:90px">주 3회</th>
-          <th style="text-align:center;min-width:90px">주 4회</th>
-          <th style="text-align:center;min-width:90px">주 5회</th>
-          <th style="width:90px"></th>
+          <th style="width:16px"></th>
+          <th style="text-align:center;min-width:130px">단계</th>
+          <th style="text-align:center;min-width:140px">교재</th>
+          <th style="text-align:center;min-width:95px">교재비</th>
+          <th style="text-align:center;min-width:95px">수강료</th>
+          <th style="text-align:center;min-width:90px">기본 교육비<br><span style="font-size:9px;font-weight:400">(수강료−교재비)</span></th>
+          <th style="text-align:center;min-width:80px">주 3회</th>
+          <th style="text-align:center;min-width:80px">주 4회</th>
+          <th style="text-align:center;min-width:80px">주 5회</th>
+          <th style="width:80px"></th>
         </tr></thead>
         <tbody id="ref-tuition-tbody"></tbody>
       </table>
@@ -13618,35 +13618,37 @@ function renderRefFees(){
     // 드롭다운+직접입력 콤보 헬퍼
     var TBFEE_OPTS=[14000,21080,31050,33000];
 
-    // 텍스트 datalist 콤보 (단계/교재용)
-    function comboSel(cls,val,opts,ph,extra){
-      var listId='dl-'+cls+'-'+Math.random().toString(36).slice(2,7);
-      var dl='<datalist id="'+listId+'">'+opts.map(function(o){return'<option value="'+o+'">';}).join('')+'</datalist>';
-      return dl+'<input class="ri-input '+cls+'" list="'+listId+'" value="'+(val||'')+'" placeholder="'+(ph||'')+'" '+(extra||'')+' autocomplete="off">';
-    }
-
-    // 교재비 전용 커스텀 콤보 (select + 직접입력 토글)
-    function tbFeeCombo(cls,val,onInputFn){
-      var isCustom=val&&TBFEE_OPTS.indexOf(parseInt(val))===-1;
-      var uid='tfc-'+Math.random().toString(36).slice(2,7);
+    // 공통 select+직접입력 콤보 (교재비와 동일한 디자인)
+    function refCombo(cls,val,opts,onChangeFn,isNum){
+      var uid='rc-'+Math.random().toString(36).slice(2,7);
+      var isCustom=val!==''&&val!==null&&val!==undefined&&opts.map(String).indexOf(String(val))===-1;
       var selStyle='display:'+(isCustom?'none':'inline-block')+';width:100%;';
       var inpStyle='display:'+(isCustom?'inline-block':'none')+';width:calc(100% - 28px);';
-      var opts='<option value="">선택</option>'+TBFEE_OPTS.map(function(o){
-        return'<option value="'+o+'"'+(parseInt(val)===o?' selected':'')+'>'+o.toLocaleString()+'원</option>';
+      var optHtml='<option value="">선택</option>'+opts.map(function(o){
+        return'<option value="'+o+'"'+(String(val)===String(o)?' selected':'')+'>'+o+'</option>';
       }).join('')+'<option value="__direct__">직접 입력...</option>';
-      var sel='<select id="'+uid+'-sel" class="ri-input '+cls+'" style="'+selStyle+'" onchange="_tbFeeSelChange(this,\''+uid+'\',\''+onInputFn+'\')">'+(opts)+'</select>';
-      var inp='<input id="'+uid+'-inp" type="number" class="ri-input '+cls+'" style="'+inpStyle+'" value="'+(isCustom?val:'')+'" placeholder="직접 입력" oninput="'+onInputFn+'">';
-      var backBtn=isCustom?'<button type="button" style="font-size:10px;padding:0 3px;cursor:pointer;border:1px solid var(--border);border-radius:3px;background:var(--surface2)" onclick="_tbFeeBack(this,\''+uid+'\')">▾</button>':'';
+      var sel='<select id="'+uid+'-sel" class="ri-input '+cls+'" style="'+selStyle+'" onchange="_refComboChange(this,\''+uid+'\',\''+onChangeFn+'\')">'+optHtml+'</select>';
+      var inp='<input id="'+uid+'-inp" '+(isNum?'type="number"':'type="text"')+' class="ri-input '+cls+'" style="'+inpStyle+'" value="'+(isCustom?val:'')+'" placeholder="직접 입력" '+(onChangeFn?'oninput="'+onChangeFn+'"':'')+' autocomplete="off">';
+      var backBtn=isCustom?'<button type="button" style="font-size:10px;padding:0 3px;cursor:pointer;border:1px solid var(--border);border-radius:3px;background:var(--surface2)" onclick="_refComboBack(this,\''+uid+'\')">▾</button>':'';
       return'<div style="display:flex;align-items:center;gap:2px;width:100%">'+sel+inp+backBtn+'</div>';
     }
 
+    var TBFEE_OPTS=[14000,21080,31050,33000];
+    var TUITION_OPTS=[180000,213000,240000,250000,320000,360000];
+
     function stageCombo(val){
       var stages=[...new Set(tuitionItems.map(function(i){return i.stage||'';}))].filter(Boolean);
-      return comboSel('ri-stage',val,stages,'단계 선택 또는 입력');
+      return refCombo('ri-stage',val||'',stages,'',false);
     }
     function levelCombo(val){
-      var levels=[...new Set(tuitionItems.map(function(i){return i.level||'';}))].filter(Boolean);
-      return comboSel('ri-level',val,levels,'교재 선택 또는 입력','onchange="_autoFillTbFee(this)"');
+      var levels=[...new Set(textbookItems.map(function(i){return i.level||i.supMaterial||'';}))].filter(Boolean);
+      return refCombo('ri-level',val||'',levels,'_autoFillTbFee(this)',false);
+    }
+    function tbFeeCombo(cls,val,onInputFn){
+      return refCombo(cls,val||'',TBFEE_OPTS,onInputFn,true);
+    }
+    function tuitionCombo(val){
+      return refCombo('ri-tuition',val||'',TUITION_OPTS,'_calcBaseFee(this)',true);
     }
     function numInp(cls,val,ph){
       return'<input class="ri-input '+cls+'" value="'+(val||'')+'" placeholder="'+(ph||'')+'" type="number">';
@@ -13665,16 +13667,16 @@ function renderRefFees(){
         var stageIdx=stageList.indexOf(item.stage||'');
         var stageBg=stageIdx%2===1?'background:#f8faff;':'';
         return '<tr data-id="'+item.id+'" data-type="tuition" draggable="true" style="'+stageBg+'">'
-          +'<td class="drag-handle" title="드래그해서 순서 변경" style="width:20px">⠿</td>'
-          +'<td style="min-width:140px">'+stageCombo(item.stage||'')+'</td>'
-          +'<td style="min-width:120px">'+levelCombo(item.level||'')+'</td>'
-          +'<td style="min-width:100px">'+tbFeeCombo('ri-textbookfee-ref',tbFee||'','_calcBaseFee(this)')+'</td>'
-          +'<td style="min-width:90px">'+numInp('ri-tuition',tuition||'','수강료')+'</td>'
-          +'<td style="text-align:center;font-size:12px;color:var(--mint);font-weight:700;min-width:100px" class="ri-base-display">'+(base?base.toLocaleString()+'원':'-')+'</td>'
-          +'<td style="min-width:90px">'+numInp('ri-w3',w3||'','자동')+'</td>'
-          +'<td style="min-width:90px">'+numInp('ri-w4',w4||'','자동')+'</td>'
-          +'<td style="min-width:90px">'+numInp('ri-w5',w5||'','자동')+'</td>'
-          +'<td style="white-space:nowrap;width:90px">'
+          +'<td class="drag-handle" title="드래그" style="width:12px;padding:0 2px;text-align:center;cursor:grab;color:var(--txt3)">⠿</td>'
+          +'<td style="min-width:130px">'+stageCombo(item.stage||'')+'</td>'
+          +'<td style="min-width:140px">'+levelCombo(item.level||'')+'</td>'
+          +'<td style="min-width:95px">'+tbFeeCombo('ri-textbookfee-ref',tbFee||'','_calcBaseFee(this)')+'</td>'
+          +'<td style="min-width:95px">'+tuitionCombo(tuition||'')+'</td>'
+          +'<td style="text-align:center;font-size:12px;color:var(--mint);font-weight:700;min-width:90px" class="ri-base-display">'+(base?base.toLocaleString()+'원':'-')+'</td>'
+          +'<td style="min-width:80px">'+numInp('ri-w3',w3||'','자동')+'</td>'
+          +'<td style="min-width:80px">'+numInp('ri-w4',w4||'','자동')+'</td>'
+          +'<td style="min-width:80px">'+numInp('ri-w5',w5||'','자동')+'</td>'
+          +'<td style="white-space:nowrap;width:80px">'
           +'<button class="btn btn-navy btn-xs" onclick="_saveRefRow(this)">저장</button> '
           +'<button class="btn btn-red btn-xs" onclick="_delRefRow(this)">삭제</button>'
           +'</td></tr>';
@@ -13684,7 +13686,7 @@ function renderRefFees(){
         +'<td>'+stageCombo('')+'</td>'
         +'<td>'+levelCombo('')+'</td>'
         +'<td>'+tbFeeCombo('ri-textbookfee-ref','','_calcBaseFee(this)')+'</td>'
-        +'<td>'+numInp('ri-tuition','','수강료')+'</td>'
+        +'<td>'+tuitionCombo('')+'</td>'
         +'<td style="text-align:center;font-size:12px;color:var(--mint);font-weight:700" class="ri-base-display">-</td>'
         +'<td>'+numInp('ri-w3','','자동')+'</td>'
         +'<td>'+numInp('ri-w4','','자동')+'</td>'
@@ -14581,41 +14583,39 @@ async function deleteEvalModule(key){
 }
 function openRefItemModal(type,id){var item=id?refItems.find(function(x){return x.id===id;}):null;$('ref-id').value=id||'';$('ref-type').value=type;$('ref-modal-title').textContent=(type==='tuition'?'교육비':'교재비')+' 기준 '+(id?'수정':'추가');$('ref-grade').value=item?item.grade||'':'';$('ref-level').value=item?item.level||'':'';$('ref-tuition-fields').style.display=type==='tuition'?'':'none';$('ref-textbook-fields').style.display=type==='textbook'?'':'none';$('ref-del-wrap').style.display=id?'block':'none';if(type==='tuition'){$('ref-base-fee').value=item?item.baseFee||'':'';var base=item?parseInt(item.baseFee)||0:0;$('ref-fee-w3').value=item&&item.feeW3?item.feeW3:(base?Math.round(base/20*12):'');$('ref-fee-w4').value=item&&item.feeW4?item.feeW4:(base?Math.round(base/20*16):'');$('ref-fee-w5').value=item&&item.feeW5?item.feeW5:(base||'');}else{$('ref-textbook-fee').value=item?item.textbookFee||'':'';$('ref-sup-fee').value=item?item.supFee||'':'';$('ref-sup-name').value=item?item.supMaterial||'':'';}$('modal-refitem').style.display='flex';}
 async function saveRefItem(){loading(true);var type=$('ref-type').value;var data={refType:type,grade:$('ref-grade').value.trim(),level:$('ref-level').value.trim(),updatedAt:new Date().toISOString()};if(type==='tuition'){data.baseFee=parseInt($('ref-base-fee').value)||0;data.feeW3=parseInt($('ref-fee-w3').value)||Math.round(data.baseFee/20*12);data.feeW4=parseInt($('ref-fee-w4').value)||Math.round(data.baseFee/20*16);data.feeW5=parseInt($('ref-fee-w5').value)||data.baseFee;}else{data.textbookFee=parseInt($('ref-textbook-fee').value)||0;data.supFee=parseInt($('ref-sup-fee').value)||0;data.supMaterial=$('ref-sup-name').value.trim();}var id=$('ref-id').value;if(id)await db.collection('refItems').doc(id).update(data);else await db.collection('refItems').add({...data,createdAt:new Date().toISOString()});await loadRefItems();renderRefFees();closeM('refitem');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
-function _tbFeeSelChange(sel,uid,onInputFn){
+function _refComboChange(sel,uid,onChangeFn){
   if(sel.value==='__direct__'){
-    // 직접 입력 모드로 전환
     sel.style.display='none';
     var inp=document.getElementById(uid+'-inp');
     if(inp){inp.style.display='inline-block';inp.focus();}
-    // ▾ 버튼 추가
     if(!document.getElementById(uid+'-back')){
       var btn=document.createElement('button');
-      btn.id=uid+'-back';btn.type='button';
-      btn.textContent='▾';
+      btn.id=uid+'-back';btn.type='button';btn.textContent='▾';
       btn.style.cssText='font-size:10px;padding:0 3px;cursor:pointer;border:1px solid var(--border);border-radius:3px;background:var(--surface2)';
-      btn.onclick=function(){_tbFeeBack(btn,uid);};
+      btn.onclick=function(){_refComboBack(btn,uid);};
       sel.parentNode.appendChild(btn);
     }
   } else {
-    // 선택 완료 — input에 값 반영 후 계산
     var inp2=document.getElementById(uid+'-inp');
-    if(inp2){inp2.value=sel.value;if(onInputFn){try{var fn=new Function('_el',onInputFn.replace('this','_el'));fn(inp2);}catch(e){}}}
-    if(onInputFn&&sel.closest('tr')){try{_calcBaseFee(sel);}catch(e){}}
+    if(inp2)inp2.value=sel.value;
+    var tr=sel.closest('tr');
+    if(tr){try{_calcBaseFee(sel);}catch(e){}try{_autoFillTbFee(sel);}catch(e){}}
   }
 }
-function _tbFeeBack(btn,uid){
-  // 직접 입력 → select 모드로 복귀
+function _refComboBack(btn,uid){
   var inp=document.getElementById(uid+'-inp');
   var sel=document.getElementById(uid+'-sel');
   if(sel){sel.style.display='inline-block';sel.value='';}
   if(inp){inp.style.display='none';inp.value='';}
   if(btn)btn.remove();
 }
+function _tbFeeSelChange(s,u,f){_refComboChange(s,u,f);}
+function _tbFeeBack(b,u){_refComboBack(b,u);}
 function _autoFillTbFee(inp){
   var row=inp.closest('tr');if(!row)return;
   var level=inp.value.trim();
   var tbFeeInp=row.querySelector('.ri-textbookfee-ref');
-  if(!tbFeeInp||tbFeeInp.value)return; // 이미 입력된 값 있으면 유지
+  if(!tbFeeInp||tbFeeInp.value)return;
   var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
   var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
   if(tb&&tb.textbookFee){tbFeeInp.value=tb.textbookFee;_calcBaseFee(tbFeeInp);}
@@ -14673,7 +14673,12 @@ async function _saveRefRow(btn){
   var data={refType:type,level:level,updatedAt:new Date().toISOString()};
   if(type==='tuition'){
     data.stage=(row.querySelector('.ri-stage')||{}).value.trim()||'';
-    var tuition=parseInt((row.querySelector('.ri-tuition')||{}).value)||0;
+    var tuition=(function(){
+      var sel=row.querySelector('select.ri-tuition');
+      var inp=row.querySelector('input.ri-tuition');
+      if(sel&&sel.style.display!=='none'&&sel.value&&sel.value!=='__direct__')return parseInt(sel.value)||0;
+      return parseInt((inp||{}).value)||0;
+    })();
     var tbFeeRef=parseInt((function(){
       var sel=row.querySelector('select.ri-textbookfee-ref,select.ri-textbookfee');
       var inp=row.querySelector('input.ri-textbookfee-ref,input.ri-textbookfee');
