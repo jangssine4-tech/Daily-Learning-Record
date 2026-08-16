@@ -13793,7 +13793,7 @@ function renderRefFees(){
     function txtCell(val,cls,ph){return'<td style="padding:2px"><input type="text" class="fi '+cls+'" value="'+(val||'')+'" placeholder="'+(ph||'')+'" style="width:80px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>';}
 
     // 드롭다운+직접입력 콤보 헬퍼
-    var TBFEE_OPTS=[14000,21080,31050,33000];
+    var TBFEE_OPTS=[14000,21080,23100,31050,33000];
 
     // 공통 select+직접입력 콤보 (교재비와 동일한 디자인)
     function refCombo(cls,val,opts,onChangeFn,isNum){
@@ -13814,7 +13814,7 @@ function renderRefFees(){
       return'<div style="display:flex;align-items:center;gap:2px;width:100%">'+sel+inp+backBtn+'</div>';
     }
 
-    var TBFEE_OPTS=[14000,21080,31050,33000];
+    var TBFEE_OPTS=[14000,21080,23100,31050,33000];
     var TUITION_OPTS=[180000,213000,240000,250000,320000,360000];
 
     var STAGE_OPTS=['초등 Phonics','초등 Basic','중등(초등)','중등(중등)','고등(중등)','고등(고등)'];
@@ -13879,6 +13879,7 @@ function renderRefFees(){
       // 수강료 변경 시 기본교육비 자동 계산 이벤트
       tbT.querySelectorAll('.ri-tuition,.ri-textbookfee-ref').forEach(function(el){
         el.addEventListener('input',function(){_calcBaseFee(this);});
+        el.addEventListener('change',function(){_calcBaseFee(this);});
       });
     }
 
@@ -14761,7 +14762,13 @@ function _refComboChange(sel,uid,onChangeFn){
     var inp2=document.getElementById(uid+'-inp');
     if(inp2)inp2.value=sel.value;
     var tr=sel.closest('tr');
-    if(tr){try{_calcBaseFee(sel);}catch(e){}try{_autoFillTbFee(sel);}catch(e){}}
+    if(tr){
+      // setTimeout으로 DOM 값이 완전히 반영된 후 계산
+      setTimeout(function(){
+        try{_calcBaseFee(sel);}catch(e){}
+        try{_autoFillTbFee(sel);}catch(e){}
+      },0);
+    }
   }
 }
 function _refComboBack(btn,uid){
