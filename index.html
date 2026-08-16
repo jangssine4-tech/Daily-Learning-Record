@@ -166,7 +166,13 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .rev-tab:hover{color:var(--navy)}
 .rev-tab.active{color:var(--mint);border-bottom-color:var(--mint)}
 .tab-group-label{padding:0 10px;font-size:10px;font-weight:700;letter-spacing:.5px;color:rgba(255,255,255,.5);background:var(--navy);display:flex;align-items:center;min-height:42px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.1)}
-.makeup-chip{display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 6px;font-size:10px;margin:1px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ri-input{background:transparent;border:none;border-bottom:1px solid transparent;border-radius:0;font-size:12px;padding:2px 4px;height:28px;box-sizing:border-box;width:100%;outline:none;transition:border-color .15s}
+.ri-input:focus{border-bottom-color:var(--navy);background:var(--surface2)}
+.ri-input:hover{border-bottom-color:var(--border2)}
+.drag-handle{cursor:grab;color:var(--txt3);font-size:14px;padding:0 4px;user-select:none}
+.drag-handle:active{cursor:grabbing}
+tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
+tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 6px;font-size:10px;margin:1px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .makeup-chip.scheduled{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
 .makeup-chip.done{background:#dcfce7;border-color:#86efac;color:#166534;text-decoration:line-through}
 .makeup-chip.has-plan{background:#fefce8;border-color:#fbbf24;color:#92400e}
@@ -596,16 +602,18 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
   <div class="expense-section">
     <h4>💰 교육비 기준 설정</h4>
     <div style="overflow-x:auto;width:100%;max-width:100%">
-      <table class="rev-tbl" style="min-width:780px">
+      <table class="rev-tbl" style="min-width:880px">
         <thead><tr>
-          <th style="text-align:center;width:160px">단계</th>
-          <th style="text-align:center;width:130px">교재</th>
-          <th style="text-align:center;width:100px">수강료</th>
+          <th style="width:20px"></th>
+          <th style="text-align:center;width:155px">단계</th>
+          <th style="text-align:center;width:120px">교재</th>
+          <th style="text-align:center;width:90px">교재비</th>
+          <th style="text-align:center;width:95px">수강료</th>
           <th style="text-align:center;width:110px">기본 교육비<br><span style="font-size:9px;font-weight:400">(수강료−교재비)</span></th>
-          <th style="text-align:center;width:90px">주 3회</th>
-          <th style="text-align:center;width:90px">주 4회</th>
-          <th style="text-align:center;width:90px">주 5회</th>
-          <th style="width:40px"></th>
+          <th style="text-align:center;width:85px">주 3회</th>
+          <th style="text-align:center;width:85px">주 4회</th>
+          <th style="text-align:center;width:85px">주 5회</th>
+          <th style="width:70px"></th>
         </tr></thead>
         <tbody id="ref-tuition-tbody"></tbody>
       </table>
@@ -616,6 +624,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
     <div style="overflow-x:auto;width:100%;max-width:100%">
       <table class="rev-tbl" style="min-width:280px;max-width:400px">
         <thead><tr>
+          <th style="width:20px"></th>
           <th style="text-align:left;padding:8px 10px">교재</th>
           <th style="text-align:right;padding:8px 10px;width:110px">교재비</th>
           <th style="width:90px"></th>
@@ -13616,31 +13625,34 @@ function renderRefFees(){
         var w5=item.feeW5||base;
         var stageIdx=stageList.indexOf(item.stage||'');
         var stageBg=stageIdx%2===1?'background:#f8faff;':'';
-        return '<tr data-id="'+item.id+'" data-type="tuition" style="'+stageBg+'">'
-          +'<td style="padding:2px"><input type="text" class="fi ri-stage" value="'+(item.stage||'')+'" placeholder="예: 초등 Basic" style="width:148px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-          +'<td style="padding:2px"><input type="text" class="fi ri-level" value="'+(item.level||'')+'" placeholder="예: Joy" style="width:118px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-          +'<td style="padding:2px"><input type="number" class="fi ri-tuition" value="'+(tuition||'')+'" placeholder="수강료" oninput="_calcBaseFee(this)" style="width:90px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
+        var inp=function(cls,val,ph,type,extra){return'<input class="ri-input '+cls+'" value="'+(val||'')+'" placeholder="'+(ph||'')+'" type="'+(type||'text')+'" '+(extra||')+'>'; };
+        return '<tr data-id="'+item.id+'" data-type="tuition" draggable="true" style="'+stageBg+'">'
+          +'<td class="drag-handle" title="드래그해서 순서 변경">⠿</td>'
+          +'<td>'+inp('ri-stage',item.stage||'','초등 Basic')+'</td>'
+          +'<td>'+inp('ri-level',item.level||'','교재명')+'</td>'
+          +'<td>'+inp('ri-textbookfee-ref',tbFee||'','교재비','number','oninput="_calcBaseFee(this)"')+'</td>'
+          +'<td>'+inp('ri-tuition',tuition||'','수강료','number','oninput="_calcBaseFee(this)"')+'</td>'
           +'<td style="text-align:center;font-size:12px;color:var(--mint);font-weight:700" class="ri-base-display">'+(base?base.toLocaleString()+'원':'-')+'</td>'
-          +'<td style="padding:2px"><input type="number" class="fi ri-w3" value="'+(w3||'')+'" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-          +'<td style="padding:2px"><input type="number" class="fi ri-w4" value="'+(w4||'')+'" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-          +'<td style="padding:2px"><input type="number" class="fi ri-w5" value="'+(w5||'')+'" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-          +'<td style="padding:2px;white-space:nowrap">'
-          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,-1)" title="위로">▲</button>'
-          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,1)" title="아래로">▼</button> '
+          +'<td>'+inp('ri-w3',w3||'','자동','number')+'</td>'
+          +'<td>'+inp('ri-w4',w4||'','자동','number')+'</td>'
+          +'<td>'+inp('ri-w5',w5||'','자동','number')+'</td>'
+          +'<td style="white-space:nowrap">'
           +'<button class="btn btn-navy btn-xs" onclick="_saveRefRow(this)">저장</button> '
           +'<button class="btn btn-red btn-xs" onclick="_delRefRow(this)">삭제</button>'
           +'</td></tr>';
       }).join('');
       // 새 항목 입력 행
       tRows+='<tr data-id="" data-type="tuition" class="ri-new-row" style="background:#f0fdf4">'
-        +'<td style="padding:2px"><input type="text" class="fi ri-stage" placeholder="예: 초등 Basic" style="width:148px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-        +'<td style="padding:2px"><input type="text" class="fi ri-level" placeholder="교재명" style="width:118px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-        +'<td style="padding:2px"><input type="number" class="fi ri-tuition" placeholder="수강료" oninput="_calcBaseFee(this)" style="width:90px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
+        +'<td></td>'
+        +'<td><input class="ri-input ri-stage" placeholder="단계명" type="text"></td>'
+        +'<td><input class="ri-input ri-level" placeholder="교재명" type="text"></td>'
+        +'<td><input class="ri-input ri-textbookfee-ref" placeholder="교재비" type="number" oninput="_calcBaseFee(this)"></td>'
+        +'<td><input class="ri-input ri-tuition" placeholder="수강료" type="number" oninput="_calcBaseFee(this)"></td>'
         +'<td style="text-align:center;font-size:12px;color:var(--mint);font-weight:700" class="ri-base-display">-</td>'
-        +'<td style="padding:2px"><input type="number" class="fi ri-w3" placeholder="자동" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-        +'<td style="padding:2px"><input type="number" class="fi ri-w4" placeholder="자동" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-        +'<td style="padding:2px"><input type="number" class="fi ri-w5" placeholder="자동" style="width:80px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-        +'<td style="padding:2px"><button class="btn btn-green btn-xs" onclick="_saveRefRow(this)">+ 추가</button></td>'
+        +'<td><input class="ri-input ri-w3" placeholder="자동" type="number"></td>'
+        +'<td><input class="ri-input ri-w4" placeholder="자동" type="number"></td>'
+        +'<td><input class="ri-input ri-w5" placeholder="자동" type="number"></td>'
+        +'<td><button class="btn btn-green btn-xs" onclick="_saveRefRow(this)">+ 추가</button></td>'
         +'</tr>';
       tbT.innerHTML=tRows;
     }
@@ -13648,24 +13660,62 @@ function renderRefFees(){
     // ── 교재비 기준 테이블 ──
     if(tbB){
       var bRows=textbookItems.map(function(item){
-        return '<tr data-id="'+item.id+'" data-type="textbook">'
-          +'<td style="padding:2px"><input type="text" class="fi ri-level" value="'+(item.level||item.supMaterial||'')+'" placeholder="교재명" style="width:140px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-          +'<td style="padding:2px;text-align:right"><input type="number" class="fi ri-textbookfee" value="'+(item.textbookFee||'')+'" placeholder="교재비" style="width:90px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-          +'<td style="padding:2px;white-space:nowrap">'
-          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,-1)" title="위로">▲</button>'
-          +'<button class="btn btn-outline btn-xs" onclick="_moveRefRow(this,1)" title="아래로">▼</button> '
+        return '<tr data-id="'+item.id+'" data-type="textbook" draggable="true">'
+          +'<td class="drag-handle" title="드래그해서 순서 변경">⠿</td>'
+          +'<td><input class="ri-input ri-level" value="'+(item.level||item.supMaterial||'')+'" placeholder="교재명" type="text"></td>'
+          +'<td><input class="ri-input ri-textbookfee" value="'+(item.textbookFee||'')+'" placeholder="교재비" type="number" style="text-align:right"></td>'
+          +'<td style="white-space:nowrap">'
           +'<button class="btn btn-navy btn-xs" onclick="_saveRefRow(this)">저장</button> '
           +'<button class="btn btn-red btn-xs" onclick="_delRefRow(this)">삭제</button>'
           +'</td></tr>';
       }).join('');
       bRows+='<tr data-id="" data-type="textbook" class="ri-new-row" style="background:#eff6ff">'
-        +'<td style="padding:2px"><input type="text" class="fi ri-level" placeholder="교재명" style="width:140px;font-size:12px;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-        +'<td style="padding:2px;text-align:right"><input type="number" class="fi ri-textbookfee" placeholder="교재비" style="width:90px;font-size:12px;text-align:right;padding:3px 6px;height:30px;box-sizing:border-box"></td>'
-        +'<td style="padding:2px"><button class="btn btn-green btn-xs" onclick="_saveRefRow(this)">+ 추가</button></td>'
+        +'<td></td>'
+        +'<td><input class="ri-input ri-level" placeholder="교재명" type="text"></td>'
+        +'<td><input class="ri-input ri-textbookfee" placeholder="교재비" type="number" style="text-align:right"></td>'
+        +'<td><button class="btn btn-green btn-xs" onclick="_saveRefRow(this)">+ 추가</button></td>'
         +'</tr>';
       tbB.innerHTML=bRows;
     }
-  }catch(e){console.error('renderRefFees 오류:',e);var _ea=document.getElementById('ref-panel-fees');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
+    // ── 드래그 앤 드롭 순서 변경 ──
+    ['ref-tuition-tbody','ref-textbook-tbody'].forEach(function(tbId){
+      var tb=document.getElementById(tbId);if(!tb)return;
+      var dragging=null;
+      tb.addEventListener('dragstart',function(e){
+        dragging=e.target.closest('tr');
+        if(dragging)setTimeout(function(){dragging.style.opacity='.4';},0);
+      });
+      tb.addEventListener('dragend',function(){
+        if(dragging){dragging.style.opacity='';dragging=null;}
+        tb.querySelectorAll('tr').forEach(function(r){r.classList.remove('drag-over');});
+      });
+      tb.addEventListener('dragover',function(e){
+        e.preventDefault();
+        var target=e.target.closest('tr');
+        if(!target||target===dragging||target.classList.contains('ri-new-row'))return;
+        tb.querySelectorAll('tr').forEach(function(r){r.classList.remove('drag-over');});
+        target.classList.add('drag-over');
+      });
+      tb.addEventListener('drop',function(e){
+        e.preventDefault();
+        var target=e.target.closest('tr');
+        if(!target||target===dragging||target.classList.contains('ri-new-row')||!dragging)return;
+        target.classList.remove('drag-over');
+        // DOM 재정렬
+        var rows=[...tb.querySelectorAll('tr:not(.ri-new-row)')];
+        var fromIdx=rows.indexOf(dragging);
+        var toIdx=rows.indexOf(target);
+        if(fromIdx<0||toIdx<0)return;
+        if(fromIdx<toIdx)target.after(dragging);else target.before(dragging);
+        // sortOrder 일괄 저장
+        var newOrder=[...tb.querySelectorAll('tr:not(.ri-new-row)')];
+        var batch=newOrder.map(function(r,i){return{id:r.dataset.id,order:i};}).filter(function(x){return x.id;});
+        Promise.all(batch.map(function(x){return db.collection('refItems').doc(x.id).update({sortOrder:x.order});}))
+          .then(function(){return loadRefItems();})
+          .then(function(){saveCacheDebounced();})
+          .catch(function(e){console.error(e);});
+      });
+    });
 }
 function getLevelOrder(){
   if(_levelOrder&&_levelOrder.length)return _levelOrder;
@@ -14490,19 +14540,20 @@ async function deleteEvalModule(key){
 function openRefItemModal(type,id){var item=id?refItems.find(function(x){return x.id===id;}):null;$('ref-id').value=id||'';$('ref-type').value=type;$('ref-modal-title').textContent=(type==='tuition'?'교육비':'교재비')+' 기준 '+(id?'수정':'추가');$('ref-grade').value=item?item.grade||'':'';$('ref-level').value=item?item.level||'':'';$('ref-tuition-fields').style.display=type==='tuition'?'':'none';$('ref-textbook-fields').style.display=type==='textbook'?'':'none';$('ref-del-wrap').style.display=id?'block':'none';if(type==='tuition'){$('ref-base-fee').value=item?item.baseFee||'':'';var base=item?parseInt(item.baseFee)||0:0;$('ref-fee-w3').value=item&&item.feeW3?item.feeW3:(base?Math.round(base/20*12):'');$('ref-fee-w4').value=item&&item.feeW4?item.feeW4:(base?Math.round(base/20*16):'');$('ref-fee-w5').value=item&&item.feeW5?item.feeW5:(base||'');}else{$('ref-textbook-fee').value=item?item.textbookFee||'':'';$('ref-sup-fee').value=item?item.supFee||'':'';$('ref-sup-name').value=item?item.supMaterial||'':'';}$('modal-refitem').style.display='flex';}
 async function saveRefItem(){loading(true);var type=$('ref-type').value;var data={refType:type,grade:$('ref-grade').value.trim(),level:$('ref-level').value.trim(),updatedAt:new Date().toISOString()};if(type==='tuition'){data.baseFee=parseInt($('ref-base-fee').value)||0;data.feeW3=parseInt($('ref-fee-w3').value)||Math.round(data.baseFee/20*12);data.feeW4=parseInt($('ref-fee-w4').value)||Math.round(data.baseFee/20*16);data.feeW5=parseInt($('ref-fee-w5').value)||data.baseFee;}else{data.textbookFee=parseInt($('ref-textbook-fee').value)||0;data.supFee=parseInt($('ref-sup-fee').value)||0;data.supMaterial=$('ref-sup-name').value.trim();}var id=$('ref-id').value;if(id)await db.collection('refItems').doc(id).update(data);else await db.collection('refItems').add({...data,createdAt:new Date().toISOString()});await loadRefItems();renderRefFees();closeM('refitem');loading(false);saveCacheDebounced();toast('✅ 저장됨');}
 function _calcBaseFee(inp){
-  // 수강료 입력 시 기본 교육비·주3/4/5회 자동 계산
   var row=inp.closest('tr');if(!row)return;
-  var tuition=parseInt(inp.value)||0;
+  var tuition=parseInt((row.querySelector('.ri-tuition')||{}).value)||0;
   var level=(row.querySelector('.ri-level')||{}).value||'';
-  // 교재비 조회
-  var tbFee=0;
-  var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
-  var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
-  if(tb)tbFee=parseInt(tb.textbookFee)||0;
+  // 행 내 교재비 입력값 우선, 없으면 교재비 표에서 조회
+  var tbFeeInput=row.querySelector('.ri-textbookfee-ref');
+  var tbFee=tbFeeInput&&tbFeeInput.value?parseInt(tbFeeInput.value)||0:0;
+  if(!tbFee&&level){
+    var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
+    var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
+    if(tb)tbFee=parseInt(tb.textbookFee)||0;
+  }
   var base=tuition-tbFee;
   var disp=row.querySelector('.ri-base-display');
   if(disp)disp.textContent=base>0?base.toLocaleString()+'원':'-';
-  // 주3/4/5회 자동
   var w3=row.querySelector('.ri-w3');var w4=row.querySelector('.ri-w4');var w5=row.querySelector('.ri-w5');
   if(base>0){
     if(w3&&!w3.dataset.manual)w3.value=Math.round(base/20*12);
@@ -14542,11 +14593,13 @@ async function _saveRefRow(btn){
   if(type==='tuition'){
     data.stage=(row.querySelector('.ri-stage')||{}).value.trim()||'';
     var tuition=parseInt((row.querySelector('.ri-tuition')||{}).value)||0;
+    var tbFeeRef=parseInt((row.querySelector('.ri-textbookfee-ref')||{}).value)||0;
     var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
     var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
-    var tbFee=tb?parseInt(tb.textbookFee)||0:0;
+    var tbFee=tbFeeRef||(tb?parseInt(tb.textbookFee)||0:0);
     var base=tuition-tbFee;
     data.tuition=tuition;
+    data.textbookFeeRef=tbFeeRef;
     data.baseFee=base;
     data.feeW3=parseInt((row.querySelector('.ri-w3')||{}).value)||Math.round(base/20*12);
     data.feeW4=parseInt((row.querySelector('.ri-w4')||{}).value)||Math.round(base/20*16);
