@@ -2291,7 +2291,7 @@ function goto(view){
   }
   else if(view==='memo'){loadStudentMemos().then(renderMemoPage);}
   else if(view==='msgboard'){initMsgBoard();}
-  else if(view==='reference'){switchRefTab(currentRefTab||'fees');var _refInit=function(){try{if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}catch(e){var el=$('ref-panel-fees');if(el)el.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}}; if(!_CURRICULUM){loadCurriculumFromFirestore().then(_refInit).catch(function(e){_refInit();});}else{_refInit();}}
+  else if(view==='reference'){switchRefTab(currentRefTab||'fees');var _refInit=function(){try{if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}catch(e){var el=$('ref-panel-fees');if(el)el.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}}; if(!_CURRICULUM){loadCurriculumFromFirestore().then(function(){_refInit();if(currentRefTab==='curriculum')renderRefCurriculum();}).catch(function(e){_refInit();});}else{_refInit();if(currentRefTab==='curriculum')renderRefCurriculum();}}
   else if(view==='offline-promo'){switchOfflinePromoTab(window._offlinePromoTab||'flyer');}
   else if(view==='op-meeting'){goto('meeting-page');}
   else if(view==='meeting-page'){renderMeetingPage();}
@@ -13655,7 +13655,7 @@ function renderRefFees(){
 }
 function getLevelOrder(){
   if(_levelOrder&&_levelOrder.length)return _levelOrder;
-  _levelOrder=Object.keys(CURRICULUM);
+  _levelOrder=Object.keys(_CURRICULUM||getCurriculum());
   return _levelOrder;
 }
 function getNextLevel(currentLevel){
