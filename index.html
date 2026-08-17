@@ -619,6 +619,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       <h4 style="margin:0">💰 교육비 기준 설정</h4>
       <div style="display:flex;align-items:center;gap:12px">
         <span style="font-size:12px;color:var(--txt3)">주3/4/5회 수강료를 각각 직접 입력하세요</span>
+        <button class="btn btn-outline btn-sm" onclick="_openTuitionOptsModal()" style="font-size:11px;white-space:nowrap">⚙️ 수강료 목록</button>
         <button class="btn btn-outline btn-sm" onclick="_openMatchRulesModal()" style="font-size:11px;white-space:nowrap">🔗 매칭 규칙</button>
         <button class="btn btn-outline btn-sm" onclick="_openRefManual()" style="font-size:11px;white-space:nowrap">📋 영향 맵 &amp; 매뉴얼</button>
       </div>
@@ -1012,7 +1013,7 @@ async function bootApp(){
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadLevelCategories();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadLevelCategories();_loadTuitionOpts();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -13754,6 +13755,97 @@ function deleteOpGuide(id){
 
 
 function _gotoRef(){goto('reference');setTimeout(function(){switchRefTab('guides');},100);}
+// 수강료 드롭다운 목록 관리
+var _tuitionOpts=null; // null이면 TUITION_OPTS(기본값) 사용
+var _TUITION_OPTS_DEFAULT=[130000,150000,180000,210000,213000,240000,250000,283000,320000,360000];
+
+async function _loadTuitionOpts(){
+  try{
+    var doc=await db.collection('config').doc('tuitionOpts').get();
+    if(doc.exists&&doc.data().opts&&doc.data().opts.length){
+      _tuitionOpts=doc.data().opts;
+    }
+  }catch(e){}
+}
+async function _saveTuitionOpts(opts){
+  await db.collection('config').doc('tuitionOpts').set({opts:opts,updatedAt:new Date().toISOString()});
+  _tuitionOpts=opts;
+}
+function _getCurrentTuitionOpts(){
+  return(_tuitionOpts||_TUITION_OPTS_DEFAULT).slice().sort(function(a,b){return a-b;});
+}
+function _openTuitionOptsModal(){
+  var prev=document.getElementById('modal-tuition-opts');if(prev)prev.remove();
+  var overlay=document.createElement('div');
+  overlay.id='modal-tuition-opts';overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+  _renderTuitionOptsModal();
+}
+function _renderTuitionOptsModal(){
+  var overlay=document.getElementById('modal-tuition-opts');if(!overlay)return;
+  var opts=_getCurrentTuitionOpts();
+  var rows=opts.map(function(v,i){
+    return '<tr>'
+      +'<td style="padding:6px 8px;font-size:13px;font-weight:600">'+v.toLocaleString()+'원</td>'
+      +'<td style="padding:6px 8px;text-align:center">'
+      +'<button class="btn btn-red btn-xs" onclick="_tuitionOptDelete('+i+')">삭제</button>'
+      +'</td></tr>';
+  }).join('');
+  overlay.innerHTML='<div class="ms" style="max-width:360px">'
+    +'<div class="mh"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div class="mt" style="margin:0">⚙️ 수강료 드롭다운 목록 관리</div>'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'modal-tuition-opts\').remove()">닫기</button>'
+    +'</div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:14px">'
+    +'<thead><tr style="background:var(--navy);color:#fff">'
+    +'<th style="padding:8px;text-align:left">수강료</th>'
+    +'<th style="padding:8px;text-align:center;width:60px">삭제</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table>'
+    +'<div style="display:flex;gap:8px;margin-bottom:14px">'
+    +'<input class="fi" id="new-tuition-opt" type="number" placeholder="추가할 수강료 (예: 270000)" style="flex:1;font-size:13px;height:36px">'
+    +'<button class="btn btn-green btn-sm" onclick="_tuitionOptAdd()">+ 추가</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button class="btn btn-outline btn-sm" onclick="_tuitionOptReset()">기본값 복원</button>'
+    +'<button class="btn btn-navy btn-sm" onclick="_tuitionOptSave()">💾 저장</button>'
+    +'</div>'
+    +'</div>';
+}
+function _tuitionOptDelete(idx){
+  var opts=_getCurrentTuitionOpts();
+  opts.splice(idx,1);
+  _tuitionOpts=opts;
+  _renderTuitionOptsModal();
+}
+function _tuitionOptAdd(){
+  var inp=$('new-tuition-opt');if(!inp)return;
+  var val=parseInt(inp.value);
+  if(!val||val<10000){toast('⚠️ 올바른 금액을 입력하세요');return;}
+  var opts=_getCurrentTuitionOpts();
+  if(opts.indexOf(val)>=0){toast('⚠️ 이미 있는 금액입니다');return;}
+  opts.push(val);
+  opts.sort(function(a,b){return a-b;});
+  _tuitionOpts=opts;
+  inp.value='';
+  _renderTuitionOptsModal();
+}
+function _tuitionOptReset(){
+  if(!confirm('기본 수강료 목록으로 복원할까요?'))return;
+  _tuitionOpts=_TUITION_OPTS_DEFAULT.slice();
+  _renderTuitionOptsModal();
+}
+async function _tuitionOptSave(){
+  try{
+    await _saveTuitionOpts(_getCurrentTuitionOpts());
+    toast('✅ 수강료 목록 저장됨');
+    document.getElementById('modal-tuition-opts').remove();
+    renderRefFees(); // 드롭다운 옵션 갱신
+  }catch(e){toast('❌ 저장 오류: '+e.message);}
+}
 function _openMatchRulesModal(){
   var prev=document.getElementById('modal-match-rules');if(prev)prev.remove();
   var overlay=document.createElement('div');
@@ -13977,7 +14069,7 @@ function renderRefFees(){
     }
 
     var TBFEE_OPTS=[14000,21080,23100,31050,33000];
-    var TUITION_OPTS=[130000,150000,180000,210000,213000,240000,250000,283000,320000,360000];
+    var TUITION_OPTS=_getCurrentTuitionOpts();
 
     var STAGE_OPTS=['초등 Phonics','초등 Basic','중등(초등)','중등(중등)','고등(중등)','고등(고등)'];
     var LEVEL_OPTS=['Phonics','Master Phonics','Basic','Grammar Plus','Prime','Advanced','First Grammar','Elite','Reader\'s Bank','천일문 입문','천일문 실력','빠바 구문','빠바 유형'];
