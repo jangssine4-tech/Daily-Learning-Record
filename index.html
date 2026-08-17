@@ -624,6 +624,12 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
         <button class="btn btn-outline btn-sm" onclick="_openRefManual()" style="font-size:11px;white-space:nowrap">📋 영향 맵 &amp; 매뉴얼</button>
       </div>
     </div>
+    <!-- 보습 분당 단가 배지 -->
+    <div id="per-min-rate-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--surface2);border-radius:10px">
+      <span style="font-size:12px;font-weight:700;color:var(--navy);margin-right:4px">⏱ 보습 분당 단가</span>
+      <div id="per-min-rate-badges" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
+      <button class="btn btn-outline btn-xs" onclick="_editPerMinRates()">✏️ 수정</button>
+    </div>
     <div style="display:flex;gap:16px;align-items:flex-start">
       <div style="overflow-x:auto;flex:1;min-width:0">
       <table class="rev-tbl" style="min-width:720px;table-layout:auto">
@@ -1013,7 +1019,7 @@ async function bootApp(){
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadLevelCategories();_loadTuitionOpts();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadLevelCategories();_loadTuitionOpts();_loadPerMinRates();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -2309,7 +2315,7 @@ function goto(view){
   }
   else if(view==='memo'){loadStudentMemos().then(renderMemoPage);}
   else if(view==='msgboard'){initMsgBoard();}
-  else if(view==='reference'){switchRefTab(currentRefTab||'fees');var _refInit=function(){try{if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}catch(e){var el=$('ref-panel-fees');if(el)el.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}}; if(!_CURRICULUM){loadCurriculumFromFirestore().then(function(){_refInit();if(currentRefTab==='curriculum')renderRefCurriculum();}).catch(function(e){_refInit();});}else{_refInit();if(currentRefTab==='curriculum')renderRefCurriculum();}}
+  else if(view==='reference'){switchRefTab(currentRefTab||'fees');var _refInit=function(){try{if(!refItems.length&&currentUser)loadRefItems().then(renderRefFees);else renderRefFees();}catch(e){var el=$('ref-panel-fees');if(el)el.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}}; if(!_CURRICULUM){loadCurriculumFromFirestore().then(function(){_refInit();if(currentRefTab==='curriculum')renderRefCurriculum();}).catch(function(e){_refInit();});}else{_refInit();if(currentRefTab==='curriculum')renderRefCurriculum();}setTimeout(_renderPerMinBadges,300);}
   else if(view==='offline-promo'){switchOfflinePromoTab(window._offlinePromoTab||'flyer');}
   else if(view==='op-meeting'){goto('meeting-page');}
   else if(view==='meeting-page'){renderMeetingPage();}
@@ -13750,6 +13756,100 @@ async function _saveTuitionOpts(opts){
 }
 function _getCurrentTuitionOpts(){
   return(_tuitionOpts||_TUITION_OPTS_DEFAULT).slice().sort(function(a,b){return a-b;});
+}
+// ── 보습 분당 단가 ──
+var _perMinRates=null;
+var _PER_MIN_RATES_DEFAULT=[
+  {label:'초등',rate:210},
+  {label:'중등',rate:245},
+  {label:'고등',rate:267}
+];
+async function _loadPerMinRates(){
+  try{
+    var doc=await db.collection('config').doc('perMinRates').get();
+    if(doc.exists&&doc.data().rates)_perMinRates=doc.data().rates;
+    else _perMinRates=_PER_MIN_RATES_DEFAULT.slice();
+  }catch(e){_perMinRates=_PER_MIN_RATES_DEFAULT.slice();}
+  _renderPerMinBadges();
+}
+function _renderPerMinBadges(){
+  var el=document.getElementById('per-min-rate-badges');if(!el)return;
+  var rates=_perMinRates||_PER_MIN_RATES_DEFAULT;
+  el.innerHTML=rates.map(function(r){
+    return'<span style="background:var(--navy);color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700">'
+      +r.label+' <span style="color:#7dd3fc">'+r.rate+'원</span>/분'
+      +'</span>';
+  }).join('');
+}
+function _editPerMinRates(){
+  var prev=document.getElementById('modal-per-min');if(prev)prev.remove();
+  var overlay=document.createElement('div');
+  overlay.id='modal-per-min';overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+  _renderPerMinModal();
+}
+function _renderPerMinModal(){
+  var overlay=document.getElementById('modal-per-min');if(!overlay)return;
+  var rates=(_perMinRates||_PER_MIN_RATES_DEFAULT).slice();
+  var rows=rates.map(function(r,i){
+    return'<tr>'
+      +'<td style="padding:6px 8px"><input class="fi" style="font-size:12px;height:30px;width:80px" value="'+r.label+'" data-idx="'+i+'" data-f="label" onchange="_perMinFieldChange(this)"></td>'
+      +'<td style="padding:6px 8px"><input class="fi" type="number" style="font-size:12px;height:30px;width:80px;text-align:right" value="'+r.rate+'" data-idx="'+i+'" data-f="rate" onchange="_perMinFieldChange(this)"></td>'
+      +'<td style="padding:6px 8px;text-align:center"><button class="btn btn-red btn-xs" onclick="_perMinDelete('+i+')">삭제</button></td>'
+      +'</tr>';
+  }).join('');
+  overlay.innerHTML='<div class="ms" style="max-width:340px">'
+    +'<div class="mh"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div class="mt" style="margin:0">⏱ 보습 분당 단가 설정</div>'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'modal-per-min\').remove()">닫기</button>'
+    +'</div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:12px">'
+    +'<thead><tr style="background:var(--navy);color:#fff">'
+    +'<th style="padding:8px;text-align:left">구분</th>'
+    +'<th style="padding:8px;text-align:right">단가(원/분)</th>'
+    +'<th style="padding:8px;width:50px"></th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="display:flex;gap:6px;margin-bottom:14px">'
+    +'<input class="fi" id="pmr-label" placeholder="구분명 (예: 특수)" style="flex:1;font-size:12px;height:32px">'
+    +'<input class="fi" id="pmr-rate" type="number" placeholder="단가" style="width:80px;font-size:12px;height:32px;text-align:right">'
+    +'<button class="btn btn-green btn-sm" onclick="_perMinAdd()">+ 추가</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button class="btn btn-outline btn-sm" onclick="_perMinReset()">기본값</button>'
+    +'<button class="btn btn-navy btn-sm" onclick="_perMinSave()">💾 저장</button>'
+    +'</div></div>';
+}
+function _perMinFieldChange(el){
+  var idx=parseInt(el.dataset.idx),f=el.dataset.f;
+  if(!_perMinRates)_perMinRates=_PER_MIN_RATES_DEFAULT.slice();
+  _perMinRates[idx][f]=f==='rate'?parseInt(el.value)||0:el.value;
+  _renderPerMinModal();
+}
+function _perMinDelete(idx){
+  if(!_perMinRates)_perMinRates=_PER_MIN_RATES_DEFAULT.slice();
+  _perMinRates.splice(idx,1);_renderPerMinModal();
+}
+function _perMinAdd(){
+  var lbl=($('pmr-label')||{}).value.trim();
+  var rt=parseInt(($('pmr-rate')||{}).value)||0;
+  if(!lbl||!rt){toast('⚠️ 구분명과 단가를 입력하세요');return;}
+  if(!_perMinRates)_perMinRates=_PER_MIN_RATES_DEFAULT.slice();
+  _perMinRates.push({label:lbl,rate:rt});
+  _renderPerMinModal();
+}
+function _perMinReset(){
+  _perMinRates=JSON.parse(JSON.stringify(_PER_MIN_RATES_DEFAULT));
+  _renderPerMinModal();
+}
+async function _perMinSave(){
+  try{
+    await db.collection('config').doc('perMinRates').set({rates:_perMinRates,updatedAt:new Date().toISOString()});
+    _renderPerMinBadges();
+    toast('✅ 저장됨');
+    document.getElementById('modal-per-min').remove();
+  }catch(e){toast('❌ 저장 오류: '+e.message);}
 }
 function _openTuitionOptsModal(){
   var prev=document.getElementById('modal-tuition-opts');if(prev)prev.remove();
