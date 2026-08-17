@@ -619,6 +619,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       <h4 style="margin:0">💰 교육비 기준 설정</h4>
       <div style="display:flex;align-items:center;gap:12px">
         <span style="font-size:12px;color:var(--txt3)">기본 교육비 = 수강료 − 교재비</span>
+        <button class="btn btn-outline btn-sm" onclick="_openMatchRulesModal()" style="font-size:11px;white-space:nowrap">🔗 매칭 규칙</button>
         <button class="btn btn-outline btn-sm" onclick="_openRefManual()" style="font-size:11px;white-space:nowrap">📋 영향 맵 &amp; 매뉴얼</button>
       </div>
     </div>
@@ -1013,7 +1014,7 @@ async function bootApp(){
     try{var permSnap=await db.collection('userPerms').get();permSnap.docs.forEach(function(pd){var u=users.find(function(x){return x.id===pd.id;});if(u)u.menuPerms=pd.data().menuPerms||{};});}catch(e){}
     applyMenuPerms();
     // Background sync after 1 second
-    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
+    setTimeout(function(){syncFromFirestore();loadStudentMemos();loadCustomEvalModules();loadLevelOrder();loadLevelCategories();loadTeacherNotes();loadCardBadges();loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();setTimeout(showJarvisAlert,2000);})});db.collection('config').doc('kakao').get().then(function(d){if(d.exists)window._kakaoConfig=d.data();}).catch(function(){});startRealtimeListeners();startPeriodicSync();autoConvertNewStudents();}, 1000);
   } else {
     // No cache - must load from Firestore
     bootProgress(30, 'Firestore 연결 중...');
@@ -6663,17 +6664,52 @@ function getSubMaterialFee(subName){
   return item?(parseInt(item.textbookFee)||0):0;
 }
 // Improved ref item lookup: maps student level to the correct ref category
+// 기본 매칭 규칙 (Firestore 데이터 없을 때 fallback)
+var _DEFAULT_LEVEL_CATEGORIES=[
+  {keyword:'Master Pho', category:'Master Phonics', matchType:'contains'},
+  {keyword:'Hello Phonics', category:'Phonics', matchType:'contains'},
+  {keyword:'Phonics', category:'Phonics', matchType:'contains'},
+  {keyword:'Joy', category:'Basic', matchType:'contains'},
+  {keyword:'Wise', category:'Basic', matchType:'contains'},
+  {keyword:'Pride', category:'Basic', matchType:'contains'},
+  {keyword:'Grammar Plus', category:'Grammar Plus', matchType:'contains'},
+  {keyword:'First Grammar', category:'First Grammar', matchType:'contains'},
+  {keyword:'Prime', category:'Prime', matchType:'contains'},
+  {keyword:'Advanced', category:'Advanced', matchType:'contains'},
+  {keyword:'Elite', category:'Elite', matchType:'contains'},
+  {keyword:'내신', category:'중고등', matchType:'contains'},
+  {keyword:"Reader's Bank", category:'중고등', matchType:'contains'},
+  {keyword:'Reader', category:'중고등', matchType:'contains'},
+  {keyword:'천일문', category:'중고등', matchType:'contains'},
+  {keyword:'빠바', category:'중고등', matchType:'contains'},
+];
+var _levelCategories=null;
+async function loadLevelCategories(){
+  try{
+    var doc=await db.collection('config').doc('levelCategories').get();
+    if(doc.exists&&doc.data().rules&&doc.data().rules.length){
+      _levelCategories=doc.data().rules;
+    }else{
+      _levelCategories=_DEFAULT_LEVEL_CATEGORIES;
+    }
+  }catch(e){_levelCategories=_DEFAULT_LEVEL_CATEGORIES;}
+}
+async function saveLevelCategories(){
+  await db.collection('config').doc('levelCategories').set({rules:_levelCategories,updatedAt:new Date().toISOString()});
+}
 function getLevelCategory(rawLevel){
   if(!rawLevel) return '';
-  if(rawLevel.match(/Hello Phonics|Phonics|Master Pho/i)) return 'Phonics';
-  if(rawLevel.match(/Joy|Wise|Pride/i)) return 'Basic';
-  if(rawLevel.match(/Grammar Plus/i)) return 'Grammar Plus';
-  if(rawLevel.match(/First Grammar/i)) return 'First Grammar';
-  if(rawLevel.match(/Prime/i)) return 'Prime';
-  if(rawLevel.match(/Advanced/i)) return 'Advanced';
-  if(rawLevel.match(/Elite/i)) return 'Elite';
-  if(rawLevel.match(/내신|Reader|천일문|빠바/)) return '중고등';
-  return rawLevel;
+  var rules=_levelCategories||_DEFAULT_LEVEL_CATEGORIES;
+  for(var i=0;i<rules.length;i++){
+    var r=rules[i];
+    if(r.matchType==='exact'){
+      if(rawLevel===r.keyword)return r.category;
+    }else{
+      // contains (대소문자 무시)
+      if(rawLevel.toLowerCase().indexOf(r.keyword.toLowerCase())>=0)return r.category;
+    }
+  }
+  return rawLevel; // 매칭 없으면 그대로 반환
 }
 function getSchoolLevel(grade){
   if(!grade)return'';
@@ -13720,6 +13756,122 @@ function deleteOpGuide(id){
 
 
 function _gotoRef(){goto('reference');setTimeout(function(){switchRefTab('guides');},100);}
+function _openMatchRulesModal(){
+  var prev=document.getElementById('modal-match-rules');if(prev)prev.remove();
+  var overlay=document.createElement('div');
+  overlay.id='modal-match-rules';overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+  _renderMatchRulesModal();
+}
+function _renderMatchRulesModal(){
+  var overlay=document.getElementById('modal-match-rules');if(!overlay)return;
+  var rules=(_levelCategories||_DEFAULT_LEVEL_CATEGORIES).slice();
+  // 학생 매칭 미리보기
+  function getMatchCount(keyword,matchType){
+    return (students||[]).filter(function(s){
+      var lv=s.level||'';
+      if(matchType==='exact')return lv===keyword;
+      return lv.toLowerCase().indexOf(keyword.toLowerCase())>=0;
+    }).length;
+  }
+  var rows=rules.map(function(r,i){
+    var cnt=getMatchCount(r.keyword,r.matchType);
+    return '<tr>'
+      +'<td style="padding:4px 6px"><input class="fi" style="font-size:12px;height:28px;width:100%" value="'+r.keyword+'" data-idx="'+i+'" data-field="keyword" onchange="_matchRuleFieldChange(this)"></td>'
+      +'<td style="padding:4px 6px"><input class="fi" style="font-size:12px;height:28px;width:100%" value="'+r.category+'" data-idx="'+i+'" data-field="category" onchange="_matchRuleFieldChange(this)"></td>'
+      +'<td style="padding:4px 6px;text-align:center">'
+      +'<select class="fi" style="font-size:11px;height:28px" data-idx="'+i+'" data-field="matchType" onchange="_matchRuleFieldChange(this)">'
+      +'<option value="contains"'+(r.matchType!=='exact'?' selected':'')+'>포함</option>'
+      +'<option value="exact"'+(r.matchType==='exact'?' selected':'')+'>정확</option>'
+      +'</select></td>'
+      +'<td style="padding:4px 6px;text-align:center;font-size:12px;color:'+(cnt>0?'var(--navy)':'var(--txt3)')+'">'+cnt+'명</td>'
+      +'<td style="padding:4px 6px;text-align:center">'
+      +'<button class="btn btn-outline btn-xs" onclick="_matchRuleMoveUp('+i+')" '+(i===0?'disabled':'')+'>▲</button> '
+      +'<button class="btn btn-outline btn-xs" onclick="_matchRuleMoveDown('+i+')" '+(i===rules.length-1?'disabled':'')+'>▼</button> '
+      +'<button class="btn btn-red btn-xs" onclick="_matchRuleDelete('+i+')">삭제</button>'
+      +'</td></tr>';
+  }).join('');
+
+  overlay.innerHTML='<div class="ms" style="max-width:640px;max-height:90dvh;overflow-y:auto">'
+    +'<div class="mh"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div class="mt" style="margin:0">🔗 단계 매칭 규칙 관리</div>'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'modal-match-rules\').remove()">닫기</button>'
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--txt3);margin-bottom:12px;background:var(--surface2);padding:10px;border-radius:8px">'
+    +'📌 학생의 단계명(예: Wise 1A)이 <b>키워드</b>를 포함하면 해당 <b>교재 카테고리</b>로 매칭됩니다.<br>'
+    +'순서가 중요합니다 — 위에 있는 규칙이 먼저 적용됩니다. (예: Master Phonics가 Phonics보다 위에 있어야 함)'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:var(--navy);color:#fff">'
+    +'<th style="padding:8px;text-align:left;width:35%">키워드 (학생 단계에서 찾을 문자)</th>'
+    +'<th style="padding:8px;text-align:left;width:30%">교재 카테고리</th>'
+    +'<th style="padding:8px;text-align:center;width:80px">매칭 방식</th>'
+    +'<th style="padding:8px;text-align:center;width:60px">매칭 학생</th>'
+    +'<th style="padding:8px;text-align:center;width:120px">순서/삭제</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table></div>'
+    +'<div style="margin-top:12px;display:flex;gap:8px;align-items:center">'
+    +'<input class="fi" id="new-rule-keyword" placeholder="키워드 (예: Pride)" style="font-size:12px;height:32px;flex:1">'
+    +'<input class="fi" id="new-rule-category" placeholder="카테고리 (예: Basic)" style="font-size:12px;height:32px;flex:1">'
+    +'<select class="fi" id="new-rule-matchtype" style="font-size:12px;height:32px;width:80px">'
+    +'<option value="contains">포함</option><option value="exact">정확</option>'
+    +'</select>'
+    +'<button class="btn btn-green btn-sm" onclick="_matchRuleAdd()">+ 추가</button>'
+    +'</div>'
+    +'<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">'
+    +'<button class="btn btn-outline btn-sm" onclick="_matchRuleReset()">기본값 복원</button>'
+    +'<button class="btn btn-navy btn-sm" onclick="_matchRuleSave()">💾 저장</button>'
+    +'</div>'
+    +'</div>';
+}
+function _matchRuleFieldChange(el){
+  var idx=parseInt(el.dataset.idx);var field=el.dataset.field;
+  if(!_levelCategories)_levelCategories=_DEFAULT_LEVEL_CATEGORIES.slice();
+  _levelCategories[idx][field]=el.value;
+  _renderMatchRulesModal();
+}
+function _matchRuleMoveUp(idx){
+  if(!_levelCategories)_levelCategories=_DEFAULT_LEVEL_CATEGORIES.slice();
+  if(idx<=0)return;
+  var tmp=_levelCategories[idx-1];_levelCategories[idx-1]=_levelCategories[idx];_levelCategories[idx]=tmp;
+  _renderMatchRulesModal();
+}
+function _matchRuleMoveDown(idx){
+  if(!_levelCategories)_levelCategories=_DEFAULT_LEVEL_CATEGORIES.slice();
+  if(idx>=_levelCategories.length-1)return;
+  var tmp=_levelCategories[idx+1];_levelCategories[idx+1]=_levelCategories[idx];_levelCategories[idx]=tmp;
+  _renderMatchRulesModal();
+}
+function _matchRuleDelete(idx){
+  if(!confirm('이 규칙을 삭제할까요?'))return;
+  if(!_levelCategories)_levelCategories=_DEFAULT_LEVEL_CATEGORIES.slice();
+  _levelCategories.splice(idx,1);
+  _renderMatchRulesModal();
+}
+function _matchRuleAdd(){
+  var kw=($('new-rule-keyword')||{}).value.trim();
+  var cat=($('new-rule-category')||{}).value.trim();
+  var mt=($('new-rule-matchtype')||{}).value||'contains';
+  if(!kw||!cat){toast('⚠️ 키워드와 카테고리를 모두 입력하세요');return;}
+  if(!_levelCategories)_levelCategories=_DEFAULT_LEVEL_CATEGORIES.slice();
+  _levelCategories.push({keyword:kw,category:cat,matchType:mt});
+  _renderMatchRulesModal();
+}
+function _matchRuleReset(){
+  if(!confirm('기본 매칭 규칙으로 복원할까요?'))return;
+  _levelCategories=JSON.parse(JSON.stringify(_DEFAULT_LEVEL_CATEGORIES));
+  _renderMatchRulesModal();
+}
+async function _matchRuleSave(){
+  try{
+    await saveLevelCategories();
+    toast('✅ 매칭 규칙 저장됨');
+    document.getElementById('modal-match-rules').remove();
+  }catch(e){toast('❌ 저장 오류: '+e.message);}
+}
 function _openRefManual(){
   var prev=document.getElementById('modal-ref-manual');if(prev)prev.remove();
   var overlay=document.createElement('div');
@@ -13827,7 +13979,7 @@ function renderRefFees(){
     }
 
     var TBFEE_OPTS=[14000,21080,23100,31050,33000];
-    var TUITION_OPTS=[180000,213000,240000,250000,320000,360000];
+    var TUITION_OPTS=[180000,213000,240000,250000,283000,320000,360000];
 
     var STAGE_OPTS=['초등 Phonics','초등 Basic','중등(초등)','중등(중등)','고등(중등)','고등(고등)'];
     var LEVEL_OPTS=['Phonics','Master Phonics','Basic','Grammar Plus','Prime','Advanced','First Grammar','Elite','Reader\'s Bank','천일문 입문','천일문 실력','빠바 구문','빠바 유형'];
