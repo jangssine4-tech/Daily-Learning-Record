@@ -618,7 +618,9 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <h4 style="margin:0">💰 교육비 기준 설정</h4>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <div id="per-min-rate-badges" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <div id="per-min-rate-badges" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button onclick="_openTuitionCalc()" class="btn btn-outline btn-sm" style="font-size:11px;white-space:nowrap">🧮 교육비 계산기</button>
+        </div>
         <button class="btn btn-outline btn-sm" onclick="_openTuitionOptsModal()" style="font-size:11px;white-space:nowrap">⚙️ 수강료 목록</button>
         <button class="btn btn-outline btn-sm" onclick="_openMatchRulesModal()" style="font-size:11px;white-space:nowrap">🔗 매칭 규칙</button>
         <button class="btn btn-outline btn-sm" onclick="_openRefManual()" style="font-size:11px;white-space:nowrap">📋 영향 맵 &amp; 매뉴얼</button>
@@ -13760,7 +13762,108 @@ var _PER_MIN_RATES_DEFAULT=[
   {label:'중등',rate:245},
   {label:'고등',rate:267}
 ];
-async function _loadPerMinRates(){
+async function _openTuitionCalc(){
+  var prev=document.getElementById('modal-tuition-calc');if(prev)prev.remove();
+  var rates=_perMinRates||_PER_MIN_RATES_DEFAULT;
+  var overlay=document.createElement('div');
+  overlay.id='modal-tuition-calc';overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+
+  var levelBadges=rates.map(function(r,i){
+    return'<button id="tc-lv-'+i+'" onclick="_tcSelectLevel('+i+')" style="'
+      +'border:2px solid var(--navy);border-radius:20px;padding:6px 16px;font-size:13px;font-weight:700;cursor:pointer;'
+      +'background:'+(i===0?'var(--navy)':'#fff')+';color:'+(i===0?'#fff':'var(--navy)')+'">'
+      +r.label+'</button>';
+  }).join('');
+
+  var weekBtns=['주 3회','주 4회','주 5회','주 6회'].map(function(lbl,i){
+    return'<button id="tc-wk-'+i+'" onclick="_tcSelectWeek('+i+')" style="'
+      +'border:2px solid var(--navy);border-radius:20px;padding:6px 16px;font-size:13px;font-weight:700;cursor:pointer;'
+      +'background:'+(i===1?'var(--navy)':'#fff')+';color:'+(i===1?'#fff':'var(--navy)')+'">'
+      +lbl+'</button>';
+  }).join('');
+
+  overlay.innerHTML='<div class="ms" style="max-width:380px">'
+    +'<div class="mh"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    +'<div class="mt" style="margin:0">🧮 교육비 계산기</div>'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'modal-tuition-calc\').remove()">닫기</button>'
+    +'</div>'
+
+    // 학교급 선택
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">학교급</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+levelBadges+'</div>'
+
+    // 수업 시수
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">수업 시수 (분)</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
+    +'<input class="fi" id="tc-min" type="number" value="50" min="10" step="5" oninput="_tcCalc()" style="width:100px;font-size:16px;text-align:center;font-weight:700">'
+    +'<span style="font-size:13px;color:var(--txt2)">분</span>'
+    +'<div style="display:flex;gap:4px;margin-left:4px">'
+    +[30,40,50,60].map(function(m){return'<button onclick="$(\'tc-min\').value='+m+';_tcCalc()" style="border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer;background:var(--surface2)">'+m+'분</button>';}).join('')
+    +'</div>'
+    +'</div>'
+
+    // 주 수업일수
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">주 수업일수</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">'+weekBtns+'</div>'
+
+    // 결과
+    +'<div style="background:linear-gradient(135deg,#eff6ff,#e0f2fe);border:2px solid #93c5fd;border-radius:14px;padding:16px;text-align:center">'
+    +'<div id="tc-formula" style="font-size:12px;color:var(--txt2);margin-bottom:6px"></div>'
+    +'<div id="tc-result" style="font-size:28px;font-weight:800;color:var(--navy)">-</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-top:4px">월 납부 기준 수강료 (교재비 포함)</div>'
+    +'</div>'
+    +'</div>';
+
+  document.body.appendChild(overlay);
+  // 초기 선택값 저장
+  overlay._tcLevel=0;
+  overlay._tcWeek=1; // 주 4회 기본
+  _tcCalc();
+}
+function _tcSelectLevel(idx){
+  var overlay=document.getElementById('modal-tuition-calc');if(!overlay)return;
+  overlay._tcLevel=idx;
+  var rates=_perMinRates||_PER_MIN_RATES_DEFAULT;
+  rates.forEach(function(_,i){
+    var btn=document.getElementById('tc-lv-'+i);
+    if(!btn)return;
+    btn.style.background=i===idx?'var(--navy)':'#fff';
+    btn.style.color=i===idx?'#fff':'var(--navy)';
+  });
+  _tcCalc();
+}
+function _tcSelectWeek(idx){
+  var overlay=document.getElementById('modal-tuition-calc');if(!overlay)return;
+  overlay._tcWeek=idx;
+  [0,1,2,3].forEach(function(i){
+    var btn=document.getElementById('tc-wk-'+i);
+    if(!btn)return;
+    btn.style.background=i===idx?'var(--navy)':'#fff';
+    btn.style.color=i===idx?'#fff':'var(--navy)';
+  });
+  _tcCalc();
+}
+function _tcCalc(){
+  var overlay=document.getElementById('modal-tuition-calc');if(!overlay)return;
+  var rates=_perMinRates||_PER_MIN_RATES_DEFAULT;
+  var levelIdx=overlay._tcLevel||0;
+  var weekIdx=overlay._tcWeek||0;
+  var weekDays=weekIdx+3; // 3,4,5,6회
+  var weekLabels=['주 3회','주 4회','주 5회','주 6회'];
+  var mins=parseInt((document.getElementById('tc-min')||{}).value)||0;
+  var rate=rates[levelIdx]?rates[levelIdx].rate:0;
+  var levelLabel=rates[levelIdx]?rates[levelIdx].label:'';
+  // 월 수업 횟수 = 주 수업일수 × 4주
+  var monthlyTotal=rate*mins*weekDays*4;
+  var formula=levelLabel+' × '+mins+'분 × '+weekLabels[weekIdx]+' × 4주 = '+rate+'원/분 × '+mins+'분 × '+(weekDays*4)+'회';
+  var res=document.getElementById('tc-result');
+  var frm=document.getElementById('tc-formula');
+  if(res)res.textContent=monthlyTotal>0?monthlyTotal.toLocaleString()+'원':'-';
+  if(frm)frm.textContent=formula;
+}
+function _loadPerMinRates(){
   try{
     var doc=await db.collection('config').doc('perMinRates').get();
     if(doc.exists&&doc.data().rates)_perMinRates=doc.data().rates;
@@ -13770,7 +13873,9 @@ async function _loadPerMinRates(){
 }
 function _renderPerMinBadges(){
   var el=document.getElementById('per-min-rate-badges');if(!el)return;
-  el.innerHTML='<button onclick="_editPerMinRates()" class="btn btn-outline btn-sm" style="font-size:11px;white-space:nowrap">⏱ 보습 분당 단가</button>';
+  el.innerHTML=''
+    +'<button onclick="_openTuitionCalc()" class="btn btn-outline btn-sm" style="font-size:11px;white-space:nowrap">🧮 교육비 계산기</button>'
+    +'<button onclick="_editPerMinRates()" class="btn btn-outline btn-sm" style="font-size:11px;white-space:nowrap">⏱ 보습 분당 단가</button>';
 }
 function _editPerMinRates(){
   var prev=document.getElementById('modal-per-min');if(prev)prev.remove();
