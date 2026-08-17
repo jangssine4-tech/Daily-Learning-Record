@@ -635,6 +635,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
           <th style="text-align:center;min-width:100px">수강료(주 3회)</th>
           <th style="text-align:center;min-width:100px">수강료(주 4회)</th>
           <th style="text-align:center;min-width:100px">수강료(주 5회)</th>
+          <th style="text-align:center;min-width:100px">수강료(주 6회)</th>
           <th style="width:70px"></th>
         </tr></thead>
         <tbody id="ref-tuition-tbody"></tbody>
@@ -6639,11 +6640,12 @@ function getTuitionByMonthlyHours(baseFee, monthlyHours, tuitionItem){
     var weeklyDays=Math.round(monthlyHours/4); // 월시수 → 주회수
     if(weeklyDays<=3&&tuitionItem.feeW3) return parseInt(tuitionItem.feeW3);
     if(weeklyDays===4&&tuitionItem.feeW4) return parseInt(tuitionItem.feeW4);
-    if(weeklyDays>=5&&tuitionItem.feeW5) return parseInt(tuitionItem.feeW5);
+    if(weeklyDays===5&&tuitionItem.feeW5) return parseInt(tuitionItem.feeW5);
+    if(weeklyDays>=6&&tuitionItem.feeW6) return parseInt(tuitionItem.feeW6);
     // 1.5시수(주2일 이하) 처리
     if(monthlyHours<=8&&tuitionItem.feeW3) return parseInt(tuitionItem.feeW3);
-    // feeW3/4/5 중 있는 값 fallback
-    return parseInt(tuitionItem.feeW5)||parseInt(tuitionItem.feeW4)||parseInt(tuitionItem.feeW3)||0;
+    // fallback
+    return parseInt(tuitionItem.feeW6)||parseInt(tuitionItem.feeW5)||parseInt(tuitionItem.feeW4)||parseInt(tuitionItem.feeW3)||0;
   }
   return 0;
 }
@@ -13768,13 +13770,7 @@ async function _loadPerMinRates(){
 }
 function _renderPerMinBadges(){
   var el=document.getElementById('per-min-rate-badges');if(!el)return;
-  var rates=_perMinRates||_PER_MIN_RATES_DEFAULT;
-  el.innerHTML='<span style="font-size:11px;color:var(--txt3);margin-right:2px">⏱ 보습 분당 단가</span>'
-    +rates.map(function(r){
-      return'<button onclick="_editPerMinRates()" style="background:var(--navy);color:#fff;border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer">'
-        +r.label+' <span style="color:#7dd3fc">'+r.rate+'원</span>/분'
-        +'</button>';
-    }).join('');
+  el.innerHTML='<button onclick="_editPerMinRates()" class="btn btn-outline btn-sm" style="font-size:11px;white-space:nowrap">⏱ 보습 분당 단가</button>';
 }
 function _editPerMinRates(){
   var prev=document.getElementById('modal-per-min');if(prev)prev.remove();
@@ -14170,6 +14166,7 @@ function renderRefFees(){
         var w3=item.feeW3||0;
         var w4=item.feeW4||0;
         var w5=item.feeW5||item.tuition||0;
+        var w6=item.feeW6||0;
         var stageIdx=stageList.indexOf(item.stage||'');
         var stageBg=stageIdx%2===1?'background:#f8faff;':'';
         return '<tr data-id="'+item.id+'" data-type="tuition" draggable="true" style="'+stageBg+'">'
@@ -14180,6 +14177,7 @@ function renderRefFees(){
           +'<td style="min-width:100px">'+tuitionCombo('ri-w3',w3||'')+'</td>'
           +'<td style="min-width:100px">'+tuitionCombo('ri-w4',w4||'')+'</td>'
           +'<td style="min-width:100px">'+tuitionCombo('ri-w5',w5||'')+'</td>'
+          +'<td style="min-width:100px">'+tuitionCombo('ri-w6',w6||'')+'</td>'
           +'<td style="white-space:nowrap;width:70px;text-align:center">'
           +'<span class="ri-save-status" style="font-size:10px;color:var(--txt3)"></span>'
           +'<button class="btn btn-red btn-xs" onclick="_delRefRow(this)">삭제</button>'
@@ -14193,6 +14191,7 @@ function renderRefFees(){
         +'<td>'+tuitionCombo('ri-w3','')+'</td>'
         +'<td>'+tuitionCombo('ri-w4','')+'</td>'
         +'<td>'+tuitionCombo('ri-w5','')+'</td>'
+        +'<td>'+tuitionCombo('ri-w6','')+'</td>'
         +'<td><button class="btn btn-green btn-xs" onclick="_saveRefRow(this)">+ 추가</button></td>'
         +'</tr>';
       tbT.innerHTML=tRows;
@@ -15202,7 +15201,8 @@ async function _autoSaveRefRow(row){
       data.feeW3=readNum('ri-w3');
       data.feeW4=readNum('ri-w4');
       data.feeW5=readNum('ri-w5');
-      data.tuition=data.feeW5||data.feeW3||data.feeW4;
+      data.feeW6=readNum('ri-w6');
+      data.tuition=data.feeW5||data.feeW6||data.feeW3||data.feeW4;
     }else{
       data.textbookFee=readNum('ri-textbookfee');
     }
@@ -15257,8 +15257,8 @@ async function _saveRefRow(btn){
     data.feeW3=readComboNum('ri-w3');
     data.feeW4=readComboNum('ri-w4');
     data.feeW5=readComboNum('ri-w5');
-    // 하위 호환: tuition은 주5회 값으로 저장
-    data.tuition=data.feeW5||data.feeW3||data.feeW4;
+    data.feeW6=readComboNum('ri-w6');
+    data.tuition=data.feeW5||data.feeW6||data.feeW3||data.feeW4;
   }else{
     data.textbookFee=readComboNum('ri-textbookfee');
     data.supFee=0;data.supMaterial='';
