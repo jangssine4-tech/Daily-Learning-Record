@@ -6634,19 +6634,18 @@ function switchSummaryTab(tab){currentSummaryTab=tab;['summary','monthly','expen
 function renderSummaryView(){var yr=parseInt($('rev-year').value)||new Date().getFullYear();var mo=parseInt($('rev-month').value)||new Date().getMonth()+1;if(currentSummaryTab==='summary')renderRevSummary(yr);else if(currentSummaryTab==='monthly')renderRevMonthly(yr,mo);else if(currentSummaryTab==='expense'){var eyr=parseInt($('exp-year')?.value)||yr;var emo=parseInt($('exp-month')?.value)||mo;renderRevExpense(eyr,emo);}else if(currentSummaryTab==='staff'){loadUsers().then(function(){renderStaffArea();});}else if(currentSummaryTab==='tax'){renderTaxArea(yr);}}
 
 function getTuitionByMonthlyHours(baseFee, monthlyHours, tuitionItem){
-  // Use stored weekly fees if available
+  // 주N회 직접 조회 방식
   if(tuitionItem){
-    if(monthlyHours===12&&tuitionItem.feeW3) return tuitionItem.feeW3;
-    if(monthlyHours===16&&tuitionItem.feeW4) return tuitionItem.feeW4;
-    if(monthlyHours===20&&tuitionItem.feeW5) return tuitionItem.feeW5||baseFee;
-    // For 1.5시수 etc (e.g. 6, 8, 10 monthly), use per-day rate
-    if(monthlyHours===6&&tuitionItem.feeW3) return Math.round(tuitionItem.feeW3/2);
-    if(monthlyHours===8&&tuitionItem.feeW4) return Math.round(tuitionItem.feeW4/2);
-    if(monthlyHours===10&&tuitionItem.feeW5) return Math.round((tuitionItem.feeW5||baseFee)/2);
+    var weeklyDays=Math.round(monthlyHours/4); // 월시수 → 주회수
+    if(weeklyDays<=3&&tuitionItem.feeW3) return parseInt(tuitionItem.feeW3);
+    if(weeklyDays===4&&tuitionItem.feeW4) return parseInt(tuitionItem.feeW4);
+    if(weeklyDays>=5&&tuitionItem.feeW5) return parseInt(tuitionItem.feeW5);
+    // 1.5시수(주2일 이하) 처리
+    if(monthlyHours<=8&&tuitionItem.feeW3) return parseInt(tuitionItem.feeW3);
+    // feeW3/4/5 중 있는 값 fallback
+    return parseInt(tuitionItem.feeW5)||parseInt(tuitionItem.feeW4)||parseInt(tuitionItem.feeW3)||0;
   }
-  if(!baseFee||!monthlyHours) return 0;
-  var perDay=baseFee/20;
-  return Math.round(perDay*monthlyHours);
+  return 0;
 }
 function getSubMaterialOptions(selectedVal){
   var tbItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
@@ -6890,16 +6889,20 @@ function calcExpectedRevenue(yr,mo){
     var sRevs=list.filter(function(r){return r.studentId===s.id&&!r.extraType&&!r.isManualMeta;});
     var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
     var rawLevel=getStudentLevelAtMonth(s,yr,mo);
-    var tuitionItem=findRefItem(rawLevel,'tuition',s.grade);var textbookItem=findRefItem(rawLevel,'textbook',s.grade);
-    var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
+    var tuitionItem=findRefItem(rawLevel,'tuition',s.grade);
+    var textbookItem=findRefItem(rawLevel,'textbook',s.grade);
+    var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
+    var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
     totalTextbook+=textbookFee;
-    var mh=getStudentMonthlyHours(s);var tuitionFee=getTuitionByMonthlyHours(baseFee,mh,tuitionItem);
+    var mh=getStudentMonthlyHours(s);
+    var tuitionFee=getTuitionByMonthlyHours(baseFee,mh,tuitionItem);
     var discountAmt=s.discount?10000:0;
     var pendingMakeups=makeups.filter(function(m){if(m.studentId!==s.id)return false;var ad=m.absentDate||'';if(!ad)return false;var md=new Date(ad);return md.getFullYear()===yr&&md.getMonth()===mo-1&&m.makeupStatus!=='done';}).length;
     var subMat=lastRev?.subMaterial||'';var subMatFee=getSubMaterialFee(subMat);
     var extra1Amt=lastRev?parseInt(lastRev.extra1Amount)||0:0;var extra2Amt=lastRev?parseInt(lastRev.extra2Amount)||0:0;
     var perHourFee=mh>0?tuitionFee/mh:0;var absentDeduction=Math.round(pendingMakeups*perHourFee);
-    var expectedAmt=tuitionFee+textbookFee+subMatFee-discountAmt; // 기타비 제외
+    // 납부예정액 = 수강료(주N회, 교재비 포함) + 부교재비 - 할인
+    var expectedAmt=tuitionFee+subMatFee-discountAmt;
     if(expectedAmt<0)expectedAmt=0;
     totalExpected+=expectedAmt;
   });
@@ -6972,7 +6975,7 @@ function renderRevMonthly(yr,mo){
     var tuitionItem=findRefItem(rawLevel,'tuition',s.grade);
     var textbookItem=findRefItem(rawLevel,'textbook',s.grade);
     var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
-    var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
+    var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0; // 참고용
     var mh=getStudentMonthlyHours(s);
     var manualMh=lastRev?.manualMonthlyHours;
     var dispMh=(manualMh!==undefined&&manualMh!==null&&manualMh!=='')?parseFloat(manualMh):mh;
@@ -6997,7 +7000,8 @@ function renderRevMonthly(yr,mo){
     var extra2Amt=lastRev?parseInt(lastRev.extra2Amount)||0:0;
     var extra2Type=lastRev?lastRev.extra2Type||'':'';
     var extraTotal=extra1Amt+extra2Amt;
-    var expectedAmt=tuitionFee+textbookFee+subMatFee-discountAmt;
+    // 납부예정액 = 수강료(주N회, 교재비 포함) + 부교재비 - 할인
+    var expectedAmt=tuitionFee+subMatFee-discountAmt;
     if(expectedAmt<0)expectedAmt=0;
     var manualExp=lastRev?.manualExpected;
     var dispExpected=(manualExp!==undefined&&manualExp!==null&&manualExp!=='')?parseInt(manualExp):expectedAmt;
@@ -7089,8 +7093,9 @@ function openExpectedDetailModal(studentId,yr,mo){
   var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
   var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
   var mh=getStudentMonthlyHours(s);
+  var weeklyDays=Math.round(mh/4);
+  var weekLabel=weeklyDays<=3?'주 3회':weeklyDays===4?'주 4회':'주 5회';
 
-  // 현재 저장된 수납 데이터
   var list=revenues.filter(function(r){
     if(r.isManualMeta)return false;
     if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;
@@ -7112,52 +7117,34 @@ function openExpectedDetailModal(studentId,yr,mo){
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
 
-  function row(label,content,color){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
-      +'<span style="font-size:12px;color:var(--txt3);min-width:90px">'+label+'</span>'
-      +'<span style="flex:1">'+content+'</span>'
-      +(color?'<span style="font-size:12px;color:'+color+';font-weight:600" id="edm-calc"></span>':'')
-      +'</div>';
-  }
-
   overlay.innerHTML='<div class="ms" style="max-width:400px">'
     +'<div class="mh"></div>'
     +'<div class="mt">납부예정액 상세 — '+s.name+'</div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">자동 연동값도 수정 가능합니다. 저장하면 이번 달 수납 기록에 반영됩니다.</div>'
 
-    // 자동 연동 (수정 가능)
-    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">자동 연동 항목</div>'
-
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
-    +'<span style="font-size:12px;color:var(--txt3);min-width:90px">기본 교육비</span>'
-    +'<input class="fi" id="edm-base" type="number" value="'+tuitionFee+'" style="width:100px;font-size:12px;text-align:right">'
-    +'<span style="font-size:11px;color:var(--txt3)">원</span>'
+    // 기준 수강료
+    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">기준 수강료</div>'
+    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:4px">'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">'+rawLevel+' / '+weekLabel+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<input class="fi" id="edm-base" type="number" value="'+tuitionFee+'" style="width:110px;font-size:14px;font-weight:700;text-align:right" oninput="edmCalc()">'
+    +'<span style="font-size:12px;color:var(--txt2)">원</span>'
+    +'<span style="font-size:11px;color:var(--txt3);margin-left:4px">(교재비 '+textbookFee.toLocaleString()+'원 포함)</span>'
+    +'</div>'
     +'</div>'
 
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
-    +'<span style="font-size:12px;color:var(--txt3);min-width:90px">교재비</span>'
-    +'<input class="fi" id="edm-textbook" type="number" value="'+textbookFee+'" style="width:100px;font-size:12px;text-align:right">'
-    +'<span style="font-size:11px;color:var(--txt3)">원</span>'
-    +'</div>'
-
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
-    +'<span style="font-size:12px;color:var(--txt3);min-width:90px">월 수업 시수</span>'
-    +'<input class="fi" id="edm-mh" type="number" value="'+dispMh+'" step="0.5" style="width:100px;font-size:12px;text-align:right">'
-    +'<span style="font-size:11px;color:var(--txt3)">시간</span>'
-    +'</div>'
+    // 조정 항목
+    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:12px 0 6px">조정 항목</div>'
 
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
     +'<span style="font-size:12px;color:var(--txt3);min-width:90px">할인</span>'
-    +'<input class="fi" id="edm-discount" type="number" value="'+discountAmt+'" style="width:100px;font-size:12px;text-align:right">'
-    +'<span style="font-size:11px;color:var(--txt3)">원 (자동)</span>'
+    +'<input class="fi" id="edm-discount" type="number" value="'+discountAmt+'" style="width:100px;font-size:12px;text-align:right" oninput="edmCalc()">'
+    +'<span style="font-size:11px;color:var(--txt3)">원 차감</span>'
     +'</div>'
-
-    // 직접 입력
-    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:12px 0 6px">직접 입력 항목</div>'
 
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
     +'<span style="font-size:12px;color:var(--txt3);min-width:90px">결석 조정</span>'
-    +'<input class="fi" id="edm-absent" type="number" value="'+absentDeduct+'" style="width:100px;font-size:12px;text-align:right">'
+    +'<input class="fi" id="edm-absent" type="number" value="'+absentDeduct+'" style="width:100px;font-size:12px;text-align:right" oninput="edmCalc()">'
     +'<span style="font-size:11px;color:var(--txt3)">원 차감</span>'
     +'</div>'
 
@@ -7168,10 +7155,10 @@ function openExpectedDetailModal(studentId,yr,mo){
     +'</select>'
     +'</div>'
 
-    // 합계 표시
-    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;margin-top:4px;border-top:2px solid var(--navy)">'
+    // 납부예정액
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;margin-top:4px;border-top:2px solid var(--navy)">'
     +'<span style="font-size:13px;font-weight:800;color:var(--navy)">납부예정액</span>'
-    +'<span style="font-size:18px;font-weight:800;color:var(--navy)" id="edm-total">계산 중...</span>'
+    +'<span style="font-size:20px;font-weight:800;color:var(--navy)" id="edm-total">계산 중...</span>'
     +'</div>'
 
     +'<button id="edm-save-btn" class="btn btn-navy btn-block">저장</button>'
@@ -7179,42 +7166,33 @@ function openExpectedDetailModal(studentId,yr,mo){
     +'</div>';
 
   document.body.appendChild(overlay);
-  // 저장/취소 버튼 이벤트 연결
   var saveBtn=document.getElementById('edm-save-btn');
   if(saveBtn)saveBtn.onclick=function(){saveExpectedDetailModal(studentId,yr,mo,overlay);};
   var cancelBtn=document.getElementById('edm-cancel-btn');
   if(cancelBtn)cancelBtn.onclick=function(){overlay.remove();};
 
-  // 실시간 합계 계산
   function calcTotal(){
     var base=parseInt($('edm-base').value)||0;
-    var tb=parseInt($('edm-textbook').value)||0;
     var disc=parseInt($('edm-discount').value)||0;
     var absent=parseInt($('edm-absent').value)||0;
     var subm=getSubMaterialFee($('edm-submat').value);
-    var total=(base+tb+subm-disc-absent);
+    var total=base+subm-disc-absent;
     if(total<0)total=0;
     var el=$('edm-total');
     if(el)el.textContent=total.toLocaleString()+'원';
   }
-  ['edm-base','edm-textbook','edm-discount','edm-absent','edm-mh'].forEach(function(id){
-    var el=$(id);if(el)el.addEventListener('input',calcTotal);
-  });
-  var sm=$('edm-submat');if(sm)sm.addEventListener('change',calcTotal);
+  window.edmCalc=calcTotal;
   calcTotal();
 }
 
 function saveExpectedDetailModal(studentId,yr,mo,overlay){
   var base=parseInt($('edm-base').value)||0;
-  var tb=parseInt($('edm-textbook').value)||0;
   var disc=parseInt($('edm-discount').value)||0;
   var absent=parseInt($('edm-absent').value)||0;
-  var mhVal=parseFloat($('edm-mh').value)||0;
   var subMat=$('edm-submat').value;
   var subMatFee=getSubMaterialFee(subMat);
-  var total=Math.max(0,base+tb+subMatFee-disc-absent);
+  var total=Math.max(0,base+subMatFee-disc-absent);
 
-  // 수납 기록 업데이트 또는 신규 생성
   var list=revenues.filter(function(r){
     if(r.isManualMeta)return false;
     if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;
@@ -7225,7 +7203,6 @@ function saveExpectedDetailModal(studentId,yr,mo,overlay){
 
   var updateData={
     manualExpected:total,
-    manualMonthlyHours:mhVal,
     absentDeduction:absent,
     subMaterial:subMat,
     updatedAt:new Date().toISOString()
