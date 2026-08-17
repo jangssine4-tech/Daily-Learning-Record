@@ -618,25 +618,23 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <h4 style="margin:0">💰 교육비 기준 설정</h4>
       <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:12px;color:var(--txt3)">기본 교육비 = 수강료 − 교재비</span>
+        <span style="font-size:12px;color:var(--txt3)">주3/4/5회 수강료를 각각 직접 입력하세요</span>
         <button class="btn btn-outline btn-sm" onclick="_openMatchRulesModal()" style="font-size:11px;white-space:nowrap">🔗 매칭 규칙</button>
         <button class="btn btn-outline btn-sm" onclick="_openRefManual()" style="font-size:11px;white-space:nowrap">📋 영향 맵 &amp; 매뉴얼</button>
       </div>
     </div>
     <div style="display:flex;gap:16px;align-items:flex-start">
       <div style="overflow-x:auto;flex:1;min-width:0">
-      <table class="rev-tbl" style="min-width:820px;table-layout:auto">
+      <table class="rev-tbl" style="min-width:720px;table-layout:auto">
         <thead><tr>
           <th style="width:16px"></th>
           <th style="text-align:center;min-width:130px">단계</th>
           <th style="text-align:center;min-width:140px">교재</th>
           <th style="text-align:center;min-width:95px">교재비</th>
-          <th style="text-align:center;min-width:95px">수강료</th>
-          <th style="text-align:center;min-width:90px">기본 교육비</th>
-          <th style="text-align:center;min-width:80px">주 3회</th>
-          <th style="text-align:center;min-width:80px">주 4회</th>
-          <th style="text-align:center;min-width:80px">주 5회</th>
-          <th style="width:80px"></th>
+          <th style="text-align:center;min-width:100px">수강료(주 3회)</th>
+          <th style="text-align:center;min-width:100px">수강료(주 4회)</th>
+          <th style="text-align:center;min-width:100px">수강료(주 5회)</th>
+          <th style="width:70px"></th>
         </tr></thead>
         <tbody id="ref-tuition-tbody"></tbody>
       </table>
@@ -13979,7 +13977,7 @@ function renderRefFees(){
     }
 
     var TBFEE_OPTS=[14000,21080,23100,31050,33000];
-    var TUITION_OPTS=[180000,213000,240000,250000,283000,320000,360000];
+    var TUITION_OPTS=[130000,150000,180000,213000,240000,250000,283000,320000,360000];
 
     var STAGE_OPTS=['초등 Phonics','초등 Basic','중등(초등)','중등(중등)','고등(중등)','고등(고등)'];
     var LEVEL_OPTS=['Phonics','Master Phonics','Basic','Grammar Plus','Prime','Advanced','First Grammar','Elite','Reader\'s Bank','천일문 입문','천일문 실력','빠바 구문','빠바 유형'];
@@ -13993,8 +13991,8 @@ function renderRefFees(){
     function tbFeeCombo(cls,val,onInputFn){
       return refCombo(cls,val||'',TBFEE_OPTS,onInputFn,true);
     }
-    function tuitionCombo(val){
-      return refCombo('ri-tuition',val||'',TUITION_OPTS,'_calcBaseFee(this)',true);
+    function tuitionCombo(cls,val){
+      return refCombo(cls,val||'',TUITION_OPTS,'',true);
     }
     function numInp(cls,val,ph){
       return'<input class="ri-input '+cls+'" value="'+(val||'')+'" placeholder="'+(ph||'')+'" type="number">';
@@ -14004,24 +14002,20 @@ function renderRefFees(){
     if(tbT){
       var stageList=[...new Set(tuitionItems.map(function(i){return i.stage||'';}))];
       var tRows=tuitionItems.map(function(item){
-        var base=parseInt(item.baseFee)||0;
         var tbFee=item.textbookFeeRef||getTbFee(item.level||'');
-        var tuition=item.tuition||(base+tbFee);
-        var w3=item.feeW3||Math.round(base/20*12);
-        var w4=item.feeW4||Math.round(base/20*16);
-        var w5=item.feeW5||base;
+        var w3=item.feeW3||0;
+        var w4=item.feeW4||0;
+        var w5=item.feeW5||item.tuition||0;
         var stageIdx=stageList.indexOf(item.stage||'');
         var stageBg=stageIdx%2===1?'background:#f8faff;':'';
         return '<tr data-id="'+item.id+'" data-type="tuition" draggable="true" style="'+stageBg+'">'
           +'<td class="drag-handle" title="드래그" style="width:12px;padding:0 2px;text-align:center;cursor:grab;color:var(--txt3)">⠿</td>'
           +'<td style="min-width:130px">'+stageCombo(item.stage||'')+'</td>'
           +'<td style="min-width:140px">'+levelCombo(item.level||'')+'</td>'
-          +'<td style="min-width:95px">'+tbFeeCombo('ri-textbookfee-ref',tbFee||'','_calcBaseFee(this)')+'</td>'
-          +'<td style="min-width:95px">'+tuitionCombo(tuition||'')+'</td>'
-          +'<td style="text-align:center;font-size:12px;color:var(--mint);font-weight:700;min-width:90px" class="ri-base-display">'+(base?base.toLocaleString()+'원':'-')+'</td>'
-          +'<td style="min-width:80px">'+numInp('ri-w3',w3||'','자동')+'</td>'
-          +'<td style="min-width:80px">'+numInp('ri-w4',w4||'','자동')+'</td>'
-          +'<td style="min-width:80px">'+numInp('ri-w5',w5||'','자동')+'</td>'
+          +'<td style="min-width:95px">'+tbFeeCombo('ri-textbookfee-ref',tbFee||'','')+'</td>'
+          +'<td style="min-width:100px">'+tuitionCombo('ri-w3',w3||'')+'</td>'
+          +'<td style="min-width:100px">'+tuitionCombo('ri-w4',w4||'')+'</td>'
+          +'<td style="min-width:100px">'+tuitionCombo('ri-w5',w5||'')+'</td>'
           +'<td style="white-space:nowrap;width:70px;text-align:center">'
           +'<span class="ri-save-status" style="font-size:10px;color:var(--txt3)"></span>'
           +'<button class="btn btn-red btn-xs" onclick="_delRefRow(this)">삭제</button>'
@@ -14031,12 +14025,10 @@ function renderRefFees(){
         +'<td></td>'
         +'<td>'+stageCombo('')+'</td>'
         +'<td>'+levelCombo('')+'</td>'
-        +'<td>'+tbFeeCombo('ri-textbookfee-ref','','_calcBaseFee(this)')+'</td>'
-        +'<td>'+tuitionCombo('')+'</td>'
-        +'<td style="text-align:center;font-size:12px;color:var(--mint);font-weight:700" class="ri-base-display">-</td>'
-        +'<td>'+numInp('ri-w3','','자동')+'</td>'
-        +'<td>'+numInp('ri-w4','','자동')+'</td>'
-        +'<td>'+numInp('ri-w5','','자동')+'</td>'
+        +'<td>'+tbFeeCombo('ri-textbookfee-ref','','')+'</td>'
+        +'<td>'+tuitionCombo('ri-w3','')+'</td>'
+        +'<td>'+tuitionCombo('ri-w4','')+'</td>'
+        +'<td>'+tuitionCombo('ri-w5','')+'</td>'
         +'<td><button class="btn btn-green btn-xs" onclick="_saveRefRow(this)">+ 추가</button></td>'
         +'</tr>';
       tbT.innerHTML=tRows;
@@ -15041,16 +15033,12 @@ async function _autoSaveRefRow(row){
     var level=readCombo('ri-level');if(!level)return false;
     var data={refType:type,level:level,updatedAt:new Date().toISOString()};
     if(type==='tuition'){
-      var tuition=readNum('ri-tuition');
-      var tbFeeRef=readNum('ri-textbookfee-ref');
-      var base=tuition-tbFeeRef;
       data.stage=readCombo('ri-stage');
-      data.tuition=tuition;
-      data.textbookFeeRef=tbFeeRef;
-      data.baseFee=base;
-      data.feeW3=parseInt((row.querySelector('.ri-w3')||{}).value)||Math.round(base/20*12);
-      data.feeW4=parseInt((row.querySelector('.ri-w4')||{}).value)||Math.round(base/20*16);
-      data.feeW5=parseInt((row.querySelector('.ri-w5')||{}).value)||base;
+      data.textbookFeeRef=readNum('ri-textbookfee-ref');
+      data.feeW3=readNum('ri-w3');
+      data.feeW4=readNum('ri-w4');
+      data.feeW5=readNum('ri-w5');
+      data.tuition=data.feeW5||data.feeW3||data.feeW4;
     }else{
       data.textbookFee=readNum('ri-textbookfee');
     }
@@ -15100,18 +15088,13 @@ async function _saveRefRow(btn){
   var data={refType:type,level:level,updatedAt:new Date().toISOString()};
   if(type==='tuition'){
     data.stage=readCombo('ri-stage');
-    var tuition=readComboNum('ri-tuition');
     var tbFeeRef=readComboNum('ri-textbookfee-ref');
-    var textbookItems=refItems.filter(function(i){return i.refType==='textbook'||(!i.refType&&(i.textbookFee||i.supMaterial));});
-    var tb=textbookItems.find(function(t){return(t.level||t.supMaterial||'')===level;});
-    var tbFee=tbFeeRef||(tb?parseInt(tb.textbookFee)||0:0);
-    var base=tuition-tbFee;
-    data.tuition=tuition;
     data.textbookFeeRef=tbFeeRef;
-    data.baseFee=base;
-    data.feeW3=parseInt((row.querySelector('.ri-w3')||{}).value)||Math.round(base/20*12);
-    data.feeW4=parseInt((row.querySelector('.ri-w4')||{}).value)||Math.round(base/20*16);
-    data.feeW5=parseInt((row.querySelector('.ri-w5')||{}).value)||base;
+    data.feeW3=readComboNum('ri-w3');
+    data.feeW4=readComboNum('ri-w4');
+    data.feeW5=readComboNum('ri-w5');
+    // 하위 호환: tuition은 주5회 값으로 저장
+    data.tuition=data.feeW5||data.feeW3||data.feeW4;
   }else{
     data.textbookFee=readComboNum('ri-textbookfee');
     data.supFee=0;data.supMaterial='';
