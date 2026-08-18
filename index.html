@@ -172,11 +172,15 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .ri-input[type=number]::-webkit-inner-spin-button,.ri-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .ri-input[type=number]{-moz-appearance:textfield}
 .drag-handle{cursor:grab;color:var(--txt3);font-size:14px;padding:0 4px;user-select:none}
-.ri-sticky-col{position:sticky;background:inherit;z-index:2}
-.ri-sticky-col-1{left:0px}
-.ri-sticky-col-2{left:28px}
-.ri-sticky-col-3{left:168px}
-tr:hover .ri-sticky-col{background:var(--hover)}
+.ri-sticky-col{position:sticky;z-index:2}
+.ri-sticky-col-1{left:0px;background:inherit}
+.ri-sticky-col-2{left:20px;background:inherit}
+.ri-sticky-col-3{left:160px;background:inherit}
+.rev-tbl thead th{position:sticky;top:0;z-index:4}
+.rev-tbl thead th.ri-sticky-col-1{z-index:5}
+.rev-tbl thead th.ri-sticky-col-2{z-index:5}
+.rev-tbl thead th.ri-sticky-col-3{z-index:5}
+tr:hover .ri-sticky-col{background:var(--hover,#f5f7fa)}
 tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .makeup-chip{display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 5px;font-size:10px;font-weight:400;margin:1px 1px 1px 0;cursor:pointer;white-space:nowrap;gap:2px;color:var(--txt2);vertical-align:middle}
 /* 미정: 기본(회색) */
@@ -630,12 +634,12 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       </div>
     </div>
     <div style="display:flex;gap:16px;align-items:flex-start">
-      <div style="overflow-x:auto;flex:1;min-width:0">
+      <div style="overflow:auto;flex:1;min-width:0;max-height:calc(100vh - 280px);border:1px solid var(--border);border-radius:8px">
       <table class="rev-tbl" style="min-width:720px;table-layout:auto">
         <thead><tr>
-          <th style="width:16px" class="ri-sticky-col ri-sticky-col-1"></th>
-          <th style="text-align:center;min-width:140px;border-right:1px solid rgba(255,255,255,.2)" class="ri-sticky-col ri-sticky-col-2">단계</th>
-          <th style="text-align:center;min-width:140px;border-right:2px solid rgba(255,255,255,.4)" class="ri-sticky-col ri-sticky-col-3">교재</th>
+          <th style="width:20px;background:var(--navy)" class="ri-sticky-col ri-sticky-col-1"></th>
+          <th style="text-align:center;min-width:140px;background:var(--navy);border-right:1px solid rgba(255,255,255,.2)" class="ri-sticky-col ri-sticky-col-2">단계</th>
+          <th style="text-align:center;min-width:140px;background:var(--navy);border-right:2px solid rgba(255,255,255,.4)" class="ri-sticky-col ri-sticky-col-3">교재</th>
           <th style="text-align:center;min-width:95px">교재비</th>
           <th style="text-align:center;min-width:100px">수강료(주 3회)</th>
           <th style="text-align:center;min-width:100px">수강료(주 4회)</th>
@@ -7101,7 +7105,16 @@ function openExpectedDetailModal(studentId,yr,mo){
   var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
   var mh=getStudentMonthlyHours(s);
   var weeklyDays=Math.round(mh/4);
-  var weekLabel=weeklyDays<=3?'주 3회':weeklyDays===4?'주 4회':'주 5회';
+  var weekLabel=weeklyDays<=3?'주 3회':weeklyDays===4?'주 4회':weeklyDays===5?'주 5회':'주 6회';
+  // 결석 차감액 자동 계산: (수강료 - 교재비) ÷ (주N회 × 4.2) × 결석일
+  var absentDays=makeups.filter(function(m){
+    if(m.studentId!==studentId)return false;
+    var ad=m.absentDate||'';if(!ad)return false;
+    var md=new Date(ad);
+    return md.getFullYear()===yr&&md.getMonth()===mo-1&&m.makeupStatus!=='done';
+  }).length;
+  var perDayFee=weeklyDays>0?Math.round((tuitionFee-textbookFee)/(weeklyDays*4.2)):0;
+  var autoAbsentDeduct=perDayFee*absentDays;
 
   var list=revenues.filter(function(r){
     if(r.isManualMeta)return false;
@@ -7124,14 +7137,16 @@ function openExpectedDetailModal(studentId,yr,mo){
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
 
-  overlay.innerHTML='<div class="ms" style="max-width:400px">'
+  var memo='<div style="font-size:10px;color:var(--txt3);padding:3px 6px;background:#f8fafc;border-radius:4px;margin-top:3px;line-height:1.5">';
+
+  overlay.innerHTML='<div class="ms" style="max-width:420px;max-height:90dvh;overflow-y:auto">'
     +'<div class="mh"></div>'
     +'<div class="mt">납부예정액 상세 — '+s.name+'</div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">자동 연동값도 수정 가능합니다. 저장하면 이번 달 수납 기록에 반영됩니다.</div>'
 
     // 기준 수강료
     +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">기준 수강료</div>'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:4px">'
+    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:2px">'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">'+rawLevel+' / '+weekLabel+'</div>'
     +'<div style="display:flex;align-items:center;gap:8px">'
     +'<input class="fi" id="edm-base" type="number" value="'+tuitionFee+'" style="width:110px;font-size:14px;font-weight:700;text-align:right" oninput="edmCalc()">'
@@ -7139,27 +7154,57 @@ function openExpectedDetailModal(studentId,yr,mo){
     +'<span style="font-size:11px;color:var(--txt3);margin-left:4px">(교재비 '+textbookFee.toLocaleString()+'원 포함)</span>'
     +'</div>'
     +'</div>'
+    +memo+'📌 학생 정보의 단계('+rawLevel+')와 수업 요일 수('+weekLabel+')를 기준으로 참고 &gt; 교육비 기준 표에서 수강료를 자동 조회합니다.</div>'
 
     // 조정 항목
     +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:12px 0 6px">조정 항목</div>'
 
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
+    // 할인
+    +'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
     +'<span style="font-size:12px;color:var(--txt3);min-width:90px">할인</span>'
     +'<input class="fi" id="edm-discount" type="number" value="'+discountAmt+'" style="width:100px;font-size:12px;text-align:right" oninput="edmCalc()">'
     +'<span style="font-size:11px;color:var(--txt3)">원 차감</span>'
     +'</div>'
-
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
-    +'<span style="font-size:12px;color:var(--txt3);min-width:90px">결석 조정</span>'
-    +'<input class="fi" id="edm-absent" type="number" value="'+absentDeduct+'" style="width:100px;font-size:12px;text-align:right" oninput="edmCalc()">'
-    +'<span style="font-size:11px;color:var(--txt3)">원 차감</span>'
+    +memo+'📌 학생 정보의 할인 설정(형제할인 등)에서 자동 적용됩니다. 직접 수정도 가능합니다.</div>'
     +'</div>'
 
-    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">'
+    // 결석 차감액
+    +'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'
+    +'<span style="font-size:12px;color:var(--txt3);min-width:90px;font-weight:600">결석 차감액</span>'
+    +'<span style="font-size:11px;color:var(--txt3)">(수강료-교재비) ÷ ('+weeklyDays+'회×4.2주) × 결석일</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:6px">'
+    +'<div style="flex:1;background:var(--surface2);border-radius:6px;padding:6px 10px">'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">결석일</div>'
+    +'<div style="display:flex;align-items:center;gap:4px">'
+    +'<input class="fi" id="edm-absent-days" type="number" value="'+absentDays+'" min="0" style="width:50px;font-size:13px;font-weight:700;text-align:center" oninput="edmAbsentCalc()">'
+    +'<span style="font-size:11px;color:var(--txt2)">일</span>'
+    +'</div>'
+    +'</div>'
+    +'<div style="flex:1;background:var(--surface2);border-radius:6px;padding:6px 10px">'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">일당 단가</div>'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy)">'+perDayFee.toLocaleString()+'원</div>'
+    +'</div>'
+    +'<div style="flex:1;background:#fff0f0;border-radius:6px;padding:6px 10px">'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">차감액</div>'
+    +'<div style="font-size:13px;font-weight:700;color:#dc2626" id="edm-absent-amt">'+autoAbsentDeduct.toLocaleString()+'원</div>'
+    +'</div>'
+    +'</div>'
+    +'<input type="hidden" id="edm-absent" value="'+autoAbsentDeduct+'">'
+    +memo+'📌 보강 계획표/오늘의 시간표에서 결석 처리 시 자동 집계됩니다. 보강 완료 결석은 제외됩니다. 결석일을 직접 수정할 수 있습니다.</div>'
+    +'</div>'
+
+    // 부교재
+    +'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
     +'<span style="font-size:12px;color:var(--txt3);min-width:90px">부교재</span>'
     +'<select class="fi" id="edm-submat" style="flex:1;font-size:12px" onchange="edmCalc()">'
     +subMatOpts
     +'</select>'
+    +'</div>'
+    +memo+'📌 부교재 금액은 참고 &gt; 교육비 기준 표의 교재비 항목에서 조회합니다. 부교재명과 교재명이 일치해야 금액이 자동 적용됩니다.</div>'
     +'</div>'
 
     // 납부예정액
@@ -7178,6 +7223,16 @@ function openExpectedDetailModal(studentId,yr,mo){
   var cancelBtn=document.getElementById('edm-cancel-btn');
   if(cancelBtn)cancelBtn.onclick=function(){overlay.remove();};
 
+  function calcAbsent(){
+    var days=parseInt($('edm-absent-days').value)||0;
+    var amt=perDayFee*days;
+    var amtEl=$('edm-absent-amt');
+    if(amtEl)amtEl.textContent=amt.toLocaleString()+'원';
+    var hiddenEl=$('edm-absent');
+    if(hiddenEl)hiddenEl.value=amt;
+    calcTotal();
+  }
+  window.edmAbsentCalc=calcAbsent;
   function calcTotal(){
     var base=parseInt($('edm-base').value)||0;
     var disc=parseInt($('edm-discount').value)||0;
@@ -13889,12 +13944,12 @@ function _tcCalc(){
   var mins=parseInt((document.getElementById('tc-min')||{}).value)||0;
   var rate=rates[levelIdx]?rates[levelIdx].rate:0;
   var levelLabel=rates[levelIdx]?rates[levelIdx].label:'';
-  // 월 수업 횟수 = 주 수업일수 × 4주
-  var monthlyTotal=rate*mins*weekDays*4;
-  var formula=levelLabel+' × '+mins+'분 × '+weekLabels[weekIdx]+' × 4주 = '+rate+'원/분 × '+mins+'분 × '+(weekDays*4)+'회';
+  // 월 수업 횟수 = 주 수업일수 × 4.2주
+  var monthlyTotal=rate*mins*weekDays*4.2;
+  var formula=levelLabel+' × '+mins+'분 × '+weekLabels[weekIdx]+' × 4.2주 = '+rate+'원/분 × '+mins+'분 × '+(weekDays*4.2)+'회';
   var res=document.getElementById('tc-result');
   var frm=document.getElementById('tc-formula');
-  if(res)res.textContent=monthlyTotal>0?monthlyTotal.toLocaleString()+'원':'-';
+  if(res)res.textContent=monthlyTotal>0?Math.round(monthlyTotal).toLocaleString()+'원':'-';
   if(frm)frm.textContent=formula;
 }
 async function _loadPerMinRates(){
@@ -14309,9 +14364,9 @@ function renderRefFees(){
         var stageIdx=stageList.indexOf(item.stage||'');
         var stageBg=stageIdx%2===1?'background:#f8faff;':'';
         return '<tr data-id="'+item.id+'" data-type="tuition" draggable="true" style="'+stageBg+'">'
-          +'<td class="drag-handle ri-sticky-col ri-sticky-col-1" title="드래그" style="width:12px;padding:0 2px;text-align:center;cursor:grab;color:var(--txt3)">⠿</td>'
-          +'<td class="ri-sticky-col ri-sticky-col-2" style="min-width:140px;border-right:1px solid var(--border)">'+stageCombo(item.stage||'')+'</td>'
-          +'<td class="ri-sticky-col ri-sticky-col-3" style="min-width:140px;border-right:2px solid var(--border2)">'+levelCombo(item.level||'')+'</td>'
+          +'<td class="drag-handle ri-sticky-col ri-sticky-col-1" title="드래그" style="width:20px;padding:0 2px;text-align:center;cursor:grab;color:var(--txt3);'+(stageBg||'background:#fff')+'"  >⠿</td>'
+          +'<td class="ri-sticky-col ri-sticky-col-2" style="min-width:140px;border-right:1px solid var(--border);'+(stageBg||'background:#fff')+'">'+stageCombo(item.stage||'')+'</td>'
+          +'<td class="ri-sticky-col ri-sticky-col-3" style="min-width:140px;border-right:2px solid var(--border2);'+(stageBg||'background:#fff')+'">'+levelCombo(item.level||'')+'</td>'
           +'<td style="min-width:95px">'+tbFeeCombo('ri-textbookfee-ref',tbFee||'','')+'</td>'
           +'<td style="min-width:100px">'+tuitionCombo('ri-w3',w3||'')+'</td>'
           +'<td style="min-width:100px">'+tuitionCombo('ri-w4',w4||'')+'</td>'
