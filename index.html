@@ -703,7 +703,11 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <!-- modal-makeup is dynamically created by _openMakeupModal() -->
 <div id="modal-report" style="display:none" class="mo" onclick="if(event.target===this){this.style.display='none'}"><div class="ms" style="max-height:90dvh;overflow-y:auto"><div class="mh"></div><div id="report-detail-inner"></div><div style="height:8px"></div><button class="btn btn-outline btn-block" onclick="document.getElementById('modal-report').style.display='none'">닫기</button></div></div>
 <div id="modal-user" style="display:none" class="mo" onclick="if(event.target===this)closeM('user')"><div class="ms"><div class="mh"></div><div class="mt">교사 계정</div><input type="hidden" id="u-id-key"><div class="r2"><div class="field"><div class="fl">이름</div><input class="fi" id="u-name" placeholder="김선생님"></div><div class="field"><div class="fl">영어 이름</div><input class="fi" id="u-engname" placeholder="Luna"></div></div><div class="field"><div class="fl">역할</div><select class="fi" id="u-role"><option value="teacher">교사</option><option value="admin">관리자</option></select></div><div class="r2"><div class="field"><div class="fl">아이디</div><input class="fi" id="u-id" placeholder="teacher1"></div><div class="field"><div class="fl">비밀번호</div><input class="fi" id="u-pw" type="password"></div></div><div class="r2"><div class="field"><div class="fl">연락처</div><input class="fi" id="u-phone" placeholder="010-0000-0000" type="tel"></div><div class="field"><div class="fl">주민번호</div><div style="display:flex;gap:4px"><input class="fi" id="u-ssn" type="password" placeholder="저장됨" style="flex:1"><button class="btn btn-outline btn-xs" type="button" onclick="var el=$('u-ssn');el.type=el.type==='password'?'text':'password'" style="white-space:nowrap;padding:4px 8px">👁</button></div></div></div><div class="field"><div class="fl">주소</div><input class="fi" id="u-address" placeholder="경기도 군포시..."></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveUser()">저장</button><div style="height:6px"></div><div id="u-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteUser()">삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('user')">취소</button></div></div>
-<div id="modal-newconsult" style="display:none" class="mo" onclick="if(event.target===this)closeM('newconsult')"><div class="ms" style="max-width:680px;max-height:92dvh;overflow-y:auto"><div class="mh"></div><div class="mt" id="nc-modal-title">신규 상담 기록</div><input type="hidden" id="nc-id">
+<div id="modal-newconsult" style="display:none" class="mo" onclick="if(event.target===this)closeM('newconsult')"><div class="ms" style="max-width:680px;max-height:92dvh;overflow-y:auto"><div class="mh"></div><div class="mt" id="nc-modal-title">신규 상담 기록</div>
+<input type="hidden" id="nc-id">
+<div style="margin-bottom:12px">
+  <button class="btn btn-outline btn-sm" onclick="_openConsultSurveyFromModal()" style="font-size:12px">📝 학부모 설문 작성/보기</button>
+</div>
 
 <!-- 학생 기본정보 -->
 <div style="border-left:3px solid var(--navy);padding-left:8px;font-size:12px;font-weight:700;color:var(--navy);margin:12px 0 8px">학생 기본정보</div>
@@ -7140,23 +7144,88 @@ function renderNewConsultStats(){
       return'<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>'+e[0]+'</span><span style="font-weight:700">'+e[1]+'건</span></div>';
     }).join('')+'</div>'
     +'</div>';
-  var statusColor={'신규 문의':'var(--blue)','상담 예정':'var(--orange)','상담 완료':'var(--mint)','등록 완료':'#16a34a','미등록':'var(--red)','체험 예정':'var(--purple)','체험 완료':'var(--navy)'};
-  $('new-consult-list').innerHTML=filtered.sort(function(a,b){return(b.inquiryDate||b.date||'')>(a.inquiryDate||a.date||'')?1:-1;}).map(function(nc){
-    var col=statusColor[nc.ncStatus||'신규 문의']||'var(--txt3)';
-    return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer" onclick="openNewConsultModal(\''+nc.id+'\')">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
-      +'<span style="font-size:14px;font-weight:700">'+(nc.studentName||nc.prospectName||'-')+'</span>'
-      +'<span style="font-size:11px;font-weight:700;color:'+col+';background:'+col+'18;padding:2px 8px;border-radius:20px">'+(nc.ncStatus||'신규 문의')+'</span>'
-      +'</div>'
-      +'<div style="font-size:11px;color:var(--txt3);display:flex;gap:10px;flex-wrap:wrap">'
-      +'<span>📅 '+(nc.inquiryDate||'-')+'</span>'
-      +'<span>🏫 '+(nc.school||'-')+' '+(nc.grade||'-')+'</span>'
-      +'<span>👩‍🏫 '+(nc.teacher||'-')+'</span>'
-      +'<span>📣 '+(nc.inflow||'-')+'</span>'
-      +'</div>'
-      +(nc.content?'<div style="font-size:11px;color:var(--txt2);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">💬 '+nc.content+'</div>':'')
-      +'</div>';
+  var statusColors={'신규 문의':'bg-blue','상담 예정':'bg-gold','상담 완료':'bg-green','체험 예정':'bg-navy','체험 완료':'bg-mint','등록 완료':'bg-red','미등록':'bg-gray'};
+  var rows=filtered.sort(function(a,b){return(b.inquiryDate||b.date||'')>(a.inquiryDate||a.date||'')?1:-1;}).map(function(n){
+    var isReg=n.ncStatus==='등록 완료';
+    var preview=n.content?(n.content.substring(0,30)+(n.content.length>30?'...':'')):'';
+    return'<tr style="cursor:pointer" onclick="openNewConsultModal(\''+n.id+'\')">'
+      +'<td style="white-space:nowrap">'+(n.inquiryDate||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+(n.date||'-')+'</td>'
+      +'<td style="font-weight:700">'+(n.prospectName||n.studentName||'-')+'</td>'
+      +'<td>'+(n.school||'-')+'</td>'
+      +'<td>'+(n.grade||'-')+'</td>'
+      +'<td>'+(n.route||n.type||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+(n.phone||'-')+'</td>'
+      +'<td>'+(n.inflow||'-')+'</td>'
+      +'<td><span class="badge '+(statusColors[n.ncStatus]||'bg-gray')+'" style="font-size:9px">'+(n.ncStatus||'-')+'</span></td>'
+      +'<td style="white-space:nowrap">'+(n.lastContact||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+(n.nextContact||'-')+'</td>'
+      +'<td>'+(isReg?(n.level||'-'):'-')+'</td>'
+      +'<td>'+(n.content?'<span onclick="event.stopPropagation();var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'block\':\'none\'" style="cursor:pointer;color:var(--blue);font-size:11px">'+preview+'</span><div style="display:none;font-size:11px;color:var(--txt);margin-top:4px;white-space:pre-wrap;max-width:200px">'+n.content+'</div>':'-')+'</td>'
+      +'</tr>';
   }).join('');
+  $('new-consult-list').innerHTML='<div style="overflow-x:auto"><table class="rev-tbl" style="font-size:11px"><thead><tr>'
+    +'<th>문의일</th><th>상담일</th><th>이름</th><th>학교</th><th>학년</th><th>상담경로</th><th>연락처</th><th>유입</th><th>상태</th><th>마지막연락</th><th>다음연락</th><th>단계</th><th>상담 내용</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+async function _openConsultSurveyFromModal(){
+  // 현재 모달의 학생 ID 또는 이름으로 설문 열기
+  var sId=$('nc-id').value;
+  var sName=$('nc-name').value.trim();
+  var docId=sId||sName;
+  if(!docId){toast('⚠️ 학생 이름을 먼저 입력하세요');return;}
+  // 설문 모달 생성
+  var prev=document.getElementById('modal-consult-survey-popup');if(prev)prev.remove();
+  var overlay=document.createElement('div');
+  overlay.id='modal-consult-survey-popup';overlay.className='mo';overlay.style.display='flex';overlay.style.zIndex='1100';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+  overlay.innerHTML='<div class="ms" style="max-width:500px;max-height:90dvh;overflow-y:auto">'
+    +'<div class="mh"></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    +'<div class="mt" style="margin:0">📝 학부모 설문 — '+(sName||docId)+'</div>'
+    +'<div style="display:flex;gap:6px">'
+    +'<button class="btn btn-outline btn-xs" onclick="_openConsultTemplateEditor()">⚙️ 설문 편집</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'modal-consult-survey-popup\').remove()">닫기</button>'
+    +'</div></div>'
+    +'<div id="survey-popup-form">⏳ 불러오는 중...</div>'
+    +'</div>';
+  await _loadConsultFormTemplate();
+  if(!_consultFormData[docId]){
+    try{var doc=await db.collection('consultForms').doc(docId).get();
+      _consultFormData[docId]=doc.exists?doc.data():{};
+    }catch(e){_consultFormData[docId]={};}
+  }
+  var t=_consultFormTemplate;
+  var d=_consultFormData[docId]||{};
+  function qBlock(q){
+    var html='<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+      +'<div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:6px">'+q.text+'</div>';
+    if(q.type==='radio'){
+      var sel=d[q.id]||'';
+      html+=q.options.map(function(o){
+        return'<label style="display:flex;align-items:flex-start;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px">'
+          +'<input type="radio" name="sp-q-'+q.id+'" value="'+o+'"'+(sel===o?' checked':'')+' onchange="_cfChange(\''+docId+'\',\''+q.id+'\',this.value)" style="margin-top:2px;flex-shrink:0"> '+o+'</label>';
+      }).join('');
+    }else if(q.type==='checkbox'){
+      var checked=Array.isArray(d[q.id])?d[q.id]:[];
+      html+=q.options.map(function(o){
+        return'<label style="display:flex;align-items:flex-start;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px">'
+          +'<input type="checkbox" value="'+o+'"'+(checked.indexOf(o)>=0?' checked':'')+' onchange="_cfCheckChange(\''+docId+'\',\''+q.id+'\',this.value,this.checked)" style="margin-top:2px;flex-shrink:0"> '+o+'</label>';
+      }).join('');
+    }
+    return html+'</div>';
+  }
+  var inflowHtml='<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+    +'<div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:6px">'+t.inflow.label+'</div>'
+    +t.inflow.options.map(function(o){
+      var chk=Array.isArray(d.inflow)?d.inflow.indexOf(o)>=0:false;
+      return'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px">'
+        +'<input type="checkbox" value="'+o+'"'+(chk?' checked':'')+' onchange="_cfCheckChange(\''+docId+'\',\'inflow\',this.value,this.checked)"> '+o+'</label>';
+    }).join('')+'</div>';
+  var formEl=document.getElementById('survey-popup-form');
+  if(formEl)formEl.innerHTML=inflowHtml+t.questions.map(qBlock).join('')
+    +'<button class="btn btn-navy btn-block" onclick="_saveConsultFormData(\''+docId+'\')">💾 저장</button>';
 }
 function ncAutoGrade(){
   var birth=$('nc-birth').value;if(!birth)return;
