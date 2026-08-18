@@ -2586,8 +2586,9 @@ function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=t
 // ── 상태 변수 ─────────────────────────────────────────
 var _wtDragInfo = null;
 var _wtUndoStack = null;
-var _wtMonthData = {};   // 캐시: 'YYYY_MM' → 데이터
-var _wtDirty = false;    // 미저장 변경 있음
+var _wtMonthData = {};
+var _wtDirty = false;
+var currentSchTab = 'today';
 
 // ── 월 키 ─────────────────────────────────────────────
 function _wtKey(yr, mo) {
@@ -2635,8 +2636,8 @@ function _wtPlanKey() {
   return 'monthlyPlan_' + yr + '_' + String(mo).padStart(2,'0');
 }
 
-function _wtLoadPlan() {
-  var key = _wtPlanKey();
+function _wtLoadPlan(yr, mo) {
+  var key = yr&&mo ? 'monthlyPlan_'+yr+'_'+String(mo).padStart(2,'0') : _wtPlanKey();
   if (_wtPlanData[key] !== undefined) return Promise.resolve();
   return db.collection('config').doc(key).get()
     .then(function(d) {
@@ -2771,16 +2772,32 @@ function renderWeeklyTimetable() {
   var yr = window._wtYr, mo = window._wtMo;
 
   area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">⏳ 불러오는 중...</div>';
-  Promise.all([_wtLoad(yr, mo), _wtLoadPlan()]).then(function() {
+  // 캐시 무효화 (월 변경 시 항상 새로 로드)
+  var planKey='monthlyPlan_'+yr+'_'+String(mo).padStart(2,'0');
+  delete _wtPlanData[planKey];
+  Promise.all([_wtLoad(yr, mo), _wtLoadPlan(yr, mo)]).then(function() {
     var data = _buildWeeklyGrid();
     _doRenderWT(area, data, yr, mo);
   });
 }
 
-function _doRenderWT(area, data, yr, mo) {
+function _wtAutoSaveAndSwitch(type, val){
+  // 현재 달 계획 자동 저장 후 월 변경
+  var prevYr=window._wtYr||new Date().getFullYear();
+  var prevMo=window._wtMo||(new Date().getMonth()+1);
+  var prevKey='monthlyPlan_'+prevYr+'_'+String(prevMo).padStart(2,'0');
+  var plan=_wtPlanData[prevKey];
+  if(plan!==undefined){
+    db.collection('config').doc(prevKey).set({plan:plan},{merge:false})
+      .catch(function(e){console.warn('자동저장 실패',e);});
+  }
+  if(type==='yr')window._wtYr=parseInt(val);
+  else window._wtMo=parseInt(val);
+  renderWeeklyTimetable();
+}
   var timeSlots = data.timeSlots, grid = data.grid, days = data.days;
   var key = _wtPlanKey();
-  var plan = _wtPlanData[key] || {};
+  var plan = _wtPlanData['monthlyPlan_'+yr+'_'+String(mo).padStart(2,'0')] || {};
 
   var yrOpts = ''; for (var y = 2024; y <= 2030; y++) yrOpts += '<option value="' + y + '"' + (y === yr ? ' selected' : '') + '>' + y + '년</option>';
   var moOpts = ''; for (var m = 1; m <= 12; m++) moOpts += '<option value="' + m + '"' + (m === mo ? ' selected' : '') + '>' + m + '월</option>';
@@ -2801,8 +2818,8 @@ function _doRenderWT(area, data, yr, mo) {
   var html = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
     + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
     + '<div style="font-size:14px;font-weight:800;color:var(--navy);margin-right:4px">📋 월간 시간표</div>'
-    + '<select class="fi" style="width:80px;font-size:11px" onchange="window._wtYr=parseInt(this.value);renderWeeklyTimetable()">' + yrOpts + '</select>'
-    + '<select class="fi" style="width:60px;font-size:11px" onchange="window._wtMo=parseInt(this.value);renderWeeklyTimetable()">' + moOpts + '</select>'
+    + '<select class="fi" style="width:80px;font-size:11px" onchange="_wtAutoSaveAndSwitch(\'yr\',this.value)">' + yrOpts + '</select>'
+    + '<select class="fi" style="width:60px;font-size:11px" onchange="_wtAutoSaveAndSwitch(\'mo\',this.value)">' + moOpts + '</select>'
     + '<button class="btn ' + (_wtEditMode ? 'btn-navy' : 'btn-outline') + ' btn-xs" onclick="_wtToggleEdit()">' + (_wtEditMode ? '✏️ 편집 중' : '✏️ 계획 편집') + '</button>'
     + (_wtEditMode ? '<button class="btn btn-green btn-xs" onclick="_wtSavePlan()">💾 저장</button>' : '')
     + '<span style="font-size:10px;color:var(--txt3)">🔵 재원 · 🩷 계획 · '+'<span style="display:inline-flex;align-items:center;gap:2px"><span style="display:inline-block;width:14px;height:14px;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;vertical-align:middle"></span><span style="color:var(--txt3)"> 특강</span></span></span>'
@@ -3852,6 +3869,18 @@ function renderScheduleNotes(){
   _scheduleNotesRendered=true;
 }
 function switchSchTab(tab){
+  // 월간 시간표 탭에서 벗어날 때 자동 저장
+  if(currentSchTab==='weekly'&&tab!=='weekly'){
+    var yr=window._wtYr||new Date().getFullYear();
+    var mo=window._wtMo||(new Date().getMonth()+1);
+    var key='monthlyPlan_'+yr+'_'+String(mo).padStart(2,'0');
+    var plan=_wtPlanData[key];
+    if(plan!==undefined){
+      db.collection('config').doc(key).set({plan:plan},{merge:false})
+        .catch(function(e){console.warn('자동저장 실패',e);});
+    }
+  }
+  currentSchTab=tab;
   ['today','weekly','capacity','notes','crm'].forEach(function(t){
     var btn=$('schtab-'+t);if(btn)btn.classList.toggle('active',t===tab);
     var pn=$('sch-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';
