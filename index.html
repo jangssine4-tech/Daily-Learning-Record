@@ -5806,6 +5806,7 @@ function renderSpecialPeriodInputs(){
       +'</select>'
       +'</div>';
   }).join('');
+}
 function updateSpecialHours(){
   var selectedDays=[...document.querySelectorAll('#s-special-days .day-pill.on')].map(function(el){return el.dataset.day;});
   var total=0;
@@ -5823,9 +5824,10 @@ function renderSpecialPeriodInputs_restore(specialPeriods){
   setTimeout(function(){
     Object.keys(specialPeriods).forEach(function(day){
       var sp=specialPeriods[day];
-      var pn=$('sper-num-'+day),pt=$('sper-time-'+day),ph=$('sper-hours-'+day);
+      var pn=$('sper-num-'+day),ph=$('sper-hours-'+day);
+      var tH=$('sper-time-h-'+day),tM=$('sper-time-m-'+day);
       if(pn)pn.value=sp.period!==undefined?sp.period:0;
-      if(pt)pt.value=sp.time||'';
+      if(sp.time){var parts=sp.time.split(':');if(tH)tH.value=parts[0]||'';if(tM)tM.value=parts[1]||'00';}
       if(ph)ph.value=sp.hours!==undefined?sp.hours:'1';
     });
     updateSpecialHours();
@@ -5835,9 +5837,11 @@ function getSpecialPeriods(){
   var selectedDays=[...document.querySelectorAll('#s-special-days .day-pill.on')].map(function(el){return el.dataset.day;});
   var specialPeriods={};var total=0;
   selectedDays.forEach(function(day){
-    var pn=$('sper-num-'+day),pt=$('sper-time-'+day),ph=$('sper-hours-'+day);
+    var pn=$('sper-num-'+day),ph=$('sper-hours-'+day);
+    var tH=$('sper-time-h-'+day),tM=$('sper-time-m-'+day);
     var h=ph&&ph.value!==undefined&&ph.value!==''?parseFloat(ph.value):1;
     var _pVal=pn?parseInt(pn.value)||0:0;
+    var _tFinal=(tH&&tH.value)?tH.value+':'+(tM?tM.value:'00'):'';
     var _tVal=pt?pt.value||'':'';
     var _pH=$('sper-time-h-'+day);var _pM=$('sper-time-m-'+day);
     var _tFinal=(_pH&&_pH.value)?_pH.value+':'+(_pM?_pM.value:'00'):'';
