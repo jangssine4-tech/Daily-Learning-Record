@@ -7597,8 +7597,14 @@ function renderRevMonthly(yr,mo){
   var cashRevAmt=list.filter(function(r){return r.method==='현금'||r.method==='계좌이체';}).reduce(function(s,r){return s+(parseInt(r.amount)||0);},0);
   var extraRevAmt=list.reduce(function(s,r){return s+(parseInt(r.extra1Amount)||0)+(parseInt(r.extra2Amount)||0);},0);
   var paidIds=new Set(list.filter(function(r){return(parseInt(r.amount)||0)>0;}).map(function(r){return r.studentId;}));
-  // Only show 재원/신규 students enrolled by this month
+  // 재원/신규 학생
   var activeStudents=students.filter(function(s){var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return false;if(s.enrollDate){var ed=new Date(s.enrollDate);if(ed.getFullYear()>yr||(ed.getFullYear()===yr&&ed.getMonth()+1>mo))return false;}return true;});
+  // 해당 월에 수납 기록이 있는 퇴원생 추가
+  var graduatedWithRev=students.filter(function(s){
+    var st=s.status||'재원';
+    if(st==='재원'||st==='신규')return false; // 재원생 제외
+    return paidIds.has(s.id)&&!activeStudents.find(function(a){return a.id===s.id;});
+  });
   // Pre-calculate total expected for summary (same logic as table rows)
   var preExpectedTotal=0;
   activeStudents.forEach(function(s){
@@ -7652,7 +7658,7 @@ function renderRevMonthly(yr,mo){
     +'</div>'
     +'<div style="font-size:10px;color:var(--txt3);padding:4px 2px">* 수강료 청구액·수납액은 학생별 수강료 합계이며, 기타 매출(특강비 등)은 총 매출에만 포함됩니다. 미수금 카드 클릭 시 미납 학생만 표시됩니다.</div>';
   var tb=$('rev-monthly-tbody');if(!tb)return;
-  var active=[...activeStudents].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+  var active=[...activeStudents,...graduatedWithRev].sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
   if(!active.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;padding:20px;color:var(--txt3)">학생 없음</td></tr>';return;}
   var subMatOpts=getSubMaterialOptions();
   var rowNum=1;
@@ -7727,7 +7733,7 @@ function renderRevMonthly(yr,mo){
 
     return '<tr style="'+(unpaidAmt>0?'background:#fff8f8':'')+'" data-paid="'+(paidAmt>=dispExpected&&paidAmt>0?'1':'0')+'">'
       +'<td style="'+c+'">'+rowNum+++'</td>'
-      +'<td style="'+c+';font-weight:700;cursor:pointer" onclick="openRevenueModal(\''+(lastRev&&lastRev.id?lastRev.id:'')+'\',\''+s.id+'\','+yr+','+mo+')">'+s.name+'</td>'
+      +'<td style="'+c+';font-weight:700;cursor:pointer" onclick="openRevenueModal(\''+(lastRev&&lastRev.id?lastRev.id:'')+'\',\''+s.id+'\','+yr+','+mo+')">'+s.name+(graduatedWithRev.find(function(g){return g.id===s.id;})?'<span style="font-size:9px;color:var(--txt3);margin-left:3px;background:var(--surface2);padding:1px 4px;border-radius:4px">퇴원</span>':'')+'</td>'
       +'<td style="'+c+'">'+( s.grade||'-')+'</td>'
       +'<td style="'+c+'">'+rawLevel+'</td>'
       +'<td style="'+c+';font-weight:600"><span style="cursor:pointer;color:'+(isManual?'var(--blue)':'inherit')+'" onmousedown="_editingExpected=true" onclick="event.stopPropagation();editExpectedAmt(this.parentElement,\''+s.id+'\','+yr+','+mo+','+dispExpected+')">'+(dispExpected>0?dispExpected.toLocaleString()+'원':'-')+'</span>'
