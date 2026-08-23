@@ -776,9 +776,21 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <!-- 상담 관리 -->
 <div style="border-left:3px solid var(--navy);padding-left:8px;font-size:12px;font-weight:700;color:var(--navy);margin:14px 0 8px">상담 관리</div>
 <div class="r2">
-  <div class="field"><div class="fl">상태</div><select class="fi" id="nc-status"><option value="신규 문의">신규 문의</option><option value="상담 예정">상담 예정</option><option value="상담 완료">상담 완료</option><option value="체험 예정">체험 예정</option><option value="체험 완료">체험 완료</option><option value="등록 완료">등록 완료</option><option value="미등록">미등록</option></select></div>
+  <div class="field"><div class="fl">상태</div><select class="fi" id="nc-status" onchange="onNcStatusChange()"><option value="신규 문의">신규 문의</option><option value="상담 예정">상담 예정</option><option value="상담 완료">상담 완료</option><option value="체험 예정">체험 예정</option><option value="체험 완료">체험 완료</option></select></div>
   <div class="field"><div class="fl">마지막 연락일</div><input type="date" class="fi" id="nc-last-contact"></div>
   <div class="field"><div class="fl">다음 연락일</div><input type="date" class="fi" id="nc-next-contact"></div>
+</div>
+<div id="nc-result-wrap" style="display:none;margin-top:10px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="display:inline-block;width:3px;height:14px;background:var(--navy);border-radius:2px"></span><span style="font-size:12px;font-weight:800;color:var(--navy)">상담 결과</span></div>
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button id="nc-result-reg-btn" onclick="setNcResult('등록 완료')" style="flex:1;padding:10px 0;border-radius:10px;font-size:13px;font-weight:700;border:2px solid var(--border);background:var(--surface);color:var(--txt2);cursor:pointer">✅ 등록 완료</button>
+    <button id="nc-result-unreg-btn" onclick="setNcResult('미등록')" style="flex:1;padding:10px 0;border-radius:10px;font-size:13px;font-weight:700;border:2px solid var(--border);background:var(--surface);color:var(--txt2);cursor:pointer">❌ 미등록</button>
+  </div>
+  <div id="nc-unreg-reason-wrap" style="display:none">
+    <div class="fl" style="margin-bottom:4px">미등록 사유</div>
+    <select class="fi" id="nc-unreg-reason" style="margin-bottom:4px"><option value="">선택</option><option value="비용 부담">비용 부담</option><option value="거리">거리</option><option value="타 학원 선택">타 학원 선택</option><option value="연락 두절">연락 두절</option><option value="시간대 불일치">시간대 불일치</option><option value="기타">기타</option></select>
+  </div>
+  <input type="hidden" id="nc-consult-result" value="">
 </div>
 
 <div style="height:12px"></div>
@@ -3368,7 +3380,7 @@ function renderCrmDailyInto(targetId){
 
   // 1. 신규 상담 CRM 자동 분류
   (newConsults||[]).forEach(function(nc){
-    if(!nc.date||nc.ncStatus==='등록 완료')return;
+    if(!nc.date||(nc.ncStatus==='등록 완료'||nc.consultResult==='등록 완료'))return;
     var name=nc.prospectName||nc.studentName||'-';
     var phone=nc.phone||'';
     var daysDiff=Math.floor((today-new Date(nc.date))/(86400000));
@@ -3389,11 +3401,11 @@ function renderCrmDailyInto(targetId){
       if(daysDiff===-1)tasks.push({id:'nct_'+nc.id,priority:2,cat:'🟡 학습 관리',type:'체험 예정 안내',name:name,reason:'내일 체험수업 예정',action:'체험수업 안내 발송',phone:phone});
     }
     // 체험 후 미등록 (체험 완료 후 3일 경과)
-    if(nc.ncStatus==='체험 완료'&&daysDiff>=1&&daysDiff<=14){
+    if(nc.ncStatus==='체험 완료'&&nc.consultResult!=='등록 완료'&&daysDiff>=1&&daysDiff<=14){
       tasks.push({id:'nce_'+nc.id,priority:1,cat:'🔴 긴급',type:'체험 후 미등록',name:name,reason:'체험 완료 '+nc.date+' ('+daysDiff+'일 경과)',action:'체험 피드백 + 등록 안내',phone:phone});
     }
     // 상담 후 미등록 (3~30일 경과)
-    if((nc.ncStatus==='상담 완료'||nc.ncStatus==='미등록')&&daysDiff>=3&&daysDiff<=30){
+    if((nc.ncStatus==='상담 완료'||nc.ncStatus==='미등록')&&nc.consultResult!=='등록 완료'&&daysDiff>=3&&daysDiff<=30){
       tasks.push({id:'nc_'+nc.id,priority:1,cat:'🔴 긴급',type:'상담 후 미등록',name:name,reason:'상담 '+nc.date+' ('+daysDiff+'일 경과)',action:'등록 여부 확인 연락',phone:phone});
     }
     // 장기 미응답 (마지막 연락 7일+ 경과)
@@ -7316,7 +7328,13 @@ function renderNewConsultStats(){
     :'<div style="padding:16px;text-align:center;color:var(--txt3);font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">해당 기간 상담 데이터가 없습니다.</div>');
   var listEl=$('new-consult-list');if(!listEl)return;
   if(!filtered.length){listEl.innerHTML='';return;}
-  var statusColors={'신규 문의':'bg-blue','상담 예정':'bg-gold','상담 완료':'bg-green','체험 예정':'bg-navy','체험 완료':'bg-mint','등록 완료':'bg-red','미등록':'bg-gray'};
+  var statusColors={'신규 문의':'bg-blue','상담 예정':'bg-gold','상담 완료':'bg-green','체험 예정':'bg-navy','체험 완료':'bg-mint','등록 완료':'bg-green','미등록':'bg-red'};
+  function _getNcBadgeInfo(n){
+    var cr=n.consultResult||'';
+    if(cr==='등록 완료')return{cls:'bg-green',label:'등록 완료'};
+    if(cr==='미등록')return{cls:'bg-red',label:'미등록'+(n.unregReason?' · '+n.unregReason:'')};
+    return{cls:statusColors[n.ncStatus]||'bg-gray',label:n.ncStatus||'-'};
+  }
   var rows=filtered.sort(function(a,b){return(b.inquiryDate||b.date||'')>(a.inquiryDate||a.date||'')?1:-1;}).map(function(n){
     var isReg=n.ncStatus==='등록 완료';
     var preview=n.content?(n.content.substring(0,30)+(n.content.length>30?'...':'')):'';
@@ -7329,7 +7347,7 @@ function renderNewConsultStats(){
       +'<td>'+(n.route||n.type||'-')+'</td>'
       +'<td style="white-space:nowrap">'+(n.phone||'-')+'</td>'
       +'<td>'+(n.inflow||'-')+'</td>'
-      +'<td><span class="badge '+(statusColors[n.ncStatus]||'bg-gray')+'" style="font-size:9px">'+(n.ncStatus||'-')+'</span></td>'
+      +'<td><span class="badge '+_getNcBadgeInfo(n).cls+'" style="font-size:9px">'+_getNcBadgeInfo(n).label+'</span></td>'
       +'<td style="white-space:nowrap">'+(n.lastContact||'-')+'</td>'
       +'<td style="white-space:nowrap">'+(n.nextContact||'-')+'</td>'
       +'<td>'+(isReg?(n.level||'-'):'-')+'</td>'
@@ -7415,6 +7433,29 @@ function ncTestResultChange(sel){
   var wrap=$('nc-test-custom-wrap');
   if(wrap)wrap.style.display=sel.value==='직접입력'?'':'none';
 }
+// 신규 상담 상태 변경 핸들러
+function onNcStatusChange(){
+  var st=$('nc-status').value;
+  var wrap=$('nc-result-wrap');
+  if(!wrap)return;
+  var showResult=(st==='상담 완료'||st==='체험 완료');
+  wrap.style.display=showResult?'block':'none';
+  if(!showResult){
+    setNcResult(''); // 결과 초기화
+  }
+}
+function setNcResult(val){
+  var hidden=$('nc-consult-result');
+  if(hidden)hidden.value=val;
+  var regBtn=$('nc-result-reg-btn');
+  var unregBtn=$('nc-result-unreg-btn');
+  var unregWrap=$('nc-unreg-reason-wrap');
+  var activeStyle='border:2px solid var(--navy);background:var(--navy);color:#fff';
+  var inactiveStyle='border:2px solid var(--border);background:var(--surface);color:var(--txt2)';
+  if(regBtn)regBtn.style.cssText='flex:1;padding:10px 0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;'+(val==='등록 완료'?activeStyle:inactiveStyle);
+  if(unregBtn)unregBtn.style.cssText='flex:1;padding:10px 0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;'+(val==='미등록'?activeStyle:inactiveStyle);
+  if(unregWrap)unregWrap.style.display=val==='미등록'?'block':'none';
+}
 function openNewConsultModal(id){
   var n=id?newConsults.find(function(x){return x.id===id;}):null;
   $('nc-id').value=id||'';
@@ -7459,6 +7500,13 @@ function openNewConsultModal(id){
   $('nc-status').value=n?.ncStatus||'신규 문의';
   $('nc-last-contact').value=n?.lastContact||todayISO();
   $('nc-next-contact').value=n?.nextContact||'';
+  // 상담 결과 초기화
+  var savedResult=n?.consultResult||'';
+  var hidden=$('nc-consult-result');if(hidden)hidden.value=savedResult;
+  var savedReason=n?.unregReason||'';
+  var reasonSel=$('nc-unreg-reason');if(reasonSel)reasonSel.value=savedReason;
+  onNcStatusChange();
+  if(savedResult)setNcResult(savedResult);
   $('nc-content').value=n?.content||'';
   $('nc-memo').value=n?.memo||'';
   // 글자수 카운터 초기화
@@ -7498,6 +7546,8 @@ async function saveNewConsult(){loading(true);
     prevMemo:$('nc-prev-memo').value.trim(),
     testResult:testResult,
     ncStatus:$('nc-status').value,
+    consultResult:$('nc-consult-result')?($('nc-consult-result').value||''):'',
+    unregReason:$('nc-unreg-reason')?($('nc-unreg-reason').value||''):'',
     lastContact:$('nc-last-contact').value,
     nextContact:$('nc-next-contact').value,
     content:$('nc-content').value.trim(),
