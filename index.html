@@ -200,10 +200,10 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .makeup-chip .mk-hint-time{color:#4f83cc;font-weight:600}
 .mk-today-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:0 2px}
 /* 칩 레이아웃: 미정=3열, 예정/완료=2열 */
-.mk-row-pending{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:1px}
-.mk-row-pending .makeup-chip{max-width:100%;box-sizing:border-box}
-.mk-row-scheduled{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:1px}
-.mk-row-scheduled .makeup-chip{max-width:100%;box-sizing:border-box}
+.mk-row-pending{display:flex;flex-wrap:wrap;gap:1px;margin-bottom:1px}
+.mk-row-pending .makeup-chip{width:calc(33.3% - 1px);box-sizing:border-box}
+.mk-row-scheduled{display:flex;flex-wrap:wrap;gap:1px;margin-bottom:1px}
+.mk-row-scheduled .makeup-chip{width:calc(50% - 1px);box-sizing:border-box}
 .day-pill{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border2);font-size:12px;font-weight:600;cursor:pointer;transition:all .12s;background:var(--surface)}
 .day-pill.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -5854,11 +5854,97 @@ function getSpecialPeriods(){
 function populateMkPeriod(selectedPeriod){
   var sel=$('mk-period');if(!sel)return;
   sel.value=String(selectedPeriod||'');
+  onMkPeriodChange();
+}
+function _getMkPeriodTime(p){
+  // customPeriods에서 시간 조회
+  if(p==='special1')return '10:00';
+  if(p==='special2')return '11:00';
+  if(p==='special3')return '12:00';
+  var num=parseInt(p);
+  if(!isNaN(num)&&num>0){
+    var cp=(customPeriods||[]).find(function(x){return x.period===num;});
+    if(cp&&cp.time)return cp.time;
+  }
+  return '';
+}
+function _fmt12hRange(startTime){
+  if(!startTime)return '';
+  var parts=startTime.split(':');
+  var h=parseInt(parts[0]),m=parseInt(parts[1]||0);
+  var ampm=h<12?'오전':'오후';
+  var h12=h%12||12;
+  return ampm+' '+h12+':'+(m<10?'0':'')+m;
 }
 function onMkPeriodChange(){
   var p=$('mk-period').value;
-  var timeMap={special1:'10:00',special2:'11:00',special3:'12:00'};
-  if(timeMap[p]){var t=$('mk-time');if(t)t.value=timeMap[p];}
+  var t=_getMkPeriodTime(p);
+  var hidden=$('mk-time');if(hidden)hidden.value=t;
+  var disp=$('mk-time-display');
+  if(disp){
+    if(t){
+      var cp=null;
+      var num=parseInt(p);
+      if(!isNaN(num)&&num>0)cp=(customPeriods||[]).find(function(x){return x.period===num;});
+      var endStr='';
+      if(cp&&cp.hours){
+        var hStart=parseInt(t.split(':')[0]),mStart=parseInt(t.split(':')[1]||0);
+        var totalMin=hStart*60+mStart+Math.round(parseFloat(cp.hours||1)*60);
+        var hEnd=Math.floor(totalMin/60),mEnd=totalMin%60;
+        endStr=' ~ '+(hEnd<10?'0':'')+hEnd+':'+(mEnd<10?'0':'')+mEnd;
+      }
+      disp.textContent='⏰ '+t+endStr;
+    } else {
+      disp.textContent=p?'':'';
+    }
+  }
+  _mkUpdateSaveBtnLabel();
+  _mkUpdateNotifyLabel();
+}
+function onMkDateChange(){
+  _mkUpdateSaveBtnLabel();
+  _mkUpdateStatusBadge();
+  _mkUpdateNotifyLabel();
+  if($('mk-notify-parent')&&$('mk-notify-parent').checked)_mkUpdateNotifyMsg();
+}
+function _mkUpdateSaveBtnLabel(){
+  var btn=$('mk-save-btn');if(!btn)return;
+  var mode=($('mk-mode')||{}).value||'new';
+  var mkDate=($('mk-date')||{}).value||'';
+  if(mode==='edit'){btn.textContent='변경사항 저장';return;}
+  btn.textContent=mkDate?'보강 일정 등록':'보강 대기 등록';
+}
+function _mkUpdateStatusBadge(){
+  var wrap=$('mk-status-badge-wrap');
+  var badge=$('mk-status-badge');
+  var doneWrap=$('mk-done-wrap');
+  var memoWrap=$('mk-result-memo-wrap');
+  if(!wrap||!badge)return;
+  var status=($('mk-status')||{}).value||'pending';
+  var mkDate=($('mk-date')||{}).value||'';
+  // 자동 상태 결정: done은 유지, 그 외 날짜 유무로 판단
+  var displayStatus=status==='done'?'done':(mkDate?'scheduled':'pending');
+  var cfg={
+    pending:{text:'미정',bg:'#f1f5f9',color:'#64748b',border:'#cbd5e1'},
+    scheduled:{text:'예정',bg:'#fefce8',color:'#92400e',border:'#f59e0b'},
+    done:{text:'완료 ✅',bg:'#dcfce7',color:'#166534',border:'#86efac'}
+  };
+  var c=cfg[displayStatus]||cfg.pending;
+  badge.textContent=c.text;
+  badge.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;background:'+c.bg+';color:'+c.color+';border:1px solid '+c.border;
+  wrap.style.display='block';
+  if(doneWrap)doneWrap.style.display=(displayStatus==='scheduled'&&status!=='done')?'block':'none';
+  if(memoWrap)memoWrap.style.display=(status==='done')?'block':'none';
+}
+function _mkUpdateNotifyLabel(){
+  var lbl=$('mk-notify-label');if(!lbl)return;
+  var mkDate=($('mk-date')||{}).value||'';
+  lbl.textContent=mkDate?'결석 및 보강 일정 안내 발송':'결석 안내 발송';
+}
+function _mkMarkDone(){
+  var hidden=$('mk-status');if(hidden)hidden.value='done';
+  _mkUpdateStatusBadge();
+  _mkUpdateSaveBtnLabel();
 }
 function clearSpecialDays(){
   document.querySelectorAll('#s-special-days .day-pill').forEach(function(el){el.classList.remove('on');});
@@ -6074,31 +6160,32 @@ function _openMakeupModal(){
   overlay.onclick=function(e){if(e.target===overlay)closeM('makeup');};
   overlay.innerHTML='<div class="ms"><div class="mh"></div>'
     +'<div class="mt" id="mk-title">보강 관리</div>'
-    +'<input type="hidden" id="mk-id"><input type="hidden" id="mk-mode" value="edit">'
+    +'<input type="hidden" id="mk-id"><input type="hidden" id="mk-mode" value="edit"><input type="hidden" id="mk-status" value="pending">'
     +'<div id="mk-student-row" style="display:none" class="field"><div class="fl">보강 학생</div><select class="fi" id="mk-student-select" onchange="_mkUpdateNotifyMsg()"><option value="">학생 선택</option></select></div>'
     +'<div id="mk-info" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px"><div style="font-size:15px;font-weight:700;color:var(--navy)" id="mk-info-name"></div><div style="font-size:12px;color:var(--txt3);margin-top:2px" id="mk-info-date"></div></div>'
-    +'<input type="hidden" id="mk-status" value="pending">'
     +'<div style="display:flex;gap:8px;margin-bottom:10px">'
     +'<div style="flex:1"><div class="fl">결석일</div><input type="date" class="fi" id="mk-absent-date" style="height:36px;box-sizing:border-box;width:100%"></div>'
     +'<div style="flex:1"><div class="fl">결석 사유</div><select class="fi" id="mk-note" style="height:36px;box-sizing:border-box;width:100%"><option value="">선택</option><option value="보강">보강</option><option value="개인 사정">개인 사정</option><option value="병결">병결</option><option value="학교 행사">학교 행사</option><option value="여행">여행</option><option value="기타">기타</option></select></div>'
     +'</div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
-    +'<div style="flex:2"><div class="fl">보강 예정일</div><input type="date" class="fi" id="mk-date" style="height:36px;box-sizing:border-box;width:100%"></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:4px">'
+    +'<div style="flex:2"><div class="fl">보강 예정일</div><input type="date" class="fi" id="mk-date" onchange="onMkDateChange()" style="height:36px;box-sizing:border-box;width:100%"></div>'
     +'<div style="flex:1"><div class="fl">교시</div><select class="fi" id="mk-period" onchange="onMkPeriodChange()" style="font-size:12px;height:36px;box-sizing:border-box;width:100%"><option value="">교시</option><option value="special1">특강 1</option><option value="special2">특강 2</option><option value="special3">특강 3</option><option value="1">1교시</option><option value="2">2교시</option><option value="3">3교시</option><option value="4">4교시</option><option value="5">5교시</option><option value="6">6교시</option><option value="7">7교시</option></select></div>'
-    +'<div style="flex:1"><div class="fl">수업 시간</div><select class="fi" id="mk-time" style="font-size:12px;height:36px;box-sizing:border-box;width:100%">'+timeOpts+'</select></div>'
+    +'</div>'
+    +'<div id="mk-time-display" style="font-size:11px;color:var(--txt3);margin-bottom:8px;padding-left:2px;min-height:16px"></div>'
+    +'<input type="hidden" id="mk-time" value="">'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px;padding-left:2px">※ 날짜를 정하지 않으면 \'미정\'으로 등록됩니다.</div>'
+    +'<div id="mk-status-badge-wrap" style="margin-bottom:10px;display:none">'
+    +'<span id="mk-status-badge" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700"></span>'
     +'</div>'
     +'<div class="field"><div class="fl">보강할 수업 내용</div><textarea class="fi" id="mk-content" rows="2" placeholder="예: JOY 2 Unit 5, 스토리 듣기 및 워크북 8~10쪽"></textarea></div>'
-    +'<div style="border-top:1px solid var(--border);margin:10px 0 12px"></div>'
-    +'<div class="field"><div class="fl">보강 상태</div><div style="display:flex;gap:8px;margin-top:4px">'
-    +'<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="mk-result-status" id="mkrs-pending" value="pending" onchange="onMkStatusChange()"> 미처리</label>'
-    +'<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="mk-result-status" id="mkrs-scheduled" value="scheduled" onchange="onMkStatusChange()"> 예정</label>'
-    +'<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="mk-result-status" id="mkrs-done" value="done" onchange="onMkStatusChange()"> 완료 ✅</label>'
-    +'</div></div>'
     +'<div id="mk-result-memo-wrap" style="display:none" class="field"><div class="fl">보강 결과 메모</div><textarea class="fi" id="mk-result-memo" rows="2" placeholder="보강 수업 내용, 특이사항 등"></textarea></div>'
-    +'<div style="border-top:1px solid var(--border);margin:12px 0 10px"></div>'
+    +'<div id="mk-done-wrap" style="display:none;margin-bottom:10px">'
+    +'<button class="btn btn-green btn-block" onclick="_mkMarkDone()">✅ 보강 완료 처리</button>'
+    +'</div>'
+    +'<div style="border-top:1px solid var(--border);margin:10px 0 10px"></div>'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
     +'<input type="checkbox" id="mk-notify-parent" style="width:16px;height:16px;accent-color:var(--mint)" onchange="_mkToggleNotify(this.checked)">'
-    +'<label for="mk-notify-parent" style="font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">📱 결석 알림 발송</label>'
+    +'<label for="mk-notify-parent" style="font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">📱 <span id="mk-notify-label">학부모 안내 발송</span></label>'
     +'</div>'
     +'<div id="mk-notify-area" style="display:none;background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:10px">'
     +'<div id="mk-notify-student-info" style="font-size:12px;color:var(--txt3);margin-bottom:8px"></div>'
@@ -6111,7 +6198,7 @@ function _openMakeupModal(){
     +'<div id="mk-notify-no-url" style="display:none;font-size:11px;color:var(--gold);margin-top:8px;text-align:center">⚠️ 설정 > 카카오 채널 설정에서 보강 예약 링크를 먼저 등록하세요.</div>'
     +'</div>'
     +'<div style="height:6px"></div>'
-    +'<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-red btn-sm" id="mk-del-btn" onclick="deleteMakeupEntry()" style="flex:0 0 auto">삭제</button><button class="btn btn-outline btn-sm" onclick="closeM(\'makeup\')" style="flex:1">취소</button><button class="btn btn-green btn-sm" onclick="saveMakeupUnified()" style="flex:2">저장</button></div>'
+    +'<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-red btn-sm" id="mk-del-btn" onclick="deleteMakeupEntry()" style="flex:0 0 auto">삭제</button><button class="btn btn-outline btn-sm" onclick="closeM(\'makeup\')" style="flex:1">취소</button><button class="btn btn-green btn-sm" id="mk-save-btn" onclick="saveMakeupUnified()" style="flex:2">보강 대기 등록</button></div>'
     +'</div>';
   document.body.appendChild(overlay);
 }
@@ -6140,24 +6227,30 @@ function _mkUpdateNotifyMsg(){
   var infoEl=$('mk-notify-student-info');
   if(infoEl)infoEl.innerHTML='<span style="font-weight:700;color:var(--navy)">'+sName+'</span>'+(sPhone?' &nbsp;·&nbsp; 학부모 연락처: '+sPhone:'<span style="color:#dc2626"> &nbsp;(학생을 먼저 선택하세요)</span>');
   if(!sName){var ta=$('mk-notify-msg');if(ta)ta.value='';return;}
-  var today=new Date();
-  var dateStr=today.getFullYear()+'년 '+String(today.getMonth()+1).padStart(2,'0')+'월 '+String(today.getDate()).padStart(2,'0')+'일';
-  var template=kc.absentMsg||'안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';
-  var msg=template.replace(/\{이름\}/g,sName).replace(/\{날짜\}/g,dateStr).replace(/\{링크\}/g,bookingUrl||'(링크 미설정)');
+  var absentDateVal=($('mk-absent-date')||{}).value||'';
+  var makeupDateVal=($('mk-date')||{}).value||'';
+  var absentDateStr=absentDateVal?absentDateVal.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1년 $2월 $3일'):'오늘';
+  var makeupPeriodSel=$('mk-period');
+  var makeupPeriodTxt=makeupPeriodSel&&makeupPeriodSel.value?makeupPeriodSel.options[makeupPeriodSel.selectedIndex].text:'';
+  var makeupDateStr=makeupDateVal?makeupDateVal.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1년 $2월 $3일'):'';
+  var template=kc.absentMsg||'안녕하세요, 어머니~^^\n{날짜} {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';
+  var msg=template.replace(/\{이름\}/g,sName).replace(/\{날짜\}/g,absentDateStr).replace(/\{링크\}/g,bookingUrl||'(링크 미설정)');
+  // 보강 일정이 잡혀 있으면 메시지에 자동 추가
+  if(makeupDateStr){
+    var scheduleInfo='\n\n📅 보강 일정: '+makeupDateStr+(makeupPeriodTxt?' '+makeupPeriodTxt:'');
+    // 링크 안내 문구 앞에 보강 일정 삽입
+    msg=msg.replace('가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉','보강 일정이 아래와 같이 확정되었습니다.'+scheduleInfo+'\n\n문의 사항이 있으시면 편하게 연락 주세요~^^\n\n👉');
+  }
   var ta=$('mk-notify-msg');if(ta)ta.value=msg;
 }
 function _mkCopyMsg(){
   var ta=$('mk-notify-msg');
   if(ta){navigator.clipboard.writeText(ta.value);toast('📋 메시지가 복사되었습니다. 카카오톡에 붙여넣기 하세요!');}
 }
-function onMkStatusChange(){
-  var val=document.querySelector('input[name="mk-result-status"]:checked')?.value||'pending';
-  var wrap=$('mk-result-memo-wrap');
-  if(wrap)wrap.style.display=val==='done'?'block':'none';
-}
 function _setMkStatus(val){
-  var el=document.querySelector('input[name="mk-result-status"][value="'+val+'"]');
-  if(el){el.checked=true;onMkStatusChange();}
+  var hidden=$('mk-status');if(hidden)hidden.value=val||'pending';
+  _mkUpdateStatusBadge();
+  _mkUpdateSaveBtnLabel();
 }
 
 function openMakeupUnified(id){
@@ -6174,9 +6267,10 @@ function openMakeupUnified(id){
   $('mk-note').value=m.makeupNote||'';
   $('mk-content').value=m.makeupContent||m.makeupNote||'';
   $('mk-date').value=m.makeupDate||'';
+  var hidden=$('mk-time');if(hidden)hidden.value=m.makeupTime||'';
   populateMkPeriod(m.makeupPeriod||'');
-  $('mk-time').value=m.makeupTime||'';
   _setMkStatus(m.makeupStatus||'pending');
+  _mkUpdateNotifyLabel();
   var memo=$('mk-result-memo');if(memo)memo.value=m.makeupResult&&m.makeupResult!==''?(m.makeupResultMemo||''):'';
   var delBtn=$('mk-del-btn');if(delBtn)delBtn.style.display='';
 }
@@ -6203,9 +6297,10 @@ function openMakeupUnifiedNew(dateStr){
   var mkInfo=$('mk-info');if(mkInfo)mkInfo.style.display='none';
   $('mk-content').value='';
   $('mk-date').value='';
+  var hidden=$('mk-time');if(hidden)hidden.value='';
   populateMkPeriod('');
-  $('mk-time').value='';
   _setMkStatus('pending');
+  _mkUpdateNotifyLabel();
   var memo=$('mk-result-memo');if(memo)memo.value='';
   var delBtn=$('mk-del-btn');if(delBtn)delBtn.style.display='none';
 }
@@ -6219,7 +6314,7 @@ async function saveMakeupUnified(){
   var mkPeriod=($('mk-period')||{}).value||'';
   var mkNote=$('mk-note').value;
   var mkContent=$('mk-content').value;
-  var mkStatus=document.querySelector('input[name="mk-result-status"]:checked')?.value||'pending';
+  var mkStatus=($('mk-status')||{}).value||'pending';
   var mkResultMemo=$('mk-result-memo')?.value||'';
   var autoStatus=mkDate?(mkStatus==='done'?'done':'scheduled'):'pending';
 
