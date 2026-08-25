@@ -2818,9 +2818,10 @@ function _buildWeeklyGrid() {
   }
 
   function timeToBlk(t) {
+    if(!t)return null;
     var mm = t.match(/(\d{1,2}):(\d{2})/);
     if (!mm) return null;
-    var h = parseInt(mm[1]), min = parseInt(mm[2]);
+    var h = parseInt(mm[1]), min = parseInt(mm[2]||0);
     return String(h).padStart(2, '0') + ':' + String(min < 30 ? 0 : 30).padStart(2, '0');
   }
 
@@ -2911,6 +2912,9 @@ function renderWeeklyTimetable() {
   Promise.all([_wtLoad(yr, mo), _wtLoadPlan(yr, mo)]).then(function() {
     var data = _buildWeeklyGrid();
     _doRenderWT(area, data, yr, mo);
+  }).catch(function(e) {
+    console.error('월간 시간표 로드 오류:', e);
+    area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">⚠️ 불러오기 실패 — <button class="btn btn-outline btn-xs" onclick="renderWeeklyTimetable()">다시 시도</button><br><small style="color:#ef4444;margin-top:4px;display:block">' + (e.message||'') + '</small></div>';
   });
 }
 
