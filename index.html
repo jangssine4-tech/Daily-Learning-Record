@@ -2155,12 +2155,18 @@ function doLogout(){
   location.reload();
 }
 function saveCache(){
-  try{
-    var obj={_ts:Date.now(),students:students,classes:classes,teachers:teachers,users:users,periods:customPeriods,reports:reports,makeups:makeups,refItems:refItems,revenues:revenues,expenses:expenses,consultations:consultations,newConsults:newConsults};
-    localStorage.setItem('academy_cache',JSON.stringify(obj));
-  }catch(e){
-    try{var obj2={_ts:Date.now(),students:students,classes:classes,teachers:teachers,users:users,periods:customPeriods,reports:[],makeups:makeups,refItems:refItems,revenues:[],expenses:[],consultations:[],newConsults:[]};localStorage.setItem('academy_cache',JSON.stringify(obj2));}catch(e2){}
-  }
+  // reports, revenues, expenses는 용량이 커서 제외 — Firestore에서 재조회 가능
+  var fn=function(){
+    try{
+      var obj={_ts:Date.now(),students:students,classes:classes,teachers:teachers,users:users,periods:customPeriods,makeups:makeups,refItems:refItems,consultations:consultations,newConsults:newConsults};
+      localStorage.setItem('academy_cache',JSON.stringify(obj));
+    }catch(e){
+      try{localStorage.removeItem('academy_cache');}catch(e2){}
+    }
+  };
+  // 브라우저 여유 시간에 실행 (메인 스레드 블로킹 방지)
+  if(typeof requestIdleCallback==='function'){requestIdleCallback(fn,{timeout:3000});}
+  else{setTimeout(fn,100);}
 }
 function loadCache(){
   try{var raw=localStorage.getItem('academy_cache');if(!raw)return null;var obj=JSON.parse(raw);if(Date.now()-obj._ts>86400000)return null;return obj;}catch(e){return null;}
@@ -6117,14 +6123,12 @@ async function saveStudent(){
     closeM('student');
     loading(false);
     toast('✅ 저장됨');
-    // 학생 목록만 즉시 갱신, 시간표는 탭 진입 시 자연스럽게 갱신
+    saveCacheDebounced();
     setTimeout(function(){
       renderStudents();
-      // 시간표 탭이 현재 열려 있을 때만 갱신
       var schedEl=$('view-schedule');
       if(schedEl&&schedEl.style.display!=='none')renderSchedule();
-      saveCacheDebounced();
-    },0);
+    },50);
   }catch(e){
     console.error('saveStudent error:',e);
     loading(false);
@@ -6139,12 +6143,12 @@ async function deleteStudent(){
     closeM('student');
     loading(false);
     toast('🗑 삭제됨');
+    saveCacheDebounced();
     setTimeout(function(){
       renderStudents();
       var schedEl=$('view-schedule');
       if(schedEl&&schedEl.style.display!=='none')renderSchedule();
-      saveCacheDebounced();
-    },0);
+    },50);
   }catch(e){
     loading(false);
     toast('❌ 삭제 실패: '+e.message);
