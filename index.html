@@ -7150,60 +7150,61 @@ function renderConsultManual(){
 }
 function renderAssignPanel(prefill){
   var el=document.getElementById('assign-panel-area');if(!el)return;
-  // 교시 옵션 생성
   var prdSet=new Set();
   customPeriods.forEach(function(cp){if(cp.period&&cp.period>0)prdSet.add(cp.period);});
   if(!prdSet.size){prdSet.add(1);prdSet.add(2);prdSet.add(3);}
   var prdBtns=[...prdSet].sort(function(a,b){return a-b;}).map(function(p){
-    return '<button class="day-pill on" data-prd="'+p+'" onclick="this.classList.toggle(\'on\');runAssignPanel()" style="min-width:52px">'+p+'교시</button>';
+    return '<button class="day-pill on" data-prd="'+p+'" onclick="this.classList.toggle(\'on\');runAssignPanel()" style="min-width:56px;font-size:13px;padding:6px 4px">'+p+'교시</button>';
   }).join('');
   var dayBtns=['월','화','수','목','금'].map(function(d){
-    return '<button class="day-pill on" data-day="'+d+'" onclick="this.classList.toggle(\'on\');runAssignPanel()">'+d+'</button>';
+    return '<button class="day-pill on" data-day="'+d+'" onclick="this.classList.toggle(\'on\');runAssignPanel()" style="font-size:14px;width:40px;height:40px">'+d+'</button>';
   }).join('');
 
   el.innerHTML=''
-    // 제목
     +'<div style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:16px">🎯 신규 학생 수업시간 추천</div>'
-    // 조건 입력 영역
-    +'<div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:16px">'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="display:inline-block;width:3px;height:14px;background:var(--navy);border-radius:2px"></span><span style="font-size:13px;font-weight:800;color:var(--navy)">수업 조건</span></div>'
-    +'<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">'
-    +'<div style="flex:1;min-width:120px"><div class="fl">주 수업 횟수</div>'
-    +'<select class="fi" id="ap-weekly" onchange="runAssignPanel()">'
+    // 조건 입력 — 한 행 배열
+    +'<div style="background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:20px">'
+    +'<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'
+    // 주 수업 횟수
+    +'<div style="min-width:100px"><div style="font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:6px">주 수업 횟수</div>'
+    +'<select class="fi" id="ap-weekly" onchange="runAssignPanel()" style="font-size:14px;height:40px">'
     +'<option value="2">주 2회</option><option value="3" selected>주 3회</option><option value="4">주 4회</option><option value="5">주 5회</option>'
     +'</select></div>'
-    +'<div style="flex:1;min-width:120px"><div class="fl">1회 수업 시간</div>'
-    +'<select class="fi" id="ap-duration" onchange="runAssignPanel()">'
+    // 1회 수업 시간
+    +'<div style="min-width:100px"><div style="font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:6px">1회 수업 시간</div>'
+    +'<select class="fi" id="ap-duration" onchange="runAssignPanel()" style="font-size:14px;height:40px">'
     +'<option value="30">30분</option><option value="60" selected>60분</option><option value="90">90분</option>'
     +'</select></div>'
+    // 가능 요일
+    +'<div><div style="font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:6px">가능 요일</div>'
+    +'<div style="display:flex;gap:5px" id="ap-days-wrap">'+dayBtns+'</div></div>'
+    // 희망 교시
+    +'<div style="flex:1;min-width:200px"><div style="font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:6px">희망 교시</div>'
+    +'<div style="display:flex;gap:5px;flex-wrap:wrap" id="ap-periods-wrap">'+prdBtns+'</div></div>'
     +'</div>'
-    +'<div class="fl" style="margin-bottom:6px">가능 요일</div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:12px" id="ap-days-wrap">'+dayBtns+'</div>'
-    +'<div class="fl" style="margin-bottom:6px">희망 교시</div>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="ap-periods-wrap">'+prdBtns+'</div>'
-    +'<div style="display:flex;gap:16px;flex-wrap:wrap">'
-    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="ap-opt-same" checked onchange="runAssignPanel()" style="accent-color:var(--navy)"> 같은 교시 통일 우선</label>'
-    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="ap-opt-bal" checked onchange="runAssignPanel()" style="accent-color:var(--navy)"> 여유 시간 우선</label>'
-    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="ap-opt-nc" onchange="runAssignPanel()" style="accent-color:var(--navy)"> 연속 요일 피하기</label>'
+    // 옵션
+    +'<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'
+    +'<label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer"><input type="checkbox" id="ap-opt-same" checked onchange="runAssignPanel()" style="width:16px;height:16px;accent-color:var(--navy)"> 같은 교시 통일 우선</label>'
+    +'<label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer"><input type="checkbox" id="ap-opt-bal" checked onchange="runAssignPanel()" style="width:16px;height:16px;accent-color:var(--navy)"> 여유 시간 우선</label>'
+    +'<label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer"><input type="checkbox" id="ap-opt-nc" onchange="runAssignPanel()" style="width:16px;height:16px;accent-color:var(--navy)"> 연속 요일 피하기</label>'
     +'</div>'
     +'</div>'
     // 결과 영역
-    +'<div id="ap-result-area"><div style="padding:20px;text-align:center;color:var(--txt3);font-size:13px">조건을 설정하면 자동으로 추천 시간이 표시됩니다</div></div>';
+    +'<div id="ap-result-area"><div style="padding:24px;text-align:center;color:var(--txt3);font-size:14px">조건을 설정하면 자동으로 추천 시간이 표시됩니다</div></div>';
 
-  // prefill 처리 (신규 상담에서 연동)
   if(prefill){
-    if(prefill.weekly)document.getElementById('ap-weekly').value=prefill.weekly;
-    if(prefill.duration)document.getElementById('ap-duration').value=prefill.duration;
+    if(prefill.weekly){var wEl=document.getElementById('ap-weekly');if(wEl)wEl.value=String(prefill.weekly);}
     if(prefill.days){
       document.querySelectorAll('#ap-days-wrap .day-pill').forEach(function(btn){
         btn.classList.toggle('on',prefill.days.includes(btn.dataset.day));
       });
     }
   }
-  // 빌드 후 바로 실행
   _buildAssignGrid();
   runAssignPanel();
 }
+
+function renderWeeklySchedule(){renderAssignPanel();}
 
 // 구버전 호환
 function renderWeeklySchedule(){renderAssignPanel();}
@@ -7225,7 +7226,7 @@ function runAssignPanel(){
   var optNc=document.getElementById('ap-opt-nc').checked;
 
   if(!okDays.length||!okPrds.length){
-    resultEl.innerHTML='<div style="padding:16px;text-align:center;color:var(--txt3);font-size:13px">가능 요일과 희망 교시를 선택하세요</div>';
+    resultEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);font-size:14px">가능 요일과 희망 교시를 선택하세요</div>';
     return;
   }
 
@@ -7250,7 +7251,7 @@ function runAssignPanel(){
   });
 
   if(!validCombos.length){
-    resultEl.innerHTML='<div style="padding:20px;text-align:center;background:#fff0f0;border-radius:10px;color:#dc2626;font-size:13px">😔 선택한 조건으로 수용 가능한 시간이 없어요.<br><span style="font-size:11px;color:var(--txt3);margin-top:4px;display:block">요일이나 교시를 더 추가해 보세요.</span></div>';
+    resultEl.innerHTML='<div style="padding:24px;text-align:center;background:#fff0f0;border-radius:12px;color:#dc2626;font-size:14px">😔 선택한 조건으로 수용 가능한 시간이 없어요.<br><span style="font-size:12px;color:var(--txt3);margin-top:6px;display:block">요일이나 교시를 더 추가해 보세요.</span></div>';
     return;
   }
 
@@ -7265,7 +7266,7 @@ function runAssignPanel(){
 
   var validDays=[...new Set(validCombos.map(function(c){return c.day;}))];
   if(validDays.length<weekly){
-    resultEl.innerHTML='<div style="padding:20px;text-align:center;background:#fffbeb;border-radius:10px;color:#d97706;font-size:13px">⚠️ 가능한 요일이 주 '+weekly+'회보다 적어요 ('+validDays.length+'개 가능).<br><span style="font-size:11px;color:var(--txt3);margin-top:4px;display:block">주 횟수를 줄이거나 가능 요일을 늘려보세요.</span></div>';
+    resultEl.innerHTML='<div style="padding:24px;text-align:center;background:#fffbeb;border-radius:12px;color:#d97706;font-size:14px">⚠️ 가능한 요일이 주 '+weekly+'회보다 적어요 ('+validDays.length+'개 가능).<br><span style="font-size:12px;color:var(--txt3);margin-top:6px;display:block">주 횟수를 줄이거나 가능 요일을 늘려보세요.</span></div>';
     return;
   }
 
@@ -7310,79 +7311,110 @@ function runAssignPanel(){
   var top3=candidates.slice(0,3);
 
   if(!top3.length){
-    resultEl.innerHTML='<div style="padding:20px;text-align:center;background:#fff0f0;border-radius:10px;color:#dc2626;font-size:13px">😔 조건을 만족하는 조합이 없어요.</div>';
+    resultEl.innerHTML='<div style="padding:24px;text-align:center;background:#fff0f0;border-radius:12px;color:#dc2626;font-size:14px">😔 조건을 만족하는 조합이 없어요.</div>';
     return;
   }
 
   var grades=[
-    {label:'최적',color:'#16a34a',bg:'#f0fdf4',border:'#16a34a'},
-    {label:'추천',color:'#2563eb',bg:'#eff6ff',border:'#2563eb'},
-    {label:'가능',color:'#d97706',bg:'#fffbeb',border:'#d97706'}
+    {label:'최적',color:'#16a34a',bg:'#f0fdf4',border:'#16a34a',activeBg:'#16a34a'},
+    {label:'추천',color:'#2563eb',bg:'#eff6ff',border:'#2563eb',activeBg:'#2563eb'},
+    {label:'가능',color:'#d97706',bg:'#fffbeb',border:'#d97706',activeBg:'#d97706'}
   ];
 
-  // 이유 텍스트 생성
   function getReason(cand){
     var reasons=[];
     var maxLoad=Math.max.apply(null,cand.fits.map(function(f){return MAX_CAP-f.minAvail+1;}));
     if(cand.minAvail>=3)reasons.push('가장 여유 있음');
     else if(cand.minAvail>=2)reasons.push('여유 충분');
-    else if(cand.minAvail>=1)reasons.push('배정 가능');
+    else reasons.push('배정 가능');
     if(cand.samePeriod)reasons.push('동일 교시 유지');
     if(maxLoad<MAX_CAP)reasons.push('만석 슬롯 없음');
     else reasons.push('일부 요일 만석');
-    var hasWarn=cand.fits.some(function(f){return f.minAvail===0;});
-    if(hasWarn)reasons.push('⚠️ 일부 요일 혼잡');
     return reasons.join(' · ');
   }
 
-  var html='<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px">📋 추천 시간표</div>';
-  top3.forEach(function(cand,idx){
-    var g=grades[idx]||grades[2];
+  function renderCandCard(cand,g){
     var periodLabel=cand.samePeriod?(cand.prd+'교시'):'교시 혼합';
-    var reason=getReason(cand);
     var maxAfter=Math.max.apply(null,cand.fits.map(function(f){return MAX_CAP-f.minAvail+1;}));
-
-    html+='<div style="border:2px solid '+g.border+';border-radius:12px;padding:14px;margin-bottom:12px;background:'+g.bg+'">'
+    var reason=getReason(cand);
+    var html='<div style="padding:20px">'
       // 헤더
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-      +'<span style="background:'+g.color+';color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">'+g.label+'</span>'
-      +'<span style="font-size:14px;font-weight:800;color:'+g.color+'">'+cand.days.join('·')+'요일 · '+periodLabel+'</span>'
-      +'</div>'
-      // 이유 텍스트
-      +'<div style="font-size:11px;color:#64748b;margin-bottom:10px">'+reason+'</div>'
-      // 요일별 슬롯 상세
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
-
+      +'<div style="font-size:18px;font-weight:800;color:'+g.color+';margin-bottom:6px">'+cand.days.join('·')+'요일 · '+periodLabel+'</div>'
+      +'<div style="font-size:13px;color:#64748b;margin-bottom:18px">'+reason+'</div>'
+      // 요일별 슬롯 카드들
+      +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px">';
     cand.fits.forEach(function(fit){
       var prdSlots=_assignPeriodDays[fit.prd]||[];
       var startIdx=prdSlots.indexOf(fit.slot);
       var useSlots=prdSlots.slice(startIdx,startIdx+slotsNeeded);
-      html+='<div style="background:#fff;border-radius:8px;padding:8px 10px;min-width:70px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.08)">'
-        +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:5px;border-bottom:1px solid var(--border);padding-bottom:4px">'+fit.day+'요일</div>';
+      html+='<div style="background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;min-width:90px;text-align:center">'
+        +'<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">'+fit.day+'요일</div>';
       useSlots.forEach(function(sl){
         var cnt=_assignSlotGrid[sl+'_'+fit.day]||0;
         var after=cnt+1;
         var isFull=after>=MAX_CAP;
         var col=isFull?'#dc2626':after>=MAX_CAP-1?'#d97706':'#16a34a';
-        html+='<div style="font-size:11px;color:'+col+';line-height:1.8">'
-          +fmt12h(sl)+'&nbsp;'
-          +'<b>'+cnt+'→'+after+'</b>/'+MAX_CAP
-          +(isFull?'&nbsp;<span style="font-size:9px;background:#fef2f2;color:#dc2626;border-radius:3px;padding:0 3px">마감</span>':'')
+        html+='<div style="margin-top:7px">'
+          +'<div style="font-size:13px;color:var(--txt3);margin-bottom:2px">'+fmt12h(sl)+'</div>'
+          +'<div style="font-size:16px;font-weight:700;color:'+col+'">'+cnt+' → <b>'+after+'</b>/'+MAX_CAP+'</div>'
+          +(isFull?'<div style="font-size:10px;background:#fef2f2;color:#dc2626;border-radius:4px;padding:1px 5px;margin-top:2px;display:inline-block">마감</div>':'')
           +'</div>';
       });
       html+='</div>';
     });
-
     html+='</div>'
-      // 배정 결과 요약
-      +'<div style="font-size:11px;color:#64748b;background:#fff;border-radius:6px;padding:6px 10px;display:flex;gap:12px;flex-wrap:wrap">'
-      +'<span>배정 후 최대 <b>'+maxAfter+'/'+MAX_CAP+'</b></span>'
-      +(maxAfter>=MAX_CAP?'<span style="color:#dc2626">⚠️ 만석 슬롯 발생</span>':'<span style="color:#16a34a">✅ 여유 있음</span>')
+      // 요약
+      +'<div style="background:var(--surface2);border-radius:8px;padding:10px 14px;font-size:13px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap">'
+      +'<span>배정 후 최대 <b style="color:'+g.color+'">'+maxAfter+'/'+MAX_CAP+'</b></span>'
+      +(maxAfter>=MAX_CAP
+        ?'<span style="color:#dc2626">⚠️ 만석 슬롯 발생</span>'
+        :'<span style="color:#16a34a">✅ 여유 있음</span>')
       +'</div>'
       +'</div>';
-  });
+    return html;
+  }
 
-  resultEl.innerHTML=html;
+  // 탭 버튼 + 콘텐츠 렌더링
+  var tabBtns=top3.map(function(cand,idx){
+    var g=grades[idx]||grades[2];
+    var periodLabel=cand.samePeriod?(cand.prd+'교시'):'교시 혼합';
+    var active=idx===0;
+    return '<button onclick="switchAssignTab('+idx+')" id="atab-'+idx+'" style="'
+      +'flex:1;padding:10px 8px;border-radius:10px;border:2px solid '+g.border+';'
+      +'background:'+(active?g.activeBg:'#fff')+';color:'+(active?'#fff':g.color)+';'
+      +'font-size:13px;font-weight:700;cursor:pointer;transition:all .15s">'
+      +'<div>'+g.label+'</div>'
+      +'<div style="font-size:11px;font-weight:500;margin-top:3px;opacity:.9">'+cand.days.join('·')+'·'+periodLabel+'</div>'
+      +'</button>';
+  }).join('');
+
+  var tabContents=top3.map(function(cand,idx){
+    var g=grades[idx]||grades[2];
+    return '<div id="acontent-'+idx+'" style="display:'+(idx===0?'block':'none')+';border:2px solid '+g.border+';border-radius:12px;background:'+g.bg+'">'
+      +renderCandCard(cand,g)
+      +'</div>';
+  }).join('');
+
+  resultEl.innerHTML=''
+    +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">📋 추천 시간표</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px">'+tabBtns+'</div>'
+    +tabContents;
+
+  // switchAssignTab 전역 함수
+  window.switchAssignTab=function(idx){
+    var grades2=[
+      {color:'#16a34a',activeBg:'#16a34a',border:'#16a34a'},
+      {color:'#2563eb',activeBg:'#2563eb',border:'#2563eb'},
+      {color:'#d97706',activeBg:'#d97706',border:'#d97706'}
+    ];
+    top3.forEach(function(_,i){
+      var btn=document.getElementById('atab-'+i);
+      var cont=document.getElementById('acontent-'+i);
+      var g=grades2[i]||grades2[2];
+      if(btn){btn.style.background=i===idx?g.activeBg:'#fff';btn.style.color=i===idx?'#fff':g.color;}
+      if(cont)cont.style.display=i===idx?'block':'none';
+    });
+  };
 }
 function renderConsults(){var sId=$('con-filter-student').value;var list=sId?consultations.filter(function(c){return c.studentId===sId;}):consultations;if(!list.length){$('consult-list').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">상담 기록 없음</div></div>';return;}var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green'};$('consult-list').innerHTML=list.map(function(c){var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';var contentPreview=c.content?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">💬 '+c.content.substring(0,50)+(c.content.length>50?'...':'')+'</div>':'';return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openConsultModal(\''+c.id+'\')"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap"><strong>'+c.studentName+'</strong><span style="font-size:11px;color:var(--txt2)">'+c.type+' · '+(c.teacher||'-')+'</span>'+csBadge+'</div><div style="font-size:10px;color:var(--txt3)">'+c.date+'</div>'+contentPreview+'</div>';}).join('');}
 function openConsultModal(id){var con=id?consultations.find(function(x){return x.id===id;}):null;$('con-id').value=id||'';$('con-modal-title').textContent=id?'상담 수정':'상담 기록';$('con-del-wrap').style.display=id?'block':'none';$('con-student').value=con?.studentId||'';$('con-date').value=con?.date||todayISO();$('con-teacher').value=con?.teacher||currentUser.name||'';$('con-type').value=con?.type||'카톡 상담';if($('con-purpose'))$('con-purpose').value=con?.purpose||'';$('con-status').value=con?.consultStatus||'상담 예정';$('con-channel').value=con?.channel||'';$('con-registered').value=con?.registered||'';$('con-reason').value=con?.reason||'';$('con-content').value=con?.content||'';$('con-priority').value=con?.priority||'';$('con-request').value=con?.request||'';$('con-result').value=con?.result||'';$('con-followup').checked=con?.followup||false;$('con-followup-area').style.display=con?.followup?'block':'none';$('con-fu-pin').checked=con?.fuType==='pin';$('con-fu-action').checked=con?.fuType==='action';$('con-fu-content').value=con?.fuContent||'';$('con-fu-deadline').value=con?.fuDeadline||'';$('con-fu-status').value=con?.fuStatus||'미처리';$('modal-consult').style.display='flex';}
