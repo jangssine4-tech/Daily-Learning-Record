@@ -7241,14 +7241,19 @@ function runAssignPanel(){
   ];
 
   // ── 헬퍼 함수들 ──
-  function canFit(day,prd){
+  // 한 요일+교시에서 가능한 모든 시작 슬롯 반환
+  function canFitAll(day,prd){
     var slots=_assignPeriodDays[prd]||[];
+    var results=[];
     for(var i=0;i<=slots.length-slotsNeeded;i++){
       var ok=true;
       for(var j=0;j<slotsNeeded;j++){if((_assignSlotGrid[slots[i+j]+'_'+day]||0)>=MAX_CAP){ok=false;break;}}
-      if(ok)return{slot:slots[i],avail:slots.slice(i,i+slotsNeeded).map(function(sl){return MAX_CAP-(_assignSlotGrid[sl+'_'+day]||0);})};
+      if(ok){
+        var avail=slots.slice(i,i+slotsNeeded).map(function(sl){return MAX_CAP-(_assignSlotGrid[sl+'_'+day]||0);});
+        results.push({slot:slots[i],avail:avail,minAvail:Math.min.apply(null,avail)});
+      }
     }
-    return null;
+    return results;
   }
 
   function getCombinations(arr,k){
@@ -7309,11 +7314,14 @@ function runAssignPanel(){
   }
 
   // ── 후보 계산 ──
+  // 각 요일+교시+시작슬롯 조합을 모두 validCombos에 추가
   var validCombos=[];
   okDays.forEach(function(day){
     okPrds.forEach(function(prd){
-      var fit=canFit(day,prd);
-      if(fit)validCombos.push({day:day,prd:prd,slot:fit.slot,avail:fit.avail,minAvail:Math.min.apply(null,fit.avail)});
+      var fits=canFitAll(day,prd);
+      fits.forEach(function(fit){
+        validCombos.push({day:day,prd:prd,slot:fit.slot,avail:fit.avail,minAvail:fit.minAvail});
+      });
     });
   });
 
@@ -7339,29 +7347,60 @@ function runAssignPanel(){
       }
       if(hasConsec)return;
     }
-    // 같은 교시 조합 — 선택된 각 교시마다 후보 생성
+    // 같은 교시 + 같은 시작 슬롯 조합
     okPrds.forEach(function(prd){
-      var fits=dayCombo.map(function(day){return validCombos.find(function(c){return c.day===day&&c.prd===prd;});});
-      if(fits.every(Boolean)){
-        var sc=_calcScore(fits,optBal,MAX_CAP);
-        if(optSame)sc+=20; // 같은 교시 통일 우선 옵션 시 가산
-        candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
-          score:sc,
-          minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
-          totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
+      // 이 교시에서 가능한 슬롯 목록 (모든 요일 공통으로 가능한 것)
+      var slotSets=dayCombo.map(function(day){
+        return validCombos.filter(function(c){return c.day===day&&c.prd===prd;}).map(function(c){return c.slot;});
+      });
+      if(slotSets.some(function(ss){return!ss.length;}))return; // 한 요일이라도 불가면 skip
+      // 공통으로 가능한 슬롯 찾기
+      var commonSlots=slotSets[0].filter(function(sl){
+        return slotSets.every(function(ss){return ss.indexOf(sl)>=0;});
+      });
+      // 공통 슬롯이 없으면 각 요일 최선 슬롯으로
+      if(!commonSlots.length){
+        var fits=dayCombo.map(function(day){
+          var dc=validCombos.filter(function(c){return c.day===day&&c.prd===prd;});
+          return dc.sort(function(a,b){return b.minAvail-a.minAvail;})[0];
+        });
+        if(fits.every(Boolean)){
+          var sc=_calcScore(fits,optBal,MAX_CAP)+(optSame?15:0);
+          candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
+            score:sc,minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
+            totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
+        }
+      } else {
+        // 공통 슬롯마다 후보 생성
+        commonSlots.forEach(function(sl){
+          var fits=dayCombo.map(function(day){
+            return validCombos.find(function(c){return c.day===day&&c.prd===prd&&c.slot===sl;});
+          });
+          if(fits.every(Boolean)){
+            var sc=_calcScore(fits,optBal,MAX_CAP)+(optSame?20:0);
+            candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
+              score:sc,minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
+              totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
+          }
+        });
       }
     });
-    // 교시 혼합 조합 — 요일마다 가장 여유 있는 교시 선택
+    // 교시 혼합 조합 — 요일마다 독립적으로 최선 슬롯 선택
     (function(){
-      var bestFits=dayCombo.map(function(day){
-        var df=validCombos.filter(function(c){return c.day===day;});
-        return df.sort(function(a,b){return b.minAvail-a.minAvail;})[0];
+      // 각 요일에서 가능한 모든 combo (교시+슬롯) 목록
+      var dayOptions=dayCombo.map(function(day){
+        return validCombos.filter(function(c){return c.day===day;});
+      });
+      if(dayOptions.some(function(opts){return!opts.length;}))return;
+      // 각 요일 최선 슬롯 선택 (minAvail 내림차순)
+      var bestFits=dayOptions.map(function(opts){
+        return opts.sort(function(a,b){return b.minAvail-a.minAvail;})[0];
       });
       if(!bestFits.every(Boolean))return;
-      // 모두 같은 교시면 이미 위에서 추가됐으므로 중복 방지
       var prds=bestFits.map(function(f){return f.prd;});
-      var allSame=prds.every(function(p){return p===prds[0];});
-      if(allSame)return; // 동일 교시는 위 브랜치에서 처리됨
+      var slts=bestFits.map(function(f){return f.slot;});
+      var allSamePrdSlot=prds.every(function(p){return p===prds[0];})&&slts.every(function(sl){return sl===slts[0];});
+      if(allSamePrdSlot)return; // 동일 교시+슬롯은 위 브랜치에서 처리됨
       candidates.push({days:dayCombo,prd:null,fits:bestFits,samePeriod:false,
         score:_calcScore(bestFits,optBal,MAX_CAP),
         minAvail:Math.min.apply(null,bestFits.map(function(f){return f.minAvail;})),
@@ -7370,6 +7409,13 @@ function runAssignPanel(){
   });
 
   candidates.sort(function(a,b){return b.score-a.score;});
+  // 중복 제거: 같은 요일+교시+슬롯 조합은 하나만
+  var seen=new Set();
+  candidates=candidates.filter(function(c){
+    var key=c.days.join(',')+'|'+c.fits.map(function(f){return f.prd+':'+f.slot;}).join(',');
+    if(seen.has(key))return false;
+    seen.add(key);return true;
+  });
   var top3=candidates.slice(0,3);
 
   if(!top3.length){
