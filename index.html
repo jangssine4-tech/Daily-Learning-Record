@@ -2956,7 +2956,8 @@ function _doRenderWT(area, data, yr, mo) {
   var yrOpts = ''; for (var y = 2024; y <= 2030; y++) yrOpts += '<option value="' + y + '"' + (y === yr ? ' selected' : '') + '>' + y + '년</option>';
   var moOpts = ''; for (var m = 1; m <= 12; m++) moOpts += '<option value="' + m + '"' + (m === mo ? ' selected' : '') + '>' + m + '월</option>';
 
-
+  // 열 너비: 시간열 70px 고정, 요일열 균등 분배
+  var colW = 'width:' + Math.floor(100/days.length) + '%';
 
   var html = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
     + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
@@ -2965,7 +2966,7 @@ function _doRenderWT(area, data, yr, mo) {
     + '<select class="fi" style="width:60px;font-size:11px" onchange="_wtAutoSaveAndSwitch(\'mo\',this.value)">' + moOpts + '</select>'
     + '<button class="btn ' + (_wtEditMode ? 'btn-navy' : 'btn-outline') + ' btn-xs" onclick="_wtToggleEdit()">' + (_wtEditMode ? '✏️ 편집 중' : '✏️ 계획 편집') + '</button>'
     + '<button class="btn btn-green btn-xs" onclick="_wtSavePlan()">💾 저장</button>'
-    + '<span style="font-size:10px;color:var(--txt3)">🔵 재원 · 🩷 계획 · '+'<span style="display:inline-flex;align-items:center;gap:2px"><span style="display:inline-block;width:14px;height:14px;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;vertical-align:middle"></span><span style="color:var(--txt3)"> 특강</span></span></span>'
+    + '<span style="font-size:10px;color:var(--txt3)">🔵 재원 · 🩷 계획 · <span style="display:inline-flex;align-items:center;gap:2px"><span style="display:inline-block;width:14px;height:14px;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;vertical-align:middle"></span><span style="color:var(--txt3)"> 특강</span></span></span>'
     + '<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
     + '</div>';
 
@@ -2974,9 +2975,15 @@ function _doRenderWT(area, data, yr, mo) {
     area.innerHTML = html; return;
   }
 
-  html += '<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px">'
-    + '<thead><tr><th style="padding:6px 4px;background:#4a6fa5;color:#fff;border:1px solid var(--border);text-align:center;min-width:60px">시간</th>';
-  days.forEach(function(d) { html += '<th style="padding:6px 4px;background:#4a6fa5;color:#fff;border:1px solid var(--border);text-align:center;min-width:80px">' + d + '</th>'; });
+  // 배지 공통 스타일
+  var badgeBase = 'display:inline-flex;align-items:center;box-sizing:border-box;height:22px;padding:0 5px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;line-height:1';
+
+  html += '<table id="weekly-timetable-table" style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed">'
+    + '<thead><tr>'
+    + '<th style="padding:6px 4px;background:#4a6fa5;color:#fff;border:1px solid var(--border);text-align:center;width:70px;min-width:60px">시간</th>';
+  days.forEach(function(d) {
+    html += '<th style="padding:6px 4px;background:#4a6fa5;color:#fff;border:1px solid var(--border);text-align:center;' + colW + '">' + d + '</th>';
+  });
   html += '</tr></thead><tbody>';
 
   var lastPrd = 0;
@@ -2990,52 +2997,44 @@ function _doRenderWT(area, data, yr, mo) {
     var h = parseInt(ts.split(':')[0]), mn = parseInt(ts.split(':')[1]);
     var endH = mn === 0 ? h : h + 1, endM = mn === 0 ? 30 : 0;
     var label = _fmt12hRange(ts + '~' + String(endH).padStart(2,'0') + ':' + String(endM).padStart(2,'0'));
-
-    html += '<tr><td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap">' + label + '</td>';
+    html += '<tr><td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap;width:70px">' + label + '</td>';
 
     days.forEach(function(d) {
       var sList = grid[ts] && grid[ts][d] ? grid[ts][d] : [];
       var planNames = (plan[ts] && plan[ts][d]) ? plan[ts][d] : [];
-      var tdStyle = _wtEditMode
-        ? 'padding:4px;border:1px solid var(--border);vertical-align:top;background:#fffbeb'
-        : 'padding:4px;border:1px solid var(--border);vertical-align:top';
+      var tdBg = _wtEditMode ? '#fffbeb' : 'var(--surface)';
+      html += '<td style="padding:4px;border:1px solid var(--border);vertical-align:top;background:' + tdBg + ';' + colW + '">'
+        + '<div style="display:flex;flex-wrap:wrap;gap:3px;min-height:28px">';
 
-      html += '<td style="' + tdStyle + '">'
-        + '<div style="display:flex;flex-wrap:wrap;gap:3px;min-height:32px">';
-
-      // 원본 학생 카드
       sList.forEach(function(s) {
         var bg = s._isSpecial ? '#fef9c3' : s._overridden ? '#e0e7ff' : '#dbeafe';
         var color = s._isSpecial ? '#854d0e' : s._overridden ? '#4338ca' : '#1e40af';
         if (_wtEditMode) {
-          // 편집 모드: 삭제 버튼 포함
-          html += '<div style="display:flex;align-items:center;gap:1px;padding:2px 4px;background:' + bg + ';border-radius:4px;font-size:11px;font-weight:600;color:' + color + '">'
+          html += '<div style="' + badgeBase + ';background:' + bg + ';color:' + color + ';gap:2px">'
             + s.name
-            + '<span onclick="_wtDeleteOrigCard(\''+ts+'\',\''+d+'\',\''+s.id+'\',this.parentNode.parentNode.parentNode)" '
-            + 'style="cursor:pointer;margin-left:2px;color:#ef4444;font-size:10px;line-height:1" title="이 셀에서 제거">✕</span>'
+            + '<span onclick="_wtDeleteOrigCard(\'' + ts + '\',\'' + d + '\',\'' + s.id + '\',this.parentNode.parentNode.parentNode)" '
+            + 'style="cursor:pointer;color:#ef4444;font-size:10px" title="이 셀에서 제거">✕</span>'
             + '</div>';
         } else {
-          html += '<div style="padding:2px 5px;background:' + bg + ';border-radius:4px;font-size:11px;font-weight:600;color:' + color + ';white-space:nowrap">' + s.name + '</div>';
+          html += '<div style="' + badgeBase + ';background:' + bg + ';color:' + color + '">' + s.name + '</div>';
         }
       });
 
-      // 계획 이름 (핑크 카드)
       planNames.forEach(function(name, idx) {
         if (_wtEditMode) {
-          html += '<div style="display:flex;align-items:center;gap:1px;padding:2px 4px;background:#fce7f3;border-radius:4px;font-size:11px;font-weight:600;color:#9d174d;border:1px dashed #f9a8d4">'
+          html += '<div style="' + badgeBase + ';background:#fce7f3;color:#9d174d;border:1px dashed #f9a8d4;gap:2px">'
             + name
-            + '<span onclick="_wtDeletePlanCard(\''+ts+'\',\''+d+'\','+idx+',this.parentNode.parentNode.parentNode)" '
-            + 'style="cursor:pointer;margin-left:2px;color:#ef4444;font-size:10px;line-height:1" title="삭제">✕</span>'
+            + '<span onclick="_wtDeletePlanCard(\'' + ts + '\',\'' + d + '\',' + idx + ',this.parentNode.parentNode.parentNode)" '
+            + 'style="cursor:pointer;color:#ef4444;font-size:10px" title="삭제">✕</span>'
             + '</div>';
         } else {
-          html += '<div style="padding:2px 5px;background:#fce7f3;border-radius:4px;font-size:11px;font-weight:600;color:#9d174d;white-space:nowrap;border:1px dashed #f9a8d4">' + name + '</div>';
+          html += '<div style="' + badgeBase + ';background:#fce7f3;color:#9d174d;border:1px dashed #f9a8d4">' + name + '</div>';
         }
       });
 
-      // 편집 모드: + 추가 버튼
       if (_wtEditMode) {
-        html += '<button onclick="_wtAddPlanCard(\''+ts+'\',\''+d+'\',this.parentNode.parentNode.parentNode)" '
-          + 'style="padding:1px 6px;background:#fce7f3;border:1px dashed #f9a8d4;border-radius:4px;font-size:12px;color:#9d174d;cursor:pointer;line-height:1.4" title="이름 추가">+</button>';
+        html += '<button onclick="_wtAddPlanCard(\'' + ts + '\',\'' + d + '\',this.parentNode.parentNode.parentNode)" '
+          + 'style="height:22px;padding:0 6px;background:#fce7f3;border:1px dashed #f9a8d4;border-radius:4px;font-size:12px;color:#9d174d;cursor:pointer;line-height:1" title="이름 추가">+</button>';
       }
 
       html += '</div></td>';
