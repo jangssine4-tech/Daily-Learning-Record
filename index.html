@@ -6143,8 +6143,22 @@ async function saveStudent(){
     // 로컬 배열 가나다순 정렬 유지
     students.sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
     _fullyPopulated=false;
-    // 월간 시간표 캐시 무효화 (특강/수업 변경 즉시 반영)
-    window._wtMonthData={};
+    // 월간 시간표 캐시 및 오버라이드 정리
+    // specialPeriods가 비어있으면 해당 학생의 오버라이드도 제거
+    var savedId=id||'';
+    if(savedId){
+      Object.keys(_wtMonthData||{}).forEach(function(wtKey){
+        var mData=_wtMonthData[wtKey];
+        if(mData&&mData.overrides&&mData.overrides[savedId]){
+          delete mData.overrides[savedId];
+          // Firestore에도 반영
+          var updateObj={};
+          updateObj['overrides.'+savedId]=firebase.firestore.FieldValue.delete();
+          db.collection('config').doc(wtKey).update(updateObj)
+            .catch(function(e){console.warn('오버라이드 삭제 실패:',e);});
+        }
+      });
+    }
     window._wtPlanData={};
     closeM('student');
     loading(false);
