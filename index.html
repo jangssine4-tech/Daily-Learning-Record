@@ -7378,25 +7378,75 @@ function runAssignPanel(){
   }
 
   // ── 탭 렌더링 ──
-  var tabBtns=top3.map(function(cand,idx){
-    var g=grades[idx]||grades[2];
-    var periodLabel=cand.samePeriod?(cand.prd+'교시'):'교시 혼합';
-    var active=idx===0;
-    return '<button onclick="switchAssignTab('+idx+')" id="atab-'+idx+'" style="'
-      +'flex:1;padding:10px 8px;border-radius:10px;border:2px solid '+g.border+';'
-      +'background:'+(active?g.activeBg:g.bg)+';color:'+(active?'#fff':(g.textColor||g.color))+';'
+  // 최적(1~2개), 추천(3~4개), 가능(전체)
+  var best=candidates.slice(0,2);
+  var recommended=candidates.slice(0,4);
+  var allCands=candidates;
+
+  var tabDefs=[
+    {id:'best',  label:'최적', sublabel:best.length+'개',  color:'#2e7d32',bg:'#e8f5e9',border:'#b2dfdb',textColor:'#1b5e20',activeBg:'#2e7d32'},
+    {id:'rec',   label:'추천', sublabel:recommended.length+'개', color:'#4527a0',bg:'#ede7f6',border:'#c5cae9',textColor:'#311b92',activeBg:'#4527a0'},
+    {id:'all',   label:'가능', sublabel:'전체 '+allCands.length+'개', color:'#e65100',bg:'#fff8e1',border:'#ffe0b2',textColor:'#bf360c',activeBg:'#e65100'}
+  ];
+
+  function renderTabContent(candList, g){
+    if(!candList.length)return'<div style="padding:20px;text-align:center;color:var(--txt3)">해당 조건의 후보가 없어요</div>';
+    return candList.map(function(cand,i){
+      var periodLabel=cand.samePeriod?(cand.prd+'교시'):'교시 혼합';
+      var reason=getReason(cand);
+      var maxAfter=Math.max.apply(null,cand.fits.map(function(f){return MAX_CAP-f.minAvail+1;}));
+      var html='<div style="'+(i>0?'border-top:1px solid '+g.border+';margin-top:12px;padding-top:12px':'')+'">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+        +'<span style="background:'+(g.textColor||g.color)+';color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;flex-shrink:0">'+(i+1)+'위</span>'
+        +'<span style="font-size:15px;font-weight:800;color:'+(g.textColor||g.color)+'">'+cand.days.join('·')+'요일 · '+periodLabel+'</span>'
+        +'</div>'
+        +'<div style="font-size:12px;color:#64748b;margin-bottom:10px">'+reason+'</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+      cand.fits.forEach(function(fit){
+        var prdSlots=_assignPeriodDays[fit.prd]||[];
+        var startIdx=prdSlots.indexOf(fit.slot);
+        var useSlots=prdSlots.slice(startIdx,startIdx+slotsNeeded);
+        html+='<div style="background:#fff;border:1.5px solid '+(g.border||'var(--border)')+';border-radius:8px;padding:8px 12px;min-width:80px;text-align:center">'
+          +'<div style="font-size:13px;font-weight:700;color:'+(g.textColor||'var(--navy)')+';margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid '+(g.border||'var(--border)')+'">'+fit.day+'요일</div>';
+        useSlots.forEach(function(sl){
+          var cnt=_assignSlotGrid[sl+'_'+fit.day]||0;
+          var after=cnt+1;
+          var isFull=after>=MAX_CAP;
+          var col=isFull?'#dc2626':after>=MAX_CAP-1?'#d97706':'#16a34a';
+          html+='<div style="margin-top:5px">'
+            +'<div style="font-size:11px;color:var(--txt3)">'+fmt12h(sl)+'</div>'
+            +'<div style="font-size:14px;font-weight:700;color:'+col+'">'+cnt+'→<b>'+after+'</b>/'+MAX_CAP+'</div>'
+            +(isFull?'<div style="font-size:9px;background:#fef2f2;color:#dc2626;border-radius:3px;padding:0 4px;display:inline-block">마감</div>':'')
+            +'</div>';
+        });
+        html+='</div>';
+      });
+      html+='</div>'
+        +'<div style="font-size:12px;color:#64748b;background:#fff;border-radius:6px;padding:6px 10px;display:flex;gap:12px">'
+        +'<span>최대 <b style="color:'+(g.textColor||g.color)+'">'+maxAfter+'/'+MAX_CAP+'</b></span>'
+        +(maxAfter>=MAX_CAP?'<span style="color:#dc2626">⚠️ 만석 슬롯 발생</span>':'<span style="color:#16a34a">✅ 여유 있음</span>')
+        +'</div>'
+        +'</div>';
+      return html;
+    }).join('');
+  }
+
+  var tabBtns=tabDefs.map(function(t,i){
+    var active=i===0;
+    return '<button onclick="switchAssignTab('+i+')" id="atab-'+i+'" style="'
+      +'flex:1;padding:10px 6px;border-radius:10px;border:2px solid '+t.border+';'
+      +'background:'+(active?t.activeBg:t.bg)+';color:'+(active?'#fff':t.textColor)+';'
       +'font-size:13px;font-weight:700;cursor:pointer;transition:all .15s">'
-      +'<div>'+g.label+'</div>'
-      +'<div style="font-size:11px;font-weight:500;margin-top:3px;opacity:.9">'+cand.days.join('·')+'·'+periodLabel+'</div>'
+      +'<div>'+t.label+'</div>'
+      +'<div style="font-size:11px;font-weight:500;margin-top:2px;opacity:.85">'+t.sublabel+'</div>'
       +'</button>';
   }).join('');
 
-  var tabContents=top3.map(function(cand,idx){
-    var g=grades[idx]||grades[2];
-    return '<div id="acontent-'+idx+'" style="display:'+(idx===0?'block':'none')+';border:2px solid '+g.border+';border-radius:12px;background:'+g.bg+'">'
-      +renderCandCard(cand,g)
-      +'</div>';
-  }).join('');
+  var tabContents=[
+    '<div id="acontent-0" style="display:block;border:2px solid '+tabDefs[0].border+';border-radius:12px;background:'+tabDefs[0].bg+';padding:16px">'+renderTabContent(best,tabDefs[0])+'</div>',
+    '<div id="acontent-1" style="display:none;border:2px solid '+tabDefs[1].border+';border-radius:12px;background:'+tabDefs[1].bg+';padding:16px">'+renderTabContent(recommended,tabDefs[1])+'</div>',
+    '<div id="acontent-2" style="display:none;border:2px solid '+tabDefs[2].border+';border-radius:12px;background:'+tabDefs[2].bg+';padding:16px;max-height:500px;overflow-y:auto">'+renderTabContent(allCands,tabDefs[2])+'</div>'
+  ].join('');
 
   resultEl.innerHTML=''
     +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">📋 추천 시간표</div>'
@@ -7404,16 +7454,10 @@ function runAssignPanel(){
     +tabContents;
 
   window.switchAssignTab=function(idx){
-    var grades2=[
-      {color:'#2e7d32',activeBg:'#2e7d32',border:'#b2dfdb',bg:'#e8f5e9',textColor:'#1b5e20'},
-      {color:'#4527a0',activeBg:'#4527a0',border:'#c5cae9',bg:'#ede7f6',textColor:'#311b92'},
-      {color:'#e65100',activeBg:'#e65100',border:'#ffe0b2',bg:'#fff8e1',textColor:'#bf360c'}
-    ];
-    top3.forEach(function(_,i){
+    tabDefs.forEach(function(t,i){
       var btn=document.getElementById('atab-'+i);
       var cont=document.getElementById('acontent-'+i);
-      var g=grades2[i]||grades2[2];
-      if(btn){btn.style.background=i===idx?g.activeBg:(g.bg||'#fff');btn.style.color=i===idx?'#fff':(g.textColor||g.color);}
+      if(btn){btn.style.background=i===idx?t.activeBg:t.bg;btn.style.color=i===idx?'#fff':t.textColor;}
       if(cont)cont.style.display=i===idx?'block':'none';
     });
   };
