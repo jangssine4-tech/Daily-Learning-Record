@@ -6113,12 +6113,18 @@ async function saveStudent(){
       students.push(Object.assign({id:ref.id},data,{createdAt:new Date().toISOString()}));
     }
     _fullyPopulated=false;
-    renderStudents();
-    renderScheduleThrottled();
+    // 모달 먼저 닫고 나서 렌더링 — UI 블로킹 방지
     closeM('student');
     loading(false);
-    saveCacheDebounced();
     toast('✅ 저장됨');
+    // 학생 목록만 즉시 갱신, 시간표는 탭 진입 시 자연스럽게 갱신
+    setTimeout(function(){
+      renderStudents();
+      // 시간표 탭이 현재 열려 있을 때만 갱신
+      var schedEl=$('view-schedule');
+      if(schedEl&&schedEl.style.display!=='none')renderSchedule();
+      saveCacheDebounced();
+    },0);
   }catch(e){
     console.error('saveStudent error:',e);
     loading(false);
@@ -6130,12 +6136,15 @@ async function deleteStudent(){
   try{
     await db.collection('students').doc(id).delete();
     students=students.filter(function(s){return s.id!==id;});
-    renderStudents();
-    renderScheduleThrottled();
     closeM('student');
     loading(false);
-    saveCacheDebounced();
     toast('🗑 삭제됨');
+    setTimeout(function(){
+      renderStudents();
+      var schedEl=$('view-schedule');
+      if(schedEl&&schedEl.style.display!=='none')renderSchedule();
+      saveCacheDebounced();
+    },0);
   }catch(e){
     loading(false);
     toast('❌ 삭제 실패: '+e.message);
