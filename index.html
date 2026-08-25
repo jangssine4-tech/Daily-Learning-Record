@@ -2997,7 +2997,7 @@ function _doRenderWT(area, data, yr, mo) {
     var h = parseInt(ts.split(':')[0]), mn = parseInt(ts.split(':')[1]);
     var endH = mn === 0 ? h : h + 1, endM = mn === 0 ? 30 : 0;
     var label = _fmt12hRange(ts + '~' + String(endH).padStart(2,'0') + ':' + String(endM).padStart(2,'0'));
-    html += '<tr><td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap;width:70px">' + label + '</td>';
+    html += '<tr><td style="padding:6px 4px;background:var(--surface2);font-weight:700;color:var(--blue);text-align:center;border:1px solid var(--border);white-space:nowrap;width:90px;min-width:90px">' + label + '</td>';
 
     days.forEach(function(d) {
       var sList = grid[ts] && grid[ts][d] ? grid[ts][d] : [];
@@ -7204,42 +7204,93 @@ function renderWeeklySchedule(){
   });
   if(!sortedTimes.length){el.innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">교시 시간 설정을 먼저 해주세요</div></div>';return;}
 
+  // 특강 슬롯별 합산 (학생 없으면 숨김)
+  var specialSlotTotal={};
+  sortedTimes.forEach(function(slot){
+    var prd=findPeriod(slot);
+    if(prd<0) specialSlotTotal[slot]=days.reduce(function(sum,day){return sum+(slotGrid[slot+'_'+day]||0);},0);
+  });
+
+  // 셀 표시 헬퍼
+  function cellDisplay(cnt){
+    var avail=MAX_CAP-cnt;
+    var over=cnt-MAX_CAP;
+    if(avail>0)  return {label:cnt+'/'+MAX_CAP, sub:'여유 '+avail, color:'#16a34a', bg:'#f0fdf4'};
+    if(avail===0)return {label:cnt+'/'+MAX_CAP, sub:'마감',   color:'#dc2626', bg:'#fff0f0'};
+    return          {label:cnt+'/'+MAX_CAP, sub:'초과 '+over, color:'#7c2d12', bg:'#fef2f2'};
+  }
+
   var colStyle='text-align:center;padding:8px 6px;min-width:80px';
   var thead='<tr style="background:#4a6fa5;color:#fff;font-size:12px;font-weight:700">'
-    +'<th style="'+colStyle+'">시간</th>';
+    +'<th style="'+colStyle+';min-width:90px">시간</th>';
   days.forEach(function(d){thead+='<th style="'+colStyle+'">'+d+'</th>';});
   thead+='</tr>';
 
   var tbody='';var lastPeriod=0;
   sortedTimes.forEach(function(slot){
     var prd=findPeriod(slot);
+    if(prd<0&&specialSlotTotal[slot]===0) return;
     if(prd!==0&&prd!==lastPeriod){
+      if(prd<0){
+        var prdTotal=sortedTimes.filter(function(sl){return findPeriod(sl)===prd;})
+          .reduce(function(sum,sl){return sum+(specialSlotTotal[sl]||0);},0);
+        if(prdTotal===0){lastPeriod=prd;return;}
+      }
       var pLabel=prd<0?'특강 '+Math.abs(prd):prd+'교시';
-      // 교시 헤더 — 가운데 정렬
       tbody+='<tr><td colspan="'+(days.length+1)+'" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;text-align:center">'+pLabel+'</td></tr>';
       lastPeriod=prd;
     }
-    tbody+='<tr><td style="text-align:center;background:var(--surface2);font-weight:600;font-size:12px;padding:6px;border-right:2px solid var(--border)">'+fmt12h(slot)+'</td>';
+    tbody+='<tr><td style="text-align:center;background:var(--surface2);font-weight:600;font-size:12px;padding:6px;border-right:2px solid var(--border);min-width:90px;white-space:nowrap">'+fmt12h(slot)+'</td>';
     days.forEach(function(day){
-      var gKey=slot+'_'+day;
-      var cnt=slotGrid[gKey]||0;
-      var avail=MAX_CAP-cnt;
-      var color=avail<=0?'#dc2626':avail<=2?'#d97706':'#16a34a';
-      var bg=avail<=0?'#fff0f0':avail<=2?'#fffbeb':'#f0fdf4';
-      // 현재 인원 + 수용 가능 인원 표시
-      var availLabel=avail>0?'<span style="font-size:9px;color:'+color+';display:block;margin-top:1px">(+'+avail+')</span>':'<span style="font-size:9px;color:#dc2626;display:block;margin-top:1px">만석</span>';
-      tbody+='<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);background:'+bg+';">'
-        +'<span style="font-size:15px;font-weight:700;color:'+color+'">'+cnt+'</span>'
-        +availLabel
+      var cnt=slotGrid[slot+'_'+day]||0;
+      var d=cellDisplay(cnt);
+      tbody+='<td style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);background:'+d.bg+'">'
+        +'<div style="font-size:14px;font-weight:700;color:'+d.color+'">'+d.label+'</div>'
+        +'<div style="font-size:10px;font-weight:600;color:'+d.color+';margin-top:2px">'+d.sub+'</div>'
         +'</td>';
     });
     tbody+='</tr>';
   });
 
-  el.innerHTML='<div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:12px;text-align:center">📅 상담용 시간표 (수용 현황)</div>'
-    +'<div style="display:flex;gap:12px;justify-content:center;margin-bottom:10px;font-size:11px">'
-    +'<span style="color:#16a34a">● 여유</span><span style="color:#d97706">● 거의 다 참</span><span style="color:#dc2626">● 만석</span>'
-    +'<span style="color:var(--txt3)">· 30분당 정원 '+MAX_CAP+'명 · (+N)=수용 가능 인원</span></div>'
+  // 전체 슬롯 통계
+  var statFree=0,statAlmost=0,statFull=0,statOver=0;
+  sortedTimes.forEach(function(slot){
+    days.forEach(function(day){
+      var cnt=slotGrid[slot+'_'+day]||0;
+      var avail=MAX_CAP-cnt;
+      if(avail>=2)statFree++;
+      else if(avail===1)statAlmost++;
+      else if(avail===0)statFull++;
+      else statOver++;
+    });
+  });
+
+  el.innerHTML=''
+    +'<div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:10px;text-align:center">📅 상담용 시간표 (수용 현황)</div>'
+    // 범례
+    +'<div style="display:flex;gap:10px;justify-content:center;margin-bottom:10px;font-size:11px;flex-wrap:wrap">'
+    +'<span style="color:#16a34a">🟢 여유 (2석+)</span>'
+    +'<span style="color:#d97706">🟠 잔여 1석</span>'
+    +'<span style="color:#dc2626">🔴 마감</span>'
+    +'<span style="color:#7c2d12">⚫ 초과</span>'
+    +'<span style="color:var(--txt3)">· 30분 정원 '+MAX_CAP+'명</span>'
+    +'</div>'
+    // 통계 카드
+    +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:70px;text-align:center;padding:8px 4px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac">'
+    +'<div style="font-size:18px;font-weight:800;color:#16a34a">'+statFree+'</div>'
+    +'<div style="font-size:10px;color:#16a34a;font-weight:600">여유 슬롯</div></div>'
+    +'<div style="flex:1;min-width:70px;text-align:center;padding:8px 4px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a">'
+    +'<div style="font-size:18px;font-weight:800;color:#d97706">'+statAlmost+'</div>'
+    +'<div style="font-size:10px;color:#d97706;font-weight:600">잔여 1석</div></div>'
+    +'<div style="flex:1;min-width:70px;text-align:center;padding:8px 4px;background:#fff0f0;border-radius:8px;border:1px solid #fca5a5">'
+    +'<div style="font-size:18px;font-weight:800;color:#dc2626">'+statFull+'</div>'
+    +'<div style="font-size:10px;color:#dc2626;font-weight:600">마감</div></div>'
+    +'<div style="flex:1;min-width:70px;text-align:center;padding:8px 4px;background:#fef2f2;border-radius:8px;border:1px solid #f87171">'
+    +'<div style="font-size:18px;font-weight:800;color:#7c2d12">'+statOver+'</div>'
+    +'<div style="font-size:10px;color:#7c2d12;font-weight:600">초과</div></div>'
+    +'</div>'
+    // 시간표
     +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:600px;border-collapse:collapse;table-layout:fixed;width:100%"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>'
     +'<div style="margin-top:10px;font-size:11px;color:var(--txt3);text-align:right">재원/신규 '+activeS.length+'명 · 학생 정보 수업 요일 기준 자동 반영</div>';
 }
