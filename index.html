@@ -2931,18 +2931,7 @@ function _doRenderWT(area, data, yr, mo) {
   var yrOpts = ''; for (var y = 2024; y <= 2030; y++) yrOpts += '<option value="' + y + '"' + (y === yr ? ' selected' : '') + '>' + y + '년</option>';
   var moOpts = ''; for (var m = 1; m <= 12; m++) moOpts += '<option value="' + m + '"' + (m === mo ? ' selected' : '') + '>' + m + '월</option>';
 
-  function findPeriod(slot) {
-    var mm = slot.match(/(\d+):(\d+)/); if (!mm) return 0;
-    var tMin = parseInt(mm[1]) * 60 + parseInt(mm[2]), best = 0;
-    customPeriods.forEach(function(cp) {
-      if (!cp.time) return;
-      var ms = cp.time.match(/(\d+):(\d+)/); if (!ms) return;
-      var cpMin = parseInt(ms[1]) * 60 + parseInt(ms[2]);
-      var cpEnd = cp.endTime ? (function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;return parseInt(em[1])*60+parseInt(em[2]);})() : cpMin + 60;
-      if (tMin >= cpMin && tMin < cpEnd) best = cp.period;
-    });
-    return best;
-  }
+
 
   var html = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
     + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
@@ -3177,7 +3166,7 @@ function renderDashMonthly(){
   var thisMonEnd=nextYr+'-'+nextMo+'-01';
   var today=todayISO();
 
-  function card(title,color,content,link){
+  function card_dash(title,color,content,link){
     var linkBtn=link?'<button onclick="'+link.fn+'" style="font-size:11px;color:'+color+';background:none;border:1px solid '+color+'44;border-radius:6px;padding:2px 8px;cursor:pointer;flex-shrink:0">'+link.label+' →</button>':'';
     return '<div style="background:var(--surface);border:1.5px solid '+color+'33;border-radius:12px;margin-bottom:12px;overflow:hidden">'
       +'<div style="background:'+color+'15;padding:8px 14px;display:flex;align-items:center;gap:8px">'
@@ -3359,11 +3348,11 @@ function renderDashMonthly(){
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">'+yr+'년 '+mo+'월 이달의 계획</div>'
     +'<div style="font-size:11px;color:var(--txt3)">4가지 기준을 확인하고 이번 달 중점 업무를 선정하세요</div>'
     +'</div>'
-    +card('① 이번 달 학사일정','#3b82f6',calHTML,{label:'학사일정 전체 보기',fn:"goto('acal')"})
-    +card('② 목표 달성률','#10b981',goalHTML,{label:'목표 관리',fn:"goto('goals')"})
-    +card('③ 참고할 플랜','#f59e0b',planHTML)
-    +card('④ 전월 미완료 업무','#ef4444',overdueHTML)
-    +card('🎯 이달의 중점 업무','#7c3aed',focusHTML,{label:'중점 추진 탭',fn:"_dbView='focus';_renderDashBoardUI($('dashboard-board-area'));switchDashTab('board')"})
+    +card_dash('① 이번 달 학사일정','#3b82f6',calHTML,{label:'학사일정 전체 보기',fn:"goto('acal')"})
+    +card_dash('② 목표 달성률','#10b981',goalHTML,{label:'목표 관리',fn:"goto('goals')"})
+    +card_dash('③ 참고할 플랜','#f59e0b',planHTML)
+    +card_dash('④ 전월 미완료 업무','#ef4444',overdueHTML)
+    +card_dash('🎯 이달의 중점 업무','#7c3aed',focusHTML,{label:'중점 추진 탭',fn:"_dbView='focus';_renderDashBoardUI($('dashboard-board-area'));switchDashTab('board')"})
     +'</div>';
 }
 function renderCrmDaily(){
@@ -4035,10 +4024,7 @@ function fmt12h(t){
   var h12=h%12||12;
   return h12+':'+ms;
 }
-function _fmt12hRange(t){
-  if(!t)return t;
-  return t.split('~').map(function(p){return fmt12h(p.trim());}).join('~');
-}
+
 function renderSchedule(){
   try{
   var schedList=$('schedule-list');
@@ -4543,7 +4529,7 @@ async function renderPfForm(sId){
     return '';
   }
 
-  function questionBlock(q,idx){
+  function questionBlock_consult(q,idx){
     var qData=d[q.id]||{};
     var editBtn='<button class="btn btn-outline btn-xs" onclick="_editConsultQ(\''+idx+'\')" style="font-size:10px;margin-left:6px">✏️</button>';
     var html='<div class="question-block" data-qidx="'+idx+'" style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
@@ -5807,17 +5793,18 @@ function renderSpecialPeriodInputs(){
     var tM2=tVal2&&tVal2.split(':')[1]?tVal2.split(':')[1]:'00';
     var hOpts2='<option value="">시</option>'+[10,11,12,13,14,15,16,17,18,19,20,21,22].map(function(h){return'<option value="'+h+'"'+(String(h)===tH2?' selected':'')+'>'+h+'시</option>';}).join('');
     var mOpts2=['00','10','20','30','40','50'].map(function(m){return'<option value="'+m+'"'+(m===tM2?' selected':'')+'>'+m+'분</option>';}).join('');
-    return '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;flex-wrap:wrap">'
-      +'<span style="font-size:12px;font-weight:600;color:#92400e;min-width:20px">'+day+'</span>'
-      +'<select class="fi" id="sper-num-'+day+'" style="width:50px;font-size:11px;padding:4px 2px">'
+    return '<div style="margin-bottom:8px">'
+      +'<div style="font-size:10px;color:var(--txt3);margin-bottom:3px">'+day+'요일</div>'
+      +'<div style="display:flex;align-items:center;gap:4px">'
+      +'<select class="fi" id="sper-num-'+day+'" style="width:60px;font-size:11px;padding:4px 2px">'
       +[{v:-1,l:'특강 1'},{v:-2,l:'특강 2'},{v:-3,l:'특강 3'},{v:1,l:'1교시'},{v:2,l:'2교시'},{v:3,l:'3교시'},{v:4,l:'4교시'},{v:5,l:'5교시'},{v:6,l:'6교시'},{v:7,l:'7교시'},{v:8,l:'8교시'},{v:9,l:'9교시'}].map(function(o){return'<option value="'+o.v+'"'+(String(o.v)===(sv.period||'0')?' selected':'')+'>'+o.l+'</option>';}).join('')
       +'</select>'
       +'<select class="fi" id="sper-time-h-'+day+'" style="width:50px;font-size:11px;padding:4px 1px">'+hOpts2+'</select>'
-      +'<select class="fi" id="sper-time-m-'+day+'" style="width:44px;font-size:11px;padding:4px 1px">'+mOpts2+'</select>'
+      +'<select class="fi" id="sper-time-m-'+day+'" style="width:56px;font-size:11px;padding:5px 2px"><option value="00">00분</option>'+mOpts2.replace('<option value="00"','<option value="00" disabled')+'</select>'
       +'<select class="fi" id="sper-hours-'+day+'" style="width:44px;font-size:11px;padding:4px 2px" onchange="updateSpecialHours()">'
       +['0','1','1.5','2','2.5','3'].map(function(h){return'<option value="'+h+'"'+(h===(sv.hours||'1')?' selected':'')+'>'+h+'시수</option>';}).join('')
       +'</select>'
-      +'</div>';
+      +'</div></div>';
   }).join('');
 }
 function updateSpecialHours(){
@@ -6523,36 +6510,7 @@ async function deleteMakeupEntry(){
   loading(false);saveCacheDebounced();toast('🗑 삭제 완료');
 }
 
-async function autoCreateAbsentReport(studentId,dateStr){
-  var s=students.find(function(x){return x.id===studentId;});if(!s)return;
-  var d=new Date(dateStr+'T12:00:00');
-  var dayNames=['일','월','화','수','목','금','토'];
-  var dn=dayNames[d.getDay()];
 
-  // 해당 요일의 모든 수업 시간 수집 (본수업 + 특강 + 오른쪽 패널)
-  var sessionTimes=[];
-  var pData=(s.periods||{})[dn];
-  if(pData&&typeof pData==='object'&&pData.time) sessionTimes.push(pData.time);
-  var spData=(s.specialPeriods||{})[dn];
-  if(spData&&spData.time) sessionTimes.push(spData.time);
-  // 세션 타임이 없으면 빈 문자열로 1개 처리
-  if(!sessionTimes.length) sessionTimes.push('');
-
-  for(var i=0;i<sessionTimes.length;i++){
-    var sessionTime=sessionTimes[i];
-    var existRep=reports.find(function(r){
-      return r.studentId===studentId&&r.date===dateStr&&(r.sessionTime||'')===(sessionTime||'');
-    });
-    if(!existRep){
-      var newRep={studentId:studentId,studentName:s.name,classId:s.classId||'',date:dateStr,sessionTime:sessionTime,teacher:s.teacher||'',teacherTablet:'',teacherBook:'',level:getStudentLevel(s),progress:'',absent:true,earlyLeave:false,absentReason:'보강 예정',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:getEvalModuleForLevel(getStudentLevel(s))||'',evalItems:{},praise:[],autoCreated:true,createdAt:new Date().toISOString()};
-      var ref=await db.collection('reports').add(newRep);
-      reports.push(Object.assign({},newRep,{id:ref.id}));
-    }else if(!existRep.absent){
-      await db.collection('reports').doc(existRep.id).update({absent:true,absentReason:'보강 예정',updatedAt:new Date().toISOString()});
-      existRep.absent=true;
-    }
-  }
-}
 
 
 function renderSpecialPage(){
@@ -7000,7 +6958,7 @@ async function renderConsultSurveyForm(sIdOrName){
   var t=_consultFormTemplate;
   var d=_consultFormData[docId]||{};
 
-  function questionBlock(q){
+  function questionBlock_eval(q){
     var html='<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
       +'<div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:6px">'+q.text+'</div>';
     if(q.type==='radio'){
@@ -7031,7 +6989,7 @@ async function renderConsultSurveyForm(sIdOrName){
   el.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">'
     +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">📝 학부모 설문</div>'
     +inflowHtml
-    +t.questions.map(questionBlock).join('')
+    +t.questions.map(questionBlock_eval).join('')
     +'</div>'
     +'<button class="btn btn-navy btn-block" onclick="_saveConsultFormData(\''+docId+'\')">💾 저장</button>';
 }
@@ -7299,7 +7257,7 @@ function renderNewConsultStats(){
   var convRate=total>0?Math.round(registered/total*100):0;
   var avgDays=dayCount>0?Math.round(totalDays/dayCount):0;
   var periodLabel=(yr?yr+'년 ':'')+( mo?parseInt(mo)+'월 기준':'전체 기간 기준');
-  function bar(val,tot,color){var pct=tot>0?Math.round(val/tot*100):0;return'<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;background:var(--border);border-radius:4px;height:6px;overflow:hidden"><div style="width:'+pct+'%;background:'+color+';height:100%;border-radius:4px"></div></div><span style="font-size:10px;color:var(--txt3);min-width:28px;text-align:right">'+pct+'%</span></div>';}
+  function bar_stat(val,tot,color){var pct=tot>0?Math.round(val/tot*100):0;return'<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;background:var(--border);border-radius:4px;height:6px;overflow:hidden"><div style="width:'+pct+'%;background:'+color+';height:100%;border-radius:4px"></div></div><span style="font-size:10px;color:var(--txt3);min-width:28px;text-align:right">'+pct+'%</span></div>';}
   var statsEl=$('nc-stats-area');if(!statsEl)return;
   statsEl.innerHTML=
     '<div style="font-size:11px;color:var(--txt3);margin-bottom:10px">📅 '+periodLabel+'</div>'
@@ -7324,11 +7282,11 @@ function renderNewConsultStats(){
       +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">🔍 문의 분석</div>'
       +'<div style="display:flex;gap:16px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:120px"><div style="font-size:11px;font-weight:600;color:var(--txt2);margin-bottom:6px">학년 분포</div>'
-      +Object.keys(gradeMap).filter(function(k){return gradeMap[k]>0;}).map(function(k){return'<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+k+'</span><span style="font-weight:700">'+gradeMap[k]+'명</span></div>'+bar(gradeMap[k],total,'#3b82f6')+'</div>';}).join('')+'</div>'
+      +Object.keys(gradeMap).filter(function(k){return gradeMap[k]>0;}).map(function(k){return'<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+k+'</span><span style="font-weight:700">'+gradeMap[k]+'명</span></div>'+bar_stat(gradeMap[k],total,'#3b82f6')+'</div>';}).join('')+'</div>'
       +'<div style="flex:1;min-width:120px"><div style="font-size:11px;font-weight:600;color:var(--txt2);margin-bottom:6px">유입 경로</div>'
-      +Object.entries(inflowMap).sort(function(a,b){return b[1]-a[1];}).map(function(e){return'<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+e[0]+'</span><span style="font-weight:700">'+e[1]+'건</span></div>'+bar(e[1],total,'#10b981')+'</div>';}).join('')+'</div>'
+      +Object.entries(inflowMap).sort(function(a,b){return b[1]-a[1];}).map(function(e){return'<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+e[0]+'</span><span style="font-weight:700">'+e[1]+'건</span></div>'+bar_stat(e[1],total,'#10b981')+'</div>';}).join('')+'</div>'
       +'<div style="flex:1;min-width:120px"><div style="font-size:11px;font-weight:600;color:var(--txt2);margin-bottom:6px">담당자별</div>'
-      +Object.entries(teacherMap).sort(function(a,b){return b[1]-a[1];}).map(function(e){return'<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+e[0]+'</span><span style="font-weight:700">'+e[1]+'건</span></div>'+bar(e[1],total,'#8b5cf6')+'</div>';}).join('')+'</div>'
+      +Object.entries(teacherMap).sort(function(a,b){return b[1]-a[1];}).map(function(e){return'<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+e[0]+'</span><span style="font-weight:700">'+e[1]+'건</span></div>'+bar_stat(e[1],total,'#8b5cf6')+'</div>';}).join('')+'</div>'
       +'</div></div>'
     :'<div style="padding:16px;text-align:center;color:var(--txt3);font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">해당 기간 상담 데이터가 없습니다.</div>');
   var listEl=$('new-consult-list');if(!listEl)return;
@@ -9154,13 +9112,13 @@ async function aiConsultSummary(studentId,mode){
     var graphHTML='';
     if(mode==='monthly'&&window._aiMonthlyStats){
       var st=window._aiMonthlyStats;
-      function bar(label,val,color){return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+label+'</span><span style="font-weight:700">'+val+'%</span></div><div style="background:#e5e7eb;border-radius:4px;height:14px;overflow:hidden"><div style="background:'+color+';height:100%;width:'+val+'%;border-radius:4px;transition:width .5s"></div></div></div>';}
+      function bar_report(label,val,color){return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+label+'</span><span style="font-weight:700">'+val+'%</span></div><div style="background:#e5e7eb;border-radius:4px;height:14px;overflow:hidden"><div style="background:'+color+';height:100%;width:'+val+'%;border-radius:4px;transition:width .5s"></div></div></div>';}
       graphHTML='<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">'
         +'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">📊 영역별 성취도 그래프</div>'
-        +bar('숙제 완료율',st.hwRate,'#10b981')
-        +bar('수업 태도',st.attAvg,'#3b82f6')
-        +bar('복습 테스트',st.revAvg,'#f59e0b')
-        +bar('진도 달성률',st.progressRate,'#8b5cf6')
+        +bar_report('숙제 완료율',st.hwRate,'#10b981')
+        +bar_report('수업 태도',st.attAvg,'#3b82f6')
+        +bar_report('복습 테스트',st.revAvg,'#f59e0b')
+        +bar_report('진도 달성률',st.progressRate,'#8b5cf6')
         +'<div style="font-size:10px;color:var(--txt3);margin-top:6px;text-align:right">총 '+st.totalClasses+'회 수업 기준</div></div>';
       // Weekly trend mini chart
       var weeks={};st.reps.forEach(function(r2){
@@ -10740,7 +10698,7 @@ function _mfmRenderStep1(overlay){
   if(projectGuides.length){tmplOpts+='<optgroup label="── 프로젝트형">';projectGuides.forEach(function(g){tmplOpts+='<option value="'+g.id+'">'+g.icon+' '+g.name+'</option>';});tmplOpts+='</optgroup>';}
   if(repeatGuides.length){tmplOpts+='<optgroup label="── 반복형">';repeatGuides.forEach(function(g){tmplOpts+='<option value="'+g.id+'">'+g.icon+' '+g.name+'</option>';});tmplOpts+='</optgroup>';}
 
-  function card(title,color,content){
+  function card_ref(title,color,content){
     return '<div style="border:1.5px solid '+color+'55;border-radius:10px;overflow:hidden;margin-bottom:10px">'
       +'<div style="background:'+color+'18;padding:8px 12px;font-size:12px;font-weight:700;color:'+color+'">'+title+'</div>'
       +'<div style="padding:10px 12px;background:var(--surface)">'+content+'</div></div>';
@@ -10777,19 +10735,19 @@ function _mfmRenderStep1(overlay){
     +'<div class="mt">이달의 중점 업무 추가 <span style="font-size:11px;color:var(--txt3);font-weight:400">1/2 선정 근거 확인</span></div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">4가지 기준을 확인하고 이번 달 중점 업무를 선정하세요.</div>'
 
-    +card('① 연간 학사일정 — 이번 달에 반드시 해야 하는 것은?','#3b82f6',calHtml)
+    +card_ref('① 연간 학사일정 — 이번 달에 반드시 해야 하는 것은?','#3b82f6',calHtml)
 
-    +card('② 연간·월간 목표 — 이번 달에 달성해야 하는 결과는?','#10b981',
+    +card_ref('② 연간·월간 목표 — 이번 달에 달성해야 하는 결과는?','#10b981',
       '<textarea class="fi" id="mfm-goal-memo" rows="2" style="font-size:12px" placeholder="예: 신규 등록 5명, 상담 10건, 블로그 8건 게시">'+(_mfm_state.goalMemo||'')+'</textarea>'
       +'<div style="font-size:10px;color:var(--txt3);margin-top:4px">목표 관리 페이지의 이번 달 목표를 참고하세요</div>'
     )
 
-    +card('③ 영역별 플랜 — 이번 달에 계획된 활동은?','#f59e0b',
+    +card_ref('③ 영역별 플랜 — 이번 달에 계획된 활동은?','#f59e0b',
       '<textarea class="fi" id="mfm-plan-memo" rows="2" style="font-size:12px" placeholder="예: 블로그 8건, 인스타 8건, 네이버 사진 업데이트, 카톡 메시지 발송">'+(_mfm_state.planMemo||'')+'</textarea>'
       +'<div style="font-size:10px;color:var(--txt3);margin-top:4px">온라인 홍보 플랜, 업무 계획 등을 참고하세요</div>'
     )
 
-    +card('④ 현재 현황·전월 미완료 — 보완해야 하는 것은?','#ef4444',
+    +card_ref('④ 현재 현황·전월 미완료 — 보완해야 하는 것은?','#ef4444',
       overdueHtml
       +'<textarea class="fi" id="mfm-status-memo" rows="2" style="font-size:12px;margin-top:8px" placeholder="예: 신규 상담 실적 부족, 보강 누락, 학부모 연락 미완료">'+(_mfm_state.statusMemo||'')+'</textarea>'
     )
@@ -10842,8 +10800,8 @@ function mfmToggleOverdue(id,checked){
   if(checked&&idx<0)_mfm_state.overdueIds.push(id);
   else if(!checked&&idx>=0)_mfm_state.overdueIds.splice(idx,1);
 }
-function mfmOnPlanChange(val){_mfm_state.planType=val;}
-function mfmOnScheduleSelect(id){_mfm_state.scheduleId=id;}
+
+
 function mfmOnTemplateChange(key){
   _mfm_state.templateKey=key;
   var info=document.getElementById('mfm-repeat-info');
@@ -13275,50 +13233,7 @@ function openAcalAddModal(editId,defaultMo){
 }
 
 
-function confirmAcalAdd(overlay,editId){
-  var title=($('acal-title')||{}).value||'';
-  var cat=($('acal-cat')||{}).value||'';
-  var manager=($('acal-manager')||{}).value||'';
-  var manager2=($('acal-manager2')||{}).value||'';
-  var note=($('acal-note')||{}).value||'';
-  if(!title.trim()){toast('제목을 입력하세요');return;}
-  var yr=window._acalYr||new Date().getFullYear();
-  var date=($('acal-date')||{}).value||'';
-  var dateEnd=($('acal-date-end')||{}).value||'';
-  var prepStart=($('acal-prep-start')||{}).value||'';
-  var repeatRuleVal=(($('acal-repeat-rule')||{}).value||'없음');
-  var annualRep=document.getElementById('acal-annual-repeat');
-  var hasRepeat=repeatRuleVal&&repeatRuleVal!=='없음';
-  // acalType: 반복 규칙이 있으면 repeat, 없으면 project
-  var acalType=hasRepeat?'repeat':'project';
-  var startMo=date?date.slice(5,7):String(new Date().getMonth()+1).padStart(2,'0');
-  var evt={
-    id:editId||Date.now().toString(36),
-    acalType:acalType,
-    title:title,cat:cat,manager:manager,manager2:manager2,note:note,
-    date:date||(yr+'-'+startMo+'-01'),
-    startMonth:startMo,
-    repeatRule:hasRepeat?repeatRuleVal:'',
-    annualRepeat:annualRep?annualRep.checked:false
-  };
-  if(dateEnd&&dateEnd!==date)evt.endDate=dateEnd; else delete evt.endDate;
-  if(prepStart)evt.prepStartDate=prepStart; else delete evt.prepStartDate;
-  if(!_academicCalendar)_academicCalendar={events:[]};
-  if(editId){
-    var idx=_academicCalendar.events.findIndex(function(e){return e.id===editId;});
-    if(idx>=0)_academicCalendar.events[idx]=evt;
-    else _academicCalendar.events.push(evt);
-  }else{
-    _academicCalendar.events.push(evt);
-  }
-  saveAcademicCalendar();
-  overlay.remove();
-  var acalEl=$('acal-main-area');
-  if(acalEl)_renderAcademicCalendarUI(acalEl);
-  var _calEl2=$('dashboard-calendar-area');
-  if(_calEl2)_renderAcademicCalendarUI(_calEl2);
-  toast('저장됐어요');
-}
+
 
 
 // ── 플랜 관리 ─────────────────────────────────────────
