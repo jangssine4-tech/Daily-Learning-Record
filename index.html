@@ -6082,7 +6082,9 @@ function openStudentModal(id){
   $('modal-student').style.display='flex';
 }
 async function saveStudent(){
-  var name=$('s-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}loading(true);
+  var name=$('s-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}
+  var t0=performance.now();
+  loading(true);
   var selectedDays=[...document.querySelectorAll('#s-days .day-pill.on')].map(function(el){return el.dataset.day;});
   var periods={};var weeklyHours=0;selectedDays.forEach(function(day){
     var pNum=$('per-num-'+day);
@@ -6110,24 +6112,37 @@ async function saveStudent(){
     }
   }
   try{
+    var t1=performance.now();
+    console.log('[saveStudent] 데이터 준비: '+(t1-t0).toFixed(0)+'ms');
     if(id){
       await db.collection('students').doc(id).update(data);
+      var t2=performance.now();
+      console.log('[saveStudent] Firestore update: '+(t2-t1).toFixed(0)+'ms');
       var idx=students.findIndex(function(x){return x.id===id;});
       if(idx>=0)students[idx]=Object.assign({},students[idx],data);
     }else{
       var ref=await db.collection('students').add(Object.assign({},data,{createdAt:new Date().toISOString()}));
+      var t2=performance.now();
+      console.log('[saveStudent] Firestore add: '+(t2-t1).toFixed(0)+'ms');
       students.push(Object.assign({id:ref.id},data,{createdAt:new Date().toISOString()}));
     }
     _fullyPopulated=false;
-    // 모달 먼저 닫고 나서 렌더링 — UI 블로킹 방지
     closeM('student');
     loading(false);
     toast('✅ 저장됨');
+    var t3=performance.now();
+    console.log('[saveStudent] closeM+toast: '+(t3-t2).toFixed(0)+'ms');
     saveCacheDebounced();
     setTimeout(function(){
+      var t4=performance.now();
       renderStudents();
+      var t5=performance.now();
+      console.log('[saveStudent] renderStudents: '+(t5-t4).toFixed(0)+'ms');
       var schedEl=$('view-schedule');
-      if(schedEl&&schedEl.style.display!=='none')renderSchedule();
+      if(schedEl&&schedEl.style.display!=='none'){
+        renderSchedule();
+        console.log('[saveStudent] renderSchedule: '+(performance.now()-t5).toFixed(0)+'ms');
+      }
     },50);
   }catch(e){
     console.error('saveStudent error:',e);
