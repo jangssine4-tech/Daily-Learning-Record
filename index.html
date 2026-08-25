@@ -7339,29 +7339,34 @@ function runAssignPanel(){
       }
       if(hasConsec)return;
     }
-    if(optSame){
-      okPrds.forEach(function(prd){
-        var fits=dayCombo.map(function(day){return validCombos.find(function(c){return c.day===day&&c.prd===prd;});});
-        if(fits.every(Boolean)){
-          candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
-            score:_calcScore(fits,optBal,MAX_CAP),
-            minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
-            totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
-        }
-      });
-    }
-    if(!optSame||!candidates.length){
+    // 같은 교시 조합 — 선택된 각 교시마다 후보 생성
+    okPrds.forEach(function(prd){
+      var fits=dayCombo.map(function(day){return validCombos.find(function(c){return c.day===day&&c.prd===prd;});});
+      if(fits.every(Boolean)){
+        var sc=_calcScore(fits,optBal,MAX_CAP);
+        if(optSame)sc+=20; // 같은 교시 통일 우선 옵션 시 가산
+        candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
+          score:sc,
+          minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
+          totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
+      }
+    });
+    // 교시 혼합 조합 — 요일마다 가장 여유 있는 교시 선택
+    (function(){
       var bestFits=dayCombo.map(function(day){
         var df=validCombos.filter(function(c){return c.day===day;});
         return df.sort(function(a,b){return b.minAvail-a.minAvail;})[0];
       });
-      if(bestFits.every(Boolean)){
-        candidates.push({days:dayCombo,prd:null,fits:bestFits,samePeriod:false,
-          score:_calcScore(bestFits,optBal,MAX_CAP),
-          minAvail:Math.min.apply(null,bestFits.map(function(f){return f.minAvail;})),
-          totalAvail:bestFits.reduce(function(s,f){return s+f.minAvail;},0)});
-      }
-    }
+      if(!bestFits.every(Boolean))return;
+      // 모두 같은 교시면 이미 위에서 추가됐으므로 중복 방지
+      var prds=bestFits.map(function(f){return f.prd;});
+      var allSame=prds.every(function(p){return p===prds[0];});
+      if(allSame)return; // 동일 교시는 위 브랜치에서 처리됨
+      candidates.push({days:dayCombo,prd:null,fits:bestFits,samePeriod:false,
+        score:_calcScore(bestFits,optBal,MAX_CAP),
+        minAvail:Math.min.apply(null,bestFits.map(function(f){return f.minAvail;})),
+        totalAvail:bestFits.reduce(function(s,f){return s+f.minAvail;},0)});
+    })();
   });
 
   candidates.sort(function(a,b){return b.score-a.score;});
