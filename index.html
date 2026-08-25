@@ -5744,6 +5744,7 @@ function renderStudents(){
   if(filter)list=list.filter(function(s){return getDisplayStatus(s)===filter;});
   if(cls2)list=list.filter(function(s){return s.classId===cls2;});
   if(search)list=list.filter(function(s){return s.name.toLowerCase().includes(search);});
+  list=list.slice().sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
   var statusColor={신규:'bg-mint',재원:'bg-green',휴원:'bg-gold',퇴원:'bg-red'};
   var tb=$('students-tbody');
   if(!list.length){tb.innerHTML='<tr><td colspan="11"><div class="empty"><div class="ei">👥</div><div class="et">학생 없음</div></div></td></tr>';return;}
@@ -5806,7 +5807,7 @@ function renderSpecialPeriodInputs(){
       +[{v:-1,l:'특강 1'},{v:-2,l:'특강 2'},{v:-3,l:'특강 3'},{v:1,l:'1교시'},{v:2,l:'2교시'},{v:3,l:'3교시'},{v:4,l:'4교시'},{v:5,l:'5교시'},{v:6,l:'6교시'},{v:7,l:'7교시'},{v:8,l:'8교시'},{v:9,l:'9교시'}].map(function(o){return'<option value="'+o.v+'"'+(String(o.v)===(sv.period||'0')?' selected':'')+'>'+o.l+'</option>';}).join('')
       +'</select>'
       +'<select class="fi" id="sper-time-h-'+day+'" style="width:50px;font-size:11px;padding:4px 1px">'+hOpts2+'</select>'
-      +'<select class="fi" id="sper-time-m-'+day+'" style="width:56px;font-size:11px;padding:5px 2px"><option value="00">00분</option>'+mOpts2.replace('<option value="00"','<option value="00" disabled')+'</select>'
+      +'<select class="fi" id="sper-time-m-'+day+'" style="width:56px;font-size:11px;padding:5px 2px"><option value="">분</option>'+mOpts2+'</select>'
       +'<select class="fi" id="sper-hours-'+day+'" style="width:44px;font-size:11px;padding:4px 2px" onchange="updateSpecialHours()">'
       +['0','1','1.5','2','2.5','3'].map(function(h){return'<option value="'+h+'"'+(h===(sv.hours||'1')?' selected':'')+'>'+h+'시수</option>';}).join('')
       +'</select>'
@@ -5849,7 +5850,7 @@ function getSpecialPeriods(){
     var tM=$('sper-time-m-'+day);
     var h=ph&&ph.value!==undefined&&ph.value!==''?parseFloat(ph.value):1;
     var pVal=pn?parseInt(pn.value)||0:0;
-    var tFinal=(tH&&tH.value)?tH.value+':'+(tM?tM.value:'00'):'';
+    var tFinal=(tH&&tH.value)?tH.value+':'+(tM&&tM.value?tM.value:'00'):'';
     if(pVal>0||tFinal)specialPeriods[day]={period:pVal,time:tFinal,hours:h};
     total+=h;
   });
@@ -6034,7 +6035,7 @@ function renderPeriodInputs(){var selectedDays=[...document.querySelectorAll('#s
     return'<div style=\"margin-bottom:8px\"><div style=\"font-size:10px;color:var(--txt3);margin-bottom:3px\">'+day+'요일</div><div style=\"display:flex;align-items:center;gap:4px\">'
       +'<select class=\"fi\" id=\"per-num-'+day+'\" style=\"width:60px;font-size:11px;padding:4px 2px\">'+[{v:-1,l:'특강 1'},{v:-2,l:'특강 2'},{v:-3,l:'특강 3'},{v:1,l:'1교시'},{v:2,l:'2교시'},{v:3,l:'3교시'},{v:4,l:'4교시'},{v:5,l:'5교시'},{v:6,l:'6교시'},{v:7,l:'7교시'},{v:8,l:'8교시'},{v:9,l:'9교시'}].map(function(o){return'<option value=\"'+o.v+'\"'+(String(o.v)===(sv.period||'1')?' selected':'')+'>'+o.l+'</option>';}).join('')+'</select>'
       +'<select class=\"fi\" id=\"per-time-h-'+day+'\" style=\"width:50px;font-size:11px;padding:4px 1px\">'+hourOpts+'</select>'
-      +'<select class=\"fi\" id=\"per-time-m-'+day+'\" style=\"width:56px;font-size:11px;padding:5px 2px\"><option value=\"00\">00분</option>'+minOpts.replace('<option value=\"00\"','<option value=\"00\" disabled')+'</select>'
+      +'<select class=\"fi\" id=\"per-time-m-'+day+'\" style=\"width:56px;font-size:11px;padding:5px 2px\"><option value=\"\">분</option>'+minOpts+'</select>'
       +'<select class=\"fi\" id=\"per-hours-'+day+'\" style=\"width:44px;font-size:11px;padding:4px 2px\" onchange=\"updateWeeklyHours()\"><option value=\"0\"'+(sv.hours==='0'?' selected':'')+'>0시수</option><option value=\"1\"'+(sv.hours==='1'||!sv.hours?' selected':'')+'>1시수</option><option value=\"1.5\"'+(sv.hours==='1.5'?' selected':'')+'>1.5시수</option><option value=\"2\"'+(sv.hours==='2'?' selected':'')+'>2시수</option><option value=\"2.5\"'+(sv.hours==='2.5'?' selected':'')+'>2.5시수</option><option value=\"3\"'+(sv.hours==='3'?' selected':'')+'>3시수</option></select>'
       +'</div></div>';
   }).join('');
@@ -6090,7 +6091,7 @@ async function saveStudent(){
     var pMin=$('per-time-m-'+day);
     var pHours=$('per-hours-'+day);
     var h=pHours&&pHours.value!==''?parseFloat(pHours.value):1;
-    var timeVal=(pHour&&pHour.value)?pHour.value+':'+(pMin?pMin.value:'00'):'';
+    var timeVal=(pHour&&pHour.value)?pHour.value+':'+(pMin&&pMin.value?pMin.value:'00'):'';
     periods[day]={period:parseInt(pNum?.value)||1,time:timeVal,hours:h};
     weeklyHours+=h;
   });
