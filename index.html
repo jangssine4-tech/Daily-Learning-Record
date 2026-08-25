@@ -7166,23 +7166,18 @@ function renderWeeklySchedule(){
       }
       if(!pTime) return;
       var m=pTime.match(/(\d{1,2}):(\d{2})/);if(!m) return;
-      var hr=parseInt(m[1]),mn=parseInt(m[2]);
-      mn=mn>=30?30:0;
-      var slotKey=String(hr).padStart(2,'0')+':'+String(mn).padStart(2,'0');
-      allTimes.add(slotKey);
-      slotGrid[slotKey+'_'+day]=(slotGrid[slotKey+'_'+day]||0)+1;
+      var hr=parseInt(m[1]),mn=parseInt(m[2]);mn=mn>=30?30:0;
+      var sk=String(hr).padStart(2,'0')+':'+String(mn).padStart(2,'0');
+      allTimes.add(sk);slotGrid[sk+'_'+day]=(slotGrid[sk+'_'+day]||0)+1;
     });
     if(s.specialPeriods){
       Object.keys(s.specialPeriods).forEach(function(day){
-        var sp=s.specialPeriods[day];
-        var spTime=sp&&sp.time?sp.time:'';
+        var sp=s.specialPeriods[day];var spTime=sp&&sp.time?sp.time:'';
         if(!spTime) return;
         var m2=spTime.match(/(\d{1,2}):(\d{2})/);if(!m2) return;
-        var hr2=parseInt(m2[1]),mn2=parseInt(m2[2]);
-        mn2=mn2>=30?30:0;
-        var slotKey2=String(hr2).padStart(2,'0')+':'+String(mn2).padStart(2,'0');
-        allTimes.add(slotKey2);
-        slotGrid[slotKey2+'_'+day]=(slotGrid[slotKey2+'_'+day]||0)+1;
+        var hr2=parseInt(m2[1]),mn2=parseInt(m2[2]);mn2=mn2>=30?30:0;
+        var sk2=String(hr2).padStart(2,'0')+':'+String(mn2).padStart(2,'0');
+        allTimes.add(sk2);slotGrid[sk2+'_'+day]=(slotGrid[sk2+'_'+day]||0)+1;
       });
     }
   });
@@ -7192,8 +7187,7 @@ function renderWeeklySchedule(){
       if(ms&&me){
         var startMin=parseInt(ms[1])*60+parseInt(ms[2]),endMin=parseInt(me[1])*60+parseInt(me[2]);
         for(var t=startMin;t<endMin;t+=30){
-          var hh=Math.floor(t/60),mm=t%60;
-          allTimes.add(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'));
+          allTimes.add(String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));
         }
       }
     }
@@ -7204,20 +7198,34 @@ function renderWeeklySchedule(){
   });
   if(!sortedTimes.length){el.innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">교시 시간 설정을 먼저 해주세요</div></div>';return;}
 
-  // 특강 슬롯별 합산 (학생 없으면 숨김)
+  // 특강 슬롯 합산
   var specialSlotTotal={};
   sortedTimes.forEach(function(slot){
     var prd=findPeriod(slot);
     if(prd<0) specialSlotTotal[slot]=days.reduce(function(sum,day){return sum+(slotGrid[slot+'_'+day]||0);},0);
   });
 
+  // 교시별 요일별 잔여석 합산 사전 계산
+  // periodDayAvail[prd][day] = 해당 교시+요일의 전체 슬롯 잔여석 합
+  var periodDayAvail={};
+  sortedTimes.forEach(function(slot){
+    var prd=findPeriod(slot);
+    if(prd===0) return;
+    if(!periodDayAvail[prd]) periodDayAvail[prd]={};
+    days.forEach(function(day){
+      var cnt=slotGrid[slot+'_'+day]||0;
+      var avail=Math.max(MAX_CAP-cnt,0);
+      periodDayAvail[prd][day]=(periodDayAvail[prd][day]||0)+avail;
+    });
+  });
+
   // 셀 표시 헬퍼
   function cellDisplay(cnt){
-    var avail=MAX_CAP-cnt;
-    var over=cnt-MAX_CAP;
-    if(avail>0)  return {label:cnt+'/'+MAX_CAP, sub:'여유 '+avail, color:'#16a34a', bg:'#f0fdf4'};
-    if(avail===0)return {label:cnt+'/'+MAX_CAP, sub:'마감',   color:'#dc2626', bg:'#fff0f0'};
-    return          {label:cnt+'/'+MAX_CAP, sub:'초과 '+over, color:'#7c2d12', bg:'#fef2f2'};
+    var avail=MAX_CAP-cnt,over=cnt-MAX_CAP;
+    if(avail>1) return{label:cnt+'/'+MAX_CAP,sub:'여유 '+avail,color:'#16a34a',bg:'#f0fdf4'};
+    if(avail===1)return{label:cnt+'/'+MAX_CAP,sub:'여유 1',   color:'#d97706',bg:'#fffbeb'};
+    if(avail===0)return{label:cnt+'/'+MAX_CAP,sub:'마감',     color:'#dc2626',bg:'#fff0f0'};
+    return          {label:cnt+'/'+MAX_CAP,sub:'초과 '+over,  color:'#7c2d12',bg:'#fef2f2'};
   }
 
   var colStyle='text-align:center;padding:8px 6px;min-width:80px';
@@ -7231,16 +7239,33 @@ function renderWeeklySchedule(){
     var prd=findPeriod(slot);
     if(prd<0&&specialSlotTotal[slot]===0) return;
     if(prd!==0&&prd!==lastPeriod){
+      // 특강 교시 전체 0명이면 헤더 숨김
       if(prd<0){
         var prdTotal=sortedTimes.filter(function(sl){return findPeriod(sl)===prd;})
           .reduce(function(sum,sl){return sum+(specialSlotTotal[sl]||0);},0);
         if(prdTotal===0){lastPeriod=prd;return;}
       }
       var pLabel=prd<0?'특강 '+Math.abs(prd):prd+'교시';
-      tbody+='<tr><td colspan="'+(days.length+1)+'" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;text-align:center">'+pLabel+'</td></tr>';
+      // 교시 헤더 — 요일별 잔여석 요약
+      var dayAvail=periodDayAvail[prd]||{};
+      var summaryParts=days.map(function(day){
+        var avail=dayAvail[day]||0;
+        var color=avail===0?'#fca5a5':avail<=2?'#fde68a':'#bbf7d0';
+        return '<span style="background:'+color+';color:#1e293b;border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700">'+day+' '+avail+'석</span>';
+      }).join(' ');
+      tbody+='<tr>'
+        +'<td colspan="'+(days.length+1)+'" style="background:#1e3a5f;color:#fff;padding:5px 10px">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:11px;font-weight:700;flex-shrink:0">'+pLabel+'</span>'
+        +'<span style="font-size:10px;color:#93c5fd;flex-shrink:0">30분 잔여석</span>'
+        +summaryParts
+        +'</div>'
+        +'</td>'
+        +'</tr>';
       lastPeriod=prd;
     }
-    tbody+='<tr><td style="text-align:center;background:var(--surface2);font-weight:600;font-size:12px;padding:6px;border-right:2px solid var(--border);min-width:90px;white-space:nowrap">'+fmt12h(slot)+'</td>';
+    tbody+='<tr>'
+      +'<td style="text-align:center;background:var(--surface2);font-weight:600;font-size:12px;padding:6px;border-right:2px solid var(--border);min-width:90px;white-space:nowrap">'+fmt12h(slot)+'</td>';
     days.forEach(function(day){
       var cnt=slotGrid[slot+'_'+day]||0;
       var d=cellDisplay(cnt);
@@ -7258,7 +7283,7 @@ function renderWeeklySchedule(){
     days.forEach(function(day){
       var cnt=slotGrid[slot+'_'+day]||0;
       var avail=MAX_CAP-cnt;
-      if(avail>=2)statFree++;
+      if(avail>1)statFree++;
       else if(avail===1)statAlmost++;
       else if(avail===0)statFull++;
       else statOver++;
@@ -7267,7 +7292,6 @@ function renderWeeklySchedule(){
 
   el.innerHTML=''
     +'<div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:10px;text-align:center">📅 상담용 시간표 (수용 현황)</div>'
-    // 범례
     +'<div style="display:flex;gap:10px;justify-content:center;margin-bottom:10px;font-size:11px;flex-wrap:wrap">'
     +'<span style="color:#16a34a">🟢 여유 (2석+)</span>'
     +'<span style="color:#d97706">🟠 잔여 1석</span>'
@@ -7275,7 +7299,6 @@ function renderWeeklySchedule(){
     +'<span style="color:#7c2d12">⚫ 초과</span>'
     +'<span style="color:var(--txt3)">· 30분 정원 '+MAX_CAP+'명</span>'
     +'</div>'
-    // 통계 카드
     +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'
     +'<div style="flex:1;min-width:70px;text-align:center;padding:8px 4px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac">'
     +'<div style="font-size:18px;font-weight:800;color:#16a34a">'+statFree+'</div>'
@@ -7290,7 +7313,6 @@ function renderWeeklySchedule(){
     +'<div style="font-size:18px;font-weight:800;color:#7c2d12">'+statOver+'</div>'
     +'<div style="font-size:10px;color:#7c2d12;font-weight:600">초과</div></div>'
     +'</div>'
-    // 시간표
     +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:600px;border-collapse:collapse;table-layout:fixed;width:100%"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>'
     +'<div style="margin-top:10px;font-size:11px;color:var(--txt3);text-align:right">재원/신규 '+activeS.length+'명 · 학생 정보 수업 요일 기준 자동 반영</div>';
 }
