@@ -7936,31 +7936,42 @@ async function saveNewConsult(){loading(true);
   renderNewConsults();
   loading(false);saveCacheDebounced();
   // 저장 후 수업시간 추천 연동 토스트
-  var savedData=data;
+  var weekly=savedData.weeklyFreq||'3';
   var toastEl=document.createElement('div');
   toastEl.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e3a5f;color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;z-index:9999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,.3)';
-  toastEl.innerHTML='✅ 저장됐어요 &nbsp;<button onclick="linkToAssign('+JSON.stringify({weekly:savedData.weeklyFreq||'3',grade:savedData.grade})+');this.parentNode.remove()" style="background:#fff;color:#1e3a5f;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">📅 수업시간 추천 →</button><button onclick="this.parentNode.remove();closeM(\'newconsult\')" style="background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;margin-left:4px">✕</button>';
+  var btnAssign=document.createElement('button');
+  btnAssign.textContent='📅 수업시간 추천 →';
+  btnAssign.style.cssText='background:#fff;color:#1e3a5f;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer';
+  btnAssign.onclick=function(){linkToAssign({weekly:weekly});toastEl.remove();};
+  var btnClose=document.createElement('button');
+  btnClose.textContent='✕';
+  btnClose.style.cssText='background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;margin-left:4px';
+  btnClose.onclick=function(){toastEl.remove();closeM('newconsult');};
+  var msgSpan=document.createElement('span');
+  msgSpan.textContent='✅ 저장됐어요';
+  toastEl.appendChild(msgSpan);
+  toastEl.appendChild(btnAssign);
+  toastEl.appendChild(btnClose);
   document.body.appendChild(toastEl);
-  setTimeout(function(){if(toastEl.parentNode)toastEl.remove();closeM('newconsult');},6000);
+  setTimeout(function(){if(toastEl.parentNode){toastEl.remove();closeM('newconsult');}},6000);
 }
 function linkToAssign(prefill){
-  // 신규 상담 모달 닫기
   closeM('newconsult');
-  // 수업 관리 > 신규 학생 배정 탭으로 이동
   goto('schedule');
   setTimeout(function(){
     switchSchTab('capacity');
-    // prefill 데이터로 조건 자동 설정
     setTimeout(function(){
       if(prefill&&prefill.weekly){
         var wEl=document.getElementById('ap-weekly');
-        if(wEl)wEl.value=prefill.weekly;
+        if(wEl)wEl.value=String(prefill.weekly);
       }
       runAssignPanel();
     },200);
   },150);
 }
-// ══ end 신규 학생 배정 연동 ══var id=$('nc-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('newConsults').doc(id).delete();newConsults=newConsults.filter(function(x){return x.id!==id;});renderNewConsults();closeM('newconsult');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
+// ══ end 신규 학생 배정 연동 ══
+
+async function deleteNewConsult(){var id=$('nc-id').value;if(!id||!confirm('삭제?'))return;loading(true);await db.collection('newConsults').doc(id).delete();newConsults=newConsults.filter(function(x){return x.id!==id;});renderNewConsults();closeM('newconsult');loading(false);saveCacheDebounced();toast('🗑 삭제됨');}
 
 // ══ REVENUE ══
 function switchSummaryTab(tab){currentSummaryTab=tab;['summary','monthly','expense','staff','tax'].forEach(function(t){var btn=$('stab-'+t);if(btn)btn.classList.toggle('active',t===tab);});$('summary-panel').style.display=tab==='summary'?'':'none';$('monthly-panel').style.display=tab==='monthly'?'flex':'none';$('expense-panel').style.display=tab==='expense'?'':'none';$('staff-panel').style.display=tab==='staff'?'':'none';$('tax-panel').style.display=tab==='tax'?'':'none';
