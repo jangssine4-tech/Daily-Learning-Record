@@ -2957,7 +2957,7 @@ function _doRenderWT(area, data, yr, mo) {
   var moOpts = ''; for (var m = 1; m <= 12; m++) moOpts += '<option value="' + m + '"' + (m === mo ? ' selected' : '') + '>' + m + '월</option>';
 
   // 열 너비: 시간열 70px 고정, 요일열 균등 분배
-  var colW = 'width:' + Math.floor(100/days.length) + '%';
+  var colW = 'width:140px;min-width:140px';
 
   var html = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto">'
     + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
@@ -6150,10 +6150,8 @@ async function saveStudent(){
         var mData=_wtMonthData[wtKey];
         if(mData&&mData.overrides&&mData.overrides[savedId]){
           delete mData.overrides[savedId];
-          // Firestore에도 반영
-          var updateObj={};
-          updateObj['overrides.'+savedId]=firebase.firestore.FieldValue.delete();
-          db.collection('config').doc(wtKey).update(updateObj)
+          // Firestore에도 반영 — 전체 overrides 필드를 갱신
+          db.collection('config').doc(wtKey).update({overrides: mData.overrides})
             .catch(function(e){console.warn('오버라이드 삭제 실패:',e);});
         }
       });
