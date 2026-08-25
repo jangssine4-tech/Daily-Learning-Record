@@ -2991,7 +2991,7 @@ function _doRenderWT(area, data, yr, mo) {
     var prd = findPeriod(ts);
     if (prd !== 0 && prd !== lastPrd) {
       var pLabel = prd < 0 ? '특강 ' + Math.abs(prd) : prd + '교시';
-      html += '<tr><td colspan="' + (days.length + 1) + '" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px">' + pLabel + '</td></tr>';
+      html += '<tr><td colspan="' + (days.length + 1) + '" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;text-align:center">' + pLabel + '</td></tr>';
       lastPrd = prd;
     }
     var h = parseInt(ts.split(':')[0]), mn = parseInt(ts.split(':')[1]);
@@ -7153,11 +7153,9 @@ function renderWeeklySchedule(){
   var days=['월','화','수','목','금','토'];
   var MAX_CAP=4;
   var activeS=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
-  // Build 30-min slot grid: key = "HH:MM_day" → count
   var slotGrid={};
   var allTimes=new Set();
   activeS.forEach(function(s){
-    // 본수업
     (s.days||[]).forEach(function(day){
       var pData=(s.periods||{})[day];var pTime='';
       if(pData&&typeof pData==='object') pTime=pData.time||'';
@@ -7174,7 +7172,6 @@ function renderWeeklySchedule(){
       allTimes.add(slotKey);
       slotGrid[slotKey+'_'+day]=(slotGrid[slotKey+'_'+day]||0)+1;
     });
-    // 특강
     if(s.specialPeriods){
       Object.keys(s.specialPeriods).forEach(function(day){
         var sp=s.specialPeriods[day];
@@ -7189,41 +7186,37 @@ function renderWeeklySchedule(){
       });
     }
   });
-  // Also add slots from customPeriods
   customPeriods.forEach(function(cp){
-    if(cp.time){var m2=cp.time.match(/(\d{1,2}):(\d{2})/);if(m2){var s1=String(parseInt(m2[1])).padStart(2,'0')+':'+String(parseInt(m2[2])>=30?30:0).padStart(2,'0');allTimes.add(s1);}
-    if(cp.endTime){var mn=parseInt(m2[2]);var halfSlot=String(parseInt(m2[1])).padStart(2,'0')+':30';if(mn<30)allTimes.add(halfSlot);}}
-    // Add :30 slot within the period
     if(cp.time&&cp.endTime){
       var ms=cp.time.match(/(\d+):(\d+)/),me=cp.endTime.match(/(\d+):(\d+)/);
-      if(ms&&me){var startMin=parseInt(ms[1])*60+parseInt(ms[2]),endMin=parseInt(me[1])*60+parseInt(me[2]);
-        for(var t=startMin;t<endMin;t+=30){var hh=Math.floor(t/60),mm=t%60;allTimes.add(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'));}}
+      if(ms&&me){
+        var startMin=parseInt(ms[1])*60+parseInt(ms[2]),endMin=parseInt(me[1])*60+parseInt(me[2]);
+        for(var t=startMin;t<endMin;t+=30){
+          var hh=Math.floor(t/60),mm=t%60;
+          allTimes.add(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'));
+        }
+      }
     }
   });
-  var sortedTimes=[...allTimes].sort(function(a,b){var ta=a.split(':'),tb=b.split(':');return(parseInt(ta[0])*60+parseInt(ta[1]))-(parseInt(tb[0])*60+parseInt(tb[1]));});
+  var sortedTimes=[...allTimes].sort(function(a,b){
+    var ta=a.split(':'),tb=b.split(':');
+    return(parseInt(ta[0])*60+parseInt(ta[1]))-(parseInt(tb[0])*60+parseInt(tb[1]));
+  });
   if(!sortedTimes.length){el.innerHTML='<div class="empty"><div class="ei">📅</div><div class="et">교시 시간 설정을 먼저 해주세요</div></div>';return;}
-  // Find which period each slot belongs to
-  function findPeriod(slot){
-    var m=slot.match(/(\d+):(\d+)/);if(!m)return 0;
-    var tMin=parseInt(m[1])*60+parseInt(m[2]);
-    var best=0;
-    customPeriods.forEach(function(cp){
-      if(!cp.time)return;
-      var ms2=cp.time.match(/(\d+):(\d+)/);if(!ms2)return;
-      var cpMin=parseInt(ms2[1])*60+parseInt(ms2[2]);
-      var cpEnd=cp.endTime?(function(){var em=cp.endTime.match(/(\d+):(\d+)/);if(!em)return cpMin+60;return parseInt(em[1])*60+parseInt(em[2]);})():cpMin+60;
-      if(tMin>=cpMin&&tMin<cpEnd)best=cp.period;
-    });
-    return best;
-  }
-  var thead='<tr style="background:#4a6fa5;color:#fff;font-size:12px;font-weight:700"><th style="text-align:center;padding:8px 6px;min-width:80px">시간</th>';
-  days.forEach(function(d){thead+='<th style="text-align:center;padding:8px;min-width:80px">'+d+'</th>';});
+
+  var colStyle='text-align:center;padding:8px 6px;min-width:80px';
+  var thead='<tr style="background:#4a6fa5;color:#fff;font-size:12px;font-weight:700">'
+    +'<th style="'+colStyle+'">시간</th>';
+  days.forEach(function(d){thead+='<th style="'+colStyle+'">'+d+'</th>';});
   thead+='</tr>';
+
   var tbody='';var lastPeriod=0;
   sortedTimes.forEach(function(slot){
     var prd=findPeriod(slot);
     if(prd!==0&&prd!==lastPeriod){
-      tbody+='<tr><td colspan="'+(days.length+1)+'" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;text-align:left">'+(prd<0?'특강 '+Math.abs(prd):prd+'교시')+'</td></tr>';
+      var pLabel=prd<0?'특강 '+Math.abs(prd):prd+'교시';
+      // 교시 헤더 — 가운데 정렬
+      tbody+='<tr><td colspan="'+(days.length+1)+'" style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;text-align:center">'+pLabel+'</td></tr>';
       lastPeriod=prd;
     }
     tbody+='<tr><td style="text-align:center;background:var(--surface2);font-weight:600;font-size:12px;padding:6px;border-right:2px solid var(--border)">'+fmt12h(slot)+'</td>';
@@ -7233,15 +7226,21 @@ function renderWeeklySchedule(){
       var avail=MAX_CAP-cnt;
       var color=avail<=0?'#dc2626':avail<=2?'#d97706':'#16a34a';
       var bg=avail<=0?'#fff0f0':avail<=2?'#fffbeb':'#f0fdf4';
-      tbody+='<td style="text-align:center;padding:6px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);background:'+bg+';font-size:15px;font-weight:700;color:'+color+'">'+cnt+'</td>';
+      // 현재 인원 + 수용 가능 인원 표시
+      var availLabel=avail>0?'<span style="font-size:9px;color:'+color+';display:block;margin-top:1px">(+'+avail+')</span>':'<span style="font-size:9px;color:#dc2626;display:block;margin-top:1px">만석</span>';
+      tbody+='<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);background:'+bg+';">'
+        +'<span style="font-size:15px;font-weight:700;color:'+color+'">'+cnt+'</span>'
+        +availLabel
+        +'</td>';
     });
     tbody+='</tr>';
   });
+
   el.innerHTML='<div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:12px;text-align:center">📅 상담용 시간표 (수용 현황)</div>'
     +'<div style="display:flex;gap:12px;justify-content:center;margin-bottom:10px;font-size:11px">'
     +'<span style="color:#16a34a">● 여유</span><span style="color:#d97706">● 거의 다 참</span><span style="color:#dc2626">● 만석</span>'
-    +'<span style="color:var(--txt3)">· 30분당 정원 '+MAX_CAP+'명</span></div>'
-    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:600px;border-collapse:collapse"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>'
+    +'<span style="color:var(--txt3)">· 30분당 정원 '+MAX_CAP+'명 · (+N)=수용 가능 인원</span></div>'
+    +'<div style="overflow-x:auto"><table class="rev-tbl" style="min-width:600px;border-collapse:collapse;table-layout:fixed;width:100%"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>'
     +'<div style="margin-top:10px;font-size:11px;color:var(--txt3);text-align:right">재원/신규 '+activeS.length+'명 · 학생 정보 수업 요일 기준 자동 반영</div>';
 }
 function renderConsults(){var sId=$('con-filter-student').value;var list=sId?consultations.filter(function(c){return c.studentId===sId;}):consultations;if(!list.length){$('consult-list').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">상담 기록 없음</div></div>';return;}var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green'};$('consult-list').innerHTML=list.map(function(c){var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';var contentPreview=c.content?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">💬 '+c.content.substring(0,50)+(c.content.length>50?'...':'')+'</div>':'';return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openConsultModal(\''+c.id+'\')"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap"><strong>'+c.studentName+'</strong><span style="font-size:11px;color:var(--txt2)">'+c.type+' · '+(c.teacher||'-')+'</span>'+csBadge+'</div><div style="font-size:10px;color:var(--txt3)">'+c.date+'</div>'+contentPreview+'</div>';}).join('');}
