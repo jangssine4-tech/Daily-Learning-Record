@@ -5734,7 +5734,13 @@ function _doSaveReportAsImage(r){
 function exportHistoryCSV(){var rows=reports.map(function(r){return[r.date,(r.teacherTablet||r.teacher||'')+(r.teacherBook?'/'+r.teacherBook:''),r.studentName,r.level,r.progress,r.absent?'O':'',r.reviewTest,r.attitude,r.dailyQuiz,r.homework,r.comment,r.memo].map(function(v){return'"'+(v||'').replace(/"/g,'""')+'"';}).join(',');});var csv='\uFEFF날짜,교사,학생,단계,진도,결석,복습테스트,태도,퀴즈,숙제,코멘트,전달사항\n'+rows.join('\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='학습일지_'+todayISO()+'.csv';a.click();}
 
 // ══ STUDENTS ══
-function getStudentWeeklyHours(s){if(s.weeklyHours)return s.weeklyHours;if(!s.days||!s.days.length)return 0;var total=0;s.days.forEach(function(d){var p=(s.periods||{})[d];total+=(p&&typeof p==='object'&&p.hours!==undefined&&p.hours!==null&&p.hours!=='')?parseFloat(p.hours):1;});return total;}
+function getStudentWeeklyHours(s){
+  var base=0;
+  if(s.weeklyHours)base=parseFloat(s.weeklyHours);
+  else if(s.days&&s.days.length){s.days.forEach(function(d){var p=(s.periods||{})[d];base+=(p&&typeof p==='object'&&p.hours!==undefined&&p.hours!==null&&p.hours!=='')?parseFloat(p.hours):1;});}
+  var special=parseFloat(s.specialWeeklyHours)||0;
+  return base+special;
+}
 function getStudentMonthlyHours(s){return getStudentWeeklyHours(s)*4;}
 function renderStudents(){
   var filter=$('s-filter-status').value;var cls2=$('s-filter-cls').value;var search=($('s-search').value||'').trim().toLowerCase();
