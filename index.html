@@ -7568,7 +7568,9 @@ function runAssignPanel(){
       if(prd<=0)return;
       if(prd!==lastPrd){
         var pLabel=prd<0?'특강 '+Math.abs(prd):prd+'교시';
-        tbody+='<tr><td style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;text-align:center;border:1px solid #3a5a95">'+pLabel+'</td>'
+        var isOkPrd2=okPrds.indexOf(prd)>=0;
+        var prdBg=isOkPrd2?'#4a6fa5':'#9aabbd';
+        tbody+='<tr><td style="background:'+prdBg+';color:#fff;font-size:11px;font-weight:700;padding:3px 8px;text-align:center;border:1px solid #3a5a95;'+(isOkPrd2?'':'opacity:.5')+'">'+pLabel+'</td>'
           +days.map(function(){return'<td style="background:#e8eef5;border:1px solid #c5d3e0"></td>';}).join('')+'</tr>';
         lastPrd=prd;
       }
@@ -7598,12 +7600,14 @@ function runAssignPanel(){
           if(avail>0)bg=hlRank===0?'#dbeafe':hlRank===1?'#dcfce7':hlRank===2?'#ede9fe':'#fef3c7';
         }
 
-        var label=avail<=0?'마감':(cnt+'/'+MAX_CAP2);
-        var subLabel=isOkDay&&avail>0?('<div style="font-size:9px;color:'+color+';margin-top:1px">+'+avail+'</div>'):'';
+        // 표시: 남은 자리만 (avail)
+        var label=avail<=0?'마감':('+'+(avail));
+        // 활성 교시 여부
+        var isOkPrd=okPrds.indexOf(prd)>=0;
+        var dimmed=!isOkDay||!isOkPrd;
 
-        tbody+='<td style="text-align:center;padding:4px 2px;border:'+border+';background:'+bg+';'+(isOkDay?'':'opacity:.5')+'">'
-          +'<div style="font-size:13px;font-weight:700;color:'+color+'">'+label+'</div>'
-          +subLabel
+        tbody+='<td style="text-align:center;padding:5px 2px;border:'+border+';background:'+(dimmed?'var(--surface2)':bg)+';'+(dimmed?'opacity:.45':'opacity:1')+'">'
+          +'<div style="font-size:14px;font-weight:700;color:'+(dimmed?'var(--txt3)':color)+'">'+label+'</div>'
           +'</td>';
       });
       tbody+='</tr>';
