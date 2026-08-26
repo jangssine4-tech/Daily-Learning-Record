@@ -14212,8 +14212,8 @@ function _savePlan(overlay,editId){
       renderPlansView();
     }).catch(function(){toast('저장 실패');});
   }else{
-    // 신규
-    var newPlan={id:Date.now().toString(36),name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,tasks:tasks||[],createdAt:new Date().toISOString()};
+    // 신규 — id는 Firestore가 생성한 것만 사용
+    var newPlan={name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,tasks:tasks||[],createdAt:new Date().toISOString()};
     db.collection('plans').add(newPlan).then(function(ref){
       newPlan.id=ref.id;
       _plans.push(newPlan);
@@ -14221,7 +14221,7 @@ function _savePlan(overlay,editId){
       if(overlay)overlay.remove();
       _selectedPlanId=newPlan.id;
       renderPlansView();
-    }).catch(function(){toast('저장 실패');});
+    }).catch(function(e){console.error('플랜 저장 실패:',e);toast('저장 실패: '+e.message);});
   }
 }
 
