@@ -460,7 +460,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <div class="view" id="view-plans">
   <div class="page-top" style="display:flex;align-items:center;justify-content:space-between">
     <div style="display:flex;align-items:center;gap:8px">
-      <h2>플랜 관리(실행 계획)</h2>
+      <h2>플랜 관리</h2>
       <div style="position:relative">
         <button id="plan-guide-btn" onclick="_togglePlanGuide()" style="width:18px;height:18px;border-radius:50%;background:#e8f0f8;border:none;color:var(--navy);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1">?</button>
         <!-- 말풍선 툴팁 -->
@@ -2537,7 +2537,7 @@ function goto(view){
     });
   }
   else if(view==='plans'){
-    loadPlans().then(function(){renderPlansView();});
+    loadPlans(true).then(function(){renderPlansView();});
   }
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
@@ -13518,14 +13518,18 @@ function _renderWMGuide(el){
 var _academicCalendar=null;
 function loadAcademicCalendar(cb,forceReload){
   // Promise 반환 + 콜백 동시 지원
+  // events가 실제로 있는 경우에만 캐시 사용
+  var hasCache=_academicCalendar&&Array.isArray(_academicCalendar.events)&&_academicCalendar.events.length>0;
   var p;
-  if(_academicCalendar&&!forceReload){p=Promise.resolve();}
+  if(hasCache&&!forceReload){p=Promise.resolve();}
   else{
     p=db.collection('config').doc('academicCalendar').get().then(function(d){
       if(d.exists){
         var raw=d.data();
-        // events가 최상위 배열인 경우와 {events:[]} 래핑 경우 모두 처리
-        if(Array.isArray(raw)){
+        // acal 뷰와 동일한 파싱 로직
+        if(raw.events&&Array.isArray(raw.events)){
+          _academicCalendar=raw;
+        } else if(Array.isArray(raw)){
           _academicCalendar={events:raw};
         } else {
           _academicCalendar=raw;
@@ -13782,10 +13786,17 @@ function openAcalAddModal(editId,defaultMo){
 // ── 플랜 관리 ─────────────────────────────────────────
 var _plans=[];
 
-function loadPlans(){
-  return db.collection('plans').orderBy('createdAt','desc').get().then(function(snap){
+var _plansLoading=null;
+function loadPlans(forceReload){
+  // 이미 로드 중이면 같은 Promise 반환 (중복 요청 방지)
+  if(_plansLoading)return _plansLoading;
+  // 이미 데이터가 있고 강제 재로드가 아니면 그대로 반환
+  if(!forceReload&&_plans&&_plans.length>0)return Promise.resolve();
+  _plansLoading=db.collection('plans').orderBy('createdAt','desc').get().then(function(snap){
     _plans=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
-  }).catch(function(){_plans=[];});
+    _plansLoading=null;
+  }).catch(function(){_plans=[];_plansLoading=null;});
+  return _plansLoading;
 }
 
 
@@ -13888,6 +13899,9 @@ function renderPlansView(){
 
 function renderPlansList(){
   var listEl=$('plans-list-col');if(!listEl)return;
+  // id 기준 중복 제거 안전장치
+  var seen={};
+  _plans=_plans.filter(function(p){if(!p.id||seen[p.id])return false;seen[p.id]=true;return true;});
   var yrFilter=($('plans-year-filter')||{}).value||'';
   var filtered=_plans.filter(function(p){
     if(_plansFilter!=='전체'&&(p.status||'예정')!==_plansFilter)return false;
@@ -14116,9 +14130,11 @@ function _openNewPlanModalInner(editPlan){
     });
     return opts;
   })(p.manager||'');
+  var _acalEvts=(_academicCalendar&&_academicCalendar.events)||[];
+  console.log('[플랜모달] 학사일정 이벤트 수:',_acalEvts.length,_academicCalendar);
   var acalOpts='<option value="">연결 안 함</option>'
-    +((_academicCalendar&&_academicCalendar.events)||[])
-    .filter(function(e){return e.title&&e.date;})
+    +_acalEvts
+    .filter(function(e){return e.id&&e.title&&e.date;})
     .sort(function(a,b){return a.date>b.date?1:-1;})
     .map(function(e){return'<option value="'+e.id+'"'+(e.id===p.acalId?' selected':'')+'>'+e.date.slice(5)+' '+e.title+'</option>';}).join('');
 
