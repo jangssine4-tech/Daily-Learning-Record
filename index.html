@@ -399,16 +399,40 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <div class="view" id="view-msgboard"><div class="page-top"><h2>발송 관리</h2><p>숙제 상태 기반 학부모 메시지 관리</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto"><button class="rev-tab active" id="msgtab-preview" onclick="switchMsgTab('preview')">미리보기</button><button class="rev-tab" id="msgtab-history" onclick="switchMsgTab('history')">발송 이력</button></div><div class="toolbar"><select class="fi" id="msg-date" style="width:auto;font-size:12px" onchange="renderMsgPreview()"></select></div><div id="msg-preview-panel" class="cp"><div id="msg-preview-area"></div></div><div id="msg-history-panel" style="display:none" class="cp"><div id="msg-history-area"></div></div></div>
 <div class="view" id="view-board">
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;align-items:center">
-    <button class="rev-tab active" id="btab-today"      onclick="switchBoardTab('today')"      style="font-size:13px;font-weight:700">✅ 오늘</button>
-    <button class="rev-tab"        id="btab-weekly"     onclick="switchBoardTab('weekly')"     style="font-size:13px;font-weight:700">📆 주간</button>
-    <button class="rev-tab"        id="btab-focus"      onclick="switchBoardTab('focus')"      style="font-size:13px;font-weight:700">🎯 중점</button>
-    <button class="rev-tab"        id="btab-area"       onclick="switchBoardTab('area')"       style="font-size:13px;font-weight:700">📂 영역별</button>
+    <button class="rev-tab active" id="btab-today"      onclick="switchBoardTab('today')"      style="font-size:13px;font-weight:700">✅ 오늘 할 일</button>
+    <button class="rev-tab"        id="btab-weekly"     onclick="switchBoardTab('weekly')"     style="font-size:13px;font-weight:700">📆 주간 할 일</button>
+    <button class="rev-tab"        id="btab-focus"      onclick="switchBoardTab('focus')"      style="font-size:13px;font-weight:700">🎯 중점 추진</button>
+    <button class="rev-tab"        id="btab-area"       onclick="switchBoardTab('area')"       style="font-size:13px;font-weight:700">📂 영역별 할 일</button>
     <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
     <button class="rev-tab"        id="btab-crm"        onclick="switchBoardTab('crm')"        style="font-size:13px;font-weight:700">👥 상담</button>
     <button class="rev-tab"        id="btab-mk"         onclick="switchBoardTab('mk')"         style="font-size:13px;font-weight:700">📣 마케팅</button>
     <button class="rev-tab"        id="btab-conditions" onclick="switchBoardTab('conditions')" style="font-size:13px;font-weight:700">⚙️</button>
   </div>
-  <div id="dashboard-board-area" class="cp"><div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div></div>
+  <!-- 오늘 할 일 패널 -->
+  <div id="board-panel-today" class="cp"><div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div></div>
+  <!-- 주간 할 일 패널 -->
+  <div id="board-panel-weekly" style="display:none" class="cp">
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 0 4px;flex-wrap:wrap">
+      <select class="fi" style="width:86px;font-size:12px;padding:3px 6px" id="board-week-yr" onchange="_boardWeekNavChange()"></select>
+      <select class="fi" style="width:68px;font-size:12px;padding:3px 6px" id="board-week-mo" onchange="_boardWeekNavChange()"></select>
+      <select class="fi" style="width:90px;font-size:12px;padding:3px 6px" id="board-week-wk" onchange="_boardWeekNavRender()"></select>
+      <button class="btn btn-outline btn-xs" onclick="_boardWeekGoToday()">이번 주</button>
+    </div>
+    <div id="board-weekly-area"></div>
+  </div>
+  <!-- 중점 추진 패널 -->
+  <div id="board-panel-focus" style="display:none" class="cp">
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 0 4px;flex-wrap:wrap">
+      <select class="fi" style="width:86px;font-size:12px;padding:3px 6px" id="board-focus-yr" onchange="_boardFocusNavChange()"></select>
+      <select class="fi" style="width:68px;font-size:12px;padding:3px 6px" id="board-focus-mo" onchange="_boardFocusNavRender()"></select>
+      <button class="btn btn-outline btn-xs" onclick="_boardFocusGoToday()">이번 달</button>
+    </div>
+    <div id="board-focus-area"></div>
+  </div>
+  <!-- 영역별 할 일 패널 -->
+  <div id="board-panel-area" style="display:none" class="cp"><div id="board-area-area"></div></div>
+  <!-- (레거시) dashboard-board-area — 일부 다른 코드에서 직접 참조하므로 숨김 유지 -->
+  <div id="dashboard-board-area" style="display:none"></div>
   <div id="board-panel-crm" style="display:none" class="cp">
     <div style="display:flex;align-items:center;gap:8px;padding:8px 0;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--txt3)">날짜</span>
@@ -424,8 +448,13 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   <div id="board-panel-conditions" style="display:none" class="cp"><div id="board-conditions-area"></div></div>
 </div>
 <div class="view" id="view-dashboard">
-  <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto">
+  <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;overflow-x:auto;gap:0">
     <button class="rev-tab active" id="dtab-monthly" onclick="switchDashTab('monthly')" style="font-size:15px;font-weight:700">이달의 계획</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 12px;flex-shrink:0">
+      <select class="fi" id="dash-monthly-yr" style="width:86px;font-size:12px;padding:3px 6px" onchange="_dashMonthlyNavRender()"></select>
+      <select class="fi" id="dash-monthly-mo" style="width:68px;font-size:12px;padding:3px 6px" onchange="_dashMonthlyNavRender()"></select>
+      <button class="btn btn-outline btn-xs" onclick="_dashMonthlyGoToday()">이번 달</button>
+    </div>
   </div>
   <div id="dash-panel-board" style="display:none;gap:0;height:calc(100vh - 100px);overflow:hidden">
     <!-- 왼쪽: 업무 목록 -->
@@ -3087,36 +3116,230 @@ function switchDashTab(tab){
 }
 
 // ── 할 일 페이지 탭 전환 ──────────────────────────────
+var _boardCurrentTab='today';
 function switchBoardTab(tab){
-  var boardTabs=['today','weekly','focus','area','crm','mk','conditions'];
-  boardTabs.forEach(function(t){
+  _boardCurrentTab=tab;
+  var allTabs=['today','weekly','focus','area','crm','mk','conditions'];
+  allTabs.forEach(function(t){
     var btn=$('btab-'+t);
     if(btn)btn.classList.toggle('active',t===tab);
   });
-  var isSpecial=['crm','mk','conditions'].indexOf(tab)>=0;
-  var mainArea=$('dashboard-board-area');
-  if(mainArea)mainArea.style.display=isSpecial?'none':'';
-  ['crm','mk','conditions'].forEach(function(p){
+  // 모든 패널 숨기기
+  var allPanels=['today','weekly','focus','area','crm','mk','conditions'];
+  allPanels.forEach(function(p){
     var el=$('board-panel-'+p);
-    if(el)el.style.display=p===tab?'':'none';
+    if(el)el.style.display='none';
   });
-  if(!isSpecial){
-    var viewMap={today:'today',weekly:'weekly',focus:'focus',area:'area'};
-    _dbView=viewMap[tab]||'today';
-    if(_dbTasks){_renderDashBoardUI($('dashboard-board-area'));}
-    else{renderDashBoard();}
-  } else if(tab==='crm'){
-    _initCrmSelectors2();
-    var dateStr=_getCrmDateStr2();
-    renderCrmDailyInto('board-crm-area',dateStr);
-  } else if(tab==='mk'){
-    loadMpPlans().then(function(){
-      if(!_opGuidesLoaded){loadOpGuides(function(){renderMkTodayPage('board-mk-area');});}
-      else{renderMkTodayPage('board-mk-area');}
-    });
-  } else if(tab==='conditions'){
-    loadCrmConditions().then(function(){_renderCrmConditionsUI($('board-conditions-area'));});
+  // 선택 패널 표시
+  var panelEl=$('board-panel-'+tab);
+  if(panelEl)panelEl.style.display='';
+
+  function _doRender(){
+    if(tab==='today'){
+      _renderBoardTodayPanel();
+    } else if(tab==='weekly'){
+      _initBoardWeekSelectors();
+      _boardWeekNavRender();
+    } else if(tab==='focus'){
+      _initBoardFocusSelectors();
+      _boardFocusNavRender();
+    } else if(tab==='area'){
+      _renderBoardAreaPanel();
+    } else if(tab==='crm'){
+      _initCrmSelectors2();
+      renderCrmDailyInto('board-crm-area',_getCrmDateStr2());
+    } else if(tab==='mk'){
+      loadMpPlans().then(function(){
+        if(!_opGuidesLoaded){loadOpGuides(function(){renderMkTodayPage('board-mk-area');});}
+        else{renderMkTodayPage('board-mk-area');}
+      });
+    } else if(tab==='conditions'){
+      loadCrmConditions().then(function(){_renderCrmConditionsUI($('board-conditions-area'));});
+    }
   }
+
+  if(_dbTasks){_doRender();}
+  else{
+    loadDashBoard(true).then(function(){loadFocusTasks();_doRender();})
+      .catch(function(e){console.error('switchBoardTab 로드 오류:',e);});
+  }
+}
+
+// ── 오늘 할 일 패널 ──
+function _renderBoardTodayPanel(){
+  var el=$('board-panel-today');if(!el)return;
+  var today=todayISO();
+  var now=new Date();
+  var autoTasks=getAutoTodayTasks(today);
+  var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
+  html+=_renderTodayTaskSection();
+  html+=_renderDbTodayView(autoTasks,today,now);
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+// ── 주간 할 일 드롭다운 ──
+var _boardWeekSelYr=null,_boardWeekSelMo=null,_boardWeekSelWk=null;
+function _initBoardWeekSelectors(){
+  var yrEl=$('board-week-yr'),moEl=$('board-week-mo');
+  if(!yrEl||yrEl.options.length>0)return;
+  var now=new Date();
+  for(var y=2024;y<=2028;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===now.getFullYear())o.selected=true;yrEl.appendChild(o);}
+  for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';if(m===now.getMonth()+1)o2.selected=true;moEl.appendChild(o2);}
+  _boardWeekNavChange();
+}
+function _boardWeekNavChange(){
+  var yrEl=$('board-week-yr'),moEl=$('board-week-mo'),wkEl=$('board-week-wk');
+  if(!yrEl||!moEl||!wkEl)return;
+  var yr=parseInt(yrEl.value),mo=parseInt(moEl.value);
+  wkEl.innerHTML='';
+  var weeks=_getWeeksOfMonth(yr,mo);
+  weeks.forEach(function(w,i){
+    var o=document.createElement('option');
+    o.value=i;
+    o.textContent=w.label;
+    wkEl.appendChild(o);
+  });
+  // 이번 주에 해당하는 주차 자동 선택
+  var now=new Date();
+  var nowStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  var selIdx=0;
+  weeks.forEach(function(w,i){if(nowStr>=w.mon&&nowStr<=w.sun)selIdx=i;});
+  wkEl.value=selIdx;
+  _boardWeekNavRender();
+}
+function _boardWeekNavRender(){
+  var yrEl=$('board-week-yr'),moEl=$('board-week-mo'),wkEl=$('board-week-wk');
+  if(!yrEl||!moEl||!wkEl)return;
+  var yr=parseInt(yrEl.value),mo=parseInt(moEl.value);
+  var weeks=_getWeeksOfMonth(yr,mo);
+  var wk=weeks[parseInt(wkEl.value||0)];
+  if(!wk)return;
+  var el=$('board-weekly-area');if(!el)return;
+  var now=new Date(wk.mon+'T00:00:00');
+  el.innerHTML=_renderDbWeekViewForRange(wk.mon,wk.sun,now);
+}
+function _boardWeekGoToday(){
+  var now=new Date();
+  var yrEl=$('board-week-yr'),moEl=$('board-week-mo');
+  if(yrEl)yrEl.value=now.getFullYear();
+  if(moEl)moEl.value=now.getMonth()+1;
+  _boardWeekNavChange();
+}
+function _getWeeksOfMonth(yr,mo){
+  var weeks=[];
+  var first=new Date(yr,mo-1,1);
+  var last=new Date(yr,mo,0);
+  var cur=new Date(first);
+  // 첫 주의 월요일로 이동 (이전 달 포함)
+  var dow=(cur.getDay()+6)%7;// 0=월
+  cur.setDate(cur.getDate()-dow);
+  var fmt=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  var wkNum=1;
+  while(cur<=last){
+    var mon=new Date(cur);
+    var sun=new Date(cur);sun.setDate(cur.getDate()+6);
+    weeks.push({mon:fmt(mon),sun:fmt(sun),label:mo+'월 '+wkNum+'주 ('+fmt(mon).slice(5)+'~'+fmt(sun).slice(5)+')'});
+    cur.setDate(cur.getDate()+7);
+    wkNum++;
+  }
+  return weeks;
+}
+
+// ── 중점 추진 드롭다운 ──
+function _initBoardFocusSelectors(){
+  var yrEl=$('board-focus-yr'),moEl=$('board-focus-mo');
+  if(!yrEl||yrEl.options.length>0)return;
+  var now=new Date();
+  for(var y=2024;y<=2028;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===now.getFullYear())o.selected=true;yrEl.appendChild(o);}
+  for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';if(m===now.getMonth()+1)o2.selected=true;moEl.appendChild(o2);}
+}
+function _boardFocusNavChange(){_boardFocusNavRender();}
+function _boardFocusNavRender(){
+  var yrEl=$('board-focus-yr'),moEl=$('board-focus-mo');
+  if(!yrEl||!moEl)return;
+  var yr=parseInt(yrEl.value),mo=parseInt(moEl.value);
+  var el=$('board-focus-area');if(!el)return;
+  var moStr=String(mo).padStart(2,'0');
+  var nextMo=mo===12?1:mo+1;
+  var nextYr=mo===12?yr+1:yr;
+  var moStart=yr+'-'+moStr+'-01';
+  var moEnd=nextYr+'-'+String(nextMo).padStart(2,'0')+'-01';
+  // 해당 월 이달의 중점: dueDate가 해당 월에 속하는 것
+  var monthlyItems=(_dbTasks||[]).filter(function(t){
+    return t.taskType==='이달의 중점'&&!(t.id&&t.id.startsWith('__'))&&t.dueDate>=moStart&&t.dueDate<moEnd;
+  });
+  // 해당 월 이번 주 중점: dueDate가 해당 월에 속하는 것
+  var weeklyItems=(_dbTasks||[]).filter(function(t){
+    return t.taskType==='이번 주 중점'&&!(t.id&&t.id.startsWith('__'))&&t.dueDate>=moStart&&t.dueDate<moEnd;
+  });
+  var now=new Date();
+  var isCurrentMonth=(yr===now.getFullYear()&&mo===now.getMonth()+1);
+  var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
+  html+=_renderFocusSectionFiltered('monthly','🎯 '+yr+'년 '+mo+'월 이달의 중점 추진','#f0f9ff',monthlyItems,isCurrentMonth);
+  html+=_renderFocusSectionFiltered('weekly','📅 '+yr+'년 '+mo+'월 이번 주 중점 추진','#f5f3ff',weeklyItems,isCurrentMonth);
+  html+='</div>';
+  el.innerHTML=html;
+}
+function _boardFocusGoToday(){
+  var now=new Date();
+  var yrEl=$('board-focus-yr'),moEl=$('board-focus-mo');
+  if(yrEl)yrEl.value=now.getFullYear();
+  if(moEl)moEl.value=now.getMonth()+1;
+  _boardFocusNavRender();
+}
+function _renderFocusSectionFiltered(type,title,color,items,isCurrentMonth){
+  var done=items.filter(function(t){return t.status==='완료';}).length;
+  var addOnclick=type==='monthly'?'openMonthlyFocusModal()':'openDbTaskModal(null,null,\'이번 주 중점\')';
+  var h='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
+  h+='<div style="background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px">';
+  h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+title+'</span>';
+  if(items.length){
+    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료</span>';
+    if(isCurrentMonth)h+='<button class="btn btn-navy btn-xs" style="margin-left:4px" onclick="'+addOnclick+'">＋ 추가</button>';
+  }else if(isCurrentMonth){
+    h+='<button class="btn btn-navy btn-xs" style="margin-left:auto" onclick="'+addOnclick+'">＋ 추가</button>';
+  }
+  h+='</div><div style="padding:8px 14px;background:var(--surface)">';
+  if(items.length){
+    items.forEach(function(t){
+      var isDone=t.status==='완료';
+      var subTasks=t.subTasks||[];
+      var subDone=subTasks.filter(function(s){return s.done;}).length;
+      var subTotal=subTasks.length;
+      var subPct=subTotal>0?Math.round(subDone/subTotal*100):0;
+      h+='<div style="padding:6px 0;border-bottom:1px solid var(--border)">';
+      h+='<div style="display:flex;align-items:center;gap:8px">';
+      h+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleFocusTask(\''+type+'\',\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
+      h+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+      if(subTotal>0){var pc=subPct===100?'#16a34a':subPct>=50?'#d97706':'#6b7280';h+='<span style="font-size:10px;font-weight:700;color:'+pc+'">'+subPct+'%</span>';}
+      h+='<button onclick="deleteFocusTask(\''+type+'\',\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;line-height:1;padding:0 4px">×</button>';
+      h+='</div>';
+      if(subTotal>0){
+        var bc=subPct===100?'#16a34a':subPct>=50?'#d97706':'#3b82f6';
+        h+='<div style="margin:4px 0 4px 24px"><div style="background:var(--surface2);border-radius:4px;height:4px;margin-bottom:5px"><div style="background:'+bc+';width:'+subPct+'%;height:4px;border-radius:4px"></div></div>';
+        subTasks.forEach(function(st,si){
+          h+='<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><input type="checkbox"'+(st.done?' checked':'')+' onchange="_toggleSubTask(\''+t.id+'\','+si+',this.checked,\''+type+'\')" style="width:13px;height:13px;cursor:pointer;accent-color:var(--mint);flex-shrink:0"><span style="font-size:11px;'+(st.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt2)')+'">'+st.name+'</span></div>';
+        });
+        h+='</div>';
+      }
+      h+='</div>';
+    });
+  }else{
+    h+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">등록된 업무가 없습니다'+(isCurrentMonth?'':'<br><span style="font-size:11px">이달의 계획에서 현재 월에 업무를 추가하세요</span>')+'</div>';
+  }
+  h+='</div></div>';
+  return h;
+}
+
+// ── 영역별 패널 ──
+function _renderBoardAreaPanel(){
+  var el=$('board-area-area');if(!el)return;
+  var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
+  html+='<div style="display:flex;justify-content:flex-end"><button class="btn btn-navy btn-sm" onclick="openDbTaskModal(null)">+ 업무 추가</button></div>';
+  html+=_renderDbAreaView();
+  html+='</div>';
+  el.innerHTML=html;
 }
 function _getCrmDateStr2(){
   var yr=parseInt(($('crm-sel-yr2')||{}).value||new Date().getFullYear());
@@ -3167,7 +3390,24 @@ var _origGoto=window.goto;
 
 
 var _dashMonthlyLoading=false;
+function _initDashMonthlySelectors(){
+  var yrEl=$('dash-monthly-yr'),moEl=$('dash-monthly-mo');
+  if(!yrEl||yrEl.options.length>0)return;
+  var now=new Date();
+  for(var y=2024;y<=2028;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===now.getFullYear())o.selected=true;yrEl.appendChild(o);}
+  for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';if(m===now.getMonth()+1)o2.selected=true;moEl.appendChild(o2);}
+}
+function _dashMonthlyNavRender(){renderDashMonthly();}
+function _dashMonthlyGoToday(){
+  var now=new Date();
+  var yrEl=$('dash-monthly-yr'),moEl=$('dash-monthly-mo');
+  if(yrEl)yrEl.value=now.getFullYear();
+  if(moEl)moEl.value=now.getMonth()+1;
+  renderDashMonthly();
+}
+
 function renderDashMonthly(){
+  _initDashMonthlySelectors();
   var el=$('dash-monthly-area');if(!el)return;
   if(!_dbTasks){
     if(_dashMonthlyLoading)return;
@@ -3181,9 +3421,12 @@ function renderDashMonthly(){
     return;
   }
   _dashMonthlyLoading=false;
-  var now=new Date();
-  var yr=now.getFullYear();
-  var mo=now.getMonth()+1;
+  var yrEl=$('dash-monthly-yr'),moEl=$('dash-monthly-mo');
+  var realNow=new Date();
+  var yr=yrEl&&yrEl.value?parseInt(yrEl.value):realNow.getFullYear();
+  var mo=moEl&&moEl.value?parseInt(moEl.value):realNow.getMonth()+1;
+  // 선택된 월의 "현재"를 해당 월 1일로 설정 (학사일정 필터링 기준)
+  var now=new Date(yr,mo-1,1);
   var moStr=String(mo).padStart(2,'0');
   var nextMo=String(mo===12?1:mo+1).padStart(2,'0');
   var nextYr=mo===12?yr+1:yr;
@@ -3215,7 +3458,7 @@ function renderDashMonthly(){
     return (ps&&ps>=thisMonStart&&ps<thisMonEnd)||(ed&&ed>=thisMonStart&&ed<thisMonEnd);
   }).sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
   var calHTML='';
-  var catColors={'설명회':'#f87171','간담회':'#fb923c','특강':'#fbbf24','외부시험':'#4ade80','홍보캠페인':'#60a5fa','상담':'#a78bfa','내부 운영':'#94a3b8'};
+  var catColors={'설명회':'#f87171','간담회':'#fb923c','특강':'#fbbf24','외부시험':'#4ade80','홍보캠페인':'#60a5fa','상담':'#a78bfa','진단 테스트':'#f472b6','내부 운영':'#94a3b8'};
   if(thisMonEvts.length){
     thisMonEvts.forEach(function(e){
       var diff=Math.round((new Date(e.date)-now)/(1000*60*60*24));
@@ -3377,7 +3620,7 @@ function renderDashMonthly(){
     +card_dash('② 목표 달성률','#10b981',goalHTML,{label:'목표 관리',fn:"goto('goals')"})
     +card_dash('③ 참고할 플랜','#f59e0b',planHTML)
     +card_dash('④ 전월 미완료 업무','#ef4444',overdueHTML)
-    +card_dash('🎯 이달의 중점 업무','#7c3aed',focusHTML,{label:'중점 추진 탭',fn:"_dbView='focus';_renderDashBoardUI($('dashboard-board-area'));switchDashTab('board')"})
+    +card_dash('🎯 이달의 중점 업무','#7c3aed',focusHTML,{label:'중점 추진 탭',fn:"goto('board');setTimeout(function(){switchBoardTab('focus');},200)"})
     +'</div>';
 }
 function renderCrmDaily(){
@@ -10797,24 +11040,8 @@ function deleteTask(id){
   db.collection('dashBoardV2').doc(id).delete().catch(function(e){console.error('deleteTask 오류:',e);});
 }
 function renderDashBoard(){
-  var el=$('dashboard-board-area');if(!el)return;
-  // 첫 진입 시 오늘 탭 활성화
-  if(!$('btab-today')||!$('btab-today').classList.contains('active')){
-    switchBoardTab('today');
-  }
-  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
-  loadFocusTasks();
-  loadPlans();
-  loadDashBoard(true).then(function(){
-    try{_renderDashBoardUI(el);}
-    catch(e){
-      console.error('renderDashBoard 오류:',e);
-      el.innerHTML='<div style="padding:20px;color:red">할 일 오류: '+e.message+'</div>';
-    }
-  }).catch(function(e){
-    console.error('loadDashBoard 오류:',e);
-    el.innerHTML='<div style="padding:20px;color:red">데이터 로드 오류: '+e.message+'</div>';
-  });
+  // board 뷰 진입 시 오늘 탭으로 초기화
+  switchBoardTab(_boardCurrentTab||'today');
 }
 
 // ── 뷰 렌더링 ─────────────────────────────────────
@@ -10879,51 +11106,20 @@ function planTaskRow(t){
     +'</div>';
 }
 
+// _renderDashBoardUI: 이제 현재 활성 탭을 다시 그림 (board 뷰의 탭 분리 후 호환용)
 function _renderDashBoardUI(el){
-  if(!el)return;
-  var today=todayISO();
-  var now=new Date();
-  var autoTasks=getAutoTodayTasks(today);
-
-  // 뷰 탭
-  var viewTabs=[
-    {id:'today',label:'✅ 오늘 할 일'},
-    {id:'week',label:'📆 주간 할 일'},
-    {id:'focus',label:'🎯 중점 추진'},
-    {id:'area',label:'🗂 영역별'}
-  ];
-  var html='<div style="max-width:720px;padding:12px;display:flex;flex-direction:column;gap:10px">';
-
-  // ── 뷰 전환 탭 + 업무 추가 버튼 ──
-  html+='<div style="display:flex;align-items:center;gap:6px">';
-  html+='<div style="display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:3px;flex:1">';
-  viewTabs.forEach(function(t){
-    var on=_dbView===t.id;
-    html+='<button onclick="_dbSetView(\''+t.id+'\')" style="flex:1;padding:6px 4px;border:none;border-radius:8px;font-size:12px;font-weight:'+(on?'800':'500')+';cursor:pointer;background:'+(on?'var(--navy)':'transparent')+';color:'+(on?'#fff':'var(--txt2)')+';transition:all .15s">'+t.label+'</button>';
-  });
-  html+='</div>';
-  if(_dbView==='area'){
-    html+='<button class="btn btn-navy btn-sm" onclick="openDbTaskModal(null)">+ 업무 추가</button>';
-  }  html+='</div>';
-
-  if(_dbView==='today'){
-    html+=_renderTodayTaskSection();
-    html+=_renderDbTodayView(autoTasks,today,now);
-  }
-  else if(_dbView==='week') html+=_renderDbWeekView(now);
-  else if(_dbView==='focus'){
-    html+=_renderFocusSection('monthly','이달의 중점 추진 사항','#f0f9ff','🎯');
-    html+=_renderFocusSection('weekly','이번 주 중점 추진 사항','#f5f3ff','📅');
-  }
-  else html+=_renderDbAreaView();
-
-  html+='</div>';
-  el.innerHTML=html;
-  // 오른쪽 패널 렌더링
-  _renderDashRightPanel();
+  var tab=_boardCurrentTab||'today';
+  if(tab==='today')_renderBoardTodayPanel();
+  else if(tab==='weekly')_boardWeekNavRender();
+  else if(tab==='focus')_boardFocusNavRender();
+  else if(tab==='area')_renderBoardAreaPanel();
 }
 
-function _dbSetView(v){_dbView=v;_renderDashBoardUI($('dashboard-board-area'));}
+function _dbSetView(v){
+  // 이전 호환용 — 해당 탭으로 전환
+  var tabMap={today:'today',week:'weekly',focus:'focus',area:'area'};
+  switchBoardTab(tabMap[v]||'today');
+}
 
 function _renderDashRightPanel(){
   var el=$('dashboard-right-area');if(!el)return;
@@ -11886,19 +12082,20 @@ function _renderDbTodayView(autoTasks,today,now){
 }
 
 // ── 이번 주 뷰 ───────────────────────────────────
-function _renderDbWeekView(now){
-  var mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7));
-  var sun=new Date(mon);sun.setDate(mon.getDate()+6);
-  var fmt=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-  var monStr=fmt(mon),sunStr=fmt(sun);
+function _renderDbWeekViewForRange(monStr,sunStr,now){
+  // monStr, sunStr: 'YYYY-MM-DD' 문자열로 직접 받는 버전
+  var nowRef=now||new Date();
   var dayNames=['일','월','화','수','목','금','토'];
+  var fmt=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  var monDate=new Date(monStr+'T00:00:00');
+  var sunDate=new Date(sunStr+'T00:00:00');
 
   // 반복형 운영안 → 이번 주 해당 요일 업무 자동 표시
   if(window._repeatRules&&window._repeatRules.length){
     window._repeatRules.forEach(function(rr){
       if(!rr.rule||!rr.rule.days)return;
       rr.rule.days.forEach(function(day){
-        for(var d=new Date(mon);d<=sun;d.setDate(d.getDate()+1)){
+        for(var d=new Date(monDate);d<=sunDate;d.setDate(d.getDate()+1)){
           if(dayNames[d.getDay()]===day){
             var dateStr=fmt(new Date(d));
             var exists=(_dbTasks||[]).some(function(t){return t.parentTask===rr.id&&t.dueDate===dateStr;});
@@ -13702,7 +13899,7 @@ function openAcalAddModal(editId,defaultMo){
   var mo=defaultMo||now.getMonth()+1;
   var startDate=e.date?e.date:(yr+'-'+String(mo).padStart(2,'0')+'-01');
   var endDate=e.endDate||startDate;
-  var cats=['설명회','간담회','특강','외부시험','홍보캠페인','상담','내부 운영'];
+  var cats=['설명회','간담회','특강','외부시험','진단 테스트','홍보캠페인','상담','내부 운영'];
   var repeatRules=['없음','매주 월','매주 화','매주 수','매주 목','매주 금','매주 월·수·금','매주 화·금','매주 화·목','매월 첫째 주','매월 말일','매년'];
   var activeStaff=(users||[]).filter(function(u){
     return (u.role==='teacher'||u.role==='admin')&&!u.adminDeleted&&(u.name||'').trim();
