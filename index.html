@@ -2509,35 +2509,14 @@ function goto(view){
     var acalEl=$('acal-main-area');
     if(!acalEl)return;
     acalEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div>';
-    // 항상 Firestore에서 새로 읽기
-    _academicCalendar=null;
-    db.collection('config').doc('academicCalendar').get().then(function(d){
-      if(d.exists){
-        var raw=d.data();
-        // Firestore 구조 진단
-        var keys=Object.keys(raw);
-        console.log('[academicCalendar] keys:',keys,'events count:',(raw.events||[]).length,'total keys:',keys.length);
-        // events 배열이 있으면 그대로, 없으면 최상위 필드들을 events로 변환 시도
-        if(raw.events&&Array.isArray(raw.events)){
-          _academicCalendar=raw;
-        } else if(Array.isArray(raw)){
-          _academicCalendar={events:raw};
-        } else {
-          // events 키가 없는 경우 — 최상위 객체 자체가 달력 데이터일 수 있음
-          _academicCalendar=raw;
-          if(!_academicCalendar.events)_academicCalendar.events=[];
-        }
-      } else {
-        _academicCalendar={events:[]};
-      }
+    loadAcademicCalendar(function(){
       _renderAcademicCalendarUI(acalEl);
-    }).catch(function(e){
-      console.error('academicCalendar 로드 오류:',e);
-      acalEl.innerHTML='<div style="padding:20px;color:red">학사일정 로드 오류: '+e.message+'</div>';
-    });
+    },true);
   }
   else if(view==='plans'){
-    loadPlans(true).then(function(){renderPlansView();});
+    _deduplicatePlansInFirestore().then(function(){
+      return loadPlans(true);
+    }).then(function(){renderPlansView();});
   }
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
@@ -13800,6 +13779,29 @@ function loadPlans(forceReload){
 }
 
 
+// Firestore에 저장된 중복 플랜 문서를 이름 기준으로 정리 (같은 이름이면 가장 오래된 것만 남김)
+function _deduplicatePlansInFirestore(){
+  return db.collection('plans').orderBy('createdAt','asc').get().then(function(snap){
+    var seen={};
+    var deleteJobs=[];
+    snap.docs.forEach(function(doc){
+      var name=(doc.data().name||'').trim();
+      if(!name)return;
+      if(seen[name]){
+        // 이미 같은 이름이 있으면 이 문서는 중복 → 삭제
+        deleteJobs.push(db.collection('plans').doc(doc.id).delete());
+      } else {
+        seen[name]=doc.id;
+      }
+    });
+    if(deleteJobs.length){
+      return Promise.all(deleteJobs).then(function(){
+        console.log('[플랜] Firestore 중복 '+deleteJobs.length+'건 삭제 완료');
+      });
+    }
+  }).catch(function(e){console.error('[플랜] 중복 정리 오류:',e);});
+}
+
 var _plansFilter='전체';
 var _selectedPlanId=null;
 
@@ -14107,8 +14109,8 @@ function _togglePlanGuide(){
   }
 }
 function openNewPlanModal(editPlan){
-  // 학사일정 로드 후 모달 열기
-  loadAcademicCalendar(function(){_openNewPlanModalInner(editPlan);});
+  // 학사일정 항상 최신으로 로드 후 모달 열기
+  loadAcademicCalendar(function(){_openNewPlanModalInner(editPlan);},true);
 }
 function _openNewPlanModalInner(editPlan){
   var isEdit=!!editPlan;
