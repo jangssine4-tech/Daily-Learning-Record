@@ -6129,13 +6129,18 @@ async function saveStudent(){
   var id=$('s-id').value;
   if(id){
     var oldS=students.find(function(x){return x.id===id;});
-    var oldLevel=oldS?getStudentLevel(oldS):'';
+    var oldLevel=oldS?(oldS.customLevel||oldS.level||''):'';
     var newLevel=data.customLevel||data.level||'';
     if(oldLevel&&newLevel&&oldLevel!==newLevel){
-      var history=oldS?.levelHistory||[];
+      var history=(oldS?.levelHistory||[]).slice(); // 원본 배열 복사
+      // 마지막 항목이 이미 같은 단계면 중복 추가 방지
+      var lastEntry=history[history.length-1];
+      var lastLevel=lastEntry?(lastEntry.customLevel||lastEntry.level||''):'';
       if(!history.length&&oldLevel)history.push({level:oldS.level||'',customLevel:oldS.customLevel||'',date:oldS.enrollDate||oldS.createdAt?.split('T')[0]||todayISO()});
-      history.push({level:data.level,customLevel:data.customLevel,date:todayISO()});
-      data.levelHistory=history;
+      if(lastLevel!==newLevel){
+        history.push({level:data.level,customLevel:data.customLevel,date:todayISO()});
+        data.levelHistory=history;
+      }
     }
   }
   try{
