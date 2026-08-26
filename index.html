@@ -269,7 +269,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   <div class="sb-sec">계획 관리</div>
   <div class="sb-item" id="snav-goals" onclick="goto('goals')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>성장 목표 관리</div>
   <div class="sb-item" id="snav-acal" onclick="goto('acal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>연간 학사일정</div>
-  <div class="sb-item" id="snav-plans" onclick="goto('plans')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>플랜 관리</div>
+  <div class="sb-item" id="snav-plans" onclick="goto('plans')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>실행 계획</div>
   <div class="sb-item" id="snav-dashboard" onclick="goto('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>이달의 계획</div>
   <div class="sb-sec">실행</div>
   <div class="sb-item" id="snav-board" onclick="goto('board')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>할 일</div>
@@ -496,11 +496,11 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
         <div id="plan-guide-box" style="display:none;position:absolute;top:26px;left:-8px;z-index:200;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 4px 16px rgba(0,0,0,.12)">
           <div style="width:8px;height:8px;background:var(--surface);border-left:1px solid var(--border);border-top:1px solid var(--border);transform:rotate(45deg);position:absolute;top:-5px;left:14px"></div>
           <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">어떤 페이지인가요?</div>
-          <div style="font-size:12px;color:var(--txt2);line-height:1.7;margin-bottom:10px">프로젝트 준비 과정을 <b>D-Day 기준</b>으로 관리해요. 실행업무를 등록하면 할 일 탭과 자동 연동돼요.</div>
+          <div style="font-size:12px;color:var(--txt2);line-height:1.7;margin-bottom:10px">프로젝트 준비 과정을 <b>D-Day 기준</b>으로 관리해요. GPT에서 만든 플랜(실행 계획)을 등록하면 할 일 탭과 자동 연동돼서 실행 계획을 관리해요.</div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
             <span style="background:#e8f0f8;color:var(--navy);font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">① 플랜 등록</span>
             <span style="background:#e6f4ea;color:#2e7d32;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">② 업무 자동생성</span>
-            <span style="background:#fff8e1;color:#e65100;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">③ 할 일 연동</span>
+            <span style="background:#fff8e1;color:#e65100;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">③ 할 일 연동 &amp; 실행 계획 관리</span>
           </div>
           <div style="font-size:11px;color:var(--txt3);line-height:1.6;border-top:1px solid var(--border);padding-top:8px">
             활용 예시: 학부모 간담회 · 특강 개설 · 신학기 모집<br>
@@ -14583,30 +14583,39 @@ function openAcalDetail(evtId){
     +'</div>';
   document.body.appendChild(overlay);
   document.getElementById('acal-detail-edit-btn').onclick=function(){overlay.remove();openAcalAddModal(evtId);};
-  document.getElementById('acal-detail-plan-btn').onclick=function(){overlay.remove();_openPlanLinkModal(evtId);};
+  document.getElementById('acal-detail-plan-btn').onclick=function(){
+    var _evtId=evtId;
+    var _ov=overlay;
+    loadPlans().then(function(){
+      _ov.remove();
+      _openPlanLinkModal(_evtId);
+    });
+  };
 }
 
 function _openPlanLinkModal(acalId){
   var e=(_academicCalendar.events||[]).find(function(x){return x.id===acalId;});
   if(!e)return;
-  var overlay=document.createElement('div');
-  overlay.className='mo';overlay.style.display='flex';
-  overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
-  var existingOpts=_plans.length>0
-    ?_plans.map(function(p){return'<option value="'+p.id+'">'+p.name+'</option>';}).join('')
-    :'<option value="">등록된 플랜 없음</option>';
-  overlay.innerHTML='<div class="ms" style="max-width:400px">'
-    +'<div class="mh"></div><div class="mt">플랜 연결 — '+e.title+'</div>'
-    +'<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="plan-link-type" value="existing" checked onchange="document.getElementById(\'pl-existing\').style.display=\'\';document.getElementById(\'pl-new\').style.display=\'none\'"> 기존 플랜 연결</label>'
-    +'<div id="pl-existing"><select class="fi" id="pl-existing-sel">'+existingOpts+'</select></div>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="plan-link-type" value="new" onchange="document.getElementById(\'pl-existing\').style.display=\'none\';document.getElementById(\'pl-new\').style.display=\'\'"> 새 플랜 등록</label>'
-    +'<div id="pl-new" style="display:none"><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove();openNewPlanModalForAcal(\''+acalId+'\')">+ 새 플랜 등록하기</button></div>'
-    +'</div>'
-    +'<button class="btn btn-navy btn-block" onclick="_linkPlanToAcal(\''+acalId+'\',this.closest(\'.mo\'))">연결</button>'
-    +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
-    +'</div>';
-  document.body.appendChild(overlay);
+  loadPlans().then(function(){
+    var overlay=document.createElement('div');
+    overlay.className='mo';overlay.style.display='flex';
+    overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
+    var existingOpts=_plans.length>0
+      ?_plans.map(function(p){return'<option value="'+p.id+'">'+p.name+'</option>';}).join('')
+      :'<option value="">등록된 플랜 없음</option>';
+    overlay.innerHTML='<div class="ms" style="max-width:400px">'
+      +'<div class="mh"></div><div class="mt">플랜 연결 — '+e.title+'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
+      +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="plan-link-type" value="existing" checked onchange="document.getElementById(\'pl-existing\').style.display=\'\';document.getElementById(\'pl-new\').style.display=\'none\'"> 기존 플랜 연결</label>'
+      +'<div id="pl-existing"><select class="fi" id="pl-existing-sel">'+existingOpts+'</select></div>'
+      +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="plan-link-type" value="new" onchange="document.getElementById(\'pl-existing\').style.display=\'none\';document.getElementById(\'pl-new\').style.display=\'\'"> 새 플랜 등록</label>'
+      +'<div id="pl-new" style="display:none"><button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove();openNewPlanModalForAcal(\''+acalId+'\')">+ 새 플랜 등록하기</button></div>'
+      +'</div>'
+      +'<button class="btn btn-navy btn-block" onclick="_linkPlanToAcal(\''+acalId+'\',this.closest(\'.mo\'))">연결</button>'
+      +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
+      +'</div>';
+    document.body.appendChild(overlay);
+  });
 }
 
 function _linkPlanToAcal(acalId,overlay){
