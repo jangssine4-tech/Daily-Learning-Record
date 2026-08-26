@@ -7156,7 +7156,6 @@ function renderAssignPanel(prefill){
   customPeriods.forEach(function(cp){if(cp.period&&cp.period>0)prdSet.add(cp.period);});
   if(!prdSet.size){prdSet.add(1);prdSet.add(2);prdSet.add(3);}
 
-  // 희망 교시 — 둥근 사각형, 활성/비활성 명확 구분
   var prdBtns=[...prdSet].sort(function(a,b){return a-b;}).map(function(p){
     return '<button class="prd-btn on" data-prd="'+p+'" onclick="_togglePrdBtn(this)" '
       +'style="min-width:52px;height:34px;border-radius:6px;border:2px solid #2e7d32;background:#2e7d32;'
@@ -7168,9 +7167,7 @@ function renderAssignPanel(prefill){
   }).join('');
 
   el.innerHTML=''
-    // 제목 — page-top h2 스타일과 동일
     +'<div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:16px">신규 학생 수업시간 추천</div>'
-    // 조건 입력 — 한 행
     +'<div style="background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:20px">'
     +'<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">'
     +'<div style="min-width:100px"><div style="font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:6px">주 수업 횟수</div>'
@@ -7192,7 +7189,9 @@ function renderAssignPanel(prefill){
     +'<label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer"><input type="checkbox" id="ap-opt-nc" onchange="runAssignPanel()" style="width:16px;height:16px;accent-color:var(--navy)"> 연속 요일 피하기</label>'
     +'</div>'
     +'</div>'
-    +'<div id="ap-result-area"><div style="padding:24px;text-align:center;color:var(--txt3);font-size:14px">조건을 설정하면 자동으로 추천 시간이 표시됩니다</div></div>';
+    // 수용 현황표 + 추천 결과 영역
+    +'<div id="ap-capacity-area"></div>'
+    +'<div id="ap-result-area" style="margin-top:20px"></div>';
 
   if(prefill){
     if(prefill.weekly){var wEl=document.getElementById('ap-weekly');if(wEl)wEl.value=String(prefill.weekly);}
@@ -7210,8 +7209,13 @@ function renderWeeklySchedule(){renderAssignPanel();}
 
 function renderWeeklySchedule(){renderAssignPanel();}
 
+function renderWeeklySchedule(){renderAssignPanel();}
+
 // 구버전 호환
 function renderWeeklySchedule(){renderAssignPanel();}
+
+// 제외된 조합 키 목록 (전역)
+var _excludedKeys=new Set();
 
 function runAssignPanel(){
   var weeklyEl=document.getElementById('ap-weekly');
@@ -7228,6 +7232,10 @@ function runAssignPanel(){
   var optSame=document.getElementById('ap-opt-same').checked;
   var optBal=document.getElementById('ap-opt-bal').checked;
   var optNc=document.getElementById('ap-opt-nc').checked;
+
+  // 조건 변경 감지 → 제외 목록 초기화
+  var condKey=[weekly,duration,okDays.join(','),okPrds.join(','),optSame,optBal,optNc].join('|');
+  if(window._lastCondKey!==condKey){window._lastCondKey=condKey;_excludedKeys.clear();}
 
   if(!okDays.length||!okPrds.length){
     resultEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);font-size:14px">가능 요일과 희망 교시를 선택하세요</div>';
@@ -7349,67 +7357,81 @@ function runAssignPanel(){
       }
       if(hasConsec)return;
     }
-    // 같은 교시 + 같은 시작 슬롯 조합
+
+    // 각 요일에서 가능한 모든 슬롯 옵션
+    var dayOptions=dayCombo.map(function(day){
+      return validCombos.filter(function(c){return c.day===day;});
+    });
+    if(dayOptions.some(function(opts){return!opts.length;}))return;
+
+    // ── 같은 교시 + 같은 시작 슬롯 조합 ──
     okPrds.forEach(function(prd){
-      // 이 교시에서 가능한 슬롯 목록 (모든 요일 공통으로 가능한 것)
       var slotSets=dayCombo.map(function(day){
         return validCombos.filter(function(c){return c.day===day&&c.prd===prd;}).map(function(c){return c.slot;});
       });
-      if(slotSets.some(function(ss){return!ss.length;}))return; // 한 요일이라도 불가면 skip
-      // 공통으로 가능한 슬롯 찾기
+      if(slotSets.some(function(ss){return!ss.length;}))return;
       var commonSlots=slotSets[0].filter(function(sl){
         return slotSets.every(function(ss){return ss.indexOf(sl)>=0;});
       });
-      // 공통 슬롯이 없으면 각 요일 최선 슬롯으로
-      if(!commonSlots.length){
-        var fits=dayCombo.map(function(day){
-          var dc=validCombos.filter(function(c){return c.day===day&&c.prd===prd;});
-          return dc.sort(function(a,b){return b.minAvail-a.minAvail;})[0];
-        });
-        if(fits.every(Boolean)){
-          var sc=_calcScore(fits,optBal,MAX_CAP)+(optSame?15:0);
-          candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
-            score:sc,minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
-            totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
-        }
-      } else {
-        // 공통 슬롯마다 후보 생성
+      if(commonSlots.length){
         commonSlots.forEach(function(sl){
           var fits=dayCombo.map(function(day){
             return validCombos.find(function(c){return c.day===day&&c.prd===prd&&c.slot===sl;});
           });
           if(fits.every(Boolean)){
             var sc=_calcScore(fits,optBal,MAX_CAP)+(optSame?20:0);
-            candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
+            candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,slotLabel:sl,
               score:sc,minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
               totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
           }
         });
+      } else {
+        // 공통 슬롯 없으면 각 요일 최선 슬롯
+        var fits=dayCombo.map(function(day){
+          var dc=validCombos.filter(function(c){return c.day===day&&c.prd===prd;});
+          return dc.sort(function(a,b){return b.minAvail-a.minAvail;})[0];
+        });
+        if(fits.every(Boolean)){
+          var sc=_calcScore(fits,optBal,MAX_CAP)+(optSame?10:0);
+          candidates.push({days:dayCombo,prd:prd,fits:fits,samePeriod:true,
+            score:sc,minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
+            totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
+        }
       }
     });
-    // 교시 혼합 조합 — 요일마다 독립적으로 최선 슬롯 선택
-    (function(){
-      // 각 요일에서 가능한 모든 combo (교시+슬롯) 목록
-      var dayOptions=dayCombo.map(function(day){
-        return validCombos.filter(function(c){return c.day===day;});
-      });
-      if(dayOptions.some(function(opts){return!opts.length;}))return;
-      // 각 요일 최선 슬롯 선택 (minAvail 내림차순)
-      var bestFits=dayOptions.map(function(opts){
-        return opts.sort(function(a,b){return b.minAvail-a.minAvail;})[0];
-      });
-      if(!bestFits.every(Boolean))return;
-      var prds=bestFits.map(function(f){return f.prd;});
-      var slts=bestFits.map(function(f){return f.slot;});
-      var allSamePrdSlot=prds.every(function(p){return p===prds[0];})&&slts.every(function(sl){return sl===slts[0];});
-      if(allSamePrdSlot)return; // 동일 교시+슬롯은 위 브랜치에서 처리됨
-      candidates.push({days:dayCombo,prd:null,fits:bestFits,samePeriod:false,
-        score:_calcScore(bestFits,optBal,MAX_CAP),
-        minAvail:Math.min.apply(null,bestFits.map(function(f){return f.minAvail;})),
-        totalAvail:bestFits.reduce(function(s,f){return s+f.minAvail;},0)});
-    })();
-  });
 
+    // ── 교시+슬롯 완전 자유 조합 (카르테시안 곱) ──
+    // 각 요일 독립적으로 모든 슬롯 선택 → 조합 폭발 방지를 위해 요일당 최대 5개로 제한
+    var limitedOptions=dayOptions.map(function(opts){
+      return opts.sort(function(a,b){return b.minAvail-a.minAvail;}).slice(0,5);
+    });
+
+    function cartesian(arrays){
+      return arrays.reduce(function(acc,arr){
+        var result=[];
+        acc.forEach(function(a){arr.forEach(function(b){result.push(a.concat([b]));});});
+        return result;
+      },[[]]);
+    }
+
+    cartesian(limitedOptions).forEach(function(combo){
+      // 같은 교시+슬롯이면 위에서 처리됐으므로 skip
+      var prds=combo.map(function(f){return f.prd;});
+      var slts=combo.map(function(f){return f.slot;});
+      var allSame=prds.every(function(p){return p===prds[0];})&&slts.every(function(sl){return sl===slts[0];});
+      if(allSame)return;
+
+      var fits=combo.map(function(opt,i){
+        return {day:dayCombo[i],prd:opt.prd,slot:opt.slot,avail:opt.avail,minAvail:opt.minAvail};
+      });
+      var samePrd=prds.every(function(p){return p===prds[0];});
+      var sc=_calcScore(fits,optBal,MAX_CAP);
+      if(samePrd&&optSame)sc+=10;
+      candidates.push({days:dayCombo,prd:samePrd?prds[0]:null,fits:fits,samePeriod:samePrd,
+        score:sc,minAvail:Math.min.apply(null,fits.map(function(f){return f.minAvail;})),
+        totalAvail:fits.reduce(function(s,f){return s+f.minAvail;},0)});
+    });
+  });
   candidates.sort(function(a,b){return b.score-a.score;});
   // 중복 제거: 같은 요일+교시+슬롯 조합은 하나만
   var seen=new Set();
@@ -7431,22 +7453,33 @@ function runAssignPanel(){
   var recommended=candidates.slice(0,4);
   var allCands=candidates;
 
+  var bestFiltered=best.filter(function(c){return!_excludedKeys.has(_getCandKey(c));});
+  var recFiltered=recommended.filter(function(c){return!_excludedKeys.has(_getCandKey(c));});
+  var allFiltered=allCands.filter(function(c){return!_excludedKeys.has(_getCandKey(c));});
+
   var tabDefs=[
-    {id:'best',  label:'최적', sublabel:best.length+'개',  color:'#2e7d32',bg:'#e8f5e9',border:'#b2dfdb',textColor:'#1b5e20',activeBg:'#2e7d32'},
-    {id:'rec',   label:'추천', sublabel:recommended.length+'개', color:'#4527a0',bg:'#ede7f6',border:'#c5cae9',textColor:'#311b92',activeBg:'#4527a0'},
-    {id:'all',   label:'가능', sublabel:'전체 '+allCands.length+'개', color:'#e65100',bg:'#fff8e1',border:'#ffe0b2',textColor:'#bf360c',activeBg:'#e65100'}
+    {id:'best',  label:'최적', sublabel:bestFiltered.length+'개',        color:'#2e7d32',bg:'#e8f5e9',border:'#b2dfdb',textColor:'#1b5e20',activeBg:'#2e7d32'},
+    {id:'rec',   label:'추천', sublabel:recFiltered.length+'개',         color:'#4527a0',bg:'#ede7f6',border:'#c5cae9',textColor:'#311b92',activeBg:'#4527a0'},
+    {id:'all',   label:'가능', sublabel:'전체 '+allFiltered.length+'개', color:'#e65100',bg:'#fff8e1',border:'#ffe0b2',textColor:'#bf360c',activeBg:'#e65100'}
   ];
 
+  function _getCandKey(cand){
+    return cand.days.join(',')+'|'+cand.fits.map(function(f){return f.prd+':'+f.slot;}).join(',');
+  }
+
   function renderTabContent(candList, g){
-    if(!candList.length)return'<div style="padding:20px;text-align:center;color:var(--txt3)">해당 조건의 후보가 없어요</div>';
-    return candList.map(function(cand,i){
+    var filtered=candList.filter(function(c){return!_excludedKeys.has(_getCandKey(c));});
+    if(!filtered.length)return'<div style="padding:20px;text-align:center;color:var(--txt3)">모든 후보가 제외됐어요. 조건을 변경하거나 제외 목록을 초기화하세요.<br><button onclick="_excludedKeys.clear();runAssignPanel()" style="margin-top:8px;padding:6px 14px;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;background:var(--surface)">🔄 제외 목록 초기화</button></div>';
+    return filtered.map(function(cand,i){
       var periodLabel=cand.samePeriod?(cand.prd+'교시'):'교시 혼합';
       var reason=getReason(cand);
       var maxAfter=Math.max.apply(null,cand.fits.map(function(f){return MAX_CAP-f.minAvail+1;}));
+      var candKey=_getCandKey(cand);
       var html='<div style="'+(i>0?'border-top:1px solid '+g.border+';margin-top:12px;padding-top:12px':'')+'">'
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
         +'<span style="background:'+(g.textColor||g.color)+';color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;flex-shrink:0">'+(i+1)+'위</span>'
         +'<span style="font-size:15px;font-weight:800;color:'+(g.textColor||g.color)+'">'+cand.days.join('·')+'요일 · '+periodLabel+'</span>'
+        +'<button onclick="_excludedKeys.add(''+candKey+'');runAssignPanel()" style="margin-left:auto;flex-shrink:0;padding:3px 10px;border:1.5px solid #ef4444;border-radius:6px;font-size:11px;font-weight:600;color:#ef4444;background:#fff;cursor:pointer">✕ 제외</button>'
         +'</div>'
         +'<div style="font-size:12px;color:#64748b;margin-bottom:10px">'+reason+'</div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
@@ -7491,13 +7524,101 @@ function runAssignPanel(){
   }).join('');
 
   var tabContents=[
-    '<div id="acontent-0" style="display:block;border:2px solid '+tabDefs[0].border+';border-radius:12px;background:'+tabDefs[0].bg+';padding:16px">'+renderTabContent(best,tabDefs[0])+'</div>',
-    '<div id="acontent-1" style="display:none;border:2px solid '+tabDefs[1].border+';border-radius:12px;background:'+tabDefs[1].bg+';padding:16px">'+renderTabContent(recommended,tabDefs[1])+'</div>',
-    '<div id="acontent-2" style="display:none;border:2px solid '+tabDefs[2].border+';border-radius:12px;background:'+tabDefs[2].bg+';padding:16px;max-height:500px;overflow-y:auto">'+renderTabContent(allCands,tabDefs[2])+'</div>'
+    '<div id="acontent-0" style="display:block;border:2px solid '+tabDefs[0].border+';border-radius:12px;background:'+tabDefs[0].bg+';padding:16px">'+renderTabContent(bestFiltered,tabDefs[0])+'</div>',
+    '<div id="acontent-1" style="display:none;border:2px solid '+tabDefs[1].border+';border-radius:12px;background:'+tabDefs[1].bg+';padding:16px">'+renderTabContent(recFiltered,tabDefs[1])+'</div>',
+    '<div id="acontent-2" style="display:none;border:2px solid '+tabDefs[2].border+';border-radius:12px;background:'+tabDefs[2].bg+';padding:16px;max-height:500px;overflow-y:auto">'+renderTabContent(allFiltered,tabDefs[2])+'</div>'
   ].join('');
 
+  // ── 수용 현황표 렌더링 (추천 셀 강조 포함) ──
+  var capEl=document.getElementById('ap-capacity-area');
+  if(capEl){
+    var days=['월','화','수','목','금'];
+    var MAX_CAP2=4;
+
+    // 추천 상위 5개의 슬롯 집합 (강조용)
+    var topCands=candidates.filter(function(c){return!_excludedKeys.has(_getCandKey(c));}).slice(0,5);
+    // 추천 슬롯: {day_slot: rank} 맵
+    var highlightMap={};
+    topCands.forEach(function(cand,ri){
+      cand.fits.forEach(function(fit){
+        var prdSlots=_assignPeriodDays[fit.prd]||[];
+        var startIdx=prdSlots.indexOf(fit.slot);
+        var useSlots=prdSlots.slice(startIdx,startIdx+slotsNeeded);
+        useSlots.forEach(function(sl){
+          var key=fit.day+'_'+sl;
+          if(highlightMap[key]===undefined||highlightMap[key]>ri)highlightMap[key]=ri;
+        });
+      });
+    });
+    // 가능 요일 (on 상태)
+    var okDays2=[...document.querySelectorAll('#ap-days-wrap .day-pill.on')].map(function(el){return el.dataset.day;});
+
+    var colStyle='text-align:center;padding:7px 4px;font-size:12px;font-weight:700;min-width:70px';
+    var thead='<tr style="background:#1e3a5f;color:#fff">'
+      +'<th style="'+colStyle+';min-width:80px;width:80px">시간</th>';
+    days.forEach(function(d){
+      var isOk=okDays2.indexOf(d)>=0;
+      thead+='<th style="'+colStyle+';'+(isOk?'background:#2d5286;':'opacity:.6')+'">'+(isOk?'<b>'+d+'</b>':d)+'</th>';
+    });
+    thead+='</tr>';
+
+    var tbody='';var lastPrd=-99;
+    _assignSortedTimes.forEach(function(slot){
+      var prd=findPeriod(slot);
+      if(prd<=0)return;
+      if(prd!==lastPrd){
+        var pLabel=prd<0?'특강 '+Math.abs(prd):prd+'교시';
+        tbody+='<tr><td style="background:#4a6fa5;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;text-align:center;border:1px solid #3a5a95">'+pLabel+'</td>'
+          +days.map(function(){return'<td style="background:#e8eef5;border:1px solid #c5d3e0"></td>';}).join('')+'</tr>';
+        lastPrd=prd;
+      }
+      tbody+='<tr>';
+      tbody+='<td style="text-align:center;background:var(--surface2);font-size:12px;font-weight:600;color:var(--blue);padding:5px 4px;border:1px solid var(--border);white-space:nowrap">'+fmt12h(slot)+'</td>';
+      days.forEach(function(day){
+        var cnt=_assignSlotGrid[slot+'_'+day]||0;
+        var avail=MAX_CAP2-cnt;
+        var isOkDay=okDays2.indexOf(day)>=0;
+        var hlKey=day+'_'+slot;
+        var hlRank=highlightMap[hlKey];
+        var isHighlight=hlRank!==undefined;
+
+        // 셀 색상
+        var bg,color,border='1px solid var(--border)';
+        if(avail<=0){bg='#fecaca';color='#dc2626';}
+        else if(avail===1){bg='#fef3c7';color='#d97706';}
+        else{bg='var(--surface)';color='#16a34a';}
+
+        // 가능 요일 비활성
+        if(!isOkDay){bg='var(--surface2)';color='var(--txt3)';}
+
+        // 추천 강조: 진한 테두리 + 살짝 다른 배경
+        if(isHighlight&&isOkDay){
+          var hlColors=['#1e40af','#2e7d32','#7c3aed','#b45309','#1d4ed8'];
+          border='2.5px solid '+(hlColors[hlRank]||hlColors[0]);
+          if(avail>0)bg=hlRank===0?'#dbeafe':hlRank===1?'#dcfce7':hlRank===2?'#ede9fe':'#fef3c7';
+        }
+
+        var label=avail<=0?'마감':(cnt+'/'+MAX_CAP2);
+        var subLabel=isOkDay&&avail>0?('<div style="font-size:9px;color:'+color+';margin-top:1px">+'+avail+'</div>'):'';
+
+        tbody+='<td style="text-align:center;padding:4px 2px;border:'+border+';background:'+bg+';'+(isOkDay?'':'opacity:.5')+'">'
+          +'<div style="font-size:13px;font-weight:700;color:'+color+'">'+label+'</div>'
+          +subLabel
+          +'</td>';
+      });
+      tbody+='</tr>';
+    });
+
+    capEl.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📊 수용 현황'
+      +'<span style="font-size:11px;font-weight:400;color:var(--txt3);margin-left:8px">진한 테두리 = 추천 조합 슬롯</span></div>'
+      +'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;table-layout:fixed"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+  }
+
   resultEl.innerHTML=''
-    +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">📋 추천 시간표</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+    +'<div style="font-size:14px;font-weight:700;color:var(--navy)">📋 추천 시간표</div>'
+    +(_excludedKeys.size?'<button onclick="_excludedKeys.clear();runAssignPanel()" style="margin-left:auto;padding:3px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)">🔄 제외 초기화 ('+_excludedKeys.size+'개)</button>':'')
+    +'</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:12px">'+tabBtns+'</div>'
     +tabContents;
 
@@ -7787,12 +7908,41 @@ function _buildAssignGrid(){
       }
     }
   });
+  // customPeriods 교시 범위 내 전체 슬롯 추가
+  customPeriods.forEach(function(cp){
+    if(cp.time&&cp.endTime){
+      var ms=cp.time.match(/(\d+):(\d+)/),me=cp.endTime.match(/(\d+):(\d+)/);
+      if(ms&&me){
+        var st=parseInt(ms[1])*60+parseInt(ms[2]),en=parseInt(me[1])*60+parseInt(me[2]);
+        for(var t=st;t<en;t+=30)allTimes.add(String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));
+      }
+    }
+  });
   _assignSlotGrid=slotGrid;
   _assignSortedTimes=[...allTimes].sort(function(a,b){
     var ta=a.split(':'),tb=b.split(':');
     return(parseInt(ta[0])*60+parseInt(ta[1]))-(parseInt(tb[0])*60+parseInt(tb[1]));
   });
   _assignPeriodDays={};
+  // customPeriods 기반으로 교시 내 모든 30분 슬롯 등록 (학생 사용 여부 무관)
+  customPeriods.forEach(function(cp){
+    if(!cp.period||cp.period<=0||!cp.time)return;
+    var prd=cp.period;
+    if(!_assignPeriodDays[prd])_assignPeriodDays[prd]=[];
+    var ms=cp.time.match(/(\d+):(\d+)/);
+    var me=cp.endTime?(cp.endTime.match(/(\d+):(\d+)/)):null;
+    if(!ms)return;
+    var startMin=parseInt(ms[1])*60+parseInt(ms[2]);
+    var endMin=me?parseInt(me[1])*60+parseInt(me[2]):startMin+60;
+    for(var t=startMin;t<endMin;t+=30){
+      var hh=Math.floor(t/60),mm2=t%60;
+      var slot=String(hh).padStart(2,'0')+':'+String(mm2).padStart(2,'0');
+      if(_assignPeriodDays[prd].indexOf(slot)===-1)_assignPeriodDays[prd].push(slot);
+      // allTimes에도 추가 (슬롯 그리드에 반영)
+      allTimes.add(slot);
+    }
+  });
+  // customPeriods에 endTime 없는 경우 fallback: _assignSortedTimes 기반
   _assignSortedTimes.forEach(function(slot){
     var prd=findPeriod(slot);
     if(prd<=0)return;
