@@ -859,7 +859,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <!-- 상담 관리 -->
 <div style="border-left:3px solid var(--navy);padding-left:8px;font-size:12px;font-weight:700;color:var(--navy);margin:14px 0 8px">상담 관리</div>
 <div class="r2">
-  <div class="field"><div class="fl">상태</div><select class="fi" id="nc-status" onchange="onNcStatusChange()"><option value="신규 문의">신규 문의</option><option value="상담 예정">상담 예정</option><option value="상담 완료">상담 완료</option><option value="체험 예정">체험 예정</option><option value="체험 완료">체험 완료</option></select></div>
+  <div class="field"><div class="fl">상태</div><select class="fi" id="nc-status" onchange="onNcStatusChange()"><option value="신규 문의">신규 문의</option><option value="상담 예정">상담 예정</option><option value="상담 완료">상담 완료</option><option value="체험 예정">체험 예정</option><option value="체험 완료">체험 완료</option><option value="등록 완료">등록 완료</option><option value="미등록">미등록</option></select></div>
   <div class="field"><div class="fl">등록 년월일</div><input type="date" class="fi" id="nc-enroll-date"></div>
 </div>
 <div class="r2">
@@ -8276,15 +8276,21 @@ function onNcStatusChange(){
   var st=$('nc-status').value;
   var wrap=$('nc-result-wrap');
   if(!wrap)return;
-  var showResult=(st==='상담 완료'||st==='체험 완료');
+  var showResult=(st==='상담 완료'||st==='체험 완료'||st==='등록 완료'||st==='미등록');
   wrap.style.display=showResult?'block':'none';
-  if(!showResult){
-    setNcResult(''); // 결과 초기화
-  }
+  if(st==='등록 완료')setNcResult('등록 완료');
+  else if(st==='미등록')setNcResult('미등록');
+  else if(!showResult)setNcResult('');
 }
 function setNcResult(val){
   var hidden=$('nc-consult-result');
   if(hidden)hidden.value=val;
+  // 등록 완료 선택 시 상태도 자동으로 '등록 완료'로 변경
+  var statusSel=$('nc-status');
+  if(statusSel){
+    if(val==='등록 완료'){statusSel.value='등록 완료';}
+    else if(val==='미등록'){statusSel.value='미등록';}
+  }
   var regBtn=$('nc-result-reg-btn');
   var unregBtn=$('nc-result-unreg-btn');
   var unregWrap=$('nc-unreg-reason-wrap');
