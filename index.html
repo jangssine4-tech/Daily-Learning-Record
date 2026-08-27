@@ -533,6 +533,42 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
         </div>
       </div>
     </div>
+    <div style="position:relative;margin-right:8px">
+      <button onclick="_toggleGptGuide(this)" class="btn btn-outline btn-sm" style="font-size:11px;color:#2563eb;border-color:#bfdbfe;background:#eff6ff">💡 GPT 실행 계획 입력 방법</button>
+      <div id="gpt-guide-box" style="display:none;position:absolute;top:36px;right:0;z-index:300;width:340px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.15)">
+        <div style="width:8px;height:8px;background:var(--surface);border-left:1px solid var(--border);border-top:1px solid var(--border);transform:rotate(45deg);position:absolute;top:-5px;right:40px"></div>
+        <div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:12px">✅ GPT 실행 계획 입력 방법</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+            <div style="font-size:12px;color:var(--txt2);line-height:1.6">GPT 출력 결과를 전체 복사<br><span style="font-size:11px;color:var(--txt3);background:var(--surface2);padding:1px 6px;border-radius:4px">Ctrl+A → Ctrl+C</span></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+            <div style="font-size:12px;color:var(--txt2);line-height:1.6"><b>+ 새 실행 계획</b> 버튼 클릭</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+            <div style="font-size:12px;color:var(--txt2);line-height:1.6">플랜명, 기준일(D-Day), 영역, 담당자 입력</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">4</div>
+            <div style="font-size:12px;color:var(--txt2);line-height:1.6">GPT 플랜 붙여넣기 칸에 붙여넣기<br><span style="font-size:11px;color:var(--txt3);background:var(--surface2);padding:1px 6px;border-radius:4px">Ctrl+V</span></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">5</div>
+            <div style="font-size:12px;color:var(--txt2);line-height:1.6"><b>✨ 실행업무 자동 생성</b> 버튼 클릭</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:22px;height:22px;border-radius:50%;background:#10b981;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">6</div>
+            <div style="font-size:12px;color:var(--txt2);line-height:1.6">미리보기 확인 후 <b>등록</b> 버튼 클릭</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--txt3);line-height:1.6">
+          💡 GPT 출력 형식: <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">업무명 | D-21 | 원장 | 높음</code>
+        </div>
+      </div>
+    </div>
     <button class="btn btn-navy btn-sm" onclick="openNewPlanModal()">+ 새 실행 계획</button>
   </div>
   <!-- 상태 필터 -->
@@ -14689,6 +14725,40 @@ function _syncAllPlanTasksToBoard(){
   });
 }
 
+function _toggleGptGuide(btn){
+  var box=document.getElementById('gpt-guide-box');
+  if(!box)return;
+  var isOpen=box.style.display!=='none';
+  box.style.display=isOpen?'none':'';
+  if(!isOpen){
+    setTimeout(function(){
+      document.addEventListener('click',function _close(e){
+        if(!box.contains(e.target)&&e.target!==btn){
+          box.style.display='none';
+          document.removeEventListener('click',_close);
+        }
+      });
+    },10);
+  }
+}
+
+function _togglePlanPasteGuide(btn){
+  var box=btn.nextElementSibling;
+  if(!box)return;
+  var isOpen=box.style.display!=='none';
+  box.style.display=isOpen?'none':'';
+  if(!isOpen){
+    setTimeout(function(){
+      document.addEventListener('click',function _close(e){
+        if(!box.contains(e.target)&&e.target!==btn){
+          box.style.display='none';
+          document.removeEventListener('click',_close);
+        }
+      });
+    },10);
+  }
+}
+
 function _toggleSyncGuide(){
   var box=document.getElementById('sync-guide-box');
   if(!box)return;
@@ -14770,10 +14840,51 @@ function _openNewPlanModalInner(editPlan){
     +'</select></div>'
     +'</div>'
     +(!isEdit?
-      '<div class="field"><div class="fl">GPT 플랜 붙여넣기</div>'
-      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;line-height:1.6">형식: <code>업무명 | D-기준 | 담당 | 중요도</code><br>예) <code>홍보물 제작 | D-21 | 원장 | 높음</code></div>'
-      +'<div style="font-size:11px;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:7px 10px;margin-bottom:8px;line-height:1.6">💡 워드 파일은 직접 드래그가 되지 않아요.<br>워드를 열고 내용을 <b>전체 선택(Ctrl+A) → 복사(Ctrl+C)</b> 후 아래에 붙여넣어 주세요.</div>'
-      +'<textarea class="fi" id="plan-paste" rows="5" placeholder="GPT에서 생성한 플랜 또는 워드 내용을 여기에 붙여넣으세요" style="font-size:11px;font-family:monospace;line-height:1.6"></textarea>'
+      '<div class="field">'
+      +'<div class="fl" style="display:flex;align-items:center;gap:6px">GPT 플랜 붙여넣기'
+      +'<div style="position:relative;display:inline-block">'
+      +'<button onclick="_togglePlanPasteGuide(this)" style="width:16px;height:16px;border-radius:50%;background:#e8f0f8;border:none;color:var(--navy);font-size:10px;font-weight:700;cursor:pointer;line-height:1;flex-shrink:0">?</button>'
+      +'<div class="plan-paste-guide" style="display:none;position:absolute;top:24px;left:0;z-index:300;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:0 6px 24px rgba(0,0,0,.15)">'
+      +'<div style="width:8px;height:8px;background:var(--surface);border-left:1px solid var(--border);border-top:1px solid var(--border);transform:rotate(45deg);position:absolute;top:-5px;left:14px"></div>'
+      // STEP 1
+      +'<div style="display:flex;gap:10px;margin-bottom:12px">'
+      +'<div style="width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>'
+      +'<div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">GPT로 실행 계획 작성</div>'
+      +'<div style="font-size:11px;color:var(--txt2);line-height:1.7">ChatGPT에게 아래처럼 요청하세요<br>'
+      +'<div style="background:#f0f9ff;border-left:3px solid #3b82f6;padding:6px 8px;border-radius:0 6px 6px 0;margin-top:4px;font-size:10px;color:#1e40af;line-height:1.8">'
+      +'"[행사명] 실행 계획을 만들어 줘.<br>'
+      +'형식: <b>업무명 | D-기준 | 담당 | 중요도</b><br>'
+      +'D-Day는 [행사일], 담당은 원장/교사,<br>'
+      +'중요도는 높음/보통/낮음.<br>'
+      +'설명 없이 이 형식으로만 출력해줘."'
+      +'</div></div></div></div>'
+      // STEP 2
+      +'<div style="display:flex;gap:10px;margin-bottom:12px">'
+      +'<div style="width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>'
+      +'<div>'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">실행 계획 변환 확인</div>'
+      +'<div style="font-size:11px;color:var(--txt2);line-height:1.7">GPT 출력이 아래 형식인지 확인하세요</div>'
+      +'<div style="background:var(--surface2);border-radius:6px;padding:6px 8px;margin-top:4px;font-size:10px;font-family:monospace;color:var(--txt2);line-height:1.8">'
+      +'초대문 발송 | D-14 | 원장 | 높음<br>'
+      +'PPT 초안 완성 | D-7 | 원장 | 높음<br>'
+      +'리허설 진행 | D-3 | 원장+교사 | 보통'
+      +'</div>'
+      +'<div style="font-size:10px;color:#ef4444;margin-top:4px">❌ 날짜(8월 27일), 표 형식, 설명 문장이 있으면 파싱 안 됨</div>'
+      +'</div></div>'
+      // STEP 3
+      +'<div style="display:flex;gap:10px">'
+      +'<div style="width:24px;height:24px;border-radius:50%;background:#10b981;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>'
+      +'<div>'
+      +'<div style="font-size:12px;font-weight:700;color:#065f46;margin-bottom:4px">붙여넣기 → 자동 생성</div>'
+      +'<div style="font-size:11px;color:var(--txt2);line-height:1.7">'
+      +'GPT 결과를 <b>전체 복사(Ctrl+A → Ctrl+C)</b> 후<br>'
+      +'아래 칸에 붙여넣기(Ctrl+V)하고<br>'
+      +'<b>✨ 실행업무 자동 생성</b> 버튼을 누르세요.'
+      +'</div></div></div>'
+      +'</div></div></div>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;margin-top:6px;line-height:1.7">형식: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">업무명 | D-기준 | 담당 | 중요도</code></div>'
+      +'<textarea class="fi" id="plan-paste" rows="6" placeholder="홍보문 초안 작성 | D-21 | 원장 | 높음&#10;초대 대상 선정 | D-21 | 원장 | 높음&#10;개별 초대 발송 | D-14 | 원장 | 높음&#10;PPT 초안 완성 | D-7 | 원장 | 높음&#10;리허설 진행 | D-3 | 원장+교사 | 높음&#10;감사 메시지 발송 | D+1 | 원장 | 보통" style="font-size:11px;font-family:monospace;line-height:1.7"></textarea>'
       +'<button onclick="_parsePlanTasks()" style="font-size:11px;color:var(--blue);background:none;border:1px solid var(--blue);border-radius:6px;padding:4px 12px;cursor:pointer;margin-top:6px">✨ 실행업무 자동 생성</button>'
       +'</div>'
       +'<div id="plan-tasks-preview" style="margin-top:8px"></div>'
@@ -14910,21 +15021,75 @@ function _doRegisterFocusTask(type,name,dday,area,manager){
 function _parsePlanTasks(){
   var text=($('plan-paste')||{}).value||'';
   var ddayEl=$('plan-dday');
-  var dday=ddayEl&&ddayEl.value?new Date(ddayEl.value):new Date();
+  var dday=ddayEl&&ddayEl.value?new Date(ddayEl.value+'T00:00:00'):new Date();
   if(!text.trim()){toast('플랜 내용을 붙여넣으세요');return;}
-  var lines=text.trim().split('\n').filter(function(l){return l.trim()&&!l.startsWith('업무명')&&!l.includes('---')&&!l.includes('──');});
+
+  var lines=text.trim().split('\n').map(function(l){return l.trim();}).filter(function(l){
+    return l&&!l.startsWith('업무명')&&!l.includes('---')&&!l.includes('──')&&!l.startsWith('#')&&l.length>1;
+  });
+
+  console.log('[플랜파싱] 전체 줄 수:',lines.length,'D-Day:',dday);
+
   var tasks=[];
   lines.forEach(function(line){
-    var parts=line.split('|').map(function(s){return s.trim();});
-    if(parts.length<2||!parts[0])return;
-    var name=parts[0];var dRef=parts[1]||'D-0';var manager=parts[2]||'원장';var priority=parts[3]||'보통';
+    // | 구분자 파싱
+    var parts=line.split('|').map(function(s){return s.trim();}).filter(function(s){return s;});
+    console.log('[플랜파싱] 줄:',line,'→ parts:',parts);
+
+    // 최소 1개 파트 + D-Day 패턴이 있으면 파싱 시도
+    var name='',dRef='D-0',manager='원장',priority='보통';
+    if(parts.length>=2){
+      name=parts[0];
+      dRef=parts[1];
+      manager=parts[2]||'원장';
+      priority=parts[3]||'보통';
+    } else if(parts.length===1){
+      // | 없이 D-0 패턴이 줄 안에 있는 경우
+      var dm=line.match(/D([+-]?\d+)/i);
+      if(dm){
+        dRef=dm[0];
+        name=line.replace(dm[0],'').replace(/[|·\-]/g,'').trim();
+      } else {
+        return; // 파싱 불가
+      }
+    } else {
+      return;
+    }
+    if(!name)return;
+
     var offset=0;var m=dRef.match(/D([+-]?\d+)/i);
     if(m)offset=parseInt(m[1]);
     var taskDate=new Date(dday);taskDate.setDate(taskDate.getDate()+offset);
     var dateStr=taskDate.getFullYear()+'-'+String(taskDate.getMonth()+1).padStart(2,'0')+'-'+String(taskDate.getDate()).padStart(2,'0');
     tasks.push({name:name,date:dateStr,dRef:dRef,manager:manager,priority:priority,done:false});
   });
-  if(!tasks.length){toast('파싱된 업무가 없어요. 형식을 확인해 주세요.');return;}
+
+  console.log('[플랜파싱] 파싱된 업무 수:',tasks.length);
+
+  if(!tasks.length){
+    toast('파싱된 업무가 없어요. 콘솔(F12)에서 형식을 확인해 주세요.\n형식: 업무명 | D-21 | 원장 | 높음');
+    return;
+  }
+  var preview=$('plan-tasks-preview');
+  if(preview){
+    var html='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">✅ '+tasks.length+'개 업무 생성 예정</div>'
+      +'<div style="background:var(--surface2);border-radius:8px;overflow:hidden">'
+      +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
+      +'<tr style="background:var(--navy);color:#fff"><th style="padding:5px 8px;text-align:left">업무명</th><th style="padding:5px">실행일</th><th style="padding:5px">담당</th><th style="padding:5px">중요도</th></tr>';
+    tasks.forEach(function(t){
+      html+='<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:5px 8px">'+t.name+'</td>'
+        +'<td style="padding:5px;text-align:center">'+t.date.slice(5)+'</td>'
+        +'<td style="padding:5px;text-align:center">'+t.manager+'</td>'
+        +'<td style="padding:5px;text-align:center;color:'+(t.priority==='높음'?'#dc2626':t.priority==='낮음'?'#94a3b8':'var(--txt)')+'">'+t.priority+'</td>'
+        +'</tr>';
+    });
+    html+='</table></div>';
+    preview.innerHTML=html;
+  }
+  window._parsedPlanTasks=tasks;
+  toast(tasks.length+'개 업무가 생성될 예정이에요');
+}
   var preview=$('plan-tasks-preview');
   if(preview){
     var html='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">✅ '+tasks.length+'개 업무 생성 예정</div>'
