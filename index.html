@@ -512,6 +512,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
         </div>
       </div>
     </div>
+    <button class="btn btn-outline btn-sm" onclick="_syncAllPlanTasksToBoard()" style="font-size:11px;color:#6b7280" title="기존 플랜의 실행업무를 할 일 탭에 한 번에 동기화">🔄 할 일 동기화</button>
     <button class="btn btn-navy btn-sm" onclick="openNewPlanModal()">+ 새 실행 계획</button>
   </div>
   <!-- 상태 필터 -->
@@ -14582,6 +14583,63 @@ function openEditPlanModal(planId){
   openNewPlanModal(plan);
 }
 
+
+// ── 기존 플랜 실행업무 → dashBoardV2 일괄 동기화 ──
+function _syncAllPlanTasksToBoard(){
+  if(!_plans||!_plans.length){toast('등록된 플랜이 없습니다');return;}
+
+  // 이미 동기화된 planId 목록 수집 (중복 방지)
+  var syncedPlanIds={};
+  (_dbTasks||[]).forEach(function(t){
+    if(t.planId)syncedPlanIds[t.planId]=true;
+  });
+
+  var toSync=_plans.filter(function(p){
+    return p.tasks&&p.tasks.length>0&&!syncedPlanIds[p.id];
+  });
+
+  if(!toSync.length){
+    toast('✅ 모든 플랜이 이미 동기화되어 있습니다');
+    return;
+  }
+
+  var totalTasks=0;
+  var batch=db.batch();
+
+  toSync.forEach(function(plan){
+    plan.tasks.forEach(function(t){
+      var taskId='plan_'+plan.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+      var dbTask={
+        id:taskId,
+        name:t.name,
+        area:plan.area||'',
+        taskType:'일반 업무',
+        priority:t.priority||'보통',
+        dueDate:t.date||t.dueDate||todayISO(),
+        status:t.done?'완료':'대기',
+        cycle:'반복없음',
+        memo:'',
+        planId:plan.id,
+        planName:plan.name,
+        manager:t.manager||plan.manager||'원장',
+        createdAt:todayISO()
+      };
+      if(!_dbTasks)_dbTasks=[];
+      _dbTasks.push(dbTask);
+      batch.set(db.collection('dashBoardV2').doc(taskId),dbTask);
+      totalTasks++;
+    });
+  });
+
+  batch.commit().then(function(){
+    toast('✅ '+toSync.length+'개 플랜, '+totalTasks+'개 업무를 할 일 탭에 동기화했어요!');
+    // 할 일 탭 갱신
+    _renderBoardTodayPanel();
+  }).catch(function(e){
+    console.error('동기화 오류:',e);
+    toast('⚠️ 동기화 실패: '+e.message);
+  });
+}
 
 function _togglePlanGuide(){
   var box=document.getElementById('plan-guide-box');
