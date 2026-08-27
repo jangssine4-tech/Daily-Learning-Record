@@ -14632,9 +14632,13 @@ function _syncAllPlanTasksToBoard(){
   });
 
   batch.commit().then(function(){
-    toast('✅ '+toSync.length+'개 플랜, '+totalTasks+'개 업무를 할 일 탭에 동기화했어요!');
-    // 할 일 탭 갱신
-    _renderBoardTodayPanel();
+    toast('✅ '+toSync.length+'개 플랜, '+totalTasks+'개 업무가 할 일에 동기화됐어요!');
+    // dashBoardV2 강제 재로드 후 할 일 탭으로 이동
+    _dbTasks=null;
+    loadDashBoard(true).then(function(){
+      goto('board');
+      setTimeout(function(){switchBoardTab('today');},100);
+    });
   }).catch(function(e){
     console.error('동기화 오류:',e);
     toast('⚠️ 동기화 실패: '+e.message);
