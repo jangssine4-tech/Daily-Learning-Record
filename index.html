@@ -807,6 +807,19 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 </div>
 <div class="field"><div class="fl">수업 희망 시간</div><input class="fi" id="nc-class-time" placeholder="오후 5:00, 주 3회"></div>
 
+<!-- 희망 수업 요일/시수 -->
+<div style="border-left:3px solid #10b981;padding-left:8px;font-size:12px;font-weight:700;color:#065f46;margin:14px 0 8px">희망 수업 요일 및 시수</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="nc-days-wrap">
+  <span class="day-pill" data-day="월" onclick="ncToggleDay(this)" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface2);color:var(--txt2);border:1.5px solid var(--border)">월</span>
+  <span class="day-pill" data-day="화" onclick="ncToggleDay(this)" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface2);color:var(--txt2);border:1.5px solid var(--border)">화</span>
+  <span class="day-pill" data-day="수" onclick="ncToggleDay(this)" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface2);color:var(--txt2);border:1.5px solid var(--border)">수</span>
+  <span class="day-pill" data-day="목" onclick="ncToggleDay(this)" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface2);color:var(--txt2);border:1.5px solid var(--border)">목</span>
+  <span class="day-pill" data-day="금" onclick="ncToggleDay(this)" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface2);color:var(--txt2);border:1.5px solid var(--border)">금</span>
+  <span class="day-pill" data-day="토" onclick="ncToggleDay(this)" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface);color:#fb923c;border:1.5px solid #fed7aa">토</span>
+</div>
+<div id="nc-period-inputs" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
+<div id="nc-hours-display" style="font-size:12px;font-weight:700;color:var(--navy);min-height:18px"></div>
+
 <!-- 학습 정보 -->
 <div style="border-left:3px solid var(--navy);padding-left:8px;font-size:12px;font-weight:700;color:var(--navy);margin:14px 0 8px">학습 정보</div>
 <div class="r2">
@@ -7912,7 +7925,123 @@ async function _openConsultSurveyFromModal(){
   if(formEl)formEl.innerHTML=inflowHtml+t.questions.map(qBlock).join('')
     +'<button class="btn btn-navy btn-block" onclick="_saveConsultFormData(\''+docId+'\')">💾 저장</button>';
 }
-function ncAutoGrade(){
+// ── 신규 상담 희망 요일/시수 ──────────────────────
+function ncToggleDay(el){
+  var isOn=el.classList.contains('on');
+  el.classList.toggle('on',!isOn);
+  el.style.background=!isOn?'var(--navy)':el.dataset.day==='토'?'var(--surface)':'var(--surface2)';
+  el.style.color=!isOn?'#fff':el.dataset.day==='토'?'#fb923c':'var(--txt2)';
+  el.style.borderColor=!isOn?'var(--navy)':el.dataset.day==='토'?'#fed7aa':'var(--border)';
+  _ncRenderPeriodInputs();
+  _ncUpdateHoursDisplay();
+}
+function _ncRenderPeriodInputs(){
+  var wrap=$('nc-period-inputs');if(!wrap)return;
+  var activeDays=[...document.querySelectorAll('#nc-days-wrap .day-pill.on')].map(function(el){return el.dataset.day;});
+  wrap.innerHTML=activeDays.map(function(day){
+    var prev=wrap.querySelector&&wrap._savedVals&&wrap._savedVals[day];
+    return'<div style="display:flex;align-items:center;gap:8px;font-size:12px">'
+      +'<span style="width:20px;font-weight:700;color:var(--navy);text-align:center">'+day+'</span>'
+      +'<select class="fi" id="nc-per-hours-'+day+'" style="width:90px;font-size:12px;padding:3px 6px" onchange="_ncUpdateHoursDisplay()">'
+      +['0','0.5','1','1.35','1.5','2','2.5','3'].map(function(h){return'<option value="'+h+'"'+(h==='1'?' selected':'')+'>'+h+'시수</option>';}).join('')
+      +'</select>'
+      +'<input class="fi" id="nc-per-time-'+day+'" placeholder="시작 시간 (예: 17:00)" style="font-size:12px;flex:1">'
+      +'</div>';
+  }).join('');
+}
+function _ncUpdateHoursDisplay(){
+  var total=0;
+  document.querySelectorAll('#nc-days-wrap .day-pill.on').forEach(function(el){
+    var h=document.getElementById('nc-per-hours-'+el.dataset.day);
+    total+=h?parseFloat(h.value)||1:1;
+  });
+  var disp=$('nc-hours-display');
+  if(disp)disp.textContent=total>0?'📅 주 '+Math.round(total)+'시수 · 월 '+Math.round(total*4)+'시수':'';
+}
+function _ncGetDaysData(){
+  var days=[];
+  var periods={};
+  document.querySelectorAll('#nc-days-wrap .day-pill.on').forEach(function(el){
+    var day=el.dataset.day;
+    days.push(day);
+    var hEl=document.getElementById('nc-per-hours-'+day);
+    var tEl=document.getElementById('nc-per-time-'+day);
+    periods[day]={hours:hEl?hEl.value:'1',time:tEl?tEl.value:''};
+  });
+  return{days:days,periods:periods};
+}
+function _ncRestoreDays(days,periods){
+  // 모든 요일 초기화
+  document.querySelectorAll('#nc-days-wrap .day-pill').forEach(function(el){
+    el.classList.remove('on');
+    el.style.background=el.dataset.day==='토'?'var(--surface)':'var(--surface2)';
+    el.style.color=el.dataset.day==='토'?'#fb923c':'var(--txt2)';
+    el.style.borderColor=el.dataset.day==='토'?'#fed7aa':'var(--border)';
+  });
+  if(!days||!days.length){_ncRenderPeriodInputs();_ncUpdateHoursDisplay();return;}
+  days.forEach(function(day){
+    var pill=document.querySelector('#nc-days-wrap .day-pill[data-day="'+day+'"]');
+    if(pill){
+      pill.classList.add('on');
+      pill.style.background='var(--navy)';
+      pill.style.color='#fff';
+      pill.style.borderColor='var(--navy)';
+    }
+  });
+  _ncRenderPeriodInputs();
+  // 시수/시간 복원
+  setTimeout(function(){
+    (days||[]).forEach(function(day){
+      var p=(periods||{})[day];
+      if(!p)return;
+      var hEl=document.getElementById('nc-per-hours-'+day);
+      var tEl=document.getElementById('nc-per-time-'+day);
+      if(hEl&&p.hours!==undefined)hEl.value=p.hours;
+      if(tEl&&p.time)tEl.value=p.time;
+    });
+    _ncUpdateHoursDisplay();
+  },30);
+}
+
+// ── 등록 완료 시 학생 자동 생성 ──────────────────
+async function _createStudentFromConsult(nc){
+  var daysData=_ncGetDaysData();
+  var weeklyHours=0;
+  daysData.days.forEach(function(day){
+    var h=daysData.periods[day];
+    weeklyHours+=h?parseFloat(h.hours)||1:1;
+  });
+  var newStudent={
+    name:nc.prospectName||nc.studentName||'',
+    grade:nc.grade||'',
+    gender:nc.gender||'',
+    birth:nc.birth||'',
+    school:nc.school||'',
+    address:nc.address||'',
+    phoneMom:nc.phone||'',
+    studentPhone:nc.studentPhone||'',
+    email:nc.email||'',
+    inflow:nc.inflow||'',
+    memo:nc.memo||'',
+    level:nc.level||'',
+    days:daysData.days,
+    periods:daysData.periods,
+    weeklyHours:weeklyHours,
+    status:'신규',
+    enrollDate:todayISO(),
+    enrollYear:new Date().getFullYear(),
+    classId:'',
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+  var ref=await db.collection('students').add(newStudent);
+  newStudent.id=ref.id;
+  students.push(newStudent);
+  // 상담 기록에 studentId 연결
+  var ncId=$('nc-id').value;
+  if(ncId)await db.collection('newConsults').doc(ncId).update({studentId:ref.id});
+  return newStudent;
+}
   var birth=$('nc-birth').value;if(!birth)return;
   var birthDate=new Date(birth);
   var today=new Date();
@@ -8226,6 +8355,8 @@ function openNewConsultModal(id){
   // 글자수 카운터 초기화
   $('nc-content-cnt').textContent=($('nc-content').value.length)+'/1000';
   $('nc-memo-cnt').textContent=($('nc-memo').value.length)+'/1000';
+  // 희망 요일/시수 복원
+  _ncRestoreDays(n?.hopeDays||[],n?.hopePeriods||{});
   $('modal-newconsult').style.display='flex';
 }
 function renderNewConsults(){_initNcYmFilter();renderNewConsultStats();}
@@ -8268,6 +8399,10 @@ async function saveNewConsult(){loading(true);
     memo:$('nc-memo').value.trim(),
     updatedAt:new Date().toISOString()
   };
+  // 희망 요일/시수 저장
+  var _daysData=_ncGetDaysData();
+  data.hopeDays=_daysData.days;
+  data.hopePeriods=_daysData.periods;
   var id=$('nc-id').value;
   if(id)await db.collection('newConsults').doc(id).update(data);
   else await db.collection('newConsults').add({...data,createdAt:new Date().toISOString()});
@@ -8275,6 +8410,40 @@ async function saveNewConsult(){loading(true);
   newConsults=snap.docs.map(function(d){return{id:d.id,...d.data()};});
   renderNewConsults();
   loading(false);saveCacheDebounced();
+  // 등록 완료 상태이고 아직 학생 미생성인 경우 자동 생성 제안
+  var isReg=data.ncStatus==='등록 완료'||data.consultResult==='등록 완료';
+  var alreadyLinked=students.find(function(s){return s.name===(data.prospectName||data.studentName);});
+  if(isReg&&!alreadyLinked){
+    var savedNc=data;
+    savedNc.id=$('nc-id').value;
+    closeM('newconsult');
+    // 확인 팝업
+    var ov=document.createElement('div');
+    ov.className='mo';ov.style.display='flex';
+    ov.innerHTML='<div class="ms" style="max-width:380px;text-align:center">'
+      +'<div class="mh"></div>'
+      +'<div style="font-size:32px;margin-bottom:8px">🎉</div>'
+      +'<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:8px">'+(data.prospectName||'학생')+'님 등록 완료!</div>'
+      +'<div style="font-size:13px;color:var(--txt2);margin-bottom:20px;line-height:1.7">상담 정보를 바탕으로<br>학생 정보를 자동 생성할까요?<br><span style="font-size:11px;color:var(--txt3)">(수업 요일·클래스는 이후 수정 가능)</span></div>'
+      +'<div style="display:flex;gap:8px">'
+      +'<button class="btn btn-navy btn-block" id="nc-auto-create-btn" style="flex:1">✅ 학생 자동 생성</button>'
+      +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()" style="flex:1">나중에</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    document.getElementById('nc-auto-create-btn').onclick=async function(){
+      loading(true);
+      try{
+        var newS=await _createStudentFromConsult(savedNc);
+        ov.remove();
+        loading(false);
+        toast('✅ 학생 정보가 생성됐어요');
+        // 학생 정보 수정 모달로 바로 이동
+        renderStudents();
+        setTimeout(function(){openStudentModal(newS.id);},300);
+      }catch(e){loading(false);toast('⚠️ 생성 실패: '+e.message);}
+    };
+    return;
+  }
   // 저장 후 수업시간 추천 연동 토스트
   var weekly=savedData.weeklyFreq||'3';
   var toastEl=document.createElement('div');
