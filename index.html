@@ -428,6 +428,12 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   </div>
   <!-- 중점 추진 패널 -->
   <div id="board-panel-focus" style="display:none" class="cp">
+    <!-- 연월 드롭다운 -->
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <select class="fi" id="focus-sel-yr" style="width:86px;font-size:12px;padding:3px 6px" onchange="_boardFocusNavRender()"></select>
+      <select class="fi" id="focus-sel-mo" style="width:68px;font-size:12px;padding:3px 6px" onchange="_boardFocusNavRender()"></select>
+      <button class="btn btn-outline btn-xs" onclick="_boardFocusGoToday()">이번 달</button>
+    </div>
     <!-- 참고 자료 아코디언 -->
     <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden">
       <div onclick="_toggleFocusRef()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);cursor:pointer;user-select:none">
@@ -3218,6 +3224,16 @@ function switchBoardTab(tab){
       _initBoardWeekSelectors();
       _boardWeekNavRender();
     } else if(tab==='focus'){
+      // 연월 드롭다운 초기화
+      var yrEl=$('focus-sel-yr'),moEl=$('focus-sel-mo');
+      if(yrEl&&yrEl.options.length===0){
+        for(var y=2024;y<=2028;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===_focusYr)o.selected=true;yrEl.appendChild(o);}
+      }
+      if(moEl&&moEl.options.length===0){
+        for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';if(m===_focusMo)o2.selected=true;moEl.appendChild(o2);}
+      }
+      if(yrEl)yrEl.value=_focusYr;
+      if(moEl)moEl.value=_focusMo;
       _boardFocusNavRender();
     } else if(tab==='area'){
       _renderBoardAreaPanel();
@@ -3394,38 +3410,52 @@ function _renderFocusRefArea(){
   el.innerHTML=html;
 }
 
-// 중점 추진 탭 렌더링 - 현재 달 자동 기준
+// 중점 추진 탭 렌더링 - 연월 드롭다운
+var _focusYr=new Date().getFullYear();
+var _focusMo=new Date().getMonth()+1;
 function _boardFocusNavChange(){_boardFocusNavRender();}
 function _boardFocusNavRender(){
-  var now=new Date();
-  var yr=now.getFullYear(),mo=now.getMonth()+1;
+  // 드롭다운에서 선택한 연월 사용
+  var yrEl=$('focus-sel-yr'),moEl=$('focus-sel-mo');
+  if(yrEl&&yrEl.value)_focusYr=parseInt(yrEl.value);
+  if(moEl&&moEl.value)_focusMo=parseInt(moEl.value);
+  var yr=_focusYr,mo=_focusMo;
   var el=$('board-focus-area');if(!el)return;
   var moStr=String(mo).padStart(2,'0');
   var nextMo=mo===12?1:mo+1;
   var nextYr=mo===12?yr+1:yr;
   var moStart=yr+'-'+moStr+'-01';
   var moEnd=nextYr+'-'+String(nextMo).padStart(2,'0')+'-01';
+  var now=new Date();
+  var isCurrentMonth=(yr===now.getFullYear()&&mo===now.getMonth()+1);
   var monthlyItems=(_dbTasks||[]).filter(function(t){
     if(t.taskType!=='이달의 중점'||t.id&&t.id.startsWith('__'))return false;
-    if(t.status!=='완료')return true;
+    if(isCurrentMonth&&t.status!=='완료')return true;
     return t.dueDate>=moStart&&t.dueDate<moEnd;
   });
   var weeklyItems=(_dbTasks||[]).filter(function(t){
     if(t.taskType!=='이번 주 중점'||t.id&&t.id.startsWith('__'))return false;
-    if(t.status!=='완료')return true;
+    if(isCurrentMonth&&t.status!=='완료')return true;
     return t.dueDate>=moStart&&t.dueDate<moEnd;
   });
   var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
-  html+=_renderFocusSectionFiltered('monthly','🎯 '+yr+'년 '+mo+'월 이달의 중점 추진','#f0f9ff',monthlyItems,true);
-  html+=_renderFocusSectionFiltered('weekly','📅 '+yr+'년 '+mo+'월 이번 주 중점 추진','#f5f3ff',weeklyItems,true);
+  html+=_renderFocusSectionFiltered('monthly','🎯 이달의 중점 추진','#f0f9ff',monthlyItems,isCurrentMonth);
+  html+=_renderFocusSectionFiltered('weekly','📅 이번 주 중점 추진','#f5f3ff',weeklyItems,isCurrentMonth);
   html+='</div>';
   el.innerHTML=html;
 }
-function _boardFocusGoToday(){_boardFocusNavRender();}
+function _boardFocusGoToday(){
+  _focusYr=new Date().getFullYear();
+  _focusMo=new Date().getMonth()+1;
+  var yrEl=$('focus-sel-yr'),moEl=$('focus-sel-mo');
+  if(yrEl)yrEl.value=_focusYr;
+  if(moEl)moEl.value=_focusMo;
+  _boardFocusNavRender();
+}
 function _initBoardFocusSelectors(){}
 function _renderFocusSectionFiltered(type,title,color,items,isCurrentMonth){
   var done=items.filter(function(t){return t.status==='완료';}).length;
-  var addOnclick=type==='monthly'?'openMonthlyFocusModal()':'openDbTaskModal(null,null,\'이번 주 중점\')';
+  var addOnclick=type==='monthly'?'openMonthlyFocusModal()':'openMonthlyFocusModal()';
   var h='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
   h+='<div style="background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px">';
   h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+title+'</span>';
@@ -12139,7 +12169,7 @@ function _renderFocusSection(type,title,color,icon){
   var items=_dbFocusTasks(type);
   var done=items.filter(function(t){return t.status==='완료';}).length;
   var typeKey=type==='monthly'?'이달의 중점':'이번 주 중점';
-  var addOnclick=type==='monthly'?'openMonthlyFocusModal()':'openDbTaskModal(null,null,\'이번 주 중점\')';
+  var addOnclick=type==='monthly'?'openMonthlyFocusModal()':'openMonthlyFocusModal()';
   var h='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
   // 헤더
   h+='<div style="background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px">';
@@ -14893,14 +14923,22 @@ function _savePlan(overlay,editId){
           batch.set(db.collection('dashBoardV2').doc(taskId),dbTask);
           return dbTask;
         });
-        batch.commit().catch(function(e){console.error('플랜 실행업무 저장 오류:',e);});
-        toast('플랜이 등록됐어요 — 실행업무 '+tasks.length+'개가 할 일에 반영됐어요 ✅');
+        batch.commit().then(function(){
+          // _dbTasks 강제 재로드 후 오늘 할 일 반영
+          _dbTasks=null;
+          loadDashBoard(true).then(function(){
+            _renderBoardTodayPanel();
+          });
+          toast('플랜이 등록됐어요 — 실행업무 '+tasks.length+'개가 할 일에 반영됐어요 ✅');
+        }).catch(function(e){console.error('플랜 실행업무 저장 오류:',e);});
       }else{
         toast('플랜이 등록됐어요');
       }
       if(overlay)overlay.remove();
       _selectedPlanId=newPlan.id;
       renderPlansView();
+      // 저장 직후 상세 화면 즉시 표시
+      setTimeout(function(){renderPlanDetail(newPlan.id);},100);
       // 중점 추진 등록 여부 묻기
       setTimeout(function(){
         var ov2=document.createElement('div');
