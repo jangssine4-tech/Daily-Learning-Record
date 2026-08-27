@@ -14777,7 +14777,41 @@ function _openNewPlanModalInner(editPlan){
       +'<button onclick="_parsePlanTasks()" style="font-size:11px;color:var(--blue);background:none;border:1px solid var(--blue);border-radius:6px;padding:4px 12px;cursor:pointer;margin-top:6px">✨ 실행업무 자동 생성</button>'
       +'</div>'
       +'<div id="plan-tasks-preview" style="margin-top:8px"></div>'
-      :'')
+      :
+      // 편집 모달 — 기존 실행업무 + 날짜 재계산
+      '<div style="margin:8px 0">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">실행업무 <span style="font-size:11px;font-weight:400;color:var(--txt3)">('+( p.tasks&&p.tasks.length||0)+'개)</span></div>'
+      // 현재 실행업무 목록
+      +(p.tasks&&p.tasks.length?
+        '<div style="background:var(--surface2);border-radius:8px;overflow:hidden;margin-bottom:10px">'
+        +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
+        +'<tr style="background:var(--navy);color:#fff"><th style="padding:5px 8px;text-align:left">업무명</th><th style="padding:5px;white-space:nowrap">현재 날짜</th><th style="padding:5px">담당</th><th style="padding:5px">중요도</th></tr>'
+        +(p.tasks||[]).map(function(t){
+          return '<tr style="border-bottom:1px solid var(--border)">'
+            +'<td style="padding:5px 8px;'+(t.done?'text-decoration:line-through;color:var(--txt3)':'')+'">' +t.name+'</td>'
+            +'<td style="padding:5px;text-align:center;color:var(--txt3)">'+(t.date?t.date.slice(5):'-')+'</td>'
+            +'<td style="padding:5px;text-align:center">'+(t.manager||'-')+'</td>'
+            +'<td style="padding:5px;text-align:center;color:'+(t.priority==='높음'?'#dc2626':'var(--txt)')+'">'+( t.priority||'-')+'</td>'
+            +'</tr>';
+        }).join('')
+        +'</table></div>'
+        :'<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">등록된 실행업무가 없습니다</div>')
+      // D-Day 재계산 버튼
+      +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+      +'<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:4px">📅 D-Day 변경 시 날짜 재계산</div>'
+      +'<div style="font-size:11px;color:#78350f;margin-bottom:8px;line-height:1.6">위의 기준일(D-Day)을 수정한 후 아래 버튼을 누르면<br>모든 실행업무의 날짜가 새 D-Day 기준으로 재계산됩니다.</div>'
+      +'<button onclick="_recalcPlanTaskDates(\''+p.id+'\')" style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:5px 14px;cursor:pointer;font-weight:700">🔄 날짜 재계산</button>'
+      +'</div>'
+      // GPT 플랜 새로 붙여넣기
+      +'<div style="border-top:1px solid var(--border);padding-top:10px">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">GPT 플랜 새로 붙여넣기 <span style="font-size:10px;font-weight:400;color:var(--txt3)">(기존 업무 대체)</span></div>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px">형식: <code>업무명 | D-기준 | 담당 | 중요도</code></div>'
+      +'<textarea class="fi" id="plan-paste" rows="4" placeholder="수정된 GPT 플랜을 붙여넣으면 기존 실행업무가 대체됩니다" style="font-size:11px;font-family:monospace;line-height:1.6"></textarea>'
+      +'<button onclick="_parsePlanTasks()" style="font-size:11px;color:var(--blue);background:none;border:1px solid var(--blue);border-radius:6px;padding:4px 12px;cursor:pointer;margin-top:6px">✨ 실행업무 재생성</button>'
+      +'</div>'
+      +'<div id="plan-tasks-preview" style="margin-top:8px"></div>'
+      +'</div>'
+    )
     +'<button class="btn btn-navy btn-block" id="plan-save-btn">'+(isEdit?'저장':'등록')+'</button>'
     +'<button class="btn btn-outline btn-block" style="border-color:#10b981;color:#065f46;background:#f0fdf4" onclick="_registerPlanAsFocusTask(this.closest(\'.mo\'))">🎯 중점 추진으로도 등록</button>'
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
@@ -14786,6 +14820,49 @@ function _openNewPlanModalInner(editPlan){
   document.getElementById('plan-save-btn').onclick=function(){_savePlan(overlay,isEdit?p.id:null);};
 }
 
+
+// D-Day 변경 시 실행업무 날짜 재계산
+function _recalcPlanTaskDates(planId){
+  var newDday=($('plan-dday')||{}).value||'';
+  if(!newDday){toast('기준일(D-Day)을 먼저 입력해 주세요');return;}
+  var plan=_plans.find(function(p){return p.id===planId;});
+  if(!plan||!plan.tasks||!plan.tasks.length){toast('재계산할 실행업무가 없습니다');return;}
+  var oldDday=plan.dday||newDday;
+  var newDdayDate=new Date(newDday+'T00:00:00');
+  var oldDdayDate=new Date(oldDday+'T00:00:00');
+  var diffMs=newDdayDate-oldDdayDate;
+  var diffDays=Math.round(diffMs/86400000);
+  if(diffDays===0){toast('기준일이 변경되지 않았습니다');return;}
+  // 각 업무 날짜를 diffDays만큼 이동
+  plan.tasks.forEach(function(t){
+    if(!t.date)return;
+    var d=new Date(t.date+'T00:00:00');
+    d.setDate(d.getDate()+diffDays);
+    t.date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  });
+  plan.dday=newDday;
+  // Firestore 저장
+  db.collection('plans').doc(planId).update({tasks:plan.tasks,dday:newDday}).then(function(){
+    // dashBoardV2의 연동 업무도 날짜 업데이트
+    var linkedTasks=(_dbTasks||[]).filter(function(t){return t.planId===planId;});
+    if(linkedTasks.length){
+      var batch=db.batch();
+      linkedTasks.forEach(function(t){
+        if(!t.dueDate)return;
+        var d=new Date(t.dueDate+'T00:00:00');
+        d.setDate(d.getDate()+diffDays);
+        t.dueDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        batch.update(db.collection('dashBoardV2').doc(t.id),{dueDate:t.dueDate});
+      });
+      batch.commit().catch(function(e){console.error('날짜 재계산 오류:',e);});
+    }
+    toast('✅ 날짜가 '+Math.abs(diffDays)+'일 '+(diffDays>0?'뒤로':'앞으로')+' 재계산됐어요!');
+    // 모달 닫고 상세 갱신
+    var ov=document.querySelector('.mo');if(ov)ov.remove();
+    renderPlanDetail(planId);
+    renderPlansList();
+  }).catch(function(){toast('재계산 실패');});
+}
 
 function _registerPlanAsFocusTask(overlay,directName,directDday,directArea){
   var name=directName||($('plan-name')||{}).value||'';
