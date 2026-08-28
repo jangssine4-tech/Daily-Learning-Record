@@ -15096,7 +15096,7 @@ function _openNewPlanModalInner(editPlan){
       +'<span style="font-size:11px;color:var(--txt2)">붙여넣기 → ✨ 실행업무 재생성</span></div>'
       +'</div></div></div>'
       +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;margin-top:4px">형식: <code>업무명 | D-기준 | 담당 | 중요도</code></div>'
-      +'<textarea class="fi" id="plan-paste" rows="4" placeholder="초대문 발송 | D-14 | 원장 | 높음&#10;PPT 초안 완성 | D-7 | 원장 | 높음&#10;리허설 진행 | D-3 | 원장+교사 | 높음" style="font-size:11px;font-family:monospace;line-height:1.6"></textarea>'
+      +'<textarea class="fi" id="plan-paste" rows="4" placeholder="초대문 발송 | D-14 | 원장 | 높음&#10;PPT 초안 완성 | D-7 | 원장 | 높음&#10;리허설 진행 | D-3 | 원장+교사 | 높음" style="font-size:11px;font-family:monospace;line-height:1.6">'+((p.rawPlan||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'))+'</textarea>'
       +'<button onclick="_parsePlanTasks()" style="font-size:11px;color:var(--blue);background:none;border:1px solid var(--blue);border-radius:6px;padding:4px 12px;cursor:pointer;margin-top:6px">✨ 실행업무 재생성</button>'
       +'</div>'
       +'<div id="plan-tasks-preview" style="margin-top:8px"></div>'
@@ -15268,6 +15268,7 @@ function _savePlan(overlay,editId){
   var status=($('plan-status')||{}).value||'예정';
   var acalLink='';
   var tasks=window._parsedPlanTasks||null;
+  var rawPlan=($('plan-paste')||{}).value||'';
   window._parsedPlanTasks=null;
 
   if(editId){
@@ -15275,7 +15276,11 @@ function _savePlan(overlay,editId){
     var plan=_plans.find(function(p){return p.id===editId;});
     if(!plan)return;
     plan.name=name;plan.area=area;plan.dday=dday;plan.manager=manager;plan.status=status;plan.acalId=acalLink;
-    db.collection('plans').doc(editId).update({name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,updatedAt:new Date().toISOString()}).then(function(){
+    // 편집 모달에서 GPT 플랜 새로 붙여넣었으면 rawPlan 갱신
+    if(rawPlan.trim())plan.rawPlan=rawPlan;
+    var updateData={name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,updatedAt:new Date().toISOString()};
+    if(rawPlan.trim())updateData.rawPlan=rawPlan;
+    db.collection('plans').doc(editId).update(updateData).then(function(){
       toast('저장됐어요');
       if(overlay)overlay.remove();
       _selectedPlanId=editId;
@@ -15283,7 +15288,7 @@ function _savePlan(overlay,editId){
     }).catch(function(){toast('저장 실패');});
   }else{
     // 신규 — id는 Firestore가 생성한 것만 사용
-    var newPlan={name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,tasks:tasks||[],createdAt:new Date().toISOString()};
+    var newPlan={name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,tasks:tasks||[],rawPlan:rawPlan,createdAt:new Date().toISOString()};
     db.collection('plans').add(newPlan).then(function(ref){
       newPlan.id=ref.id;
       _plans.push(newPlan);
