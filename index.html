@@ -7921,15 +7921,41 @@ function _onConStudentChange(sId){
 }
 function _toggleConTag(el){
   el.classList.toggle('on');
+  // 기타 태그면 입력 필드 표시/숨김
+  if(el.dataset.val==='기타'){
+    var wrap=$('con-topic-etc-wrap');
+    if(wrap)wrap.style.display=el.classList.contains('on')?'':'none';
+    if(!el.classList.contains('on')&&$('con-topic-etc'))$('con-topic-etc').value='';
+  }
+  _updateConTopics();
+}
+function _onConEtcInput(){_updateConTopics();}
+function _updateConTopics(){
   var vals=[...document.querySelectorAll('#con-topic-tags .con-tag.on')].map(function(t){return t.dataset.val;});
+  // 기타가 선택됐고 직접 입력값이 있으면 대체
+  var etcVal=($('con-topic-etc')||{}).value||'';
+  if(vals.includes('기타')&&etcVal.trim()){
+    vals[vals.indexOf('기타')]='기타:'+etcVal.trim();
+  }
   var inp=$('con-topics');if(inp)inp.value=vals.join(',');
 }
 function _setConTags(topicsStr){
   document.querySelectorAll('#con-topic-tags .con-tag').forEach(function(t){t.classList.remove('on');});
+  var wrap=$('con-topic-etc-wrap');if(wrap)wrap.style.display='none';
+  if($('con-topic-etc'))$('con-topic-etc').value='';
   if(!topicsStr)return;
   topicsStr.split(',').forEach(function(v){
-    var tag=document.querySelector('#con-topic-tags .con-tag[data-val="'+v.trim()+'"]');
-    if(tag)tag.classList.add('on');
+    v=v.trim();
+    if(v.startsWith('기타:')){
+      // 기타 직접입력 복원
+      var tag=document.querySelector('#con-topic-tags .con-tag[data-val="기타"]');
+      if(tag)tag.classList.add('on');
+      if(wrap)wrap.style.display='';
+      if($('con-topic-etc'))$('con-topic-etc').value=v.slice(3);
+    } else {
+      var tag2=document.querySelector('#con-topic-tags .con-tag[data-val="'+v+'"]');
+      if(tag2)tag2.classList.add('on');
+    }
   });
   var inp=$('con-topics');if(inp)inp.value=topicsStr;
 }
@@ -18392,6 +18418,9 @@ if(document.readyState==='loading'){
   <span class="con-tag" data-val="친구관계" onclick="_toggleConTag(this)">친구관계</span>
   <span class="con-tag" data-val="교사요청" onclick="_toggleConTag(this)">교사요청</span>
   <span class="con-tag" data-val="기타" onclick="_toggleConTag(this)">기타</span>
+</div>
+<div id="con-topic-etc-wrap" style="display:none;margin-top:6px">
+  <input class="fi" id="con-topic-etc" placeholder="기타 상담 주제를 입력해 주세요" style="font-size:12px" oninput="_onConEtcInput()">
 </div>
 <input type="hidden" id="con-topics">
 
