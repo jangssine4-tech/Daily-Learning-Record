@@ -3263,6 +3263,14 @@ function switchBoardTab(tab){
 }
 
 // ── 오늘 할 일 패널 ──
+function toggleTaskDone(id,done){
+  var t=(_dbTasks||[]).find(function(x){return x.id===id;});
+  if(!t)return;
+  t.status=done?'완료':'대기';
+  saveTask(id);
+  _renderBoardAreaPanel();
+}
+
 function _renderBoardTodayPanel(){
   var el=$('board-panel-today');if(!el)return;
   var today=todayISO();
@@ -3505,8 +3513,44 @@ function _renderFocusSectionFiltered(type,title,color,items,isCurrentMonth){
 // ── 영역별 패널 ──
 function _renderBoardAreaPanel(){
   var el=$('board-area-area');if(!el)return;
+  var today=todayISO();
   var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
   html+='<div style="display:flex;justify-content:flex-end"><button class="btn btn-navy btn-sm" onclick="openDbTaskModal(null)">+ 업무 추가</button></div>';
+
+  // 플랜 연동 업무 섹션
+  var planTasks=(_dbTasks||[]).filter(function(t){return t.planId&&t.status!=='완료';});
+  if(planTasks.length){
+    // 플랜별로 그룹핑
+    var planGroups={};
+    planTasks.forEach(function(t){
+      var key=t.planId;
+      if(!planGroups[key])planGroups[key]={name:t.planName||'플랜',tasks:[]};
+      planGroups[key].tasks.push(t);
+    });
+    html+='<div style="border:1px solid #bfdbfe;border-radius:12px;overflow:hidden">';
+    html+='<div style="background:#eff6ff;padding:8px 14px;font-size:13px;font-weight:800;color:#1d4ed8">📋 실행 계획 업무</div>';
+    Object.values(planGroups).forEach(function(g){
+      html+='<div style="padding:8px 14px;border-top:1px solid #e0f2fe">';
+      html+='<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px">'+g.name+'</div>';
+      g.tasks.sort(function(a,b){return(a.dueDate||'')>(b.dueDate||'')?1:-1;}).forEach(function(t){
+        var isToday=t.dueDate===today;
+        var isOverdue=t.dueDate&&t.dueDate<today;
+        var daysLeft=t.dueDate?Math.round((new Date(t.dueDate)-new Date(today))/(86400000)):null;
+        var dateLabel=isOverdue?'<span style="color:#ef4444;font-size:10px">⚠️ D+'+Math.abs(daysLeft)+'</span>':
+                      isToday?'<span style="color:#10b981;font-size:10px;font-weight:700">오늘</span>':
+                      daysLeft!==null?'<span style="color:#6b7280;font-size:10px">D-'+daysLeft+'</span>':'';
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">'
+          +'<input type="checkbox" onchange="toggleTaskDone(\''+t.id+'\',this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--mint)">'
+          +'<span style="flex:1;font-size:12px;color:var(--txt)">'+(t.name||'')+'</span>'
+          +dateLabel
+          +'<span style="font-size:10px;color:var(--txt3)">'+(t.dueDate?t.dueDate.slice(5):'')+'</span>'
+          +'</div>';
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
   html+=_renderDbAreaView();
   html+='</div>';
   el.innerHTML=html;
@@ -4478,8 +4522,17 @@ function switchSchTab(tab){
 
 var _scheduleRenderTimer=null;
 function renderScheduleThrottled(){
-  if(_scheduleRenderTimer)return;
-  _scheduleRenderTimer=setTimeout(function(){_scheduleRenderTimer=null;renderSchedule();},1000);
+  if(_scheduleRenderTimer)clearTimeout(_scheduleRenderTimer);
+  _scheduleRenderTimer=setTimeout(function(){
+    _scheduleRenderTimer=null;
+    renderSchedule();
+    // 월간 시간표도 함께 갱신
+    var weeklyArea=$('weekly-timetable-area');
+    if(weeklyArea){
+      window._wtPlanData={};
+      renderWeeklyTimetable();
+    }
+  },800);
 }
 function fmt12h(t){
   // Convert "HH:MM" to "H:MM" (no AM/PM prefix - all classes are PM)
@@ -6253,9 +6306,12 @@ function renderSpecialPeriodInputs(){
   var selectedDays=[...document.querySelectorAll('#s-special-days .day-pill.on')].map(function(el){return el.dataset.day;});
   var area=$('s-special-periods-area');if(!area)return;
   // 기존 입력값 보존
-  var saved={};['월','화','수','목','금'].forEach(function(d){
-    var pn=$('sper-num-'+d),pt=$('sper-time-'+d),ph=$('sper-hours-'+d);
-    if(pn||pt||ph)saved[d]={period:pn?pn.value:'1',time:pt?pt.value:'',hours:ph?ph.value:'1'};
+  var saved={};['월','화','수','목','금','토'].forEach(function(d){
+    var pn=$('sper-num-'+d),tH=$('sper-time-h-'+d),tM=$('sper-time-m-'+d),ph=$('sper-hours-'+d);
+    if(pn||tH||ph){
+      var timeStr=(tH&&tH.value)?(tH.value+':'+(tM&&tM.value?tM.value:'00')):'';
+      saved[d]={period:pn?pn.value:'1',time:timeStr,hours:ph?ph.value:'1'};
+    }
   });
   // 교시 옵션 (특강 포함)
   var periodOpts=[{v:-1,l:'특강 1'},{v:-2,l:'특강 2'},{v:-3,l:'특강 3'},{v:1,l:'1교시'},{v:2,l:'2교시'},{v:3,l:'3교시'},{v:4,l:'4교시'},{v:5,l:'5교시'},{v:6,l:'6교시'},{v:7,l:'7교시'},{v:8,l:'8교시'},{v:9,l:'9교시'}];
@@ -6610,7 +6666,6 @@ async function saveStudent(){
       });
     }
     window._wtPlanData={};
-    closeM('student');
     loading(false);
     toast('✅ 저장됨');
     saveCacheDebounced();
@@ -15093,12 +15148,13 @@ function _savePlan(overlay,editId){
           return dbTask;
         });
         batch.commit().then(function(){
-          // _dbTasks 강제 재로드 후 오늘 할 일 반영
+          toast('플랜이 등록됐어요 — 실행업무 '+tasks.length+'개가 할 일에 반영됐어요 ✅');
+          // 강제 재로드 후 영역별 할 일 탭으로 이동 (플랜 업무는 영역별에서 가장 잘 보임)
           _dbTasks=null;
           loadDashBoard(true).then(function(){
-            _renderBoardTodayPanel();
+            goto('board');
+            setTimeout(function(){switchBoardTab('area');},150);
           });
-          toast('플랜이 등록됐어요 — 실행업무 '+tasks.length+'개가 할 일에 반영됐어요 ✅');
         }).catch(function(e){console.error('플랜 실행업무 저장 오류:',e);});
       }else{
         toast('플랜이 등록됐어요');
