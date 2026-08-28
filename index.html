@@ -7907,15 +7907,13 @@ function runAssignPanel(){
     +'<span style="font-size:11px;font-weight:400;color:var(--txt3);margin-left:8px">하늘색 = 추천 조합 · 숫자는 남은 자리</span></div>'
     +'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;table-layout:fixed"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
 }
-function renderConsults(){var sId=$('con-filter-student').value;var list=sId?consultations.filter(function(c){return c.studentId===sId;}):consultations;if(!list.length){$('consult-list').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">상담 기록 없음</div></div>';return;}var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green'};$('consult-list').innerHTML=list.map(function(c){var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';var contentPreview=c.content?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">💬 '+c.content.substring(0,50)+(c.content.length>50?'...':'')+'</div>':'';return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openConsultModal(\''+c.id+'\')"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap"><strong>'+c.studentName+'</strong><span style="font-size:11px;color:var(--txt2)">'+c.type+' · '+(c.teacher||'-')+'</span>'+csBadge+'</div><div style="font-size:10px;color:var(--txt3)">'+c.date+'</div>'+contentPreview+'</div>';}).join('');}
+function renderConsults(){var sId=$('con-filter-student').value;var list=sId?consultations.filter(function(c){return c.studentId===sId;}):consultations;if(!list.length){$('consult-list').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">상담 기록 없음</div></div>';return;}var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green'};$('consult-list').innerHTML=list.map(function(c){var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';var contentPreview=c.content?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">💬 '+c.content.substring(0,50)+(c.content.length>50?'...':'')+'</div>':'';var callTimeStr=c.callTime?'<span style="font-size:10px;color:#2563eb;background:#eff6ff;padding:1px 6px;border-radius:4px;margin-left:4px">📞 '+c.callTime+'</span>':'';return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openConsultModal(\''+c.id+'\')"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap"><strong>'+c.studentName+'</strong>'+callTimeStr+'<span style="font-size:11px;color:var(--txt2)">'+c.type+' · '+(c.teacher||'-')+'</span>'+csBadge+'</div><div style="font-size:10px;color:var(--txt3)">'+c.date+'</div>'+contentPreview+'</div>';}).join('');}
 function _onConStudentChange(sId){
   var info=$('con-student-info');if(!info)return;
   var s=students.find(function(x){return x.id===sId;});
-  if(!s){info.style.display='none';return;}
+  if(!s){info.innerHTML='';return;}
   var lastCon=consultations.filter(function(c){return c.studentId===sId;}).sort(function(a,b){return b.date>a.date?1:-1;})[0];
-  info.style.display='';
-  info.innerHTML='<span style="color:var(--navy);font-weight:700">'+s.name+'</span>'
-    +' &nbsp;·&nbsp; '+(s.grade||'-')
+  info.innerHTML=(s.grade||'-')
     +' &nbsp;·&nbsp; 담당: '+(s.teacher||'미정')
     +(lastCon?' &nbsp;·&nbsp; <span style="color:var(--txt3)">최근상담: '+lastCon.date+'</span>':'');
 }
@@ -18382,12 +18380,10 @@ if(document.readyState==='loading'){
 
 <!-- ① 기본 정보 -->
 <div style="border-left:3px solid var(--navy);padding-left:8px;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px">기본 정보</div>
-<div class="field">
-  <div class="fl">학생 *</div>
-  <select class="fi" id="con-student" onchange="_onConStudentChange(this.value)"><option value="">학생 선택</option></select>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+  <div style="flex:0 0 45%"><div class="fl">학생 *</div><select class="fi" id="con-student" onchange="_onConStudentChange(this.value)"><option value="">학생 선택</option></select></div>
+  <div id="con-student-info" style="flex:1;font-size:11px;color:var(--txt2);line-height:1.8;padding-top:16px"></div>
 </div>
-<!-- 학생 자동 정보 표시 -->
-<div id="con-student-info" style="display:none;background:var(--surface2);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:var(--txt2);line-height:1.8"></div>
 <div class="r2">
   <div class="field"><div class="fl">상담일</div><input type="date" class="fi" id="con-date"></div>
   <div class="field"><div class="fl">담당자</div><input class="fi" id="con-teacher" placeholder="담당 선생님"></div>
@@ -18475,7 +18471,10 @@ if(document.readyState==='loading'){
       <option value="완료">완료</option>
     </select>
   </div>
-  <div style="font-size:11px;color:#16a34a;margin-top:4px">💡 저장 시 할 일 탭에 후속 조치 업무가 자동 생성됩니다</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+    <div style="font-size:11px;color:#16a34a">💡 저장 시 할 일 탭에 후속 조치 업무가 자동 생성됩니다</div>
+    <button onclick="closeM('consult');setTimeout(function(){goto('memo');},100)" style="font-size:11px;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:3px 10px;cursor:pointer;flex-shrink:0">📌 메모로 이동 →</button>
+  </div>
 </div>
 
 <button class="btn btn-green btn-block" onclick="saveConsult()">저장</button>
