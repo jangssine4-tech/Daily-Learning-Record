@@ -94,7 +94,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
 .bg-navy{background:var(--navy);color:#fff}.bg-blue{background:#dbeafe;color:#1d4ed8}
 .bg-green{background:#dcfce7;color:#166534}.bg-red{background:#fee2e2;color:#991b1b}
-.bg-gold{background:#fef3c7;color:#92400e}.bg-gray{background:var(--surface2);color:var(--txt2)}
+.bg-gold{background:#fef3c7;color:#92400e}.bg-gray{background:#f1f5f9;color:#64748b}
 .bg-mint{background:#ccfbf1;color:#0f766e}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-end;justify-content:center;z-index:1000;backdrop-filter:blur(2px)}
 @media(min-width:600px){.mo{align-items:center}}
@@ -5269,7 +5269,7 @@ function renderPfConsult(sId){
   var el=$('pf-consult-area');if(!el)return;
   var list=consultations.filter(function(c){return c.studentId===sId;}).sort(function(a,b){return b.date>a.date?1:-1;});
   if(!list.length){el.innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">상담 기록 없음</div></div>';return;}
-  var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green'};
+  var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green','기록':'bg-gray','조치 필요':'bg-red','조치 중':'bg-gold','확인 필요':'bg-blue','완료':'bg-green'};
   el.innerHTML=list.map(function(c){
     var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';
     return '<div class="card" style="padding:12px;margin-bottom:8px">'
@@ -7907,7 +7907,7 @@ function runAssignPanel(){
     +'<span style="font-size:11px;font-weight:400;color:var(--txt3);margin-left:8px">하늘색 = 추천 조합 · 숫자는 남은 자리</span></div>'
     +'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;table-layout:fixed"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
 }
-function renderConsults(){var sId=$('con-filter-student').value;var list=sId?consultations.filter(function(c){return c.studentId===sId;}):consultations;if(!list.length){$('consult-list').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">상담 기록 없음</div></div>';return;}var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green'};$('consult-list').innerHTML=list.map(function(c){var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';var contentPreview=c.content?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">💬 '+c.content.substring(0,50)+(c.content.length>50?'...':'')+'</div>':'';var callTimeStr=c.callTime?'<span style="font-size:10px;color:#2563eb;background:#eff6ff;padding:1px 6px;border-radius:4px;margin-left:4px">📞 '+c.callTime+'</span>':'';return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openConsultModal(\''+c.id+'\')"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap"><strong>'+c.studentName+'</strong>'+callTimeStr+'<span style="font-size:11px;color:var(--txt2)">'+c.type+' · '+(c.teacher||'-')+'</span>'+csBadge+'</div><div style="font-size:10px;color:var(--txt3)">'+c.date+'</div>'+contentPreview+'</div>';}).join('');}
+function renderConsults(){var sId=$('con-filter-student').value;var list=sId?consultations.filter(function(c){return c.studentId===sId;}):consultations;if(!list.length){$('consult-list').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">상담 기록 없음</div></div>';return;}var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green','기록':'bg-gray','조치 필요':'bg-red','조치 중':'bg-gold','확인 필요':'bg-blue','완료':'bg-green'};$('consult-list').innerHTML=list.map(function(c){var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';var contentPreview=c.content?'<div style="font-size:11px;color:var(--txt3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">💬 '+c.content.substring(0,50)+(c.content.length>50?'...':'')+'</div>':'';var callTimeStr=c.callTime?'<span style="font-size:10px;color:#2563eb;background:#eff6ff;padding:1px 6px;border-radius:4px;margin-left:4px">📞 '+c.callTime+'</span>':'';return'<div class="card" style="padding:12px;cursor:pointer;margin-bottom:8px" onclick="openConsultModal(\''+c.id+'\')"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap"><strong>'+c.studentName+'</strong>'+callTimeStr+'<span style="font-size:11px;color:var(--txt2)">'+c.type+' · '+(c.teacher||'-')+'</span>'+csBadge+'</div><div style="font-size:10px;color:var(--txt3)">'+c.date+'</div>'+contentPreview+'</div>';}).join('');}
 function _onConStudentChange(sId){
   var info=$('con-student-info');if(!info)return;
   var s=students.find(function(x){return x.id===sId;});
@@ -8047,7 +8047,7 @@ function renderConsultCommentView(){
   var s=students.find(function(x){return x.id===sId;});
   var list=consultations.filter(function(c){return c.studentId===sId;}).sort(function(a,b){return b.date>a.date?1:-1;});
   if(!list.length){$('consult-list').innerHTML='<div class="empty"><div class="ei">💬</div><div class="et">'+(s?.name||'')+'의 상담 기록이 없습니다</div></div>';return;}
-  var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green'};
+  var csColors={'상담 예정':'bg-gold','상담 완료':'bg-green','기록':'bg-gray','조치 필요':'bg-red','조치 중':'bg-gold','확인 필요':'bg-blue','완료':'bg-green'};
   var html='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">💬 '+(s?.name||'')+' 상담 내용 모아보기 <span style="font-size:13px;font-weight:500;color:var(--txt3)">('+list.length+'건)</span></div>';
   html+=list.map(function(c){
     var csBadge=c.consultStatus?'<span class="badge '+(csColors[c.consultStatus]||'bg-gray')+'" style="font-size:9px">'+c.consultStatus+'</span>':'';
