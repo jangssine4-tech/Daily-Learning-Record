@@ -3272,10 +3272,22 @@ function switchBoardTab(tab){
     }
   }
 
-  if(_dbTasks){_doRender();}
-  else{
-    loadDashBoard(true).then(function(){loadFocusTasks();_doRender();})
-      .catch(function(e){console.error('switchBoardTab 로드 오류:',e);});
+  if(_dbTasks){
+    // today/weekly 탭은 플랜 업무도 표시하므로 _plans도 로드 보장
+    if((tab==='today'||tab==='weekly')&&(!_plans||!_plans.length)){
+      loadPlans().then(function(){_doRender();});
+    } else {
+      _doRender();
+    }
+  } else {
+    loadDashBoard(true).then(function(){
+      loadFocusTasks();
+      if((tab==='today'||tab==='weekly')&&(!_plans||!_plans.length)){
+        loadPlans().then(function(){_doRender();});
+      } else {
+        _doRender();
+      }
+    }).catch(function(e){console.error('switchBoardTab 로드 오류:',e);});
   }
 }
 
@@ -3298,6 +3310,19 @@ function _renderBoardTodayPanel(){
   html+=_renderDbTodayView(autoTasks,today,now);
   html+='</div>';
   el.innerHTML=html;
+  // _plans 미로드 시 로드 후 재렌더링
+  if(!_plans||!_plans.length){
+    loadPlans().then(function(){
+      var el2=$('board-panel-today');if(!el2)return;
+      var today2=todayISO();var now2=new Date();
+      var auto2=getAutoTodayTasks(today2);
+      var h2='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
+      h2+=_renderTodayTaskSection();
+      h2+=_renderDbTodayView(auto2,today2,now2);
+      h2+='</div>';
+      el2.innerHTML=h2;
+    });
+  }
 }
 
 // ── 주간 할 일 드롭다운 ──
@@ -3340,6 +3365,19 @@ function _boardWeekNavRender(){
   var el=$('board-weekly-area');if(!el)return;
   var now=new Date(wk.mon+'T00:00:00');
   el.innerHTML=_renderDbWeekViewForRange(wk.mon,wk.sun,now);
+  // _plans 미로드 시 로드 후 재렌더링
+  if(!_plans||!_plans.length){
+    loadPlans().then(function(){
+      var yrEl2=$('board-week-yr'),moEl2=$('board-week-mo'),wkEl2=$('board-week-wk');
+      if(!yrEl2||!moEl2||!wkEl2)return;
+      var yr2=parseInt(yrEl2.value),mo2=parseInt(moEl2.value);
+      var weeks2=_getWeeksOfMonth(yr2,mo2);
+      var wk2=weeks2[parseInt(wkEl2.value||0)];
+      if(!wk2)return;
+      var el2=$('board-weekly-area');if(!el2)return;
+      el2.innerHTML=_renderDbWeekViewForRange(wk2.mon,wk2.sun,new Date(wk2.mon+'T00:00:00'));
+    });
+  }
 }
 function _boardWeekGoToday(){
   var now=new Date();
