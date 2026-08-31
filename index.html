@@ -12785,7 +12785,7 @@ function _dbTaskRow(t,hideAreaBadge){
     +areaBadge
     +typeIcon
     +'<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+';cursor:pointer" onclick="openDbTaskModal(\''+t.id+'\')">'+t.name+'</span>'
-    +(t.dueDate?'<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.dueDate.slice(5)+'</span>':'')
+    +(t.startDate&&t.dueDate?'<span style="font-size:10px;color:#7c3aed;flex-shrink:0;background:#f5f3ff;padding:1px 5px;border-radius:4px">'+t.startDate.slice(5)+'~'+t.dueDate.slice(5)+'</span>':(!t.startDate&&t.dueDate?'<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.dueDate.slice(5)+'</span>':''))
     +'<select style="font-size:10px;border:1px solid var(--border);border-radius:6px;padding:1px 3px;background:var(--surface);color:'+(_DB_STATUS_COLORS[t.status]||'var(--txt)')+';cursor:pointer" onchange="_dbUpdateStatus(\''+t.id+'\',this.value)">'+statusOpts+'</select>'
     +'<button onclick="openDbTaskModal(\''+t.id+'\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt3);padding:0 2px" title="편집">✏️</button>'
     +'<button onclick="_dbDeleteTask(\''+t.id+'\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt3);padding:0 2px" title="삭제">✕</button>'
@@ -12859,13 +12859,43 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate){
   // 업무 영역
   var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
   var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
-  // 완료 기한 + 우선순위
-  var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
-  var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';dueInp.value=t&&t.dueDate?t.dueDate:(defaultDueDate||today);
+  // 기한 방식 선택 (단일 마감일 / 기간)
+  var isRange=!!(t&&t.startDate);
+  var dateWrap=document.createElement('div');dateWrap.style.marginBottom='10px';
+  // 라디오 토글
+  var radioRow=document.createElement('div');radioRow.style.cssText='display:flex;gap:14px;margin-bottom:8px';
+  ['single','range'].forEach(function(mode){
+    var lbl=document.createElement('label');lbl.style.cssText='display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:var(--txt)';
+    var rd=document.createElement('input');rd.type='radio';rd.name='dbt-date-mode';rd.value=mode;
+    rd.style.cssText='width:14px;height:14px;accent-color:var(--navy);cursor:pointer';
+    rd.checked=(mode==='range'?isRange:!isRange);
+    rd.onchange=function(){_dbtToggleDateMode(this.value);};
+    lbl.appendChild(rd);lbl.appendChild(document.createTextNode(mode==='single'?'완료 기한':'기간 설정'));
+    radioRow.appendChild(lbl);
+  });
+  dateWrap.appendChild(radioRow);
+  // 단일 기한 영역
+  var singleWrap=document.createElement('div');singleWrap.id='dbt-single-wrap';
+  singleWrap.style.display=isRange?'none':'';
+  var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';
+  dueInp.value=t&&t.dueDate?t.dueDate:(defaultDueDate||today);
+  singleWrap.appendChild(mkLbl('완료 기한'));singleWrap.appendChild(dueInp);
+  // 기간 설정 영역
+  var rangeWrap=document.createElement('div');rangeWrap.id='dbt-range-wrap';
+  rangeWrap.style.cssText='display:'+(isRange?'grid':'none')+';grid-template-columns:1fr 1fr;gap:8px';
+  var startInp=document.createElement('input');startInp.className='fi';startInp.id='dbt-start';startInp.type='date';startInp.style.fontSize='12px';
+  startInp.value=t&&t.startDate?t.startDate:(defaultDueDate||today);
+  var endInp=document.createElement('input');endInp.className='fi';endInp.id='dbt-end';endInp.type='date';endInp.style.fontSize='12px';
+  endInp.value=t&&t.dueDate?t.dueDate:(defaultDueDate||today);
+  var sdiv=document.createElement('div');sdiv.appendChild(mkLbl('시작일'));sdiv.appendChild(startInp);
+  var ediv=document.createElement('div');ediv.appendChild(mkLbl('종료일'));ediv.appendChild(endInp);
+  rangeWrap.appendChild(sdiv);rangeWrap.appendChild(ediv);
+  dateWrap.appendChild(singleWrap);dateWrap.appendChild(rangeWrap);
+  // 우선순위
   var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');
-  var dw=document.createElement('div');dw.appendChild(mkLbl('완료 기한'));dw.appendChild(dueInp);
+  var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
   var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
-  r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
+  r1.appendChild(dateWrap);r1.appendChild(pw);box.appendChild(r1);
   // 상위 업무
   var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';
   var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);
@@ -12897,20 +12927,40 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate){
   br.appendChild(canB);br.appendChild(savB);box.appendChild(br);
   modal.appendChild(box);document.body.appendChild(modal);nameInp.focus();
 }
+function _dbtToggleDateMode(mode){
+  var sw=document.getElementById('dbt-single-wrap');
+  var rw=document.getElementById('dbt-range-wrap');
+  if(!sw||!rw)return;
+  if(mode==='range'){
+    sw.style.display='none';rw.style.display='grid';
+  }else{
+    sw.style.display='';rw.style.display='none';
+  }
+}
 function _dbSaveTaskModal(id){
   var name=(document.getElementById('dbt-name')||{}).value||'';
   var area=(document.getElementById('dbt-area')||{}).value||'';
   var taskType=(document.getElementById('dbt-tasktype')||{}).value||'일반 업무';
   var priority=(document.getElementById('dbt-priority')||{}).value||'중요';
-  var dueDate=(document.getElementById('dbt-due')||{}).value||todayISO();
   var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
+  var modeEl=document.querySelector('input[name="dbt-date-mode"]:checked');
+  var mode=modeEl?modeEl.value:'single';
+  var dueDate,startDate;
+  if(mode==='range'){
+    startDate=(document.getElementById('dbt-start')||{}).value||todayISO();
+    dueDate=(document.getElementById('dbt-end')||{}).value||startDate;
+    if(dueDate<startDate)dueDate=startDate;
+  }else{
+    dueDate=(document.getElementById('dbt-due')||{}).value||todayISO();
+    startDate='';
+  }
   if(!name.trim()){alert('업무명을 입력하세요');return;}
   if(!_dbTasks)_dbTasks=[];
   if(id){
     var t=_dbTasks.find(function(x){return x.id===id;});
-    if(t){t.name=name;t.area=area;t.taskType=taskType;t.priority=priority;t.dueDate=dueDate;t.parentTask=parentTask;}
+    if(t){t.name=name;t.area=area;t.taskType=taskType;t.priority=priority;t.dueDate=dueDate;t.startDate=startDate||'';t.parentTask=parentTask;}
   }else{
-    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,taskType:taskType,priority:priority,dueDate:dueDate,parentTask:parentTask,status:'대기',cycle:'반복없음',memo:'',createdAt:todayISO()});
+    _dbTasks.push({id:'task_'+Date.now(),name:name,area:area,taskType:taskType,priority:priority,dueDate:dueDate,startDate:startDate||'',parentTask:parentTask,status:'대기',cycle:'반복없음',memo:'',createdAt:todayISO()});
   }
   // 신규/수정 모두 해당 task만 저장
   var savedId=id||(_dbTasks[_dbTasks.length-1]&&_dbTasks[_dbTasks.length-1].id);
