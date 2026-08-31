@@ -2648,9 +2648,7 @@ function goto(view){
     },true);
   }
   else if(view==='plans'){
-    _deduplicatePlansInFirestore().then(function(){
-      return loadPlans(true);
-    }).then(function(){renderPlansView();});
+    loadPlans(true).then(function(){renderPlansView();});
   }
   else if(view==='summary'){initYearSelects('summary');if(!revenues.length&&currentUser)Promise.all([loadRevenues(),loadExpenses()]).then(renderSummaryView);else renderSummaryView();}
 }
@@ -14625,11 +14623,19 @@ function _switchToPlansView(){
   if(plansView)plansView.classList.add('active');
   document.querySelectorAll('.sb-item').forEach(function(el){el.classList.remove('active');});
   var sb=document.getElementById('snav-plans');if(sb)sb.classList.add('active');
-  // 렌더링 — requestAnimationFrame으로 DOM 반영 후 실행 보장
-  requestAnimationFrame(function(){
+  // 연속 두 번 렌더링으로 DOM 반영 확실히 보장
+  setTimeout(function(){
     renderPlansList();
     if(_selectedPlanId)renderPlanDetail(_selectedPlanId);
-  });
+    // 혹시 첫 번째가 빈 화면이면 한 번 더
+    setTimeout(function(){
+      var listEl=document.getElementById('plans-list-col');
+      if(listEl&&listEl.children.length===0&&_plans.length>0){
+        renderPlansList();
+        if(_selectedPlanId)renderPlanDetail(_selectedPlanId);
+      }
+    },300);
+  },50);
 }
 
 function _deduplicatePlansInFirestore(){
@@ -15401,7 +15407,14 @@ function _savePlan(overlay,editId){
     var newPlan={name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,tasks:tasks||[],rawPlan:rawPlan,createdAt:new Date().toISOString()};
     db.collection('plans').add(newPlan).then(function(ref){
       newPlan.id=ref.id;
-      _plans.unshift(newPlan); // 목록 맨 앞에 추가
+      // 로딩 중인 Promise가 있으면 완료 후 push, 아니면 바로
+      var doInsert=function(){
+        // 이미 같은 id가 있으면 중복 삽입 방지
+        if(!_plans.find(function(p){return p.id===ref.id;})){
+          _plans.unshift(newPlan);
+        }
+      };
+      if(_plansLoading){_plansLoading.then(doInsert);}else{doInsert();}
 
       // 실행업무를 dashBoardV2에 날짜 기준으로 저장 → 할 일 탭 자동 반영
       if(tasks&&tasks.length){
