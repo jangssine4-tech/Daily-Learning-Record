@@ -14618,6 +14618,20 @@ function loadPlans(forceReload){
 
 
 // Firestore에 저장된 중복 플랜 문서를 이름 기준으로 정리 (같은 이름이면 가장 오래된 것만 남김)
+function _switchToPlansView(){
+  // 뷰 전환
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  var plansView=document.getElementById('view-plans');
+  if(plansView)plansView.classList.add('active');
+  document.querySelectorAll('.sb-item').forEach(function(el){el.classList.remove('active');});
+  var sb=document.getElementById('snav-plans');if(sb)sb.classList.add('active');
+  // 렌더링 — requestAnimationFrame으로 DOM 반영 후 실행 보장
+  requestAnimationFrame(function(){
+    renderPlansList();
+    if(_selectedPlanId)renderPlanDetail(_selectedPlanId);
+  });
+}
+
 function _deduplicatePlansInFirestore(){
   return db.collection('plans').orderBy('createdAt','asc').get().then(function(snap){
     var seen={};
@@ -15387,50 +15401,33 @@ function _savePlan(overlay,editId){
     var newPlan={name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,tasks:tasks||[],rawPlan:rawPlan,createdAt:new Date().toISOString()};
     db.collection('plans').add(newPlan).then(function(ref){
       newPlan.id=ref.id;
-      _plans.push(newPlan);
+      _plans.unshift(newPlan); // 목록 맨 앞에 추가
 
       // 실행업무를 dashBoardV2에 날짜 기준으로 저장 → 할 일 탭 자동 반영
       if(tasks&&tasks.length){
         var batch=db.batch();
-        var dbTasks=tasks.map(function(t){
+        tasks.forEach(function(t){
           var taskId='plan_'+ref.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
           var dbTask={
-            id:taskId,
-            name:t.name,
-            area:area,
-            taskType:'일반 업무',
-            priority:t.priority||'보통',
-            dueDate:t.date,
-            status:'대기',
-            cycle:'반복없음',
-            memo:'',
-            planId:ref.id,      // 어느 플랜에서 왔는지
-            planName:name,      // 플랜 이름 표시용
-            manager:t.manager||manager,
-            createdAt:todayISO()
+            id:taskId,name:t.name,area:area,taskType:'일반 업무',
+            priority:t.priority||'보통',dueDate:t.date,status:'대기',
+            cycle:'반복없음',memo:'',planId:ref.id,planName:name,
+            manager:t.manager||manager,createdAt:todayISO()
           };
           if(!_dbTasks)_dbTasks=[];
           _dbTasks.push(dbTask);
           batch.set(db.collection('dashBoardV2').doc(taskId),dbTask);
-          return dbTask;
         });
         batch.commit().then(function(){
           toast('플랜이 등록됐어요 — 실행업무 '+tasks.length+'개가 할 일에 반영됐어요 ✅');
-          _dbTasks=null;
-          loadDashBoard(true);
         }).catch(function(e){console.error('플랜 실행업무 저장 오류:',e);});
       }else{
         toast('플랜이 등록됐어요');
       }
       if(overlay)overlay.remove();
-      _selectedPlanId=newPlan.id;
-      // plans 뷰로 이동 후 즉시 렌더링
-      document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
-      var plansView=document.getElementById('view-plans');
-      if(plansView)plansView.classList.add('active');
-      document.querySelectorAll('.sb-item').forEach(function(el){el.classList.remove('active');});
-      var sb=document.getElementById('snav-plans');if(sb)sb.classList.add('active');
-      renderPlansView();
+      _selectedPlanId=ref.id;
+      // plans 뷰 전환 후 렌더링
+      _switchToPlansView();
       // 중점 추진 등록 여부 묻기
       setTimeout(function(){
         var ov2=document.createElement('div');
