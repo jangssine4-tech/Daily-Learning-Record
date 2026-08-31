@@ -12859,10 +12859,17 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate){
   // 업무 영역
   var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
   var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
-  // 기한 방식 선택 (단일 마감일 / 기간)
+  // 완료 기한 + 우선순위 (윗줄)
   var isRange=!!(t&&t.startDate);
-  var dateWrap=document.createElement('div');dateWrap.style.marginBottom='10px';
-  // 라디오 토글
+  var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px';
+  var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';
+  dueInp.value=t&&t.dueDate?t.dueDate:(defaultDueDate||today);
+  dueInp.style.display=isRange?'none':'';
+  var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');
+  var dw=document.createElement('div');dw.appendChild(mkLbl('완료 기한'));dw.appendChild(dueInp);
+  var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
+  r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
+  // 라디오 토글 (완료 기한 아래)
   var radioRow=document.createElement('div');radioRow.style.cssText='display:flex;gap:14px;margin-bottom:8px';
   ['single','range'].forEach(function(mode){
     var lbl=document.createElement('label');lbl.style.cssText='display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:var(--txt)';
@@ -12873,16 +12880,10 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate){
     lbl.appendChild(rd);lbl.appendChild(document.createTextNode(mode==='single'?'완료 기한':'기간 설정'));
     radioRow.appendChild(lbl);
   });
-  dateWrap.appendChild(radioRow);
-  // 단일 기한 영역
-  var singleWrap=document.createElement('div');singleWrap.id='dbt-single-wrap';
-  singleWrap.style.display=isRange?'none':'';
-  var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';
-  dueInp.value=t&&t.dueDate?t.dueDate:(defaultDueDate||today);
-  singleWrap.appendChild(mkLbl('완료 기한'));singleWrap.appendChild(dueInp);
-  // 기간 설정 영역
+  box.appendChild(radioRow);
+  // 기간 설정 영역 (라디오 아래, 기간 선택 시만 표시)
   var rangeWrap=document.createElement('div');rangeWrap.id='dbt-range-wrap';
-  rangeWrap.style.cssText='display:'+(isRange?'grid':'none')+';grid-template-columns:1fr 1fr;gap:8px';
+  rangeWrap.style.cssText='display:'+(isRange?'grid':'none')+';grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px';
   var startInp=document.createElement('input');startInp.className='fi';startInp.id='dbt-start';startInp.type='date';startInp.style.fontSize='12px';
   startInp.value=t&&t.startDate?t.startDate:(defaultDueDate||today);
   var endInp=document.createElement('input');endInp.className='fi';endInp.id='dbt-end';endInp.type='date';endInp.style.fontSize='12px';
@@ -12890,12 +12891,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate){
   var sdiv=document.createElement('div');sdiv.appendChild(mkLbl('시작일'));sdiv.appendChild(startInp);
   var ediv=document.createElement('div');ediv.appendChild(mkLbl('종료일'));ediv.appendChild(endInp);
   rangeWrap.appendChild(sdiv);rangeWrap.appendChild(ediv);
-  dateWrap.appendChild(singleWrap);dateWrap.appendChild(rangeWrap);
-  // 우선순위
-  var prSel=mkSel('dbt-priority',_DB_PRIORITIES.map(function(p){return{v:p,l:_DB_PRIORITY_SHORT[p]+' '+p};}),t?t.priority:'중요');
-  var r1=document.createElement('div');r1.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
-  var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
-  r1.appendChild(dateWrap);r1.appendChild(pw);box.appendChild(r1);
+  box.appendChild(rangeWrap);
   // 상위 업무
   var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';
   var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);
@@ -12928,13 +12924,13 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate){
   modal.appendChild(box);document.body.appendChild(modal);nameInp.focus();
 }
 function _dbtToggleDateMode(mode){
-  var sw=document.getElementById('dbt-single-wrap');
+  var due=document.getElementById('dbt-due');
   var rw=document.getElementById('dbt-range-wrap');
-  if(!sw||!rw)return;
+  if(!due||!rw)return;
   if(mode==='range'){
-    sw.style.display='none';rw.style.display='grid';
+    due.style.display='none';rw.style.display='grid';
   }else{
-    sw.style.display='';rw.style.display='none';
+    due.style.display='';rw.style.display='none';
   }
 }
 function _dbSaveTaskModal(id){
