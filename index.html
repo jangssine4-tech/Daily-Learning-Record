@@ -521,7 +521,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <div style="display:flex;align-items:center;gap:8px">
       <!-- 동기화 -->
       <div style="display:flex;align-items:center;gap:4px;position:relative">
-        <button class="btn btn-outline btn-sm" onclick="_syncAllPlanTasksToBoard()" style="font-size:11px;color:#6b7280">🔄 할 일 탭으로 동기화</button>
+        <button class="btn btn-outline btn-sm" onclick="_cleanupPlanTasksFromBoard()" style="font-size:11px;color:#ef4444">🧹 중복 정리</button>
         <button onclick="_toggleSyncGuide()" style="width:16px;height:16px;border-radius:50%;background:#e8f0f8;border:none;color:var(--navy);font-size:10px;font-weight:700;cursor:pointer;line-height:1;flex-shrink:0">?</button>
         <div id="sync-guide-box" style="display:none;position:absolute;top:28px;right:0;z-index:200;width:360px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.12)">
           <div style="width:8px;height:8px;background:var(--surface);border-left:1px solid var(--border);border-top:1px solid var(--border);transform:rotate(45deg);position:absolute;top:-5px;right:8px"></div>
@@ -15574,82 +15574,20 @@ function openEditPlanModal(planId){
 }
 
 
-// ── 기존 플랜 실행업무 → dashBoardV2 일괄 동기화 ──
-function _syncAllPlanTasksToBoard(){
-  if(!_plans||!_plans.length){toast('등록된 플랜이 없습니다');return;}
-
-  // 이미 동기화된 planId 목록 수집 (중복 방지)
-  var syncedPlanIds={};
-  (_dbTasks||[]).forEach(function(t){
-    if(t.planId)syncedPlanIds[t.planId]=true;
-  });
-
-  var toSync=_plans.filter(function(p){
-    return p.tasks&&p.tasks.length>0&&!syncedPlanIds[p.id];
-  });
-
-  if(!toSync.length){
-    toast('✅ 모든 플랜이 이미 동기화되어 있습니다');
-    return;
-  }
-
-  var totalTasks=0;
-  var batch=db.batch();
-
-  toSync.forEach(function(plan){
-    plan.tasks.forEach(function(t){
-      var taskId='plan_'+plan.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      var dbTask={
-        id:taskId,
-        name:t.name,
-        area:plan.area||'',
-        taskType:'일반 업무',
-        priority:t.priority||'보통',
-        dueDate:t.date||t.dueDate||todayISO(),
-        status:t.done?'완료':'대기',
-        cycle:'반복없음',
-        memo:'',
-        planId:plan.id,
-        planName:plan.name,
-        manager:t.manager||plan.manager||'원장',
-        createdAt:todayISO()
-      };
-      if(!_dbTasks)_dbTasks=[];
-      _dbTasks.push(dbTask);
-      batch.set(db.collection('dashBoardV2').doc(taskId),dbTask);
-      totalTasks++;
-    });
-  });
-
-  batch.commit().then(function(){
-    toast('✅ '+toSync.length+'개 플랜, '+totalTasks+'개 업무가 할 일에 동기화됐어요!');
-    // dashBoardV2 강제 재로드 후 할 일 탭으로 이동
-    _dbTasks=null;
-    loadDashBoard(true).then(function(){
-      goto('board');
-      setTimeout(function(){switchBoardTab('today');},100);
-    });
-  }).catch(function(e){
-    console.error('동기화 오류:',e);
-    toast('⚠️ 동기화 실패: '+e.message);
-  });
+// ── 기존 dashBoardV2에 저장된 planId 업무 일괄 삭제 ──
+function _cleanupPlanTasksFromBoard(){
+  if(!confirm('할 일 탭에 저장된 플랜 실행업무를 모두 삭제할까요?\n(실행 계획 관리의 데이터는 유지됩니다)'))return;
+  db.collection('dashBoardV2').where('planId','!=','').get().then(function(snap){
+    if(!snap.size){toast('삭제할 플랜 업무가 없어요');return;}
+    var batch=db.batch();
+    snap.docs.forEach(function(doc){batch.delete(doc.ref);});
+    batch.commit().then(function(){
+      _dbTasks=(_dbTasks||[]).filter(function(t){return !t.planId;});
+      toast('✅ '+snap.size+'개 플랜 업무 정리 완료');
+      _renderDashBoardUI($('dashboard-board-area'));
+    }).catch(function(e){toast('오류: '+e.message);});
+  }).catch(function(e){toast('조회 오류: '+e.message);});
 }
-
-function _toggleGptGuide(btn){
-  var box=document.getElementById('gpt-guide-box');
-  if(!box)return;
-  var isOpen=box.style.display!=='none';
-  box.style.display=isOpen?'none':'';
-  if(!isOpen){
-    setTimeout(function(){
-      document.addEventListener('click',function _close(e){
-        if(!box.contains(e.target)&&e.target!==btn){
-          box.style.display='none';
-          document.removeEventListener('click',_close);
-        }
-      });
-    },10);
-  }
 }
 
 function _togglePlanPasteGuide(btn){
@@ -16035,27 +15973,7 @@ function _savePlan(overlay,editId){
       };
       if(_plansLoading){_plansLoading.then(doInsert);}else{doInsert();}
 
-      // 실행업무를 dashBoardV2에 날짜 기준으로 저장 → 할 일 탭 자동 반영
-      if(tasks&&tasks.length){
-        var batch=db.batch();
-        tasks.forEach(function(t){
-          var taskId='plan_'+ref.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-          var dbTask={
-            id:taskId,name:t.name,detail:t.detail||'',area:area,taskType:'일반 업무',
-            priority:t.priority||'보통',dueDate:t.date,status:'대기',
-            cycle:'반복없음',memo:'',planId:ref.id,planName:name,
-            manager:t.manager||manager,createdAt:todayISO()
-          };
-          if(!_dbTasks)_dbTasks=[];
-          _dbTasks.push(dbTask);
-          batch.set(db.collection('dashBoardV2').doc(taskId),dbTask);
-        });
-        batch.commit().then(function(){
-          toast('플랜이 등록됐어요 — 실행업무 '+tasks.length+'개가 할 일에 반영됐어요 ✅');
-        }).catch(function(e){console.error('플랜 실행업무 저장 오류:',e);});
-      }else{
-        toast('플랜이 등록됐어요');
-      }
+      toast('플랜이 등록됐어요 ✅');
       if(overlay)overlay.remove();
       _selectedPlanId=ref.id;
       // plans 뷰 전환 후 렌더링
