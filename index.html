@@ -3337,82 +3337,16 @@ function toggleTaskDone(id,done){
 
 function _renderBoardTodayPanel(){
   var el=$('board-panel-today');if(!el)return;
-  var today=todayISO();
-  var now=new Date();
-  var autoTasks=getAutoTodayTasks(today);
-  var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
-  html+=_renderTodayTaskSection();
-  html+=_renderDbTodayView(autoTasks,today,now);
-  html+='</div>';
-  el.innerHTML=html;
-  // _plans 미로드 시 로드 후 재렌더링
-  if(!_plans||!_plans.length){
-    loadPlans().then(function(){
-      var el2=$('board-panel-today');if(!el2)return;
-      var today2=todayISO();var now2=new Date();
-      var auto2=getAutoTodayTasks(today2);
-      var h2='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
-      h2+=_renderTodayTaskSection();
-      h2+=_renderDbTodayView(auto2,today2,now2);
-      h2+='</div>';
-      el2.innerHTML=h2;
-    });
-  }
-}
-
-// ── 주간 할 일 드롭다운 ──
-var _boardWeekSelYr=null,_boardWeekSelMo=null,_boardWeekSelWk=null;
-function _initBoardWeekSelectors(){
-  var yrEl=$('board-week-yr'),moEl=$('board-week-mo');
-  if(!yrEl||yrEl.options.length>0)return;
-  var now=new Date();
-  for(var y=2024;y<=2028;y++){var o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===now.getFullYear())o.selected=true;yrEl.appendChild(o);}
-  for(var m=1;m<=12;m++){var o2=document.createElement('option');o2.value=m;o2.textContent=m+'월';if(m===now.getMonth()+1)o2.selected=true;moEl.appendChild(o2);}
-  _boardWeekNavChange();
-}
-function _boardWeekNavChange(){
-  var yrEl=$('board-week-yr'),moEl=$('board-week-mo'),wkEl=$('board-week-wk');
-  if(!yrEl||!moEl||!wkEl)return;
-  var yr=parseInt(yrEl.value),mo=parseInt(moEl.value);
-  wkEl.innerHTML='';
-  var weeks=_getWeeksOfMonth(yr,mo);
-  weeks.forEach(function(w,i){
-    var o=document.createElement('option');
-    o.value=i;
-    o.textContent=w.label;
-    wkEl.appendChild(o);
+  var p=(_plans&&_plans.length)?Promise.resolve():loadPlans();
+  p.then(function(){
+    var el2=$('board-panel-today');if(!el2)return;
+    var today=todayISO();var now=new Date();
+    var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
+    html+=_renderTodayTaskSection();
+    html+=_renderDbTodayView([],today,now);
+    html+='</div>';
+    el2.innerHTML=html;
   });
-  // 이번 주에 해당하는 주차 자동 선택
-  var now=new Date();
-  var nowStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  var selIdx=0;
-  weeks.forEach(function(w,i){if(nowStr>=w.mon&&nowStr<=w.sun)selIdx=i;});
-  wkEl.value=selIdx;
-  _boardWeekNavRender();
-}
-function _boardWeekNavRender(){
-  var yrEl=$('board-week-yr'),moEl=$('board-week-mo'),wkEl=$('board-week-wk');
-  if(!yrEl||!moEl||!wkEl)return;
-  var yr=parseInt(yrEl.value),mo=parseInt(moEl.value);
-  var weeks=_getWeeksOfMonth(yr,mo);
-  var wk=weeks[parseInt(wkEl.value||0)];
-  if(!wk)return;
-  var el=$('board-weekly-area');if(!el)return;
-  var now=new Date(wk.mon+'T00:00:00');
-  el.innerHTML=_renderDbWeekViewForRange(wk.mon,wk.sun,now);
-  // _plans 미로드 시 로드 후 재렌더링
-  if(!_plans||!_plans.length){
-    loadPlans().then(function(){
-      var yrEl2=$('board-week-yr'),moEl2=$('board-week-mo'),wkEl2=$('board-week-wk');
-      if(!yrEl2||!moEl2||!wkEl2)return;
-      var yr2=parseInt(yrEl2.value),mo2=parseInt(moEl2.value);
-      var weeks2=_getWeeksOfMonth(yr2,mo2);
-      var wk2=weeks2[parseInt(wkEl2.value||0)];
-      if(!wk2)return;
-      var el2=$('board-weekly-area');if(!el2)return;
-      el2.innerHTML=_renderDbWeekViewForRange(wk2.mon,wk2.sun,new Date(wk2.mon+'T00:00:00'));
-    });
-  }
 }
 function _boardWeekGoToday(){
   var now=new Date();
@@ -13029,8 +12963,9 @@ function _renderDbAreaView(){
   return html;
 }
 
-// ── 공통: 플랜 그룹 드롭다운 카드 렌더링 ──────────
+// ── 공통: 플랜 그룹 드롭다운 카드 (실행단계 > 업무 2단계 구조) ──────────
 function _renderPlanGroupCards(planTasks, ctxId){
+  // planId별 그룹핑
   var groups={};var order=[];
   planTasks.forEach(function(t){
     if(!groups[t._planId]){groups[t._planId]={name:t.planName,tasks:[]};order.push(t._planId);}
@@ -13043,38 +12978,106 @@ function _renderPlanGroupCards(planTasks, ctxId){
     var uid='pgc-'+ctxId+'-'+planId;
     var gPlan=(_plans||[]).find(function(p){return p.id===planId;});
     var hasDocs=gPlan&&gPlan.docs&&gPlan.docs.length>0;
-    h+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px">';
-    // 플랜 헤더 (클릭시 토글)
-    h+='<div onclick="_togglePlanGroupCard(\''+uid+'\')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface2);cursor:pointer;user-select:none">';
-    h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">📋 '+g.name+'</span>';
-    h+='<span style="font-size:11px;color:var(--txt3)">'+gDone+'/'+g.tasks.length+'</span>';
-    if(hasDocs)h+='<button onclick="event.stopPropagation();_toggleWeeklyDocs(\''+planId+'\')" style="margin-left:auto;font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:5px;background:white;cursor:pointer;color:var(--txt2)">📄 '+gPlan.docs.length+'개</button>';
-    h+='<span id="pgc-icon-'+uid+'" style="'+(hasDocs?'':'margin-left:auto;')+' font-size:13px;color:var(--txt3);transition:transform .2s;transform:rotate(-90deg)">▾</span>';
-    h+='</div>';
-    // 업무 목록 (기본 접힘)
-    h+='<div id="'+uid+'" style="display:none;padding:4px 12px;background:var(--surface)">';
+    // 실행단계별 그룹핑
+    var stageGroups={};var stageOrder=[];
     g.tasks.forEach(function(t){
-      var isDone=t.done;
-      var tName=t.name||'';var tDetail=t.detail||'';
-      if(!tDetail){var ci=tName.indexOf(':');if(ci>0){tDetail=tName.slice(ci+1).trim();tName=tName.slice(0,ci).trim();}}
-      h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">';
-      h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
-      h+='<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+tName+'</span>';
-      h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.date.slice(5)+'</span>';
-      h+='</div>';
+      var s=t.stage||'실행업무';
+      if(!stageGroups[s]){stageGroups[s]=[];stageOrder.push(s);}
+      stageGroups[s].push(t);
     });
+    var hasStages=stageOrder.length>1||(stageOrder.length===1&&stageOrder[0]!=='실행업무');
+    // 진행률
+    var pct=g.tasks.length?Math.round(gDone/g.tasks.length*100):0;
+    h+='<div style="border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden;margin-bottom:8px">';
+    // 플랜 헤더
+    h+='<div onclick="_togglePlanGroupCard(\''+uid+'\',\'pgc-icon-'+uid+'\',\'pgc-body-'+uid+'\')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#eff6ff;cursor:pointer;user-select:none">';
+    h+='<span style="font-size:13px;font-weight:800;color:#1d4ed8">📋 '+g.name+'</span>';
+    h+='<span style="font-size:11px;color:#3b82f6">'+gDone+'/'+g.tasks.length+'</span>';
+    if(hasDocs)h+='<button onclick="event.stopPropagation();_toggleWeeklyDocs(\''+planId+'\')" style="margin-left:auto;font-size:10px;padding:2px 7px;border:1px solid #bfdbfe;border-radius:5px;background:white;cursor:pointer;color:#1d4ed8">📄 '+gPlan.docs.length+'개</button>';
+    h+='<span id="pgc-icon-'+uid+'" style="'+(hasDocs?'':'margin-left:auto;')+'font-size:13px;color:#3b82f6;transition:transform .2s;transform:rotate(-90deg)">▾</span>';
+    h+='</div>';
+    // 진행률 바
+    h+='<div style="background:#dbeafe;height:4px"><div style="background:#2563eb;width:'+pct+'%;height:4px;transition:width .3s"></div></div>';
+    // 본문 (기본 접힘)
+    h+='<div id="pgc-body-'+uid+'" style="display:none;background:var(--surface)">';
+    if(hasStages){
+      // 실행단계 > 업무 2단계 구조
+      stageOrder.forEach(function(stage,si){
+        var sTasks=stageGroups[stage];
+        var sDone=sTasks.filter(function(t){return t.done;}).length;
+        var sUid='pgc-s-'+ctxId+'-'+planId+'-'+si;
+        var firstDate=sTasks.reduce(function(min,t){return(!min||t.date<min)?t.date:min;},'');
+        var lastDate=sTasks.reduce(function(max,t){return(!max||t.date>max)?t.date:max;},'');
+        var dateRange=firstDate?(firstDate===lastDate?firstDate.slice(5):firstDate.slice(5)+'~'+lastDate.slice(5)):'';
+        h+='<div style="border-bottom:1px solid #e0f2fe">';
+        h+='<div onclick="_togglePlanGroupCard(\''+sUid+'\',\'pgc-si-'+sUid+'\',\'pgc-sb-'+sUid+'\')" style="display:flex;align-items:center;gap:8px;padding:8px 12px 8px 16px;cursor:pointer;background:var(--surface2);user-select:none">';
+        h+='<span style="font-size:12px;font-weight:700;color:var(--navy)">📌 '+stage+'</span>';
+        h+='<span style="font-size:10px;color:var(--txt3)">'+sDone+'/'+sTasks.length+'</span>';
+        if(dateRange)h+='<span style="font-size:10px;color:#3b82f6;background:#eff6ff;padding:1px 6px;border-radius:8px">'+dateRange+'</span>';
+        h+='<span id="pgc-si-'+sUid+'" style="margin-left:auto;font-size:12px;color:var(--txt3);transform:rotate(-90deg);transition:transform .2s">▾</span>';
+        h+='</div>';
+        h+='<div id="pgc-sb-'+sUid+'" style="display:none;padding:4px 0 4px 16px">';
+        sTasks.forEach(function(t){
+          h+=_renderPlanTaskRow(t,planId);
+        });
+        h+='</div></div>';
+      });
+    } else {
+      // 단계 없이 업무 목록만
+      h+='<div style="padding:4px 0 4px 8px">';
+      g.tasks.forEach(function(t){h+=_renderPlanTaskRow(t,planId);});
+      h+='</div>';
+    }
     h+='</div></div>';
   });
   return h;
 }
 
-function _togglePlanGroupCard(uid){
-  var el=document.getElementById(uid);
-  var icon=document.getElementById('pgc-icon-'+uid);
+// 개별 업무 행 렌더링
+function _renderPlanTaskRow(t, planId){
+  var isDone=t.done;
+  var tName=t.name||'';var tDetail=t.detail||'';var tCriterion=t.criterion||'';
+  if(!tDetail&&tName.indexOf(':')>0){var ci=tName.indexOf(':');tDetail=tName.slice(ci+1).trim();tName=tName.slice(0,ci).trim();}
+  var pc=t.priority==='높음'?'#dc2626':t.priority==='낮음'?'#94a3b8':'#2563eb';
+  var detUid='ptrow-'+planId+'-'+t._taskIdx;
+  var h='<div style="border-bottom:1px solid var(--border);padding:6px 8px">';
+  h+='<div style="display:flex;align-items:center;gap:8px">';
+  h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+(t._planId||planId)+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
+  h+='<div style="flex:1;min-width:0'+(tDetail||tCriterion?';cursor:pointer":onclick="_togglePlanTaskDetail(\''+detUid+'\')"':'"')+'>';
+  h+='<div style="font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+tName+'</div>';
+  if(t.manager||t.date)h+='<div style="font-size:10px;color:var(--txt3)">'+t.manager+(t.date?' · '+t.date.slice(5):'')+'</div>';
+  h+='</div>';
+  if(tDetail||tCriterion)h+='<button onclick="_togglePlanTaskDetail(\''+detUid+'\')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:13px;flex-shrink:0">▾</button>';
+  h+='</div>';
+  if(tDetail||tCriterion){
+    h+='<div id="'+detUid+'" style="display:none;margin:4px 0 2px 24px;padding:6px 10px;background:#eff6ff;border-radius:8px;border-left:3px solid '+pc+'">';
+    if(tDetail)h+='<div style="font-size:11px;color:#1e40af;line-height:1.7;margin-bottom:'+(tCriterion?'6px':'0')+'">'+tDetail+'</div>';
+    if(tCriterion)h+='<div style="font-size:10px;font-weight:700;color:#1d4ed8">✅ 완료기준: <span style="font-weight:400">'+tCriterion+'</span></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+function _togglePlanGroupCard(bodyId, iconId, bodyElId){
+  // 이전 방식 호환
+  var uid=bodyId;
+  var elId=bodyElId||('pgc-body-'+uid.replace('pgc-',''));
+  var iconElId=iconId||('pgc-icon-'+uid.replace('pgc-',''));
+  var el=document.getElementById(elId)||document.getElementById(uid);
+  var icon=document.getElementById(iconElId);
   if(!el)return;
   var isOpen=el.style.display!=='none';
   el.style.display=isOpen?'none':'';
   if(icon)icon.style.transform=isOpen?'rotate(-90deg)':'rotate(0deg)';
+}
+
+function _togglePlanTaskDetail(uid){
+  var el=document.getElementById(uid);if(!el)return;
+  var isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'block';
+  var btn=el.previousElementSibling&&el.previousElementSibling.querySelector('button');
+  if(btn)btn.textContent=isOpen?'▾':'▴';
 }
 
 // ── 업무 행 렌더링 ────────────────────────────────
@@ -15711,8 +15714,8 @@ function _openNewPlanModalInner(editPlan){
       +'<div style="display:flex;gap:8px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#e8f0f8;color:var(--navy);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><span style="font-size:11px;color:var(--txt2)">실행 계획 변환 확인</span></div>'
       +'<div style="display:flex;gap:8px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#d1fae5;color:#065f46;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div><span style="font-size:11px;color:var(--txt2)">붙여넣기 → ✨ 실행업무 자동 생성</span></div>'
       +'</div></div></div></div>'
-      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;margin-top:6px;line-height:1.7">형식: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">업무명 | D-기준 | 담당 | 중요도</code></div>'
-      +'<textarea class="fi" id="plan-paste" rows="6" placeholder="홍보문 초안 작성 | D-21 | 원장 | 높음&#10;초대 대상 선정 | D-21 | 원장 | 높음&#10;개별 초대 발송 | D-14 | 원장 | 높음&#10;PPT 초안 완성 | D-7 | 원장 | 높음&#10;리허설 진행 | D-3 | 원장+교사 | 높음&#10;감사 메시지 발송 | D+1 | 원장 | 보통" style="font-size:11px;font-family:monospace;line-height:1.7"></textarea>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;margin-top:6px;line-height:1.7">형식: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">실행단계 | 일정 | 업무 | 세부내용 | 담당자 | 중요도 | 완료기준</code></div>'
+      +'<textarea class="fi" id="plan-paste" rows="6" placeholder="초기 실행 준비 | D-21 | 초대 대상 선정 | 기존 학부모 중 초4~6 대상자 분류 | 원장 | 높음 | 초대 명단 확정&#10;콘텐츠 완성 | D-10 | PPT 초안 제작 | 핵심 5장 구성 | 원장 | 높음 | 초안 완성&#10;리허설 | D-3 | 최종 리허설 진행 | 발표 흐름 점검 | 원장+교사 | 높음 | 오류 없이 진행" style="font-size:11px;font-family:monospace;line-height:1.7"></textarea>'
       +'<button onclick="_parsePlanTasks()" style="font-size:11px;color:var(--blue);background:none;border:1px solid var(--blue);border-radius:6px;padding:4px 12px;cursor:pointer;margin-top:6px">✨ 실행업무 자동 생성</button>'
       +'</div>'
       +'<div id="plan-tasks-preview" style="margin-top:8px"></div>'
@@ -15858,79 +15861,91 @@ function _parsePlanTasks(){
   if(!text.trim()){toast('플랜 내용을 붙여넣으세요');return;}
 
   var lines=text.trim().split('\n').map(function(l){return l.trim();}).filter(function(l){
-    return l&&!l.startsWith('업무명')&&!l.includes('---')&&!l.includes('──')&&!l.startsWith('#')&&l.length>1;
+    return l&&!l.match(/^실행.단계/)&&!l.match(/^업무명/)&&!l.includes('---')&&!l.includes('──')&&!l.startsWith('#')&&l.length>1;
   });
 
-  console.log('[플랜파싱] 전체 줄 수:',lines.length,'D-Day:',dday);
+  // 형식 자동 감지: 5열 이상 = 신형식(7열), 미만 = 구형식(4열)
+  var isNewFormat=false;
+  for(var i=0;i<Math.min(lines.length,5);i++){
+    if(lines[i].split('|').length>=5){isNewFormat=true;break;}
+  }
 
   var tasks=[];
+  var stages={};
+  var stageOrder=[];
+
   lines.forEach(function(line){
-    // | 구분자 파싱
     var parts=line.split('|').map(function(s){return s.trim();}).filter(function(s){return s;});
-    console.log('[플랜파싱] 줄:',line,'→ parts:',parts);
+    if(!parts.length)return;
 
-    // 최소 1개 파트 + D-Day 패턴이 있으면 파싱 시도
-    var name='',dRef='D-0',manager='원장',priority='보통';
-    if(parts.length>=2){
-      name=parts[0];
-      dRef=parts[1];
-      manager=parts[2]||'원장';
-      priority=parts[3]||'보통';
-    } else if(parts.length===1){
-      // | 없이 D-0 패턴이 줄 안에 있는 경우
-      var dm=line.match(/D([+-]?\d+)/i);
-      if(dm){
-        dRef=dm[0];
-        name=line.replace(dm[0],'').replace(/[|·\-]/g,'').trim();
-      } else {
-        return; // 파싱 불가
-      }
+    if(isNewFormat&&parts.length>=3){
+      // 신형식: 실행단계 | 일정 | 업무 | 세부내용 | 담당자 | 중요도 | 완료기준
+      var stage=parts[0]||'기타';
+      var dRef=parts[1]||'D-0';
+      var taskName=parts[2]||'';
+      var detail=parts[3]||'';
+      var manager=parts[4]||'원장';
+      var priority=parts[5]||'보통';
+      var criterion=parts[6]||'';
+      if(!taskName)return;
+      var offset=0;var m=dRef.match(/D([+-]?\d+)/i);
+      if(m)offset=parseInt(m[1]);
+      var td=new Date(dday);td.setDate(td.getDate()+offset);
+      var dateStr=td.getFullYear()+'-'+String(td.getMonth()+1).padStart(2,'0')+'-'+String(td.getDate()).padStart(2,'0');
+      if(!stages[stage]){stages[stage]=[];stageOrder.push(stage);}
+      var task={name:taskName,detail:detail,date:dateStr,dRef:dRef,manager:manager,priority:priority,criterion:criterion,done:false,stage:stage};
+      stages[stage].push(task);
+      tasks.push(task);
     } else {
-      return;
+      // 구형식: 업무명 | D-기준 | 담당 | 중요도
+      var name=parts[0]||'';
+      var dRef2=parts[1]||'D-0';
+      var manager2=parts[2]||'원장';
+      var priority2=parts[3]||'보통';
+      if(!name)return;
+      var offset2=0;var m2=dRef2.match(/D([+-]?\d+)/i);
+      if(m2)offset2=parseInt(m2[1]);
+      var td2=new Date(dday);td2.setDate(td2.getDate()+offset2);
+      var dateStr2=td2.getFullYear()+'-'+String(td2.getMonth()+1).padStart(2,'0')+'-'+String(td2.getDate()).padStart(2,'0');
+      var detail2='';var colonIdx=name.indexOf(':');
+      if(colonIdx>0){detail2=name.slice(colonIdx+1).trim();name=name.slice(0,colonIdx).trim();}
+      var stage2='실행업무';
+      if(!stages[stage2]){stages[stage2]=[];stageOrder.push(stage2);}
+      var task2={name:name,detail:detail2,date:dateStr2,dRef:dRef2,manager:manager2,priority:priority2,criterion:'',done:false,stage:stage2};
+      stages[stage2].push(task2);
+      tasks.push(task2);
     }
-    if(!name)return;
-
-    var offset=0;var m=dRef.match(/D([+-]?\d+)/i);
-    if(m)offset=parseInt(m[1]);
-    var taskDate=new Date(dday);taskDate.setDate(taskDate.getDate()+offset);
-    var dateStr=taskDate.getFullYear()+'-'+String(taskDate.getMonth()+1).padStart(2,'0')+'-'+String(taskDate.getDate()).padStart(2,'0');
-    // 업무명: 세부내용 형식이면 분리
-    var detail='';
-    var colonIdx=name.indexOf(':');
-    if(colonIdx>0&&colonIdx<name.length-1){
-      detail=name.slice(colonIdx+1).trim();
-      name=name.slice(0,colonIdx).trim();
-    }
-    tasks.push({name:name,detail:detail,date:dateStr,dRef:dRef,manager:manager,priority:priority,done:false});
   });
 
-  console.log('[플랜파싱] 파싱된 업무 수:',tasks.length);
+  if(!tasks.length){toast('파싱된 업무가 없어요. 형식을 확인해 주세요.');return;}
 
-  if(!tasks.length){
-    toast('파싱된 업무가 없어요. 콘솔(F12)에서 형식을 확인해 주세요.\n형식: 업무명 | D-21 | 원장 | 높음');
-    return;
-  }
+  // 프리뷰 — 실행단계별 그룹으로 표시
   var preview=$('plan-tasks-preview');
   if(preview){
-    var html='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">✅ '+tasks.length+'개 업무 생성 예정</div>'
-      +'<div style="background:var(--surface2);border-radius:8px;overflow:hidden">'
-      +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
-      +'<tr style="background:var(--navy);color:#fff"><th style="padding:5px 8px;text-align:left">업무명</th><th style="padding:5px">실행일</th><th style="padding:5px">담당</th><th style="padding:5px">중요도</th></tr>';
-    tasks.forEach(function(t){
-      html+='<tr style="border-bottom:1px solid var(--border)">'
-        +'<td style="padding:5px 8px">'+t.name+'</td>'
-        +'<td style="padding:5px;text-align:center">'+t.date.slice(5)+'</td>'
-        +'<td style="padding:5px;text-align:center">'+t.manager+'</td>'
-        +'<td style="padding:5px;text-align:center;color:'+(t.priority==='높음'?'#dc2626':t.priority==='낮음'?'#94a3b8':'var(--txt)')+'">'+t.priority+'</td>'
-        +'</tr>';
+    var html='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px">✅ '+tasks.length+'개 업무 / '+stageOrder.length+'개 실행단계 생성 예정</div>';
+    stageOrder.forEach(function(stage){
+      var sTasks=stages[stage];
+      html+='<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:6px">';
+      html+='<div style="background:var(--navy);color:white;padding:5px 10px;font-size:11px;font-weight:700">📌 '+stage+' ('+sTasks.length+'개)</div>';
+      html+='<table style="width:100%;font-size:11px;border-collapse:collapse">';
+      html+='<tr style="background:var(--surface2)"><th style="padding:4px 8px;text-align:left">업무</th><th style="padding:4px">일정</th><th style="padding:4px">담당</th><th style="padding:4px">중요도</th></tr>';
+      sTasks.forEach(function(t){
+        html+='<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:4px 8px">'+t.name+(t.detail?'<div style="font-size:10px;color:var(--txt3)">'+t.detail+'</div>':'')+'</td>'
+          +'<td style="padding:4px;text-align:center;white-space:nowrap">'+t.date.slice(5)+'</td>'
+          +'<td style="padding:4px;text-align:center">'+t.manager+'</td>'
+          +'<td style="padding:4px;text-align:center;color:'+(t.priority==='높음'?'#dc2626':'var(--txt)')+'">'+t.priority+'</td>'
+          +'</tr>';
+      });
+      html+='</table></div>';
     });
-    html+='</table></div>';
     preview.innerHTML=html;
   }
   window._parsedPlanTasks=tasks;
-  toast(tasks.length+'개 업무가 생성될 예정이에요');
+  window._parsedPlanStages=stages;
+  window._parsedPlanStageOrder=stageOrder;
+  toast(tasks.length+'개 업무 ('+stageOrder.length+'개 실행단계) 생성 예정');
 }
-
 function _savePlan(overlay,editId){
   var name=($('plan-name')||{}).value||'';
   if(!name.trim()){toast('플랜명을 입력하세요');return;}
