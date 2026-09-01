@@ -13005,40 +13005,58 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
 function _renderDbAreaView(){
   var areas=_dbAreaFilter?[_dbAreaFilter]:_DB_AREAS;
   var allTasks=_dbFiltered((_dbTasks||[]).filter(function(t){return !t.id||!t.id.startsWith('__');}));
-  var today=todayISO();
   var html='';
-  // 이번 달 플랜 업무 (영역별)
+  // 이번 달 전체 플랜 업무 — 영역별로 분류
   var now=new Date();
   var moStr=String(now.getMonth()+1).padStart(2,'0');
   var moStart=now.getFullYear()+'-'+moStr+'-01';
   var nextMo=now.getMonth()+2;var nextYr=now.getFullYear();
   if(nextMo>12){nextMo=1;nextYr++;}
   var moEnd=nextYr+'-'+String(nextMo).padStart(2,'0')+'-01';
-  var planAllTasks=getPlanTasksForRange(moStart,moEnd);
-  if(planAllTasks.length){
-    html+='<div style="border:1.5px solid #bfdbfe;border-radius:12px;overflow:hidden;margin-bottom:10px">';
-    html+='<div style="background:#eff6ff;padding:8px 14px">';
-    html+='<span style="font-size:13px;font-weight:800;color:#1d4ed8">📋 이달의 플랜 업무</span>';
-    html+='</div>';
-    html+='<div style="padding:6px 14px;background:var(--surface)">';
-    html+=_renderPlanGroupCards(planAllTasks,'area');
-    html+='</div></div>';
-  }
+  // planId → area 매핑
+  var planAreaMap={};
+  (_plans||[]).forEach(function(p){if(p.id&&p.area)planAreaMap[p.id]=p.area;});
+  var allPlanTasks=getPlanTasksForRange(moStart,moEnd);
+  // 영역별 플랜 업무 그룹
+  var planByArea={};
+  allPlanTasks.forEach(function(t){
+    var area=planAreaMap[t._planId]||'';
+    if(!area)return;
+    // 학부모 소통 - 설명회 → 학부모 소통 상위로도 매핑
+    var areaKey=area;
+    if(!planByArea[areaKey])planByArea[areaKey]=[];
+    planByArea[areaKey].push(t);
+  });
   areas.forEach(function(area){
     var items=allTasks.filter(function(t){return t.area===area;});
     var active=items.filter(function(t){return t.status!=='완료'&&t.status!=='보류';});
     var done=items.filter(function(t){return t.status==='완료';}).length;
+    // 이 영역의 플랜 업무 (하위 영역 포함: 학부모 소통 - 설명회 등)
+    var areaPlanTasks=[];
+    Object.keys(planByArea).forEach(function(k){
+      if(k===area||k.indexOf(area+' -')===0||k.indexOf(area)===0){
+        areaPlanTasks=areaPlanTasks.concat(planByArea[k]);
+      }
+    });
+    var totalCount=active.length+areaPlanTasks.length;
+    if(!totalCount&&!done)return; // 업무 없으면 영역 카드 숨김
     html+='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:4px">';
     html+='<div style="background:var(--surface2);padding:7px 14px;display:flex;align-items:center;gap:6px">';
-    html+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+_DB_AREA_ICONS[area]+' '+area+'</span>';
-    if(items.length)html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료 · 진행 '+active.length+'</span>';
+    html+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+(_DB_AREA_ICONS[area]||'📋')+' '+area+'</span>';
+    html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료'+(areaPlanTasks.length?' · 플랜 '+areaPlanTasks.length+'건':'')+'</span>';
     html+='</div>';
     html+='<div style="padding:6px 14px;background:var(--surface)">';
+    // 일반 업무
     if(active.length){
       active.sort(function(a,b){var po={'1순위 (긴급+중요)':0,'2순위 (중요)':1,'3순위 (긴급)':2,'4순위 (일반)':3};return(po[a.priority]||3)-(po[b.priority]||3);});
       active.forEach(function(t){html+=_dbTaskRow(t,true);});
-    }else{
+    }else if(!areaPlanTasks.length){
       html+='<div style="font-size:11px;color:var(--txt3);padding:6px 0">등록된 업무가 없습니다</div>';
+    }
+    // 플랜 업무 드롭다운
+    if(areaPlanTasks.length){
+      if(active.length)html+='<div style="height:4px"></div>';
+      html+=_renderPlanGroupCards(areaPlanTasks,'area-'+area);
     }
     html+='</div></div>';
   });
