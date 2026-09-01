@@ -3337,16 +3337,17 @@ function toggleTaskDone(id,done){
 
 function _renderBoardTodayPanel(){
   var el=$('board-panel-today');if(!el)return;
-  // _plans 와 _dbTasks 모두 로드 보장
-  var p1=(_plans&&_plans.length)?Promise.resolve():loadPlans();
-  var p2=_dbTasks?Promise.resolve():loadDashBoard(true);
-  Promise.all([p1,p2]).then(function(){
+  function doRender(){
     var el2=$('board-panel-today');if(!el2)return;
     var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
     html+=_renderTodayTaskSection();
     html+='</div>';
     el2.innerHTML=html;
-  });
+  }
+  // _plans 로드 보장, _dbTasks는 이미 로드된 경우가 대부분
+  var p1=(_plans&&_plans.length)?Promise.resolve():loadPlans().catch(function(){return null;});
+  var p2=_dbTasks?Promise.resolve():(typeof loadDashBoard==='function'?loadDashBoard(true).catch(function(){return null;}):Promise.resolve());
+  Promise.all([p1,p2]).then(doRender).catch(doRender);
 }
 function _boardWeekNavRender(){
   var yrEl=$('board-week-yr'),moEl=$('board-week-mo'),wkEl=$('board-week-wk');
@@ -3357,13 +3358,13 @@ function _boardWeekNavRender(){
   if(!wk)return;
   var monStr=wk.mon,sunStr=wk.sun;
   var el=$('board-weekly-area');if(!el)return;
-  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">⏳ 로딩 중...</div>';
-  var p1=(_plans&&_plans.length)?Promise.resolve():loadPlans();
-  var p2=_dbTasks?Promise.resolve():loadDashBoard(true);
-  Promise.all([p1,p2]).then(function(){
+  function doWeekRender(){
     var el2=$('board-weekly-area');if(!el2)return;
     el2.innerHTML=_renderDbWeekViewForRange(monStr,sunStr,new Date(monStr+'T00:00:00'));
-  });
+  }
+  var p1=(_plans&&_plans.length)?Promise.resolve():loadPlans().catch(function(){return null;});
+  var p2=_dbTasks?Promise.resolve():(typeof loadDashBoard==='function'?loadDashBoard(true).catch(function(){return null;}):Promise.resolve());
+  Promise.all([p1,p2]).then(doWeekRender).catch(doWeekRender);
 }
 
 function _initBoardWeekSelectors(){
@@ -3396,7 +3397,6 @@ function _boardWeekNavChange(){
   wkEl.value=selIdx;
   _boardWeekNavRender();
 }
-
 function _boardWeekGoToday(){
   var now=new Date();
   var yrEl=$('board-week-yr'),moEl=$('board-week-mo');
