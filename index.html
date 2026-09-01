@@ -3646,31 +3646,25 @@ function _renderFocusPlanSection(moStart,moEnd){
     h+='<div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;color:var(--txt3);font-size:12px">이번 달 실행 중인 플랜이 없어요</div>';
     return h;
   }
+  // 플랜 업무 목록 생성 (getPlanTasksForRange 방식으로 통일)
+  var now2=new Date();
+  var moStr2=String(now2.getMonth()+1).padStart(2,'0');
+  var planTasks=[];
   plans.forEach(function(plan){
-    var done=(plan.tasks||[]).filter(function(t){return t.done;}).length;
-    var total=(plan.tasks||[]).length;
-    var pct=total>0?Math.round(done/total*100):0;
-    var statusColor=plan.status==='완료'?'#16a34a':plan.status==='진행 중'?'#2563eb':'#d97706';
-    var uid='focus-plan-'+plan.id;
-    h+='<div style="border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:8px">';
-    // 플랜명 헤더 (체크박스 없음)
-    h+='<div style="background:var(--surface2);padding:10px 14px">';
-    h+='<div style="display:flex;align-items:center;gap:8px">';
-    h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">📋 '+plan.name+'</span>';
-    h+='<span style="font-size:10px;font-weight:700;color:'+statusColor+';border:1px solid '+statusColor+';padding:1px 6px;border-radius:8px">'+plan.status+'</span>';
-    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">D-Day '+plan.dday.slice(5)+'</span>';
-    h+='</div>';
-    // 진행률 바
-    h+='<div style="margin-top:6px"><div style="background:var(--border);border-radius:4px;height:4px"><div style="background:'+statusColor+';width:'+pct+'%;height:4px;border-radius:4px;transition:width .3s"></div></div>';
-    h+='<div style="font-size:10px;color:var(--txt3);margin-top:2px">'+done+'/'+total+'개 완료 ('+pct+'%)</div></div>';
-    h+='</div>';
-    // 실행과제 펼치기 버튼
-    h+='<div style="padding:6px 14px;background:var(--surface)">';
-    h+='<button onclick="_toggleFocusPlanTasks(\''+uid+'\',\''+plan.id+'\')" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer;color:var(--txt2);width:100%;text-align:left">실행과제 ▾</button>';
-    h+='<div id="'+uid+'" style="display:none"></div>';
-    h+='</div>';
-    h+='</div>';
+    (plan.tasks||[]).forEach(function(t,i){
+      planTasks.push({
+        _planId:plan.id, _taskIdx:i,
+        name:t.name, detail:t.detail||'', date:t.date||plan.dday||'',
+        done:t.done, planName:plan.name,
+        priority:t.priority||'보통', manager:t.manager||''
+      });
+    });
   });
+  if(!planTasks.length){
+    h+='<div style="font-size:12px;color:var(--txt3);padding:8px 0;text-align:center">이번 달 실행 중인 플랜 업무가 없어요</div>';
+    return h;
+  }
+  h+=_renderPlanGroupCards(planTasks,'focus');
   return h;
 }
 function _boardFocusGoToday(){
@@ -12995,41 +12989,11 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
     html+='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">이번 주 등록된 업무가 없습니다</div>';
   }
 
-  // 플랜 실행업무 (이번 주) - 플랜명 그룹 + 업무명+날짜만 간소화
+  // 플랜 실행업무 (이번 주) - 드롭다운 카드
   var planWeekTasks=getPlanTasksForRange(monStr,sunStr);
   if(planWeekTasks.length){
     html+='<div style="border-top:1.5px dashed var(--border);margin-top:6px;padding-top:6px">';
-    // 플랜명별 그룹핑
-    var weekPlanGroups={};var weekPlanOrder=[];
-    planWeekTasks.forEach(function(t){
-      if(!weekPlanGroups[t.planName]){weekPlanGroups[t.planName]=[];weekPlanOrder.push(t.planName);}
-      weekPlanGroups[t.planName].push(t);
-    });
-    // planName→planId 매핑 (참고문서 버튼용)
-    var weekPlanIdMap={};
-    planWeekTasks.forEach(function(t){weekPlanIdMap[t.planName]=t._planId;});
-    weekPlanOrder.forEach(function(pName){
-      var gTasks=weekPlanGroups[pName];
-      var gDone=gTasks.filter(function(t){return t.done;}).length;
-      var gPlanId=weekPlanIdMap[pName]||'';
-      var gPlan=gPlanId?(_plans||[]).find(function(p){return p.id===gPlanId;}):null;
-      var hasDocs=gPlan&&gPlan.docs&&gPlan.docs.length>0;
-      html+='<div style="margin-bottom:8px">';
-      html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
-      html+='<span style="font-size:11px;font-weight:700;color:var(--navy)">📋 '+pName+'</span>';
-      html+='<span style="font-size:10px;color:var(--txt3)">'+gDone+'/'+gTasks.length+'</span>';
-      if(gPlanId){html+='<button onclick="_toggleWeeklyDocs(\''+gPlanId+'\')" style="margin-left:auto;font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:5px;background:var(--surface);cursor:pointer;color:var(--txt2)">📄 '+(hasDocs?gPlan.docs.length+'개':'참고문서')+'</button>';}
-      html+='</div>';
-      gTasks.forEach(function(t){
-        var isDone=t.done;
-        html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0 4px 8px;border-bottom:1px solid var(--border)">';
-        html+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
-        html+='<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
-        html+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.date.slice(5)+'</span>';
-        html+='</div>';
-      });
-      html+='</div>';
-    });
+    html+=_renderPlanGroupCards(planWeekTasks,'week-'+monStr);
     html+='</div>';
   }
   html+='</div></div>';
@@ -13041,7 +13005,25 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
 function _renderDbAreaView(){
   var areas=_dbAreaFilter?[_dbAreaFilter]:_DB_AREAS;
   var allTasks=_dbFiltered((_dbTasks||[]).filter(function(t){return !t.id||!t.id.startsWith('__');}));
+  var today=todayISO();
   var html='';
+  // 이번 달 플랜 업무 (영역별)
+  var now=new Date();
+  var moStr=String(now.getMonth()+1).padStart(2,'0');
+  var moStart=now.getFullYear()+'-'+moStr+'-01';
+  var nextMo=now.getMonth()+2;var nextYr=now.getFullYear();
+  if(nextMo>12){nextMo=1;nextYr++;}
+  var moEnd=nextYr+'-'+String(nextMo).padStart(2,'0')+'-01';
+  var planAllTasks=getPlanTasksForRange(moStart,moEnd);
+  if(planAllTasks.length){
+    html+='<div style="border:1.5px solid #bfdbfe;border-radius:12px;overflow:hidden;margin-bottom:10px">';
+    html+='<div style="background:#eff6ff;padding:8px 14px">';
+    html+='<span style="font-size:13px;font-weight:800;color:#1d4ed8">📋 이달의 플랜 업무</span>';
+    html+='</div>';
+    html+='<div style="padding:6px 14px;background:var(--surface)">';
+    html+=_renderPlanGroupCards(planAllTasks,'area');
+    html+='</div></div>';
+  }
   areas.forEach(function(area){
     var items=allTasks.filter(function(t){return t.area===area;});
     var active=items.filter(function(t){return t.status!=='완료'&&t.status!=='보류';});
@@ -13061,6 +13043,54 @@ function _renderDbAreaView(){
     html+='</div></div>';
   });
   return html;
+}
+
+// ── 공통: 플랜 그룹 드롭다운 카드 렌더링 ──────────
+function _renderPlanGroupCards(planTasks, ctxId){
+  var groups={};var order=[];
+  planTasks.forEach(function(t){
+    if(!groups[t._planId]){groups[t._planId]={name:t.planName,tasks:[]};order.push(t._planId);}
+    groups[t._planId].tasks.push(t);
+  });
+  var h='';
+  order.forEach(function(planId){
+    var g=groups[planId];
+    var gDone=g.tasks.filter(function(t){return t.done;}).length;
+    var uid='pgc-'+ctxId+'-'+planId;
+    var gPlan=(_plans||[]).find(function(p){return p.id===planId;});
+    var hasDocs=gPlan&&gPlan.docs&&gPlan.docs.length>0;
+    h+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px">';
+    // 플랜 헤더 (클릭시 토글)
+    h+='<div onclick="_togglePlanGroupCard(\''+uid+'\')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface2);cursor:pointer;user-select:none">';
+    h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">📋 '+g.name+'</span>';
+    h+='<span style="font-size:11px;color:var(--txt3)">'+gDone+'/'+g.tasks.length+'</span>';
+    if(hasDocs)h+='<button onclick="event.stopPropagation();_toggleWeeklyDocs(\''+planId+'\')" style="margin-left:auto;font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:5px;background:white;cursor:pointer;color:var(--txt2)">📄 '+gPlan.docs.length+'개</button>';
+    h+='<span id="pgc-icon-'+uid+'" style="'+(hasDocs?'':'margin-left:auto;')+' font-size:13px;color:var(--txt3);transition:transform .2s;transform:rotate(-90deg)">▾</span>';
+    h+='</div>';
+    // 업무 목록 (기본 접힘)
+    h+='<div id="'+uid+'" style="display:none;padding:4px 12px;background:var(--surface)">';
+    g.tasks.forEach(function(t){
+      var isDone=t.done;
+      var tName=t.name||'';var tDetail=t.detail||'';
+      if(!tDetail){var ci=tName.indexOf(':');if(ci>0){tDetail=tName.slice(ci+1).trim();tName=tName.slice(0,ci).trim();}}
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">';
+      h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
+      h+='<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+tName+'</span>';
+      h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.date.slice(5)+'</span>';
+      h+='</div>';
+    });
+    h+='</div></div>';
+  });
+  return h;
+}
+
+function _togglePlanGroupCard(uid){
+  var el=document.getElementById(uid);
+  var icon=document.getElementById('pgc-icon-'+uid);
+  if(!el)return;
+  var isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'';
+  if(icon)icon.style.transform=isOpen?'rotate(-90deg)':'rotate(0deg)';
 }
 
 // ── 업무 행 렌더링 ────────────────────────────────
