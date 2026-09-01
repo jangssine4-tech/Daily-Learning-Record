@@ -3523,24 +3523,70 @@ function _boardFocusNavRender(){
   if(moEl&&moEl.value)_focusMo=parseInt(moEl.value);
   var yr=_focusYr,mo=_focusMo;
   var el=$('board-focus-area');if(!el)return;
-  var moStr=String(mo).padStart(2,'0');
-  var nextMo=mo===12?1:mo+1;
-  var nextYr=mo===12?yr+1:yr;
-  var moStart=yr+'-'+moStr+'-01';
-  var moEnd=nextYr+'-'+String(nextMo).padStart(2,'0')+'-01';
-  var now=new Date();
-  var isCurrentMonth=(yr===now.getFullYear()&&mo===now.getMonth()+1);
 
-  var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
+  // 로딩 표시
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">⏳ 로딩 중...</div>';
 
-  // ── 섹션1: 이달의 업무 (학사일정 자동 연동, 구 참고자료) ──
-  html+=_renderFocusAcalSection(yr,mo,moStart,moEnd,now);
+  // academicCalendar + plans 둘 다 로드 보장 후 렌더링
+  var p1=(_academicCalendar&&_academicCalendar.events)
+    ? Promise.resolve()
+    : new Promise(function(resolve){loadAcademicCalendar(resolve);});
+  var p2=(_plans&&_plans.length)
+    ? Promise.resolve()
+    : loadPlans();
 
-  // ── 섹션2: 이달의 플랜 (실행 계획 관리에서 자동 연동) ──
-  html+=_renderFocusPlanSection(moStart,moEnd);
+  Promise.all([p1,p2]).then(function(){
+    var el2=$('board-focus-area');if(!el2)return;
+    var moStr=String(mo).padStart(2,'0');
+    var nextMo=mo===12?1:mo+1;
+    var nextYr=mo===12?yr+1:yr;
+    var moStart=yr+'-'+moStr+'-01';
+    var moEnd=nextYr+'-'+String(nextMo).padStart(2,'0')+'-01';
+    var now=new Date();
+    var prevMo=mo===1?12:mo-1;
+    var prevYr=mo===1?yr-1:yr;
+    var prevStart=prevYr+'-'+String(prevMo).padStart(2,'0')+'-01';
 
-  html+='</div>';
-  el.innerHTML=html;
+    var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
+
+    // ── 섹션0: 전월 미완료 업무 ──
+    html+=_renderFocusPrevSection(prevStart,moStart);
+
+    // ── 섹션1: 이달의 업무 (학사일정 자동 연동) ──
+    html+=_renderFocusAcalSection(yr,mo,moStart,moEnd,now);
+
+    // ── 섹션2: 이달의 플랜 (실행 계획 관리 자동 연동) ──
+    html+=_renderFocusPlanSection(moStart,moEnd);
+
+    html+='</div>';
+    el2.innerHTML=html;
+  });
+}
+
+// 전월 미완료 업무
+function _renderFocusPrevSection(prevStart,moStart){
+  var overdue=(_dbTasks||[]).filter(function(t){
+    return t.dueDate&&t.dueDate>=prevStart&&t.dueDate<moStart
+      &&t.status!=='완료'
+      &&(!t.taskType||t.taskType==='일반 업무'||t.taskType==='이달의 중점'||t.taskType==='이번 주 중점')
+      &&!t.planId;
+  });
+  if(!overdue.length)return '';
+  var h='<div style="border:1.5px solid #fca5a5;border-radius:12px;overflow:hidden">';
+  h+='<div style="background:#fff1f2;padding:9px 14px;display:flex;align-items:center;gap:8px">';
+  h+='<span style="font-size:13px;font-weight:800;color:#dc2626">⚠️ 전월 미완료 업무</span>';
+  h+='<span style="font-size:11px;color:#ef4444">'+overdue.length+'건</span>';
+  h+='</div>';
+  h+='<div style="padding:8px 14px;background:var(--surface)">';
+  overdue.forEach(function(t){
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+    h+='<input type="checkbox" onchange="toggleFocusTask(\'monthly\',\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
+    h+='<span style="flex:1;font-size:12px;color:var(--txt)">'+t.name+'</span>';
+    h+='<span style="font-size:10px;color:#ef4444;flex-shrink:0">~'+t.dueDate.slice(5)+'</span>';
+    h+='</div>';
+  });
+  h+='</div></div>';
+  return h;
 }
 
 // 이달의 업무 — 학사일정에서 이번 달 일정 자동 표시
