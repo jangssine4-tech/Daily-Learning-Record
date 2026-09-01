@@ -15181,8 +15181,8 @@ function _openNewPlanModalInner(editPlan){
       +'<div style="display:flex;gap:8px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#e8f0f8;color:var(--navy);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><span style="font-size:11px;color:var(--txt2)">실행 계획 변환 확인</span></div>'
       +'<div style="display:flex;gap:8px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#d1fae5;color:#065f46;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div><span style="font-size:11px;color:var(--txt2)">붙여넣기 → ✨ 실행업무 자동 생성</span></div>'
       +'</div></div></div></div>'
-      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;margin-top:6px;line-height:1.7">형식: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">업무명 | D-기준 | 담당 | 중요도</code></div>'
-      +'<textarea class="fi" id="plan-paste" rows="6" placeholder="홍보문 초안 작성 | D-21 | 원장 | 높음&#10;초대 대상 선정 | D-21 | 원장 | 높음&#10;개별 초대 발송 | D-14 | 원장 | 높음&#10;PPT 초안 완성 | D-7 | 원장 | 높음&#10;리허설 진행 | D-3 | 원장+교사 | 높음&#10;감사 메시지 발송 | D+1 | 원장 | 보통" style="font-size:11px;font-family:monospace;line-height:1.7"></textarea>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;margin-top:6px;line-height:1.7">형식: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">실행단계 | 일정 | 업무 | 세부내용 | 담당자 | 중요도 | 완료기준</code></div>'
+      +'<textarea class="fi" id="plan-paste" rows="6" placeholder="초기 실행 준비 | D-10 | 초대 대상 선정 | 기존 학부모 초4~6 대상자 분류 | 원장 | 높음 | 초대 명단 확정&#10;초기 실행 준비 | D-10 | 초대문 제작 | 설명회 안내 문구 작성 | 원장 | 높음 | 초대문 완성&#10;콘텐츠 완성 | D-7 | PPT 초안 제작 | 핵심 5장 구성 | 원장 | 높음 | 초안 완성&#10;리허설 | D-3 | 최종 리허설 | 발표 흐름 점검 | 원장+교사 | 높음 | 오류 없이 진행" style="font-size:11px;font-family:monospace;line-height:1.7"></textarea>'
       +'<button onclick="_parsePlanTasks()" style="font-size:11px;color:var(--blue);background:none;border:1px solid var(--blue);border-radius:6px;padding:4px 12px;cursor:pointer;margin-top:6px">✨ 실행업무 자동 생성</button>'
       +'</div>'
       +'<div id="plan-tasks-preview" style="margin-top:8px"></div>'
@@ -15328,71 +15328,71 @@ function _parsePlanTasks(){
   if(!text.trim()){toast('플랜 내용을 붙여넣으세요');return;}
 
   var lines=text.trim().split('\n').map(function(l){return l.trim();}).filter(function(l){
-    return l&&!l.startsWith('업무명')&&!l.includes('---')&&!l.includes('──')&&!l.startsWith('#')&&l.length>1;
+    return l&&!l.match(/^실행.단계/)&&!l.match(/^업무명/)&&!l.includes('---')&&!l.includes('──')&&!l.startsWith('#')&&l.length>1;
   });
 
-  console.log('[플랜파싱] 전체 줄 수:',lines.length,'D-Day:',dday);
-
+  // 신형식만 지원: 실행단계 | 일정 | 업무 | 세부내용 | 담당자 | 중요도 | 완료기준
   var tasks=[];
-  lines.forEach(function(line){
-    // | 구분자 파싱
-    var parts=line.split('|').map(function(s){return s.trim();}).filter(function(s){return s;});
-    console.log('[플랜파싱] 줄:',line,'→ parts:',parts);
+  var stages={};
+  var stageOrder=[];
 
-    // 최소 1개 파트 + D-Day 패턴이 있으면 파싱 시도
-    var name='',dRef='D-0',manager='원장',priority='보통';
-    if(parts.length>=2){
-      name=parts[0];
-      dRef=parts[1];
-      manager=parts[2]||'원장';
-      priority=parts[3]||'보통';
-    } else if(parts.length===1){
-      // | 없이 D-0 패턴이 줄 안에 있는 경우
-      var dm=line.match(/D([+-]?\d+)/i);
-      if(dm){
-        dRef=dm[0];
-        name=line.replace(dm[0],'').replace(/[|·\-]/g,'').trim();
-      } else {
-        return; // 파싱 불가
-      }
-    } else {
-      return;
-    }
-    if(!name)return;
+  lines.forEach(function(line){
+    var parts=line.split('|').map(function(s){return s.trim();}).filter(function(s){return s;});
+    if(parts.length<3)return; // 최소 실행단계|일정|업무 3열 필요
+
+    var stage=parts[0]||'기타';
+    var dRef=parts[1]||'D-0';
+    var taskName=parts[2]||'';
+    var detail=parts[3]||'';
+    var manager=parts[4]||'원장';
+    var priority=parts[5]||'보통';
+    var criterion=parts[6]||'';
+    if(!taskName)return;
 
     var offset=0;var m=dRef.match(/D([+-]?\d+)/i);
     if(m)offset=parseInt(m[1]);
-    var taskDate=new Date(dday);taskDate.setDate(taskDate.getDate()+offset);
-    var dateStr=taskDate.getFullYear()+'-'+String(taskDate.getMonth()+1).padStart(2,'0')+'-'+String(taskDate.getDate()).padStart(2,'0');
-    tasks.push({name:name,date:dateStr,dRef:dRef,manager:manager,priority:priority,done:false});
+    var td=new Date(dday);td.setDate(td.getDate()+offset);
+    var dateStr=td.getFullYear()+'-'+String(td.getMonth()+1).padStart(2,'0')+'-'+String(td.getDate()).padStart(2,'0');
+
+    if(!stages[stage]){stages[stage]=[];stageOrder.push(stage);}
+    var task={name:taskName,detail:detail,date:dateStr,dRef:dRef,manager:manager,priority:priority,criterion:criterion,done:false,stage:stage};
+    stages[stage].push(task);
+    tasks.push(task);
   });
 
-  console.log('[플랜파싱] 파싱된 업무 수:',tasks.length);
-
   if(!tasks.length){
-    toast('파싱된 업무가 없어요. 콘솔(F12)에서 형식을 확인해 주세요.\n형식: 업무명 | D-21 | 원장 | 높음');
+    toast('파싱된 업무가 없어요.\n형식: 실행단계 | 일정 | 업무 | 세부내용 | 담당자 | 중요도 | 완료기준');
     return;
   }
+
+  // 프리뷰 — 실행단계별 그룹으로 표시
   var preview=$('plan-tasks-preview');
   if(preview){
-    var html='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">✅ '+tasks.length+'개 업무 생성 예정</div>'
-      +'<div style="background:var(--surface2);border-radius:8px;overflow:hidden">'
-      +'<table style="width:100%;font-size:11px;border-collapse:collapse">'
-      +'<tr style="background:var(--navy);color:#fff"><th style="padding:5px 8px;text-align:left">업무명</th><th style="padding:5px">실행일</th><th style="padding:5px">담당</th><th style="padding:5px">중요도</th></tr>';
-    tasks.forEach(function(t){
-      html+='<tr style="border-bottom:1px solid var(--border)">'
-        +'<td style="padding:5px 8px">'+t.name+'</td>'
-        +'<td style="padding:5px;text-align:center">'+t.date.slice(5)+'</td>'
-        +'<td style="padding:5px;text-align:center">'+t.manager+'</td>'
-        +'<td style="padding:5px;text-align:center;color:'+(t.priority==='높음'?'#dc2626':t.priority==='낮음'?'#94a3b8':'var(--txt)')+'">'+t.priority+'</td>'
-        +'</tr>';
+    var html='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px">✅ '+tasks.length+'개 업무 / '+stageOrder.length+'개 실행단계</div>';
+    stageOrder.forEach(function(stage){
+      var sTasks=stages[stage];
+      html+='<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:6px">';
+      html+='<div style="background:var(--navy);color:white;padding:5px 10px;font-size:11px;font-weight:700">📌 '+stage+' ('+sTasks.length+'개)</div>';
+      html+='<table style="width:100%;font-size:11px;border-collapse:collapse">';
+      html+='<tr style="background:var(--surface2)"><th style="padding:4px 8px;text-align:left">업무</th><th style="padding:4px">일정</th><th style="padding:4px">담당</th><th style="padding:4px">중요도</th></tr>';
+      sTasks.forEach(function(t){
+        html+='<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:4px 8px">'+t.name+(t.detail?'<div style="font-size:10px;color:var(--txt3)">'+t.detail+'</div>':'')+'</td>'
+          +'<td style="padding:4px;text-align:center;white-space:nowrap">'+t.date.slice(5)+'</td>'
+          +'<td style="padding:4px;text-align:center">'+t.manager+'</td>'
+          +'<td style="padding:4px;text-align:center;color:'+(t.priority==='높음'?'#dc2626':'var(--txt)')+'">'+t.priority+'</td>'
+          +'</tr>';
+      });
+      html+='</table></div>';
     });
-    html+='</table></div>';
     preview.innerHTML=html;
   }
   window._parsedPlanTasks=tasks;
-  toast(tasks.length+'개 업무가 생성될 예정이에요');
+  window._parsedPlanStages=stages;
+  window._parsedPlanStageOrder=stageOrder;
+  toast(tasks.length+'개 업무 ('+stageOrder.length+'개 실행단계) 생성 예정');
 }
+
 
 function _savePlan(overlay,editId){
   var name=($('plan-name')||{}).value||'';
@@ -15411,7 +15411,13 @@ function _savePlan(overlay,editId){
     var plan=_plans.find(function(p){return p.id===editId;});
     if(!plan)return;
     plan.name=name;plan.area=area;plan.dday=dday;plan.manager=manager;plan.status=status;plan.acalId=acalLink;
-    db.collection('plans').doc(editId).update({name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,updatedAt:new Date().toISOString()}).then(function(){
+    if(rawPlan.trim())plan.rawPlan=rawPlan;
+    // 새 실행업무 자동 생성된 경우 tasks 교체
+    if(tasks&&tasks.length)plan.tasks=tasks;
+    var updateData={name:name,area:area,dday:dday,manager:manager,status:status,acalId:acalLink,updatedAt:new Date().toISOString()};
+    if(rawPlan.trim())updateData.rawPlan=rawPlan;
+    if(tasks&&tasks.length)updateData.tasks=tasks;
+    db.collection('plans').doc(editId).update(updateData).then(function(){
       toast('저장됐어요');
       if(overlay)overlay.remove();
       _selectedPlanId=editId;
