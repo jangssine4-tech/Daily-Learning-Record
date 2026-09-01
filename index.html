@@ -11701,6 +11701,7 @@ function getPlanTasksForDate(dateStr){
           _planId:p.id,_taskIdx:i,
           id:'plan_'+p.id+'_'+i,
           name:t.name,
+          detail:t.detail||'',
           date:t.date,
           manager:t.manager,
           priority:t.priority,
@@ -11724,6 +11725,7 @@ function getPlanTasksForRange(startStr,endStr){
           _planId:p.id,_taskIdx:i,
           id:'plan_'+p.id+'_'+i,
           name:t.name,
+          detail:t.detail||'',
           date:t.date,
           manager:t.manager,
           priority:t.priority,
@@ -12011,12 +12013,42 @@ function _renderTodayTaskSection(){
     h+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">오늘 등록된 업무가 없습니다<br><span style="font-size:11px">＋ 추가 버튼 또는 업무 기한을 오늘로 설정하면 자동으로 표시됩니다</span></div>';
   }
 
-  // 플랜 실행업무 (오늘)
+  // 플랜 실행업무 (오늘) - Progressive Disclosure
   var planTodayTasks=getPlanTasksForDate(today);
   if(planTodayTasks.length){
     h+='<div style="border-top:1.5px dashed var(--border);margin-top:6px;padding-top:6px">';
     h+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">📋 플랜 업무</div>';
-    planTodayTasks.forEach(function(t){h+=planTaskRow(t);});
+    planTodayTasks.forEach(function(t){
+      var isDone=t.done;
+      // 기존 저장 데이터에서도 콜론 분리 시도 (detail 미저장 레거시 대응)
+      var tName=t.name||'';
+      var tDetail=t.detail||'';
+      if(!tDetail){
+        var ci=tName.indexOf(':');
+        if(ci>0){tDetail=tName.slice(ci+1).trim();tName=tName.slice(0,ci).trim();}
+      }
+      var uid='ptd-'+t._planId+'-'+t._taskIdx;
+      var priorityColor=t.priority==='높음'?'#dc2626':t.priority==='낮음'?'#94a3b8':'var(--blue)';
+      h+='<div style="border-bottom:1px solid var(--border);padding:6px 0">';
+      // 기본 행: 체크박스 + 업무명 + 플랜명 + 중요도 + 펼치기 버튼
+      h+='<div style="display:flex;align-items:center;gap:8px">';
+      h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
+      h+='<div style="flex:1;min-width:0;cursor:pointer" onclick="_togglePlanDetail(\''+uid+'\')">'; 
+      h+='<div style="font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+tName+'</div>';
+      h+='<div style="font-size:10px;color:var(--txt3);margin-top:1px">📋 '+t.planName+' · <span style="color:'+priorityColor+'">'+t.priority+'</span></div>';
+      h+='</div>';
+      if(tDetail){
+        h+='<button onclick="_togglePlanDetail(\''+uid+'\')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:16px;padding:0 4px;flex-shrink:0">▾</button>';
+      }
+      h+='</div>';
+      // 세부내용 (기본 접힘)
+      if(tDetail){
+        h+='<div id="'+uid+'" style="display:none;margin:6px 0 4px 24px;padding:8px 12px;background:var(--surface2);border-radius:8px;border-left:3px solid '+priorityColor+'">';
+        h+='<div style="font-size:12px;color:var(--txt2);line-height:1.7">'+tDetail+'</div>';
+        h+='</div>';
+      }
+      h+='</div>';
+    });
     h+='</div>';
   }
   h+='</div></div>';
@@ -12818,12 +12850,34 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
     html+='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">이번 주 등록된 업무가 없습니다</div>';
   }
 
-  // 플랜 실행업무 (이번 주)
+  // 플랜 실행업무 (이번 주) - 플랜명 그룹 + 업무명+날짜만 간소화
   var planWeekTasks=getPlanTasksForRange(monStr,sunStr);
   if(planWeekTasks.length){
     html+='<div style="border-top:1.5px dashed var(--border);margin-top:6px;padding-top:6px">';
-    html+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px">📋 플랜 업무</div>';
-    planWeekTasks.forEach(function(t){html+=planTaskRow(t);});
+    // 플랜명별 그룹핑
+    var weekPlanGroups={};var weekPlanOrder=[];
+    planWeekTasks.forEach(function(t){
+      if(!weekPlanGroups[t.planName]){weekPlanGroups[t.planName]=[];weekPlanOrder.push(t.planName);}
+      weekPlanGroups[t.planName].push(t);
+    });
+    weekPlanOrder.forEach(function(pName){
+      var gTasks=weekPlanGroups[pName];
+      var gDone=gTasks.filter(function(t){return t.done;}).length;
+      html+='<div style="margin-bottom:8px">';
+      html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+      html+='<span style="font-size:11px;font-weight:700;color:var(--navy)">📋 '+pName+'</span>';
+      html+='<span style="font-size:10px;color:var(--txt3)">'+gDone+'/'+gTasks.length+'</span>';
+      html+='</div>';
+      gTasks.forEach(function(t){
+        var isDone=t.done;
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0 4px 8px;border-bottom:1px solid var(--border)">';
+        html+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
+        html+='<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+        html+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.date.slice(5)+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
     html+='</div>';
   }
   html+='</div></div>';
@@ -14948,10 +15002,18 @@ function renderPlanDetail(planId){
   var linkedAcal=plan.acalId?(_academicCalendar&&_academicCalendar.events||[]).find(function(e){return e.id===plan.acalId;}):null;
 
   var tasksHTML=(plan.tasks||[]).map(function(t,i){
-    return'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
+    var tName=t.name||'';
+    var tDetail=t.detail||'';
+    if(!tDetail){var ci=tName.indexOf(':');if(ci>0){tDetail=tName.slice(ci+1).trim();tName=tName.slice(0,ci).trim();}}
+    var pColor=t.priority==='높음'?'#dc2626':t.priority==='낮음'?'#94a3b8':'var(--txt3)';
+    return'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
       +'<input type="checkbox" data-pid="'+planId+'" data-idx="'+i+'"'+(t.done?' checked':'')+' onchange="_togglePlanTaskInline(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--navy)">'
-      +'<div style="flex:1"><div style="font-size:13px;'+(t.done?'text-decoration:line-through;color:var(--txt3)':'')+'">'+t.name+'</div>'
-      +'<div style="font-size:11px;color:var(--txt3)">'+t.date.slice(5)+' · '+t.manager+' · <span style="color:'+(t.priority==='높음'?'#dc2626':'var(--txt3)')+'">'+t.priority+'</span></div></div>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13px;'+(t.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+tName+'</div>'
+      +(tDetail?'<div style="font-size:11px;color:var(--txt2);margin-top:2px;line-height:1.5">'+tDetail+'</div>':'')
+      +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+t.date.slice(5)+' · '+t.manager+' · <span style="color:'+pColor+'">'+t.priority+'</span></div>'
+      +'</div></div>'
       +'</div>';
   }).join('');
 
@@ -15104,6 +15166,55 @@ function _deletePlanDoc(planId, idx){
     window._pdTab[planId]='docs';
     renderPlanDetail(planId);
   }).catch(function(){toast('삭제 실패');});
+}
+
+// Step 4: _togglePlanTask — plans.tasks[].done + Firestore 동시 저장
+function _togglePlanTask(planId, idx, checked){
+  var plan=(_plans||[]).find(function(p){return p.id===planId;});
+  if(!plan||!plan.tasks||!plan.tasks[idx])return;
+  plan.tasks[idx].done=checked;
+  // Firestore plans 컬렉션 업데이트
+  db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(e){
+    console.error('[플랜체크] 저장 오류:',e);
+  });
+  // dashBoardV2 연동 업무 status도 동기화
+  var linkedId='plan_'+planId+'_'+idx;
+  var linked=(_dbTasks||[]).find(function(t){return t.id===linkedId||t.planId===planId&&t.dueDate===plan.tasks[idx].date&&t.name&&(t.name===plan.tasks[idx].name||(plan.tasks[idx].name&&t.name.startsWith(plan.tasks[idx].name)));});
+  if(linked){
+    linked.status=checked?'완료':'대기';
+    db.collection('dashBoardV2').doc(linked.id).update({status:linked.status}).catch(function(){});
+  }
+  // 진행률 갱신 — 실행 계획 관리 페이지가 열려있으면 즉시 반영
+  var done=(plan.tasks||[]).filter(function(t){return t.done;}).length;
+  var total=plan.tasks.length;
+  var pct=total>0?Math.round(done/total*100):0;
+  var bar=$('pd-bar-'+planId);var txt=$('pd-txt-'+planId);
+  if(bar)bar.style.width=pct+'%';
+  if(txt)txt.textContent=done+' / '+total+'개 완료 ('+pct+'%)';
+  if(done===total&&total>0){
+    toast('🎉 '+plan.name+' 모든 업무 완료!');
+    _changePlanStatus(planId,'완료');
+  }
+  renderPlansList();
+}
+
+// 오늘 할 일 플랜 업무 세부내용 펼치기/접기
+function _togglePlanDetail(uid){
+  var el=document.getElementById(uid);
+  if(!el)return;
+  var isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'block';
+  // ▾/▴ 버튼 토글
+  var btn=el.previousElementSibling&&el.previousElementSibling.querySelector('button[onclick*="'+uid+'"]');
+  if(!btn){
+    // 부모에서 찾기
+    var parent=el.parentElement;
+    if(parent){
+      var btns=parent.querySelectorAll('button');
+      btns.forEach(function(b){if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes(uid))btn=b;});
+    }
+  }
+  if(btn)btn.textContent=isOpen?'▾':'▴';
 }
 
 function _togglePlanTaskInline(cb){
@@ -15557,7 +15668,14 @@ function _parsePlanTasks(){
     if(m)offset=parseInt(m[1]);
     var taskDate=new Date(dday);taskDate.setDate(taskDate.getDate()+offset);
     var dateStr=taskDate.getFullYear()+'-'+String(taskDate.getMonth()+1).padStart(2,'0')+'-'+String(taskDate.getDate()).padStart(2,'0');
-    tasks.push({name:name,date:dateStr,dRef:dRef,manager:manager,priority:priority,done:false});
+    // 업무명: 세부내용 형식이면 분리
+    var detail='';
+    var colonIdx=name.indexOf(':');
+    if(colonIdx>0&&colonIdx<name.length-1){
+      detail=name.slice(colonIdx+1).trim();
+      name=name.slice(0,colonIdx).trim();
+    }
+    tasks.push({name:name,detail:detail,date:dateStr,dRef:dRef,manager:manager,priority:priority,done:false});
   });
 
   console.log('[플랜파싱] 파싱된 업무 수:',tasks.length);
@@ -15634,7 +15752,7 @@ function _savePlan(overlay,editId){
         tasks.forEach(function(t){
           var taskId='plan_'+ref.id+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
           var dbTask={
-            id:taskId,name:t.name,area:area,taskType:'일반 업무',
+            id:taskId,name:t.name,detail:t.detail||'',area:area,taskType:'일반 업무',
             priority:t.priority||'보통',dueDate:t.date,status:'대기',
             cycle:'반복없음',memo:'',planId:ref.id,planName:name,
             manager:t.manager||manager,createdAt:todayISO()
