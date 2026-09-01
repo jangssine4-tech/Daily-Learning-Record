@@ -3337,17 +3337,35 @@ function toggleTaskDone(id,done){
 
 function _renderBoardTodayPanel(){
   var el=$('board-panel-today');if(!el)return;
-  var p=(_plans&&_plans.length)?Promise.resolve():loadPlans();
-  p.then(function(){
+  // _plans 와 _dbTasks 모두 로드 보장
+  var p1=(_plans&&_plans.length)?Promise.resolve():loadPlans();
+  var p2=_dbTasks?Promise.resolve():loadDashBoard(true);
+  Promise.all([p1,p2]).then(function(){
     var el2=$('board-panel-today');if(!el2)return;
-    var today=todayISO();var now=new Date();
     var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
     html+=_renderTodayTaskSection();
-    html+=_renderDbTodayView([],today,now);
     html+='</div>';
     el2.innerHTML=html;
   });
 }
+function _boardWeekNavRender(){
+  var yrEl=$('board-week-yr'),moEl=$('board-week-mo'),wkEl=$('board-week-wk');
+  if(!yrEl||!moEl||!wkEl)return;
+  var yr=parseInt(yrEl.value),mo=parseInt(moEl.value);
+  var weeks=_getWeeksOfMonth(yr,mo);
+  var wk=weeks[parseInt(wkEl.value||0)];
+  if(!wk)return;
+  var monStr=wk.mon,sunStr=wk.sun;
+  var el=$('board-weekly-area');if(!el)return;
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">⏳ 로딩 중...</div>';
+  var p1=(_plans&&_plans.length)?Promise.resolve():loadPlans();
+  var p2=_dbTasks?Promise.resolve():loadDashBoard(true);
+  Promise.all([p1,p2]).then(function(){
+    var el2=$('board-weekly-area');if(!el2)return;
+    el2.innerHTML=_renderDbWeekViewForRange(monStr,sunStr,new Date(monStr+'T00:00:00'));
+  });
+}
+
 function _boardWeekGoToday(){
   var now=new Date();
   var yrEl=$('board-week-yr'),moEl=$('board-week-mo');
