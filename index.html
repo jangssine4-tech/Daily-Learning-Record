@@ -414,7 +414,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;align-items:center">
     <button class="rev-tab active" id="btab-today"      onclick="switchBoardTab('today')"      style="font-size:13px;font-weight:700">✅ 오늘 할 일</button>
     <button class="rev-tab"        id="btab-weekly"     onclick="switchBoardTab('weekly')"     style="font-size:13px;font-weight:700">📆 주간 할 일</button>
-    <button class="rev-tab"        id="btab-focus"      onclick="switchBoardTab('focus')"      style="font-size:13px;font-weight:700">🎯 중점 추진</button>
+    <button class="rev-tab"        id="btab-focus"      onclick="switchBoardTab('focus')"      style="font-size:13px;font-weight:700">📅 이달의 할 일</button>
     <button class="rev-tab"        id="btab-area"       onclick="switchBoardTab('area')"       style="font-size:13px;font-weight:700">📂 영역별 할 일</button>
     <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
     <button class="rev-tab"        id="btab-crm"        onclick="switchBoardTab('crm')"        style="font-size:13px;font-weight:700">👥 상담</button>
@@ -3528,7 +3528,6 @@ var _focusYr=new Date().getFullYear();
 var _focusMo=new Date().getMonth()+1;
 function _boardFocusNavChange(){_boardFocusNavRender();}
 function _boardFocusNavRender(){
-  // 드롭다운에서 선택한 연월 사용
   var yrEl=$('focus-sel-yr'),moEl=$('focus-sel-mo');
   if(yrEl&&yrEl.value)_focusYr=parseInt(yrEl.value);
   if(moEl&&moEl.value)_focusMo=parseInt(moEl.value);
@@ -3541,21 +3540,102 @@ function _boardFocusNavRender(){
   var moEnd=nextYr+'-'+String(nextMo).padStart(2,'0')+'-01';
   var now=new Date();
   var isCurrentMonth=(yr===now.getFullYear()&&mo===now.getMonth()+1);
-  var monthlyItems=(_dbTasks||[]).filter(function(t){
-    if(t.taskType!=='이달의 중점'||t.id&&t.id.startsWith('__'))return false;
-    if(isCurrentMonth&&t.status!=='완료')return true;
-    return t.dueDate>=moStart&&t.dueDate<moEnd;
-  });
-  var weeklyItems=(_dbTasks||[]).filter(function(t){
-    if(t.taskType!=='이번 주 중점'||t.id&&t.id.startsWith('__'))return false;
-    if(isCurrentMonth&&t.status!=='완료')return true;
-    return t.dueDate>=moStart&&t.dueDate<moEnd;
-  });
+
   var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
-  html+=_renderFocusSectionFiltered('monthly','🎯 이달의 중점 추진','#f0f9ff',monthlyItems,isCurrentMonth);
-  html+=_renderFocusSectionFiltered('weekly','📅 이번 주 중점 추진','#f5f3ff',weeklyItems,isCurrentMonth);
+
+  // ── 섹션1: 이달의 업무 (학사일정 자동 연동, 구 참고자료) ──
+  html+=_renderFocusAcalSection(yr,mo,moStart,moEnd,now);
+
+  // ── 섹션2: 이달의 플랜 (실행 계획 관리에서 자동 연동) ──
+  html+=_renderFocusPlanSection(moStart,moEnd);
+
   html+='</div>';
   el.innerHTML=html;
+}
+
+// 이달의 업무 — 학사일정에서 이번 달 일정 자동 표시
+function _renderFocusAcalSection(yr,mo,moStart,moEnd,now){
+  var thisMonStart=moStart;
+  var thisMonEnd=moEnd;
+  var allEvts=(_academicCalendar&&_academicCalendar.events)||[];
+  var thisMonEvts=allEvts.filter(function(e){
+    if(!e.date)return false;
+    var ps=e.prepStartDate||'';
+    var ed=e.endDate||e.date;
+    return (e.date>=thisMonStart&&e.date<thisMonEnd)
+      ||(ed>=thisMonStart&&ed<thisMonEnd)
+      ||(ps&&ps>=thisMonStart&&ps<thisMonEnd)
+      ||(e.date<thisMonStart&&ed>=thisMonStart);
+  }).sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
+  var catColors={'설명회':'#f87171','간담회':'#fb923c','특강':'#fbbf24','외부시험':'#4ade80','홍보캠페인':'#60a5fa','상담':'#a78bfa','이벤트':'#f472b6','진단 테스트':'#f472b6','내부 운영':'#94a3b8'};
+  var h='<div style="border:1.5px solid #bfdbfe;border-radius:12px;overflow:hidden">';
+  h+='<div style="background:#eff6ff;padding:9px 14px;display:flex;align-items:center;gap:8px">';
+  h+='<span style="font-size:13px;font-weight:800;color:#1d4ed8">📅 이달의 업무</span>';
+  h+='<span style="font-size:11px;color:#3b82f6">'+yr+'년 '+mo+'월</span>';
+  h+='</div>';
+  h+='<div style="padding:8px 14px;background:var(--surface)">';
+  if(!thisMonEvts.length){
+    h+='<div style="font-size:12px;color:var(--txt3);padding:6px 0">이번 달 학사일정이 없어요</div>';
+  }else{
+    thisMonEvts.forEach(function(e){
+      var diff=Math.round((new Date(e.date)-now)/(1000*60*60*24));
+      var dday=diff>0?'<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px">D-'+diff+'</span>'
+        :diff===0?'<span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 5px;border-radius:4px">오늘</span>'
+        :'<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:1px 5px;border-radius:4px">완료</span>';
+      var catCol=catColors[e.cat]||'#94a3b8';
+      h+='<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)">';
+      h+='<span style="font-size:11px;font-weight:600;color:var(--txt3);flex-shrink:0">'+e.date.slice(5)+'</span>';
+      if(e.cat)h+='<span style="font-size:9px;font-weight:700;background:'+catCol+';color:#fff;padding:2px 6px;border-radius:10px;flex-shrink:0">'+e.cat+'</span>';
+      h+='<span style="font-size:12px;flex:1;color:var(--txt)">'+e.title+'</span>';
+      h+=dday;
+      h+='</div>';
+    });
+  }
+  h+='</div></div>';
+  return h;
+}
+
+// 이달의 플랜 — 실행 계획에서 이번 달 D-Day 있는 플랜 자동 표시
+function _renderFocusPlanSection(moStart,moEnd){
+  var plans=(_plans||[]).filter(function(p){
+    if(!p.dday)return false;
+    // D-Day가 이번 달이거나, 이번 달에 실행 중인 플랜
+    if(p.dday>=moStart&&p.dday<moEnd)return true;
+    // 실행 중 상태면 D-Day 지나도 표시
+    if(p.status==='진행 중')return true;
+    return false;
+  });
+  var h='';
+  if(!plans.length){
+    h+='<div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;color:var(--txt3);font-size:12px">이번 달 실행 중인 플랜이 없어요</div>';
+    return h;
+  }
+  plans.forEach(function(plan){
+    var done=(plan.tasks||[]).filter(function(t){return t.done;}).length;
+    var total=(plan.tasks||[]).length;
+    var pct=total>0?Math.round(done/total*100):0;
+    var statusColor=plan.status==='완료'?'#16a34a':plan.status==='진행 중'?'#2563eb':'#d97706';
+    var uid='focus-plan-'+plan.id;
+    h+='<div style="border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:8px">';
+    // 플랜명 헤더 (체크박스 없음)
+    h+='<div style="background:var(--surface2);padding:10px 14px">';
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">📋 '+plan.name+'</span>';
+    h+='<span style="font-size:10px;font-weight:700;color:'+statusColor+';border:1px solid '+statusColor+';padding:1px 6px;border-radius:8px">'+plan.status+'</span>';
+    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">D-Day '+plan.dday.slice(5)+'</span>';
+    h+='</div>';
+    // 진행률 바
+    h+='<div style="margin-top:6px"><div style="background:var(--border);border-radius:4px;height:4px"><div style="background:'+statusColor+';width:'+pct+'%;height:4px;border-radius:4px;transition:width .3s"></div></div>';
+    h+='<div style="font-size:10px;color:var(--txt3);margin-top:2px">'+done+'/'+total+'개 완료 ('+pct+'%)</div></div>';
+    h+='</div>';
+    // 실행과제 펼치기 버튼
+    h+='<div style="padding:6px 14px;background:var(--surface)">';
+    h+='<button onclick="_toggleFocusPlanTasks(\''+uid+'\',\''+plan.id+'\')" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer;color:var(--txt2);width:100%;text-align:left">실행과제 ▾</button>';
+    h+='<div id="'+uid+'" style="display:none"></div>';
+    h+='</div>';
+    h+='</div>';
+  });
+  return h;
 }
 function _boardFocusGoToday(){
   _focusYr=new Date().getFullYear();
@@ -12899,51 +12979,6 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
       html+='</div>';
     });
     html+='</div>';
-  }
-  html+='</div></div>';
-
-  // ── 이번 주 중점 추진 (방안 A: 주간 탭 병합) ──
-  var weekFocusItems=_dbFocusTasks('weekly');
-  var weekFocusDone=weekFocusItems.filter(function(t){return t.status==='완료';}).length;
-  html+='<div style="border:1px solid #c4b5fd;border-radius:12px;overflow:hidden;margin-top:10px">';
-  html+='<div style="background:#f5f3ff;padding:8px 14px;display:flex;align-items:center;gap:8px">';
-  html+='<span style="font-size:13px;font-weight:800;color:#6d28d9">🎯 이번 주 중점 추진</span>';
-  if(weekFocusItems.length){
-    html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+weekFocusDone+'/'+weekFocusItems.length+' 완료</span>';
-    html+='<button class="btn btn-xs" style="margin-left:4px;background:#7c3aed;color:#fff" onclick="openDbTaskModal(null,null,\'이번 주 중점\')">＋ 추가</button>';
-  }else{
-    html+='<button class="btn btn-xs" style="margin-left:auto;background:#7c3aed;color:#fff" onclick="openDbTaskModal(null,null,\'이번 주 중점\')">＋ 추가</button>';
-  }
-  html+='</div>';
-  html+='<div style="padding:8px 14px;background:var(--surface)">';
-  if(weekFocusItems.length){
-    weekFocusItems.forEach(function(t){
-      var isDone=t.status==='완료';
-      var subTasks=t.subTasks||[];
-      var subDone=subTasks.filter(function(s){return s.done;}).length;
-      var subTotal=subTasks.length;
-      var subPct=subTotal>0?Math.round(subDone/subTotal*100):0;
-      html+='<div style="padding:6px 0;border-bottom:1px solid var(--border)">';
-      html+='<div style="display:flex;align-items:center;gap:8px">';
-      html+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleFocusTask(\'weekly\',\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#7c3aed">';
-      if(t.area)html+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;flex-shrink:0">'+t.area+'</span>';
-      html+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
-      if(subTotal>0){var pctColor=subPct===100?'#16a34a':subPct>=50?'#d97706':'#6b7280';html+='<span style="font-size:10px;font-weight:700;color:'+pctColor+'">'+subPct+'%</span>';}
-      html+='<button onclick="openDbTaskModal(\''+t.id+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--txt3);padding:0 2px">✏️</button>';
-      html+='<button onclick="deleteFocusTask(\'weekly\',\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button>';
-      html+='</div>';
-      if(subTotal>0){
-        var barColor=subPct===100?'#16a34a':subPct>=50?'#d97706':'#3b82f6';
-        html+='<div style="margin:4px 0 4px 24px"><div style="background:var(--surface2);border-radius:4px;height:4px;margin-bottom:4px"><div style="background:'+barColor+';width:'+subPct+'%;height:4px;border-radius:4px"></div></div>';
-        subTasks.forEach(function(st,si){
-          html+='<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><input type="checkbox"'+(st.done?' checked':'')+' onchange="_toggleSubTask(\''+t.id+'\','+si+',this.checked,\'weekly\')" style="width:13px;height:13px;cursor:pointer;accent-color:#7c3aed;flex-shrink:0"><span style="font-size:11px;'+(st.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt2)')+'">'+st.name+'</span></div>';
-        });
-        html+='</div>';
-      }
-      html+='</div>';
-    });
-  }else{
-    html+='<div style="text-align:center;padding:10px;color:var(--txt3);font-size:12px">이번 주 중점 업무가 없습니다<br><span style="font-size:11px">＋ 추가 또는 이달의 중점 업무에서 주차별 업무를 등록하면 자동으로 표시됩니다</span></div>';
   }
   html+='</div></div>';
 
