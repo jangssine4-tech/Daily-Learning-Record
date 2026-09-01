@@ -443,17 +443,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       <select class="fi" id="focus-sel-mo" style="width:68px;font-size:12px;padding:3px 6px" onchange="_boardFocusNavRender()"></select>
       <button class="btn btn-outline btn-xs" onclick="_boardFocusGoToday()">이번 달</button>
     </div>
-    <!-- 참고 자료 아코디언 -->
-    <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden">
-      <div onclick="_toggleFocusRef()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);cursor:pointer;user-select:none">
-        <span style="font-size:12px;font-weight:700;color:var(--navy)">📋 이달의 참고 자료</span>
-        <span id="focus-ref-icon" style="font-size:13px;color:var(--txt3);transition:transform .2s;transform:rotate(-90deg)">▾</span>
-      </div>
-      <div id="focus-ref-body" style="display:none;padding:10px 14px">
-        <div id="focus-ref-area"><div style="padding:10px;text-align:center;color:var(--txt3);font-size:12px">⏳ 로딩 중...</div></div>
-      </div>
-    </div>
-    <!-- 중점 업무 -->
+    <!-- 이달의 할 일 -->
     <div id="board-focus-area"></div>
   </div>
   <!-- 영역별 할 일 패널 -->
@@ -11898,7 +11888,23 @@ function _renderDashBoardUI(el){
   var tab=_boardCurrentTab||'today';
   if(tab==='today')_renderBoardTodayPanel();
   else if(tab==='weekly')_boardWeekNavRender();
-  else if(tab==='focus')_boardFocusNavRender();
+  else if(tab==='focus'){
+    // _academicCalendar 로드 보장 후 렌더링
+    if(!_academicCalendar||!_academicCalendar.events){
+      loadAcademicCalendar(function(){
+        // _plans도 로드 보장
+        if(!_plans||!_plans.length){
+          loadPlans().then(function(){_boardFocusNavRender();});
+        }else{
+          _boardFocusNavRender();
+        }
+      });
+    }else if(!_plans||!_plans.length){
+      loadPlans().then(function(){_boardFocusNavRender();});
+    }else{
+      _boardFocusNavRender();
+    }
+  }
   else if(tab==='area')_renderBoardAreaPanel();
 }
 
