@@ -4895,7 +4895,10 @@ function renderSchedule(){
 
   if(allNotPresent.length){
     html+='<div style="background:#f8fafc;border:1px dashed var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px">'
-      +'<div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:6px">오늘 수업 없는 학생 ('+allNotPresent.length+'명)</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      +'<span style="font-size:11px;font-weight:600;color:var(--txt3)">오늘 수업 없는 학생 ('+allNotPresent.length+'명)</span>'
+      +'<button onclick="_showPauseGuide(null)" style="width:16px;height:16px;border-radius:50%;background:#e2e8f0;border:none;cursor:pointer;font-size:9px;font-weight:700;color:#64748b;line-height:1;padding:0" title="일시정지 처리 방법">?</button>'
+      +'</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:4px">';
 
     // 수업 없는 학생 먼저 (이름순)
@@ -15389,6 +15392,49 @@ function _toggleWeeklyDocs(planId){
   }
   h+='</div></div>';
   el.innerHTML=h;
+}
+
+// 일시정지 처리 안내 모달
+function _showPauseGuide(){
+  var existing = document.getElementById('pause-guide-modal');
+  if(existing) existing.remove();
+
+  var ov = document.createElement('div');
+  ov.id = 'pause-guide-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+
+  var steps = [
+    {num:'1', text:'잉아 LMS 접속'},
+    {num:'2', text:'회원 관리 클릭'},
+    {num:'3', text:'학생 이름 검색 후 클릭'},
+    {num:'4', text:'화면 오른편 <b>일시정지</b> 클릭'},
+    {num:'5', text:'달력에서 <b>오늘 날짜</b> 선택'},
+    {num:'6', text:'<b>설정</b> 클릭'},
+  ];
+
+  var stepsHtml = steps.map(function(s){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9">'
+      +'<div style="width:24px;height:24px;border-radius:50%;background:var(--navy);color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+s.num+'</div>'
+      +'<div style="font-size:13px;color:#1e293b;line-height:1.5">'+s.text+'</div>'
+      +'</div>';
+  }).join('');
+
+  ov.innerHTML = '<div style="background:white;border-radius:16px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2)">'
+    +'<div style="background:var(--navy);padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'
+    +'<div style="font-size:14px;font-weight:800;color:white">⏸ 결석 학생 일시정지 처리 방법</div>'
+    +'<button onclick="document.getElementById('pause-guide-modal').remove()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;line-height:1;padding:0">×</button>'
+    +'</div>'
+    +'<div style="padding:14px 18px">'
+    +'<div style="font-size:11px;color:#64748b;margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:8px;border-left:3px solid var(--navy)">잉아 LMS에서 일시정지 처리하면 해당 기간 수업료가 자동 차감됩니다.</div>'
+    +stepsHtml
+    +'</div>'
+    +'<div style="padding:10px 18px 16px">'
+    +'<button onclick="document.getElementById('pause-guide-modal').remove()" style="width:100%;padding:10px;border:none;border-radius:10px;background:var(--navy);color:white;font-size:13px;font-weight:700;cursor:pointer">확인</button>'
+    +'</div>'
+    +'</div>';
+
+  document.body.appendChild(ov);
 }
 
 function _togglePlanDetail(uid){
