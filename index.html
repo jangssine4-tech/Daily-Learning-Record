@@ -3520,37 +3520,102 @@ function _boardFocusGoToday(){
 }
 function _initBoardFocusSelectors(){}
 function _renderFocusSectionFiltered(type,title,color,items,isCurrentMonth){
-  var done=items.filter(function(t){return t.status==='완료';}).length;
+  // 루트 항목만 헤더 카운트에 표시 (하위 업무는 상위 진행률로 표시)
+  var roots=items.filter(function(t){return !t.parentTask||!items.find(function(p){return p.id===t.parentTask;});});
+  var done=roots.filter(function(t){return t.status==='완료';}).length;
   var addOnclick=type==='monthly'?'openMonthlyFocusModal()':'openMonthlyFocusModal()';
   var h='<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px">';
   h+='<div style="background:'+color+';padding:8px 14px;display:flex;align-items:center;gap:8px">';
   h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+title+'</span>';
-  if(items.length){
-    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+items.length+' 완료</span>';
+  if(roots.length){
+    h+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+roots.length+' 완료</span>';
     h+='<button class="btn btn-navy btn-xs" style="margin-left:4px" onclick="'+addOnclick+'">＋ 추가</button>';
   }else{
     h+='<button class="btn btn-navy btn-xs" style="margin-left:auto" onclick="'+addOnclick+'">＋ 추가</button>';
   }
   h+='</div><div style="padding:8px 14px;background:var(--surface)">';
   if(items.length){
+    // parentTask 기반 계층 구조 렌더링
+    // 1) 상위 없는 항목(루트)과 하위 항목 분리
+    var roots=items.filter(function(t){return !t.parentTask||!items.find(function(p){return p.id===t.parentTask;});});
+    var childMap={};
     items.forEach(function(t){
+      if(t.parentTask&&items.find(function(p){return p.id===t.parentTask;})){
+        if(!childMap[t.parentTask])childMap[t.parentTask]=[];
+        childMap[t.parentTask].push(t);
+      }
+    });
+    // 헤더 완료 수 재계산 (하위 업무 포함)
+    var totalWithChildren=0,doneWithChildren=0;
+    items.forEach(function(t){totalWithChildren++;if(t.status==='완료')doneWithChildren++;});
+
+    roots.forEach(function(t){
       var isDone=t.status==='완료';
+      var children=childMap[t.id]||[];
+      // subTasks(기존 방식) + parentTask 방식 하위 업무 합산
       var subTasks=t.subTasks||[];
       var subDone=subTasks.filter(function(s){return s.done;}).length;
       var subTotal=subTasks.length;
-      var subPct=subTotal>0?Math.round(subDone/subTotal*100):0;
+      // parentTask 방식 하위 업무 진행률
+      var childDone=children.filter(function(c){return c.status==='완료';}).length;
+      var childTotal=children.length;
+      // 전체 하위 합산
+      var allChildDone=subDone+childDone;
+      var allChildTotal=subTotal+childTotal;
+      var childPct=allChildTotal>0?Math.round(allChildDone/allChildTotal*100):0;
+
       h+='<div style="padding:6px 0;border-bottom:1px solid var(--border)">';
       h+='<div style="display:flex;align-items:center;gap:8px">';
       h+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleFocusTask(\''+type+'\',\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
       h+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
-      if(subTotal>0){var pc=subPct===100?'#16a34a':subPct>=50?'#d97706':'#6b7280';h+='<span style="font-size:10px;font-weight:700;color:'+pc+'">'+subPct+'%</span>';}
+      if(allChildTotal>0){
+        var pc=childPct===100?'#16a34a':childPct>=50?'#d97706':'#6b7280';
+        h+='<span style="font-size:10px;font-weight:700;color:'+pc+'">'+allChildDone+'/'+allChildTotal+' ('+childPct+'%)</span>';
+      }
       h+='<button onclick="deleteFocusTask(\''+type+'\',\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;line-height:1;padding:0 4px">×</button>';
       h+='</div>';
-      if(subTotal>0){
-        var bc=subPct===100?'#16a34a':subPct>=50?'#d97706':'#3b82f6';
-        h+='<div style="margin:4px 0 4px 24px"><div style="background:var(--surface2);border-radius:4px;height:4px;margin-bottom:5px"><div style="background:'+bc+';width:'+subPct+'%;height:4px;border-radius:4px"></div></div>';
+
+      // 진행률 바 (하위 있을 때만)
+      if(allChildTotal>0){
+        var bc=childPct===100?'#16a34a':childPct>=50?'#d97706':'#3b82f6';
+        h+='<div style="margin:4px 0 2px 24px"><div style="background:var(--surface2);border-radius:4px;height:4px;margin-bottom:6px"><div style="background:'+bc+';width:'+childPct+'%;height:4px;border-radius:4px;transition:width .3s"></div></div>';
+        // parentTask 방식 하위 업무 표시
+        children.forEach(function(c){
+          var cDone=c.status==='완료';
+          var grandChildren=childMap[c.id]||[];
+          var gcDone=grandChildren.filter(function(g){return g.status==='완료';}).length;
+          var gcTotal=grandChildren.length;
+          var gcPct=gcTotal>0?Math.round(gcDone/gcTotal*100):0;
+          h+='<div style="padding:3px 0;border-bottom:1px solid var(--border)">';
+          h+='<div style="display:flex;align-items:center;gap:6px;padding:1px 0">';
+          h+='<span style="color:var(--txt3);font-size:11px;flex-shrink:0">└</span>';
+          h+='<input type="checkbox"'+(cDone?' checked':'')+' onchange="toggleFocusTask(\''+type+'\',\''+c.id+'\')" style="width:13px;height:13px;cursor:pointer;accent-color:var(--mint);flex-shrink:0">';
+          h+='<span onclick="openDbTaskModal(\''+c.id+'\')" style="flex:1;font-size:11px;cursor:pointer;'+(cDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt2)')+'">'+c.name+'</span>';
+          if(gcTotal>0){var gcc=gcPct===100?'#16a34a':gcPct>=50?'#d97706':'#6b7280';h+='<span style="font-size:10px;color:'+gcc+'">'+gcDone+'/'+gcTotal+'</span>';}
+          h+='<span style="font-size:10px;color:var(--txt3)">'+(c.dueDate?c.dueDate.slice(5):'')+'</span>';
+          h+='<button onclick="deleteFocusTask(\''+type+'\',\''+c.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px">×</button>';
+          h+='</div>';
+          // 3단계 하위 (일반 업무 → 이번 주 중점 → 이달의 중점 구조에서 일반 업무)
+          if(gcTotal>0){
+            grandChildren.forEach(function(g){
+              var gDone=g.status==='완료';
+              h+='<div style="display:flex;align-items:center;gap:6px;padding:1px 0 1px 18px">';
+              h+='<span style="color:var(--txt3);font-size:10px;flex-shrink:0">└</span>';
+              h+='<input type="checkbox"'+(gDone?' checked':'')+' onchange="toggleFocusTask(\''+type+'\',\''+g.id+'\')" style="width:12px;height:12px;cursor:pointer;accent-color:var(--mint);flex-shrink:0">';
+              h+='<span onclick="openDbTaskModal(\''+g.id+'\')" style="flex:1;font-size:11px;cursor:pointer;'+(gDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt2)')+'">'+g.name+'</span>';
+              h+='<span style="font-size:10px;color:var(--txt3)">'+(g.dueDate?g.dueDate.slice(5):'')+'</span>';
+              h+='</div>';
+            });
+          }
+          h+='</div>';
+        });
+        // subTasks(기존 방식) 하위 표시
         subTasks.forEach(function(st,si){
-          h+='<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><input type="checkbox"'+(st.done?' checked':'')+' onchange="_toggleSubTask(\''+t.id+'\','+si+',this.checked,\''+type+'\')" style="width:13px;height:13px;cursor:pointer;accent-color:var(--mint);flex-shrink:0"><span style="font-size:11px;'+(st.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt2)')+'">'+st.name+'</span></div>';
+          h+='<div style="display:flex;align-items:center;gap:6px;padding:2px 0">';
+          h+='<span style="color:var(--txt3);font-size:11px;flex-shrink:0">└</span>';
+          h+='<input type="checkbox"'+(st.done?' checked':'')+' onchange="_toggleSubTask(\''+t.id+'\','+si+',this.checked,\''+type+'\')" style="width:13px;height:13px;cursor:pointer;accent-color:var(--mint);flex-shrink:0">';
+          h+='<span style="font-size:11px;'+(st.done?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt2)')+'">'+st.name+'</span>';
+          h+='</div>';
         });
         h+='</div>';
       }
@@ -11831,13 +11896,44 @@ function loadFocusTasks(){
 }
 function toggleFocusTask(type,id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
-  if(t){
-    t.status=t.status==='완료'?'대기':'완료';
-    saveTask(id);
-    _renderDashBoardUI($('dashboard-board-area'));
+  if(!t)return;
+  var newStatus=t.status==='완료'?'대기':'완료';
+  t.status=newStatus;
+  saveTask(id);
+  // 하위 업무(parentTask===id)도 같이 토글
+  if(newStatus==='완료'){
+    (_dbTasks||[]).filter(function(x){return x.parentTask===id;}).forEach(function(c){
+      c.status='완료';saveTask(c.id);
+      // 3단계 하위도
+      (_dbTasks||[]).filter(function(x){return x.parentTask===c.id;}).forEach(function(g){
+        g.status='완료';saveTask(g.id);
+      });
+    });
   }
+  // 상위 업무 진행률 자동 갱신 (모든 하위 완료 시 상위도 완료)
+  if(t.parentTask){
+    var parent=(_dbTasks||[]).find(function(x){return x.id===t.parentTask;});
+    if(parent){
+      var siblings=(_dbTasks||[]).filter(function(x){return x.parentTask===parent.id;});
+      if(siblings.length&&siblings.every(function(s){return s.status==='완료';})){
+        parent.status='완료';saveTask(parent.id);
+        toast('✅ 하위 업무 전체 완료 — 상위 업무도 완료 처리됐어요');
+      }
+    }
+  }
+  _renderDashBoardUI($('dashboard-board-area'));
 }
 function deleteFocusTask(type,id){
+  // 하위 업무도 함께 삭제
+  var children=(_dbTasks||[]).filter(function(x){return x.parentTask===id;});
+  children.forEach(function(c){
+    (_dbTasks||[]).filter(function(x){return x.parentTask===c.id;}).forEach(function(g){
+      _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==g.id;});
+      deleteTask(g.id);
+    });
+    _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==c.id;});
+    deleteTask(c.id);
+  });
   _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==id;});
   deleteTask(id);
   _renderDashBoardUI($('dashboard-board-area'));
