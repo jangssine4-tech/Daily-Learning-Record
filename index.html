@@ -14969,7 +14969,7 @@ function _deletePlan(planId){
   if(!confirm('플랜을 삭제할까요?\n실행업무와 결과 기록도 모두 삭제돼요.'))return;
   // 연결된 _dbTasks도 Firestore에서 삭제
   var linkedTasks=(_dbTasks||[]).filter(function(t){return t.planId===planId;});
-  var deleteJobs=linkedTasks.map(function(t){return db.collection('tasks').doc(t.id).delete();});
+  var deleteJobs=linkedTasks.map(function(t){return db.collection('dashBoardV2').doc(t.id).delete();});
   deleteJobs.push(db.collection('plans').doc(planId).delete());
   Promise.all(deleteJobs).then(function(){
     _plans=_plans.filter(function(p){return p.id!==planId;});
@@ -15355,10 +15355,25 @@ function _parsePlanTasks(){
     var criterion=parts[6]||'';
     if(!taskName)return;
 
-    var offset=0;var m=dRef.match(/D([+-]?\d+)/i);
-    if(m)offset=parseInt(m[1]);
-    var td=new Date(dday);td.setDate(td.getDate()+offset);
-    var dateStr=td.getFullYear()+'-'+String(td.getMonth()+1).padStart(2,'0')+'-'+String(td.getDate()).padStart(2,'0');
+    // 날짜 파싱: 9/2, 9/2~3, D-3, D+0 등 다양한 형식 지원
+    var dateStr='';
+    var mSlash=dRef.match(/(\d{1,2})\/(\d{1,2})/); // 9/2 또는 9/2~3 형식
+    var mD=dRef.match(/D([+-]?\d+)/i); // D-3, D+0 형식
+    if(mSlash){
+      // 9/2 형식 — 연도는 dday 기준
+      var mo=parseInt(mSlash[1]);var dy=parseInt(mSlash[2]);
+      var yr=dday.getFullYear();
+      // 월이 dday 기준 월보다 작으면 다음 해로
+      if(mo<dday.getMonth()+1)yr++;
+      dateStr=yr+'-'+String(mo).padStart(2,'0')+'-'+String(dy).padStart(2,'0');
+    }else if(mD){
+      var offset=parseInt(mD[1]);
+      var td=new Date(dday);td.setDate(td.getDate()+offset);
+      dateStr=td.getFullYear()+'-'+String(td.getMonth()+1).padStart(2,'0')+'-'+String(td.getDate()).padStart(2,'0');
+    }else{
+      // 인식 안 되는 형식 → dday 사용
+      dateStr=dday.getFullYear()+'-'+String(dday.getMonth()+1).padStart(2,'0')+'-'+String(dday.getDate()).padStart(2,'0');
+    }
 
     if(!stages[stage]){stages[stage]=[];stageOrder.push(stage);}
     var task={name:taskName,detail:detail,date:dateStr,dRef:dRef,manager:manager,priority:priority,criterion:criterion,done:false,stage:stage};
