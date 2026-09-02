@@ -9383,14 +9383,10 @@ function openExpectedDetailModal(studentId,yr,mo){
   var weeklyDays=Math.round(mh/4);
   var weekLabel=weeklyDays<=3?'주 3회':weeklyDays===4?'주 4회':weeklyDays===5?'주 5회':'주 6회';
   // 결석 차감액 자동 계산: (수강료 - 교재비) ÷ (주N회 × 4.2) × 결석일
-  var absentDays=makeups.filter(function(m){
-    if(m.studentId!==studentId)return false;
-    var ad=m.absentDate||'';if(!ad)return false;
-    var md=new Date(ad);
-    return md.getFullYear()===yr&&md.getMonth()===mo-1&&m.makeupStatus!=='done';
-  }).length;
+  // 결석 차감은 자동 집계 없이 수동 입력만 사용
+  var absentDays=0;
   var perDayFee=(tuitionFee>0&&weeklyDays>0)?Math.round((tuitionFee-textbookFee)/(weeklyDays*4.2)):0;
-  var autoAbsentDeduct=isNaN(perDayFee)?0:perDayFee*absentDays;
+  var autoAbsentDeduct=0;
 
   var list=revenues.filter(function(r){
     if(r.isManualMeta)return false;
@@ -9563,16 +9559,16 @@ function saveExpectedDetailModal(studentId,yr,mo,overlay){
   if(lastRev){
     Object.assign(lastRev,updateData);
     db.collection('revenues').doc(lastRev.id).update(updateData)
-      .then(function(){toast('저장됐어요');if(overlay)overlay.remove();renderMonthlyRevenue();})
-      .catch(function(){toast('저장 실패');});
+      .then(function(){toast('저장됐어요');if(overlay)overlay.remove();renderRevMonthly(yr,mo);})
+      .catch(function(e){console.error('저장 오류:',e);toast('저장 실패: '+e.message);});
   }else{
     // 수납 기록이 없으면 예정액만 저장
     var s=students.find(function(x){return x.id===studentId;});
     var newRec=Object.assign({studentId:studentId,studentName:s?s.name:'',revYear:yr,revMonth:mo,amount:0,method:'',paidDate:'',memo:''},updateData);
     db.collection('revenues').add(newRec).then(function(ref){
       revenues.push(Object.assign({id:ref.id},newRec));
-      toast('저장됐어요');if(overlay)overlay.remove();renderMonthlyRevenue();
-    }).catch(function(){toast('저장 실패');});
+      toast('저장됐어요');if(overlay)overlay.remove();renderRevMonthly(yr,mo);
+    }).catch(function(e){console.error('저장 오류:',e);toast('저장 실패: '+e.message);});
   }
 }
 
