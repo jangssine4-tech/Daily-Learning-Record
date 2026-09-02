@@ -14967,11 +14967,17 @@ function _savePlanResult(planId){
 
 function _deletePlan(planId){
   if(!confirm('플랜을 삭제할까요?\n실행업무와 결과 기록도 모두 삭제돼요.'))return;
-  db.collection('plans').doc(planId).delete().then(function(){
+  // 연결된 _dbTasks도 Firestore에서 삭제
+  var linkedTasks=(_dbTasks||[]).filter(function(t){return t.planId===planId;});
+  var deleteJobs=linkedTasks.map(function(t){return db.collection('tasks').doc(t.id).delete();});
+  deleteJobs.push(db.collection('plans').doc(planId).delete());
+  Promise.all(deleteJobs).then(function(){
     _plans=_plans.filter(function(p){return p.id!==planId;});
+    _dbTasks=(_dbTasks||[]).filter(function(t){return t.planId!==planId;});
     _selectedPlanId=null;
     toast('삭제됐어요');
     renderPlansView();
+    if($('board-area-area'))_renderBoardAreaPanel();
   }).catch(function(){toast('삭제 실패');});
 }
 
