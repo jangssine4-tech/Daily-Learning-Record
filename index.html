@@ -9442,8 +9442,11 @@ function openExpectedDetailModal(studentId,yr,mo){
     '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--txt3)">순수 수강료</span><span>'+puretuition.toLocaleString()+'원</span></div>'+
     '<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:var(--txt3)">교재비</span><span>'+textbookFee.toLocaleString()+'원</span></div>'+
     '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px"><span style="font-weight:700">합계</span>'+
-    '<input id="edm-base" type="text" value="'+tuitionFee.toLocaleString()+'" style="width:110px;font-size:14px;font-weight:800;text-align:right;border:1px solid var(--border);border-radius:6px;padding:2px 6px;background:var(--surface);color:var(--navy)" oninput="edmFormatBase(this);edmCalc()">'+
-    '<span style="font-size:12px;color:var(--txt3);align-self:center;margin-left:4px">원</span></div>'+
+    '<div style="display:flex;align-items:center;gap:4px">'+
+    '<input id="edm-base" type="text" value="'+tuitionFee.toLocaleString()+'" style="width:100px;font-size:14px;font-weight:800;text-align:right;border:1px solid var(--border);border-radius:6px;padding:2px 6px;background:var(--surface);color:var(--navy)" oninput="edmFormatBase(this);edmCalc()">'+
+    '<button type="button" onclick="edmOpenCalc('edm-base')" style="font-size:14px;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;cursor:pointer;color:var(--txt2)">🧮</button>'+
+    '<span style="font-size:12px;color:var(--txt3)">원</span>'+
+    '</div></div>'+
     '</div></div>'+
 
     // 조정 항목
@@ -9455,7 +9458,8 @@ function openExpectedDetailModal(studentId,yr,mo){
     '<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:8px">할인</div>'+
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'+
     '<span style="font-size:12px;color:var(--txt3);min-width:50px">금액</span>'+
-    '<input id="edm-discount" type="text" value="'+discountAmt.toLocaleString()+'" style="width:100px;font-size:13px;font-weight:700;text-align:right;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface)" oninput="edmFormatDisc(this);edmCalc()">'+
+    '<input id="edm-discount" type="text" value="'+discountAmt.toLocaleString()+'" style="width:90px;font-size:13px;font-weight:700;text-align:right;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface)" oninput="edmFormatDisc(this);edmCalc()">'+
+    '<button type="button" onclick="edmOpenCalc('edm-discount')" style="font-size:14px;background:none;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;color:var(--txt2)">🧮</button>'+
     '<span style="font-size:12px;color:var(--txt3)">원</span>'+
     '</div>'+
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">'+
@@ -9616,6 +9620,128 @@ function openExpectedDetailModal(studentId,yr,mo){
     document.getElementById('edm-sum2-submat').textContent='+'+subm.toLocaleString()+'원';
     document.getElementById('edm-sum2-disc').textContent='-'+disc.toLocaleString()+'원';
     document.getElementById('edm-sum2-absent').textContent='-'+absent.toLocaleString()+'원';
+  };
+
+  // 🧮 계산기 팝업
+  window.edmOpenCalc=function(targetId){
+    var existing=document.getElementById('edm-calc-popup');
+    if(existing){
+      // 같은 버튼 다시 누르면 닫기
+      if(existing.dataset.target===targetId){existing.remove();return;}
+      existing.remove();
+    }
+    var el=document.getElementById(targetId);
+    if(!el)return;
+    var raw=(el.value||'').replace(/[^0-9]/g,'');
+    var initVal=raw||'0';
+
+    var popup=document.createElement('div');
+    popup.id='edm-calc-popup';
+    popup.dataset.target=targetId;
+    popup.style.cssText='position:fixed;z-index:99999;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);padding:14px;width:220px;';
+
+    // 팝업 위치: 입력창 기준
+    var rect=el.getBoundingClientRect();
+    var top=rect.bottom+6;
+    var left=rect.left;
+    if(left+220>window.innerWidth)left=window.innerWidth-228;
+    if(top+320>window.innerHeight)top=rect.top-320;
+    popup.style.top=top+'px';
+    popup.style.left=left+'px';
+
+    var display=initVal==='0'?'':initVal;
+    var calcStr='';  // 연산 문자열
+
+    function render(){
+      popup.innerHTML=
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+        '<span style="font-size:11px;font-weight:700;color:var(--txt3)">계산기</span>'+
+        '<button onclick="document.getElementById('edm-calc-popup').remove()" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--txt3);line-height:1">×</button>'+
+        '</div>'+
+        // 수식 표시
+        '<div style="font-size:10px;color:var(--txt3);text-align:right;height:14px;margin-bottom:2px;padding:0 4px">'+
+        (calcStr||'&nbsp;')+
+        '</div>'+
+        // 결과 표시
+        '<div style="font-size:22px;font-weight:800;text-align:right;padding:4px 8px;background:var(--surface2);border-radius:8px;margin-bottom:10px;color:var(--navy);letter-spacing:-1px">'+
+        (display||'0')+
+        '</div>'+
+        // 버튼 그리드
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px">'+
+        btn('C','#dc2626')+btn('±','#6b7280')+btn('%','#6b7280')+btn('÷','var(--navy)')+
+        btn('7')+btn('8')+btn('9')+btn('×','var(--navy)')+
+        btn('4')+btn('5')+btn('6')+btn('−','var(--navy)')+
+        btn('1')+btn('2')+btn('3')+btn('+','var(--navy)')+
+        btn('0','','2')+btn('.')+btn('=','var(--navy)')+
+        '</div>'+
+        '<button onclick="edmCalcApply()" style="width:100%;margin-top:8px;padding:8px;font-size:13px;font-weight:700;background:var(--navy);color:#fff;border:none;border-radius:8px;cursor:pointer">확인 — 이 금액 적용</button>';
+      // 클릭 이벤트
+      popup.querySelectorAll('.edm-calc-btn').forEach(function(b){
+        b.onclick=function(){edmCalcPress(b.dataset.val);};
+      });
+    }
+    function btn(label,color,span){
+      var bg=color?color:'var(--surface2)';
+      var txtColor=(color&&color!=='var(--surface2)'&&color!=='#6b7280')?'#fff':'var(--txt)';
+      if(color==='#6b7280')txtColor='#fff';
+      return '<button class="edm-calc-btn" data-val="'+label+'" style="'+
+        'grid-column:span '+(span||1)+';padding:10px 0;font-size:15px;font-weight:700;'+
+        'background:'+bg+';color:'+txtColor+';border:none;border-radius:8px;cursor:pointer">'+label+'</button>';
+    }
+
+    window.edmCalcPress=function(v){
+      if(v==='C'){display='';calcStr='';render();return;}
+      if(v==='='){
+        try{
+          var expr=calcStr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-');
+          var result=Math.round(Function('"use strict";return ('+expr+')')());
+          display=result.toLocaleString();
+          calcStr='';
+        }catch(e){display='오류';calcStr='';}
+        render();return;
+      }
+      if(v==='±'){
+        var n=parseFloat((display||'0').replace(/,/g,''));
+        display=(-n).toLocaleString();render();return;
+      }
+      if(v==='%'){
+        var n2=parseFloat((display||'0').replace(/,/g,''));
+        display=(n2/100).toLocaleString();render();return;
+      }
+      if(['÷','×','−','+'].indexOf(v)>=0){
+        var raw2=(display||'0').replace(/,/g,'');
+        calcStr=(calcStr||'')+raw2+v;
+        display='';render();return;
+      }
+      // 숫자/소수점
+      var cur=(display||'').replace(/,/g,'');
+      if(v==='.'&&cur.indexOf('.')>=0)return;
+      cur=cur===''&&v==='.'?'0.':cur+v;
+      display=cur.indexOf('.')>=0?cur:parseInt(cur).toLocaleString();
+      render();
+    };
+    window.edmCalcApply=function(){
+      var raw2=(display||'0').replace(/,/g,'');
+      var num=parseInt(raw2)||0;
+      var tgt=document.getElementById(targetId);
+      if(tgt){tgt.value=num.toLocaleString();}
+      popup.remove();
+      if(targetId==='edm-base'){edmFormatBase(tgt);} else if(targetId==='edm-discount'){edmFormatDisc(tgt);}
+      edmCalc();
+    };
+
+    render();
+    document.body.appendChild(popup);
+
+    // 팝업 외부 클릭 시 닫기
+    setTimeout(function(){
+      document.addEventListener('click',function closeCalc(e){
+        var p=document.getElementById('edm-calc-popup');
+        if(p&&!p.contains(e.target)&&!e.target.closest('button[onclick*="edmOpenCalc"]')){
+          p.remove();document.removeEventListener('click',closeCalc);
+        }
+      });
+    },100);
   };
 
   // 초기 계산 실행
