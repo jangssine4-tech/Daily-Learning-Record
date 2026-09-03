@@ -2830,6 +2830,15 @@ async function loadCardBadges(){
   try{var d=await db.collection('config').doc('cardBadges').get();window._cardBadges=d.exists?d.data():{};}catch(e){window._cardBadges={};}
 }
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
+function _schRevClick(el){
+  var sid=el.dataset.sid;
+  var yr=parseInt(el.dataset.yr);
+  var mo=parseInt(el.dataset.mo);
+  var ov=el.closest('.mo');
+  if(ov)ov.remove();
+  setTimeout(function(){openExpectedDetailModal(sid,yr,mo);},100);
+}
+
 function openSchRevModal(){
   // 현재 날짜 기준 년/월
   var d=new Date(_scheduleDate||todayISO());
@@ -2866,7 +2875,7 @@ function openSchRevModal(){
     var paid=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
     var isPaid=paid>=expected&&expected>0;
 
-    listHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="overlay.remove();setTimeout(function(){openExpectedDetailModal(''+s.id+'','+yr+','+mo+');},100)">'+
+    listHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer" data-sid="'+s.id+'" data-yr="'+yr+'" data-mo="'+mo+'" onclick="_schRevClick(this)">'+
       '<div style="flex:1">'+
       '<div style="font-size:13px;font-weight:700;color:var(--navy)">'+s.name+'</div>'+
       '<div style="font-size:11px;color:var(--txt3)">'+rawLevel+'</div>'+
@@ -2886,7 +2895,7 @@ function openSchRevModal(){
     '<div style="font-size:11px;opacity:.7">'+yr+'년 '+moLabel+' 납부 현황</div>'+
     '<div style="font-size:17px;font-weight:800;margin-top:2px">💰 학생별 납부예정액</div>'+
     '</div>'+
-    '<button onclick="this.closest('.mo').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:13px">✕</button>'+
+    '<button id="sch-rev-close-btn" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:13px">✕</button>'+
     '</div>'+
     '<div style="max-height:70vh;overflow-y:auto">'+
     listHtml+
@@ -2895,6 +2904,8 @@ function openSchRevModal(){
     '</div>';
 
   document.body.appendChild(overlay);
+  var closeBtn=document.getElementById('sch-rev-close-btn');
+  if(closeBtn)closeBtn.onclick=function(){overlay.remove();};
 }
 
 
