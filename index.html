@@ -19113,5 +19113,52 @@ if(document.readyState==='loading'){
 </div>
 </div>
 
+<script>
+// 📱 핀치 줌 — Edge 모바일 user-scalable 무시 대응
+(function(){
+  var scale=1, lastScale=1;
+  var startDist=0;
+  var originX=0, originY=0;
+  var el=document.getElementById('content')||document.body;
+
+  function dist(t){
+    var dx=t[0].clientX-t[1].clientX;
+    var dy=t[0].clientY-t[1].clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+
+  document.addEventListener('touchstart',function(e){
+    if(e.touches.length===2){
+      e.preventDefault();
+      startDist=dist(e.touches);
+      lastScale=scale;
+      var cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      var cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      originX=cx;
+      originY=cy;
+    }
+  },{passive:false});
+
+  document.addEventListener('touchmove',function(e){
+    if(e.touches.length===2){
+      e.preventDefault();
+      var newDist=dist(e.touches);
+      scale=Math.min(4,Math.max(0.5,lastScale*(newDist/startDist)));
+      el.style.transformOrigin=originX+'px '+originY+'px';
+      el.style.transform='scale('+scale+')';
+    }
+  },{passive:false});
+
+  document.addEventListener('touchend',function(e){
+    if(e.touches.length<2){
+      // 1 이하면 1로 스냅백
+      if(scale<1){
+        scale=1;
+        el.style.transform='scale(1)';
+      }
+    }
+  },{passive:true});
+})();
+</script>
 </body>
 </html>
