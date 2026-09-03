@@ -2561,6 +2561,10 @@ function initYearSelects(which){
 
 // OPTIMIZED goto - ensures populate only when needed
 function goto(view){
+  // History API — 뒤로가기 버튼으로 앱 내 이전 화면으로 이동
+  if(!window._gotoFromPop){
+    window.history.pushState({view:view},'',window.location.pathname+'#'+view);
+  }
   // 월간 중점 선정 경유가 아닌 직접 이동 시 돌아가기 버튼 제거
   if(!_fromMonthly){var rb=document.getElementById('monthly-return-bar');if(rb)rb.remove();}
   var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open')){sb.classList.remove('open');var ov=document.getElementById('mob-overlay');if(ov)ov.classList.remove('open');}
@@ -18882,6 +18886,11 @@ function deletePeriodRow(idx){
 
 
 function _initApp(){
+  // 초기 진입 시 현재 화면을 history에 등록 (뒤로가기 기준점)
+  var _initView='schedule';
+  var _hash=window.location.hash.replace('#','');
+  if(_hash)_initView=_hash;
+  window.history.replaceState({view:_initView},'',window.location.pathname+'#'+_initView);
   bootProgress(5, 'Firebase 확인 중...');
   var cfg=getCfg();
   // Year/month selects
@@ -18907,6 +18916,22 @@ if(document.readyState==='loading'){
       else{setTimeout(checkFb,50);}
     };
     checkFb();
+  });
+
+  // 📱 뒤로가기 버튼 — 앱 내 이전 화면으로 이동
+  window.addEventListener('popstate',function(e){
+    if(e.state&&e.state.view){
+      window._gotoFromPop=true;
+      goto(e.state.view);
+      window._gotoFromPop=false;
+    } else {
+      // 히스토리가 더 없으면 기본 화면(schedule)으로
+      window._gotoFromPop=true;
+      goto('schedule');
+      window._gotoFromPop=false;
+      // 앱 밖으로 나가지 않도록 현재 상태 다시 push
+      window.history.pushState({view:'schedule'},'',window.location.pathname+'#schedule');
+    }
   });
 } else {
   var checkFb2=function(){
