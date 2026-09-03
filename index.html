@@ -9426,10 +9426,19 @@ function openExpectedDetailModal(studentId,yr,mo){
     '<div style="font-size:11px;opacity:.6;margin-bottom:10px">'+yr+'년 '+moLabel+' · 저장하면 수납 기록에 반영됩니다</div>'+
     // 상단 최종 납부예정액 강조
     '<div style="font-size:28px;font-weight:900;letter-spacing:-1px" id="edm-total-top">'+initTotal.toLocaleString()+'원</div>'+
-    '<div style="margin-top:8px;font-size:11px;opacity:.7;display:flex;gap:12px">'+
-    '<span>수강료 <b id="edm-sum-base">'+tuitionFee.toLocaleString()+'</b>원</span>'+
-    '<span>할인 <b id="edm-sum-disc" style="color:#fbbf24">-<span id="edm-sum-disc-val">'+discountAmt.toLocaleString()+'</span></b>원</span>'+
-    '<span>결석차감 <b id="edm-sum-absent" style="color:#93c5fd">-<span id="edm-sum-absent-val">'+absentDeduct.toLocaleString()+'</span></b>원</span>'+
+    '<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">'+
+    '<div style="background:rgba(255,255,255,.12);border-radius:8px;padding:6px 12px;min-width:80px">'+
+    '<div style="font-size:10px;opacity:.7;margin-bottom:2px">수강료</div>'+
+    '<div style="font-size:15px;font-weight:800"><span id="edm-sum-base">'+tuitionFee.toLocaleString()+'</span>원</div>'+
+    '</div>'+
+    '<div style="background:rgba(255,255,255,.12);border-radius:8px;padding:6px 12px;min-width:80px">'+
+    '<div style="font-size:10px;opacity:.7;margin-bottom:2px">할인</div>'+
+    '<div style="font-size:15px;font-weight:800;color:#fbbf24">-<span id="edm-sum-disc-val">'+discountAmt.toLocaleString()+'</span>원</div>'+
+    '</div>'+
+    '<div style="background:rgba(255,255,255,.12);border-radius:8px;padding:6px 12px;min-width:80px">'+
+    '<div style="font-size:10px;opacity:.7;margin-bottom:2px">결석 차감</div>'+
+    '<div style="font-size:15px;font-weight:800;color:#93c5fd">-<span id="edm-sum-absent-val">'+absentDeduct.toLocaleString()+'</span>원</div>'+
+    '</div>'+
     '</div></div>'+
     // 본문
     '<div style="padding:16px 20px;overflow-y:auto;max-height:60vh">'+
@@ -9468,7 +9477,7 @@ function openExpectedDetailModal(studentId,yr,mo){
     '<option value="원장할인"'+(discountReason==='원장할인'?' selected':'')+'>원장 할인</option>'+
     '<option value="기타"'+(discountReason==='기타'?' selected':'')+'>기타</option>'+
     '</select></div>'+
-    '<div id="edm-disc-memo-wrap" style="display:'+(discountReason==='이벤트할인'?'flex':'none')+';gap:8px;align-items:center;margin-top:4px">'+
+    '<div id="edm-disc-memo-wrap" style="display:'+((discountReason==='이벤트할인'||discountReason==='기타')?'flex':'none')+';gap:8px;align-items:center;margin-top:4px">'+
     '<span style="font-size:12px;color:var(--txt3);min-width:50px">내용</span>'+
     '<input id="edm-disc-memo" type="text" value="'+discountMemo+'" placeholder="이벤트 내용 입력" style="flex:1;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface)">'+
     '</div></div>'+
@@ -9481,7 +9490,7 @@ function openExpectedDetailModal(studentId,yr,mo){
     '</div>'+
     '<div id="edm-absent-tip" style="display:none;font-size:10px;color:var(--txt3);background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:8px;line-height:1.7">'+
     '순수 수강료 '+puretuition.toLocaleString()+'원 ÷ 월 '+(weeklyDays*4.2).toFixed(1)+'회 = 회당 '+perDayFee.toLocaleString()+'원<br>차감액 = 회당 '+perDayFee.toLocaleString()+'원 × 결석 횟수</div>'+
-    '<div style="display:flex;gap:12px;align-items:center">'+
+    '<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">'+
     '<div style="display:flex;align-items:center;gap:6px">'+
     '<span style="font-size:12px;color:var(--txt3)">결석 횟수</span>'+
     '<input id="edm-absent-days" type="number" value="'+absentDays+'" min="0" style="width:52px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;padding:4px;background:var(--surface)" oninput="edmAbsentCalc()">'+
@@ -9491,6 +9500,8 @@ function openExpectedDetailModal(studentId,yr,mo){
     '<div style="font-size:10px;color:var(--txt3)">회당 차감 '+perDayFee.toLocaleString()+'원</div>'+
     '<div style="font-size:14px;font-weight:800;color:var(--navy)">-<span id="edm-absent-amt">'+absentDeduct.toLocaleString()+'</span>원</div>'+
     '</div></div>'+
+    '<button id="edm-absent-apply-btn" style="width:100%;padding:7px;font-size:12px;font-weight:700;background:var(--navy);color:#fff;border:none;border-radius:8px;cursor:pointer">✂️ 차감 적용 — 납부예정액에서 위 금액 차감</button>'+
+    '<div id="edm-absent-applied-notice" style="display:'+(absentDeduct>0?'block':'none')+';font-size:10px;color:var(--mint);margin-top:5px;text-align:center">✅ 차감 적용됨 · '+absentDeduct.toLocaleString()+'원 차감 중</div>'+
     '<input type="hidden" id="edm-absent" value="'+absentDeduct+'">'+
     '</div>'+
 
@@ -9534,6 +9545,15 @@ function openExpectedDetailModal(studentId,yr,mo){
     var t=document.getElementById('edm-absent-tip');
     t.style.display=t.style.display==='none'?'block':'none';
   };
+  document.getElementById('edm-absent-apply-btn').onclick=function(){
+    var days=parseInt(document.getElementById('edm-absent-days').value)||0;
+    var amt=perDayFee*days;
+    document.getElementById('edm-absent').value=amt;
+    var notice=document.getElementById('edm-absent-applied-notice');
+    if(notice){notice.style.display='block';notice.textContent='✅ 차감 적용됨 · '+amt.toLocaleString()+'원 차감 중';}
+    edmCalc();
+    toast(amt.toLocaleString()+'원 차감이 납부예정액에 반영됐어요');
+  };
   document.getElementById('edm-reset-btn').onclick=function(){
     document.getElementById('edm-base').value=tuitionFee.toLocaleString();
     document.getElementById('edm-discount').value=discountAmt.toLocaleString();
@@ -9543,6 +9563,8 @@ function openExpectedDetailModal(studentId,yr,mo){
     document.getElementById('edm-absent-days').value=0;
     document.getElementById('edm-absent').value=0;
     document.getElementById('edm-absent-amt').textContent='0';
+    var notice=document.getElementById('edm-absent-applied-notice');
+    if(notice)notice.style.display='none';
     document.getElementById('edm-submat').value='';
     document.getElementById('edm-submat-applied').value=0;
     document.getElementById('edm-submat-amt').textContent='+0원';
@@ -9552,7 +9574,7 @@ function openExpectedDetailModal(studentId,yr,mo){
 
   window.edmDiscReasonChange=function(){
     var v=document.getElementById('edm-disc-reason').value;
-    document.getElementById('edm-disc-memo-wrap').style.display=(v==='이벤트할인')?'flex':'none';
+    document.getElementById('edm-disc-memo-wrap').style.display=(v==='이벤트할인'||v==='기타')?'flex':'none';
   };
   window.edmFormatBase=function(el){
     var raw=el.value.replace(/[^0-9]/g,'');
@@ -9566,8 +9588,7 @@ function openExpectedDetailModal(studentId,yr,mo){
     var days=parseInt(document.getElementById('edm-absent-days').value)||0;
     var amt=perDayFee*days;
     document.getElementById('edm-absent-amt').textContent=amt.toLocaleString();
-    document.getElementById('edm-absent').value=amt;
-    edmCalc();
+    // 납부예정액은 차감 버튼 눌러야 반영 — 여기서는 미리보기만
   };
   window.edmSubmatChange=function(){
     var submatVal=document.getElementById('edm-submat').value;
@@ -9588,9 +9609,9 @@ function openExpectedDetailModal(studentId,yr,mo){
     document.getElementById('edm-total-top').textContent=total.toLocaleString()+'원';
     document.getElementById('edm-total').textContent=total.toLocaleString()+'원';
     // 요약 업데이트
-    document.getElementById('edm-sum-base').textContent=base.toLocaleString();
-    document.getElementById('edm-sum-disc-val').textContent=disc.toLocaleString();
-    document.getElementById('edm-sum-absent-val').textContent=absent.toLocaleString();
+    var sumBase=document.getElementById('edm-sum-base');if(sumBase)sumBase.textContent=base.toLocaleString();
+    var sumDisc=document.getElementById('edm-sum-disc-val');if(sumDisc)sumDisc.textContent=disc.toLocaleString();
+    var sumAbsent=document.getElementById('edm-sum-absent-val');if(sumAbsent)sumAbsent.textContent=absent.toLocaleString();
     document.getElementById('edm-sum2-base').textContent=base.toLocaleString()+'원';
     document.getElementById('edm-sum2-submat').textContent='+'+subm.toLocaleString()+'원';
     document.getElementById('edm-sum2-disc').textContent='-'+disc.toLocaleString()+'원';
