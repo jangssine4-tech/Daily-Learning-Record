@@ -9650,17 +9650,31 @@ function openExpectedDetailModal(studentId,yr,mo){
     var calcStr='';  // 연산 문자열
 
     function render(){
+      // 모달에 표시된 금액 읽기
+      var baseEl=document.getElementById('edm-base');
+      var baseVal=baseEl?parseInt((baseEl.value||'0').replace(/[^0-9]/g,''))||0:0;
+      var pureTuitionVal=puretuition||0;
+      var textbookVal=textbookFee||0;
+      var totalEl=document.getElementById('edm-total');
+      var totalVal=totalEl?parseInt((totalEl.textContent||'0').replace(/[^0-9]/g,''))||0:0;
+
       popup.innerHTML=
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
-        '<span style="font-size:11px;font-weight:700;color:var(--txt3)">계산기</span>'+
-        '<button id="edm-calc-close-btn" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--txt3);line-height:1">×</button>'+
+        '<span style="font-size:12px;font-weight:700;color:var(--navy)">🧮 계산기</span>'+
+        '<button id="edm-calc-close-btn" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--txt3);line-height:1">×</button>'+
+        '</div>'+
+        // 단축 금액 버튼
+        '<div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">'+
+        qbtn('교재비 '+textbookVal.toLocaleString(),textbookVal)+
+        qbtn('순수수강료 '+pureTuitionVal.toLocaleString(),pureTuitionVal)+
+        qbtn('납부예정액 '+totalVal.toLocaleString(),totalVal)+
         '</div>'+
         // 수식 표시
         '<div style="font-size:10px;color:var(--txt3);text-align:right;height:14px;margin-bottom:2px;padding:0 4px">'+
         (calcStr||'&nbsp;')+
         '</div>'+
         // 결과 표시
-        '<div style="font-size:22px;font-weight:800;text-align:right;padding:4px 8px;background:var(--surface2);border-radius:8px;margin-bottom:10px;color:var(--navy);letter-spacing:-1px">'+
+        '<div style="font-size:22px;font-weight:800;text-align:right;padding:6px 10px;background:var(--surface2);border-radius:8px;margin-bottom:10px;color:var(--navy);letter-spacing:-1px">'+
         (display||'0')+
         '</div>'+
         // 버튼 그리드
@@ -9670,14 +9684,27 @@ function openExpectedDetailModal(studentId,yr,mo){
         btn('4')+btn('5')+btn('6')+btn('−','var(--navy)')+
         btn('1')+btn('2')+btn('3')+btn('+','var(--navy)')+
         btn('0','','2')+btn('.')+btn('=','var(--navy)')+
-        '</div>'+
-        '';
-      // 클릭 이벤트
+        '</div>';
+      // 숫자 버튼 이벤트
       popup.querySelectorAll('.edm-calc-btn').forEach(function(b){
         b.onclick=function(){edmCalcPress(b.dataset.val);};
       });
+      // 단축 금액 버튼 이벤트
+      popup.querySelectorAll('.edm-calc-qbtn').forEach(function(b){
+        b.onclick=function(){
+          display=parseInt(b.dataset.val).toLocaleString();
+          calcStr='';
+          render();
+        };
+      });
       var closeBtn=popup.querySelector('#edm-calc-close-btn');
       if(closeBtn)closeBtn.onclick=function(){popup.remove();};
+    }
+    function qbtn(label,val){
+      return '<button class="edm-calc-qbtn" data-val="'+val+'" style="'+
+        'font-size:10px;font-weight:600;padding:4px 7px;background:var(--surface2);'+
+        'border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--navy);white-space:nowrap">'+
+        label+'</button>';
     }
     function btn(label,color,span){
       var bg=color?color:'var(--surface2)';
@@ -9692,8 +9719,12 @@ function openExpectedDetailModal(studentId,yr,mo){
       if(v==='C'){display='';calcStr='';render();return;}
       if(v==='='){
         try{
-          var expr=calcStr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-');
-          var result=Math.round(Function('"use strict";return ('+expr+')')());
+          var curNum=(display||'0').replace(/,/g,'');
+          var expr=(calcStr||'')+curNum;
+          expr=expr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-');
+          if(!expr||expr===''){ render(); return; }
+          var result=Math.round(eval(expr));
+          if(!isFinite(result))throw new Error('not finite');
           display=result.toLocaleString();
           calcStr='';
         }catch(e){display='오류';calcStr='';}
