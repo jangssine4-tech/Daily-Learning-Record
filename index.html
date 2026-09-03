@@ -224,7 +224,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .es{font-size:12px}
 .period-row{display:grid;grid-template-columns:60px 1fr 1fr auto;gap:8px;align-items:center;margin-bottom:6px}
 .period-row label{font-size:11px;color:var(--txt2);font-weight:600}
-#mob-top-bar{display:none;padding:10px 16px;background:var(--navy);color:#fff;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0}
+#mob-top-bar{display:none;background:var(--navy);color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
 #mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199}
 @media(max-width:600px){#sidebar{position:fixed;top:0;left:0;height:100dvh;transform:translateX(-100%)} #sidebar.open{transform:translateX(0)} #content{margin-left:0;max-width:100vw} #mob-top-bar{display:block} #mob-overlay.open{display:block} .s-card{width:calc(50% - 6px)!important;flex:0 0 calc(50% - 6px)!important} .student-cards{padding:8px} }
 /* Boot loading overlay - pure CSS, no JS needed */
@@ -314,7 +314,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 </nav>
 
 <div id="content">
-<div id="mob-top-bar" onclick="toggleMobMenu()">☰ 메뉴</div>
+<div id="mob-top-bar" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px"><span onclick="toggleMobMenu()" style="cursor:pointer">☰ 메뉴</span><div style="display:flex;align-items:center;gap:6px"><button onclick="appZoomOut()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1">−</button><span id="mob-zoom-label" style="font-size:11px;min-width:32px;text-align:center">100%</span><button onclick="appZoomIn()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:6px;font-size:16px;cursor:pointer;line-height:1">+</button></div></div>
 <div class="view" id="view-checklist">
   <div class="page-top"><h2>교사 체크리스트</h2></div>
   <div class="cp" id="checklist-area"></div>
@@ -19118,50 +19118,78 @@ if(document.readyState==='loading'){
 </div>
 
 <script>
-// 📱 핀치 줌 — Edge 모바일 user-scalable 무시 대응
+// 앱 내 콘텐츠 줌 — 버튼 + 핀치 줌 (프레임 고정, #content 내용만 축소/확대)
 (function(){
-  var scale=1, lastScale=1;
-  var startDist=0;
-  var originX=0, originY=0;
-  var el=document.getElementById('content')||document.body;
+  var _zoom=100;
+  var _steps=[60,70,80,90,100,110,120];
+  var el=null;
 
-  function dist(t){
-    var dx=t[0].clientX-t[1].clientX;
-    var dy=t[0].clientY-t[1].clientY;
+  function applyZoom(save){
+    if(!el)el=document.getElementById('content');
+    if(!el)return;
+    el.style.fontSize=_zoom+'%';
+    var lbl=document.getElementById('mob-zoom-label');
+    if(lbl)lbl.textContent=_zoom+'%';
+    if(save!==false){try{localStorage.setItem('_appZoom',_zoom);}catch(e){}}
+  }
+
+  window.appZoomOut=function(){
+    var idx=_steps.indexOf(_zoom);
+    if(idx>0){_zoom=_steps[idx-1];applyZoom();}
+  };
+  window.appZoomIn=function(){
+    var idx=_steps.indexOf(_zoom);
+    if(idx<_steps.length-1){_zoom=_steps[idx+1];applyZoom();}
+  };
+
+  // 핀치 줌
+  var _startDist=0, _startZoom=100;
+  function getTouchDist(touches){
+    var dx=touches[0].clientX-touches[1].clientX;
+    var dy=touches[0].clientY-touches[1].clientY;
     return Math.sqrt(dx*dx+dy*dy);
+  }
+  function snapToStep(z){
+    return _steps.reduce(function(prev,cur){
+      return Math.abs(cur-z)<Math.abs(prev-z)?cur:prev;
+    });
   }
 
   document.addEventListener('touchstart',function(e){
     if(e.touches.length===2){
-      e.preventDefault();
-      startDist=dist(e.touches);
-      lastScale=scale;
-      var cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
-      var cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
-      originX=cx;
-      originY=cy;
+      _startDist=getTouchDist(e.touches);
+      _startZoom=_zoom;
     }
-  },{passive:false});
+  },{passive:true});
 
   document.addEventListener('touchmove',function(e){
     if(e.touches.length===2){
-      e.preventDefault();
-      var newDist=dist(e.touches);
-      scale=Math.min(4,Math.max(0.5,lastScale*(newDist/startDist)));
-      el.style.transformOrigin=originX+'px '+originY+'px';
-      el.style.transform='scale('+scale+')';
-    }
-  },{passive:false});
-
-  document.addEventListener('touchend',function(e){
-    if(e.touches.length<2){
-      // 1 이하면 1로 스냅백
-      if(scale<1){
-        scale=1;
-        el.style.transform='scale(1)';
+      var newDist=getTouchDist(e.touches);
+      var ratio=newDist/_startDist;
+      var raw=Math.round(_startZoom*ratio);
+      var clamped=Math.min(120,Math.max(60,raw));
+      if(clamped!==_zoom){
+        _zoom=clamped;
+        applyZoom(false); // 움직이는 중엔 저장 안 함
       }
     }
   },{passive:true});
+
+  document.addEventListener('touchend',function(e){
+    if(e.touches.length<2&&_startDist>0){
+      // 손 뗄 때 가장 가까운 단계로 스냅
+      _zoom=snapToStep(_zoom);
+      applyZoom(true);
+      _startDist=0;
+    }
+  },{passive:true});
+
+  // 저장된 줌 복원
+  document.addEventListener('DOMContentLoaded',function(){
+    try{var saved=localStorage.getItem('_appZoom');if(saved)_zoom=parseInt(saved)||100;}catch(e){}
+    el=document.getElementById('content');
+    applyZoom(false);
+  });
 })();
 </script>
 </body>
