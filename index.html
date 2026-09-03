@@ -329,7 +329,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   </div>
   <div class="cp" id="meeting-area" style="overflow-y:auto"></div>
 </div>
-<div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">월간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">신규 학생 배정</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">전달 사항</button></div><div id="sch-panel-today"><div class="toolbar" style="display:flex;align-items:center;gap:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button></div><div id="schedule-notes-award" class="cp" style="margin-bottom:0;padding-bottom:0"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="assign-panel-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
+<div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">월간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">신규 학생 배정</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">전달 사항</button></div><div id="sch-panel-today"><div style="position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);padding:6px 12px"><div class="toolbar" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button class="btn btn-outline btn-xs" onclick="openSchRevModal()" style="color:#16a34a;border-color:#16a34a;font-size:11px">💰 회계</button></div><div id="schedule-notes-award" style="margin:0;padding:0"></div></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="assign-panel-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
   <div style="display:flex;gap:16px;align-items:flex-start;padding:0 0 0 0">
   <div class="cp" style="max-width:560px;flex:0 0 auto"><div class="card" style="padding:16px">
@@ -2830,6 +2830,74 @@ async function loadCardBadges(){
   try{var d=await db.collection('config').doc('cardBadges').get();window._cardBadges=d.exists?d.data():{};}catch(e){window._cardBadges={};}
 }
 function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
+function openSchRevModal(){
+  // 현재 날짜 기준 년/월
+  var d=new Date(_scheduleDate||todayISO());
+  var yr=d.getFullYear();var mo=d.getMonth()+1;
+  var moLabel=mo+'월';
+
+  var overlay=document.createElement('div');
+  overlay.className='mo';overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+
+  // 재원 학생 목록
+  var activeStudents=(students||[]).filter(function(s){
+    var st=s.status||'재원';return st==='재원'||st==='신규';
+  }).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+
+  var listHtml='';
+  activeStudents.forEach(function(s){
+    // 납부예정액 계산
+    var rawLevel=getStudentLevelAtMonth(s,yr,mo);
+    var tuitionItem=findRefItem(rawLevel,'tuition',s.grade);
+    var baseFee=tuitionItem?parseInt(tuitionItem.baseFee)||0:0;
+    var mh=getStudentMonthlyHours(s);
+    var dispMh=mh;
+    var tuitionFee=getTuitionByMonthlyHours(baseFee,dispMh,tuitionItem);
+    // 저장된 manualExpected 확인
+    var sRevs=(revenues||[]).filter(function(r){
+      if(r.isManualMeta||r.extraType)return false;
+      if(r.studentId!==s.id)return false;
+      if(r.revYear&&r.revMonth)return r.revYear===yr&&r.revMonth===mo;
+      var rd=new Date(r.paidDate);return rd.getFullYear()===yr&&rd.getMonth()===mo-1;
+    });
+    var lastRev=sRevs.sort(function(a,b){return b.paidDate>a.paidDate?1:-1;})[0];
+    var expected=lastRev&&lastRev.manualExpected!=null?parseInt(lastRev.manualExpected):tuitionFee;
+    var paid=sRevs.reduce(function(sum,r){return sum+(parseInt(r.amount)||0);},0);
+    var isPaid=paid>=expected&&expected>0;
+
+    listHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="overlay.remove();setTimeout(function(){openExpectedDetailModal(''+s.id+'','+yr+','+mo+');},100)">'+
+      '<div style="flex:1">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--navy)">'+s.name+'</div>'+
+      '<div style="font-size:11px;color:var(--txt3)">'+rawLevel+'</div>'+
+      '</div>'+
+      '<div style="text-align:right">'+
+      '<div style="font-size:13px;font-weight:800;color:'+(isPaid?'var(--mint)':'var(--navy)')+'">'+expected.toLocaleString()+'원</div>'+
+      '<div style="font-size:10px;color:'+(isPaid?'var(--mint)':'#f59e0b')+'">'+(isPaid?'✅ 납부완료':'⏳ 미납부')+'</div>'+
+      '</div>'+
+      '<div style="font-size:16px;color:var(--txt3)">›</div>'+
+      '</div>';
+  });
+
+  overlay.innerHTML=
+    '<div class="ms" style="max-width:380px;width:100%;padding:0;overflow:hidden">'+
+    '<div style="background:var(--navy);padding:14px 18px;color:#fff;display:flex;align-items:center;justify-content:space-between">'+
+    '<div>'+
+    '<div style="font-size:11px;opacity:.7">'+yr+'년 '+moLabel+' 납부 현황</div>'+
+    '<div style="font-size:17px;font-weight:800;margin-top:2px">💰 학생별 납부예정액</div>'+
+    '</div>'+
+    '<button onclick="this.closest('.mo').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:13px">✕</button>'+
+    '</div>'+
+    '<div style="max-height:70vh;overflow-y:auto">'+
+    listHtml+
+    '</div>'+
+    '<div style="padding:10px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--txt3);text-align:center">학생 이름을 누르면 납부예정액 상세를 바로 열 수 있어요</div>'+
+    '</div>';
+
+  document.body.appendChild(overlay);
+}
+
+
 function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
 // ══════════════════════════════════════════════════════
 // 월간 시간표 전용 추가 슬롯 관리 (localStorage)
@@ -4536,11 +4604,49 @@ function renderScheduleNotes(){
       var sReps=reports.filter(function(r){return r.studentId===s.id&&!r.absent&&r.date<_td;}).sort(function(a,b){return b.date>a.date?1:-1;});
       if(sReps.length){var lp=sReps[0].progress||'';if(lp==='Level Test'||lp==='전체 Review'){var aK='award_'+_td+'_'+s.id+'_'+lp;if(!localStorage.getItem(aK))awardStudents.push({name:s.name,level:sReps[0].level||'',progress:lp,aKey:aK});}}
     });
-    if(awardStudents.length){
-      var ah='<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:2px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-bottom:12px;box-sizing:border-box;width:100%"><div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px">🏆 오늘 성적표 & 상장 나가야 할 학생 ('+awardStudents.length+'명)</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
-      awardStudents.forEach(function(as){ah+='<div style="display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #fde68a;border-radius:20px;padding:4px 8px 4px 10px"><span style="font-size:12px;font-weight:700;color:#1e3a5f">'+as.name+'</span><span class="badge '+(as.progress==='Level Test'?'bg-red':'bg-gold')+'" style="font-size:8px">'+as.level+'</span><button onclick="event.stopPropagation();localStorage.setItem(\''+as.aKey+'\',\'1\');renderScheduleNotes();toast(\'✅ '+as.name+' 확인\')" style="background:var(--mint);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center">✓</button></div>';});
-      ah+='</div></div>';awardEl.innerHTML=ah;
-    } else {awardEl.innerHTML='';}
+    // 수업없는 학생 박스 — 나중에 notPresent html이 만들어지면 여기다 끼워넣음
+    window._awardStudentsCache=awardStudents;
+    window._renderAwardBox=function(){
+      var aS=window._awardStudentsCache||[];
+      var nS=window._notPresentCache||[];
+      var aHasData=aS.length>0;
+      var nHasData=nS.length>0;
+
+      // 성적표/상장 박스
+      var aBox='<div id="sch-award-box" style="flex:1;min-width:0;background:'+(aHasData?'linear-gradient(135deg,#fffbeb,#fef3c7)':'var(--surface2)')+';border:'+(aHasData?'2px solid #fbbf24':'1px solid var(--border)')+';border-radius:10px;overflow:hidden">'+
+        '<div onclick="document.getElementById(\'sch-award-inner\').style.display=document.getElementById(\'sch-award-inner\').style.display===\'none\'?\'block\':\'none\'" style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;cursor:pointer">'+
+        '<span style="font-size:11px;font-weight:700;color:'+(aHasData?'#92400e':'var(--txt3)')+'">🏆 성적표·상장 ('+aS.length+'명)'+(aHasData?' 🔴':'')+' </span>'+
+        '<span style="font-size:10px;color:var(--txt3)">▼</span>'+
+        '</div>'+
+        '<div id="sch-award-inner" style="display:none;padding:0 10px 8px;border-top:1px solid '+(aHasData?'#fde68a':'var(--border)')+'">'+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;padding-top:6px">';
+      aS.forEach(function(as){
+        aBox+='<div style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid #fde68a;border-radius:16px;padding:3px 7px">'+
+          '<span style="font-size:11px;font-weight:700;color:#1e3a5f">'+as.name+'</span>'+
+          '<span class="badge '+(as.progress==='Level Test'?'bg-red':'bg-gold')+'" style="font-size:8px">'+as.level+'</span>'+
+          '<button onclick="event.stopPropagation();localStorage.setItem(\''+as.aKey+'\',\'1\');renderScheduleNotes();toast(\'✅ '+as.name+' 확인\')" style="background:var(--mint);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center">✓</button>'+
+          '</div>';
+      });
+      if(!aS.length)aBox+='<span style="font-size:11px;color:var(--txt3)">해당 학생 없음</span>';
+      aBox+='</div></div></div>';
+
+      // 수업없는 학생 박스
+      var nBox='<div id="sch-noclass-box" style="flex:1;min-width:0;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;overflow:hidden">'+
+        '<div onclick="document.getElementById(\'sch-noclass-inner\').style.display=document.getElementById(\'sch-noclass-inner\').style.display===\'none\'?\'block\':\'none\'" style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;cursor:pointer">'+
+        '<span style="font-size:11px;font-weight:600;color:var(--txt3)">📋 수업없는 학생 ('+nS.length+'명) <button onclick="event.stopPropagation();_showPauseGuide()" style="width:14px;height:14px;border-radius:50%;background:#e2e8f0;border:none;cursor:pointer;font-size:8px;color:#64748b;line-height:1;padding:0">?</button></span>'+
+        '<span style="font-size:10px;color:var(--txt3)">▼</span>'+
+        '</div>'+
+        '<div id="sch-noclass-inner" style="display:none;padding:0 10px 8px;border-top:1px solid var(--border)">'+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;padding-top:6px">';
+      nS.forEach(function(s){
+        nBox+='<span style="font-size:11px;background:var(--surface);padding:2px 8px;border-radius:10px;color:var(--txt2)">'+s.name+(s._absent?'(결석)':'')+' </span>';
+      });
+      if(!nS.length)nBox+='<span style="font-size:11px;color:var(--txt3)">해당 학생 없음</span>';
+      nBox+='</div></div></div>';
+
+      if(awardEl)awardEl.innerHTML='<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">'+aBox+nBox+'</div>';
+    };
+    window._renderAwardBox();
   }
   _scheduleNotesRendered=true;
 }
@@ -4766,24 +4872,12 @@ function renderSchedule(){
   // 통합: 수업 없는 학생 + 결석 학생
   var allNotPresent=notToday.concat(absentToday);
 
-  if(allNotPresent.length){
-    html+='<div style="background:#f8fafc;border:1px dashed var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px">'
-      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'      +'<span style="font-size:11px;font-weight:600;color:var(--txt3)">오늘 수업 없는 학생 ('+allNotPresent.length+'명)</span>'      +'<button onclick="_showPauseGuide()" style="width:16px;height:16px;border-radius:50%;background:#e2e8f0;border:none;cursor:pointer;font-size:9px;font-weight:700;color:#64748b;line-height:1;padding:0" title="일시정지 처리 방법">?</button>'      +'</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:4px">';
-
-    // 수업 없는 학생 먼저 (이름순)
-    notToday.sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).forEach(function(s){
-      html+='<span style="font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:10px;color:var(--txt2)">'+s.name+'</span>';
-    });
-
-    // 결석 학생 오른쪽에 (사유 포함)
-    absentToday.sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).forEach(function(s){
-      var reason='결석';
-      html+='<span style="font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:10px;color:var(--txt2)">'+s.name+'('+reason+')</span>';
-    });
-
-    html+='</div></div>';
-  }
+  // 수업없는 학생 데이터를 award 박스에 전달해서 함께 렌더링
+  var notPresentData=[];
+  notToday.sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).forEach(function(s){notPresentData.push({name:s.name,_absent:false});});
+  absentToday.sort(function(a,b){return a.name.localeCompare(b.name,'ko');}).forEach(function(s){notPresentData.push({name:s.name,_absent:true});});
+  window._notPresentCache=notPresentData;
+  if(window._renderAwardBox)window._renderAwardBox();
   // Load memos for speech bubbles (deduplicate by ID)
   var memoMap={};var actionMemoMap={};var _seenMemoIds={};
   (window._studentMemos||[]).forEach(function(m){
@@ -9426,10 +9520,11 @@ function openExpectedDetailModal(studentId,yr,mo){
     '<div style="font-size:11px;opacity:.6;margin-bottom:10px">'+yr+'년 '+moLabel+' · 저장하면 수납 기록에 반영됩니다</div>'+
     // 상단 최종 납부예정액 강조
     '<div style="font-size:28px;font-weight:900;letter-spacing:-1px" id="edm-total-top">'+initTotal.toLocaleString()+'원</div>'+
-    '<div style="margin-top:10px;font-size:13px;opacity:.85;display:flex;gap:16px;flex-wrap:wrap">'+
+    '<div style="margin-top:10px;font-size:13px;opacity:.85;display:flex;gap:16px;flex-wrap:wrap;align-items:center">'+
     '<span>수강료 <b id="edm-sum-base">'+tuitionFee.toLocaleString()+'</b>원</span>'+
     '<span>할인 <b style="color:#fbbf24">-<span id="edm-sum-disc-val">'+discountAmt.toLocaleString()+'</span></b>원</span>'+
     '<span>결석차감 <b style="color:#93c5fd">-<span id="edm-sum-absent-val">'+absentDeduct.toLocaleString()+'</span></b>원</span>'+
+    '<button type="button" data-calcfor="edm-absent-days" onclick="edmOpenCalc(this.dataset.calcfor)" style="margin-left:auto;font-size:13px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:2px 9px;cursor:pointer;color:#fff">🧮</button>'+
     '</div></div>'+
     // 본문
     '<div style="padding:16px 20px;overflow-y:auto;max-height:60vh">'+
@@ -9476,10 +9571,7 @@ function openExpectedDetailModal(studentId,yr,mo){
     // 결석 차감
     '<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
-    '<div style="display:flex;align-items:center;gap:6px">'+
     '<span style="font-size:12px;font-weight:700;color:var(--txt2)">결석 차감</span>'+
-    '<button type="button" data-calcfor="edm-absent-days" onclick="edmOpenCalc(this.dataset.calcfor)" style="font-size:12px;background:none;border:1px solid var(--border);border-radius:4px;padding:1px 7px;cursor:pointer;color:var(--txt2)">🧮</button>'+
-    '</div>'+
     '<div style="display:flex;gap:6px">'+
     '<button type="button" id="edm-absent-info-btn" style="font-size:11px;color:var(--txt3);background:none;border:1px solid var(--border);border-radius:4px;padding:1px 7px;cursor:pointer">계산기준 ⓘ</button>'+
     '<button type="button" id="edm-absent-apply-btn" style="font-size:11px;font-weight:700;color:#fff;background:var(--navy);border:none;border-radius:4px;padding:1px 10px;cursor:pointer">적용</button>'+
@@ -9679,14 +9771,24 @@ function openExpectedDetailModal(studentId,yr,mo){
     var display=initVal==='0'?'':initVal;
     var calcStr='';  // 연산 문자열
 
+    var history=[];  // 계산 히스토리
     function render(){
       // 모달에 표시된 금액 읽기
       var baseEl=document.getElementById('edm-base');
-      var baseVal=baseEl?parseInt((baseEl.value||'0').replace(/[^0-9]/g,''))||0:0;
       var pureTuitionVal=puretuition||0;
       var textbookVal=textbookFee||0;
       var totalEl=document.getElementById('edm-total');
       var totalVal=totalEl?parseInt((totalEl.textContent||'0').replace(/[^0-9]/g,''))||0:0;
+
+      // 히스토리 HTML
+      var histHtml='';
+      if(history.length){
+        histHtml='<div style="max-height:80px;overflow-y:auto;margin-bottom:6px;padding:4px 6px;background:var(--surface2);border-radius:6px">';
+        history.forEach(function(h){
+          histHtml+='<div style="font-size:11px;color:var(--txt3);text-align:right;line-height:1.7">'+h+'</div>';
+        });
+        histHtml+='</div>';
+      }
 
       popup.innerHTML=
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
@@ -9699,9 +9801,11 @@ function openExpectedDetailModal(studentId,yr,mo){
         qbtn('순수수강료 '+pureTuitionVal.toLocaleString(),pureTuitionVal)+
         qbtn('납부예정액 '+totalVal.toLocaleString(),totalVal)+
         '</div>'+
+        // 계산 히스토리
+        histHtml+
         // 수식 표시
-        '<div style="font-size:10px;color:var(--txt3);text-align:right;height:14px;margin-bottom:2px;padding:0 4px">'+
-        (calcStr||'&nbsp;')+
+        '<div style="font-size:11px;color:var(--txt3);text-align:right;min-height:16px;margin-bottom:2px;padding:0 4px">'+
+        (calcStr?(calcStr+(display||'')):'&nbsp;')+
         '</div>'+
         // 결과 표시
         '<div style="font-size:22px;font-weight:800;text-align:right;padding:6px 10px;background:var(--surface2);border-radius:8px;margin-bottom:10px;color:var(--navy);letter-spacing:-1px">'+
@@ -9762,15 +9866,19 @@ function openExpectedDetailModal(studentId,yr,mo){
     }
 
     window.edmCalcPress=function(v){
-      if(v==='C'){display='';calcStr='';render();return;}
+      if(v==='C'){display='';calcStr='';history=[];render();return;}
       if(v==='='){
         try{
           var curNum=(display||'0').replace(/,/g,'');
           var expr=(calcStr||'')+curNum;
+          var exprOrig=expr; // 히스토리용 원본
           expr=expr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-');
           if(!expr||expr===''){ render(); return; }
           var result=Math.round(eval(expr));
           if(!isFinite(result))throw new Error('not finite');
+          // 히스토리 기록
+          history.push(exprOrig+' = '+result.toLocaleString());
+          if(history.length>10)history.shift(); // 최대 10줄
           display=result.toLocaleString();
           calcStr='';
         }catch(e){display='오류';calcStr='';}
