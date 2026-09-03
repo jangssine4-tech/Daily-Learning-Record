@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=10.0, user-scalable=yes, shrink-to-fit=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="잉글리시아이">
@@ -2584,7 +2584,7 @@ function goto(view){
       var dp=$('schedule-date-pick');if(dp)dp.value=todayISO();
     }
     window._scheduleFromMakeup=false;
-    loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});renderScheduleNotes();
+    loadCrmDone().then(function(){loadCrmTemplates().then(function(){renderCrmDaily();})});renderScheduleNotes();_fixStickyPad();
   }
   else if(view==='write'){if(typeof renderWriteReport==='function')renderWriteReport();}
   else if(view==='history'){loadReports().then(renderHistory);}
@@ -2834,7 +2834,18 @@ function toggleCardTag(key,el){
 async function loadCardBadges(){
   try{var d=await db.collection('config').doc('cardBadges').get();window._cardBadges=d.exists?d.data():{};}catch(e){window._cardBadges={};}
 }
-function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();renderScheduleNotes();}
+function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();renderScheduleNotes();_fixStickyPad();}
+function _fixStickyPad(){
+  setTimeout(function(){
+    var hdr=document.getElementById('sch-panel-today-header');
+    var panel=document.getElementById('sch-panel-today');
+    if(!hdr||!panel)return;
+    // sticky 헤더 전체(탭+헤더) 높이
+    var stickyWrap=hdr.parentElement;
+    var h=stickyWrap?stickyWrap.offsetHeight:0;
+    panel.style.paddingTop=h?h+'px':'0';
+  },100);
+}
 function _schRevClick(el){
   var sid=el.dataset.sid;
   var yr=parseInt(el.dataset.yr);
@@ -2914,7 +2925,7 @@ function openSchRevModal(){
 }
 
 
-function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();renderScheduleNotes();}
+function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();renderScheduleNotes();_fixStickyPad();}
 // ══════════════════════════════════════════════════════
 // 월간 시간표 전용 추가 슬롯 관리 (localStorage)
 // ══════════════════════════════════════════════════════
@@ -19117,5 +19128,9 @@ if(document.readyState==='loading'){
 </div>
 </div>
 
+<script>
+window.addEventListener('resize', function(){_fixStickyPad&&_fixStickyPad();});
+document.addEventListener('DOMContentLoaded', function(){setTimeout(function(){_fixStickyPad&&_fixStickyPad();},500);});
+</script>
 </body>
 </html>
