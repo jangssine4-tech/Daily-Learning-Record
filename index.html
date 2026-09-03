@@ -9384,7 +9384,6 @@ function openExpectedDetailModal(studentId,yr,mo){
   var textbookFee=textbookItem?parseInt(textbookItem.textbookFee)||0:0;
   var mh=getStudentMonthlyHours(s);
   var weeklyDays=Math.round(mh/4);
-  var weekLabel=weeklyDays<=3?'주 3회':weeklyDays===4?'주 4회':weeklyDays===5?'주 5회':'주 6회';
 
   var list=revenues.filter(function(r){
     if(r.isManualMeta)return false;
@@ -9396,161 +9395,223 @@ function openExpectedDetailModal(studentId,yr,mo){
 
   var manualMh=lastRev&&lastRev.manualMonthlyHours!=null?lastRev.manualMonthlyHours:'';
   var dispMh=manualMh!==''?parseFloat(manualMh):mh;
-  // tuitionFee는 한 번만 선언 (버그 수정)
   var tuitionFee=getTuitionByMonthlyHours(baseFee,dispMh,tuitionItem);
+  var puretuition=tuitionFee-textbookFee; // 순수 수강료
   var discountAmt=s.discount?10000:0;
-  // 저장된 결석 차감액 불러오기 (수동 입력값)
   var absentDeduct=lastRev&&lastRev.absentDeduction?parseInt(lastRev.absentDeduction)||0:0;
-  var perDayFee=(tuitionFee>0&&weeklyDays>0)?Math.round((tuitionFee-textbookFee)/(weeklyDays*4.2)):0;
+  var perDayFee=(puretuition>0&&weeklyDays>0)?Math.round(puretuition/(weeklyDays*4.2)):0;
   var absentDays=perDayFee>0?Math.round(absentDeduct/perDayFee):0;
   var subMat=lastRev&&lastRev.subMaterial||'';
   var subMatFee=getSubMaterialFee(subMat);
   var subMatOpts=getSubMaterialOptions(subMat);
-  // 자동 계산된 기본값 (초기화 버튼용)
-  var autoBase=tuitionFee;
-  var autoDiscount=discountAmt;
-  var autoSubMat='';
-  var autoAbsentDays=0;
-  var autoAbsentAmt=0;
+  var discountReason=lastRev&&lastRev.discountReason||'';
+  var discountMemo=lastRev&&lastRev.discountMemo||'';
+  // 저장된 manualExpected 있으면 그걸로, 없으면 자동계산
+  var savedExpected=lastRev&&lastRev.manualExpected!=null&&lastRev.manualExpected!==''?parseInt(lastRev.manualExpected):null;
+  var autoExpected=Math.max(0,tuitionFee+subMatFee-discountAmt-absentDeduct);
+  var initTotal=savedExpected!==null?savedExpected:autoExpected;
+
+  var moLabel=mo+'월';
+  var weekLabel=weeklyDays+'회';
 
   var overlay=document.createElement('div');
   overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
 
-  var memo='<div style="font-size:10px;color:var(--txt3);padding:3px 6px;background:#f8fafc;border-radius:4px;margin-top:3px;line-height:1.5">';
-  function infoBtn(id,txt){
-    return'<span style="display:inline-flex;flex-direction:column;flex-shrink:0;margin-left:4px;position:relative">'
-      +'<button type="button" onclick="event.stopPropagation();var t=document.getElementById(\'tip-'+id+'\');var open=t.style.display===\'none\';document.querySelectorAll(\'.edm-tip\').forEach(function(el){el.style.display=\'none\';});if(open)t.style.display=\'block\';" '
-      +'style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--txt3);line-height:1;padding:0;width:14px;height:14px">ⓘ</button>'
-      +'<div id="tip-'+id+'" class="edm-tip" style="display:none;position:fixed;left:50%;transform:translateX(-50%);top:auto;z-index:9999;font-size:10px;color:var(--txt3);background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.8;width:260px;max-width:80vw;box-shadow:0 2px 8px rgba(0,0,0,.2)">'+txt+'</div>'
-      +'</span>';
-  }
+  overlay.innerHTML=
+    '<div class="ms" style="max-width:420px;width:100%;padding:0;overflow:hidden">'+
+    // 헤더
+    '<div style="background:var(--navy);padding:16px 20px 12px;color:#fff">'+
+    '<div style="font-size:11px;opacity:.7;margin-bottom:2px">납부예정액 상세 · '+s.name+'</div>'+
+    '<div style="font-size:11px;opacity:.6;margin-bottom:10px">'+yr+'년 '+moLabel+' · 저장하면 수납 기록에 반영됩니다</div>'+
+    // 상단 최종 납부예정액 강조
+    '<div style="font-size:28px;font-weight:900;letter-spacing:-1px" id="edm-total-top">'+initTotal.toLocaleString()+'원</div>'+
+    '<div style="margin-top:8px;font-size:11px;opacity:.7;display:flex;gap:12px">'+
+    '<span>수강료 <b id="edm-sum-base">'+tuitionFee.toLocaleString()+'</b>원</span>'+
+    '<span>할인 <b id="edm-sum-disc" style="color:#fbbf24">-<span id="edm-sum-disc-val">'+discountAmt.toLocaleString()+'</span></b>원</span>'+
+    '<span>결석차감 <b id="edm-sum-absent" style="color:#93c5fd">-<span id="edm-sum-absent-val">'+absentDeduct.toLocaleString()+'</span></b>원</span>'+
+    '</div></div>'+
+    // 본문
+    '<div style="padding:16px 20px;overflow-y:auto;max-height:60vh">'+
 
-  overlay.innerHTML='<div class="ms" style="max-width:420px;max-height:90dvh;overflow-y:auto">'
-    +'<div class="mh"></div>'
-    +'<div class="mt">납부예정액 상세 — '+s.name+'</div>'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">자동 연동값도 수정 가능합니다. 저장하면 이번 달 수납 기록에 반영됩니다.</div>'
-
-    // 기준 수강료
-    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px;display:flex;align-items:center;white-space:nowrap">기준 수강료'+infoBtn('base','학생 정보의 단계('+rawLevel+')와 수업 요일 수('+weekLabel+')를 기준으로, 참고 > 교육비 기준 표에서 수강료를 자동 조회합니다.')+'</div>'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:2px">'
-    // 기준 수강료 — rawLevel/weekLabel을 ⓘ 오른편에 표시
-    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px;display:flex;align-items:center;gap:6px;white-space:nowrap">기준 수강료'+infoBtn('base','학생 정보의 단계('+rawLevel+')와 수업 요일 수('+weekLabel+')를 기준으로, 참고 > 교육비 기준 표에서 수강료를 자동 조회합니다.')+'<span style="font-size:11px;font-weight:400;color:var(--txt3)">'+rawLevel+' / '+weekLabel+'</span></div>'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:2px">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<input class="fi" id="edm-base" type="number" value="'+tuitionFee+'" style="width:110px;font-size:14px;font-weight:700;text-align:right" oninput="edmCalc()">'
-    +'<span style="font-size:12px;color:var(--txt2)">원</span>'
-    +'<span style="font-size:11px;color:var(--txt3)">(교재비 '+textbookFee.toLocaleString()+'원 포함)</span>'
-    +'</div>'
-    +'</div>'
+    // 기본 납부금액
+    '<div style="margin-bottom:14px">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">기본 납부금액</div>'+
+    '<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;font-size:13px">'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--txt3)">수강 과정</span><span style="font-weight:600">'+rawLevel+' · 주 '+weekLabel+'</span></div>'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--txt3)">순수 수강료</span><span>'+puretuition.toLocaleString()+'원</span></div>'+
+    '<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:var(--txt3)">교재비</span><span>'+textbookFee.toLocaleString()+'원</span></div>'+
+    '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px"><span style="font-weight:700">합계</span>'+
+    '<input id="edm-base" type="text" value="'+tuitionFee.toLocaleString()+'" style="width:110px;font-size:14px;font-weight:800;text-align:right;border:1px solid var(--border);border-radius:6px;padding:2px 6px;background:var(--surface);color:var(--navy)" oninput="edmFormatBase(this);edmCalc()">'+
+    '<span style="font-size:12px;color:var(--txt3);align-self:center;margin-left:4px">원</span></div>'+
+    '</div></div>'+
 
     // 조정 항목
-    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:12px 0 6px">조정 항목</div>'
+    '<div style="margin-bottom:14px">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">조정 항목</div>'+
 
     // 할인
-    +'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="display:flex;align-items:center;min-width:70px;white-space:nowrap"><span style="font-size:12px;color:var(--txt3)">할인</span>'+infoBtn('discount','학생 정보의 할인 설정(형제할인 등)에서 자동 적용됩니다.<br>직접 수정도 가능합니다.')+'</div>'
-    +'<input class="fi" id="edm-discount" type="number" value="'+discountAmt+'" style="width:100px;font-size:12px;text-align:right" oninput="edmCalc()">'
-    +'<span style="font-size:11px;color:var(--txt3);white-space:nowrap">원 차감</span>'
-    +'</div>'
-    +'</div>'
+    '<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:8px">할인</div>'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'+
+    '<span style="font-size:12px;color:var(--txt3);min-width:50px">금액</span>'+
+    '<input id="edm-discount" type="text" value="'+discountAmt.toLocaleString()+'" style="width:100px;font-size:13px;font-weight:700;text-align:right;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface)" oninput="edmFormatDisc(this);edmCalc()">'+
+    '<span style="font-size:12px;color:var(--txt3)">원</span>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">'+
+    '<span style="font-size:12px;color:var(--txt3);min-width:50px">사유</span>'+
+    '<select id="edm-disc-reason" style="flex:1;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 6px;background:var(--surface)" onchange="edmDiscReasonChange()">'+
+    '<option value=""'+(discountReason===''?' selected':'')+'>선택</option>'+
+    '<option value="형제할인"'+(discountReason==='형제할인'?' selected':'')+'>형제 할인</option>'+
+    '<option value="영수할인"'+(discountReason==='영수할인'?' selected':'')+'>영수 할인</option>'+
+    '<option value="이벤트할인"'+(discountReason==='이벤트할인'?' selected':'')+'>이벤트 할인</option>'+
+    '<option value="원장할인"'+(discountReason==='원장할인'?' selected':'')+'>원장 할인</option>'+
+    '<option value="기타"'+(discountReason==='기타'?' selected':'')+'>기타</option>'+
+    '</select></div>'+
+    '<div id="edm-disc-memo-wrap" style="display:'+(discountReason==='이벤트할인'?'flex':'none')+';gap:8px;align-items:center;margin-top:4px">'+
+    '<span style="font-size:12px;color:var(--txt3);min-width:50px">내용</span>'+
+    '<input id="edm-disc-memo" type="text" value="'+discountMemo+'" placeholder="이벤트 내용 입력" style="flex:1;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface)">'+
+    '</div></div>'+
 
-    // 결석 차감액
-    +'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'    +'<div style="display:flex;align-items:center;white-space:nowrap"><span style="font-size:12px;color:var(--txt3);font-weight:600">결석 차감액</span>'+infoBtn('absent','결석일을 입력하면 일당 단가와 차감액이 자동 계산됩니다.<br>차감 버튼을 눌러야 납부예정액에 반영됩니다.')+'</div>'    +'<span style="font-size:11px;color:var(--txt3)">(수강료-교재비) ÷ ('+weeklyDays+'회×4.2주) × 결석일</span>'    +'</div>'    +'<div style="display:flex;gap:8px;align-items:flex-end">'    +'<div style="flex:1;background:var(--surface2);border-radius:6px;padding:6px 10px">'    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:4px">결석일</div>'    +'<div style="display:flex;align-items:center;gap:4px">'    +'<input class="fi" id="edm-absent-days" type="number" value="'+absentDays+'" min="0" style="width:50px;font-size:13px;font-weight:700;text-align:center;height:32px" oninput="edmAbsentCalc()">'    +'<span style="font-size:11px;color:var(--txt2)">일</span>'    +'</div></div>'    +'<div style="flex:1;background:var(--surface2);border-radius:6px;padding:6px 10px">'    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:4px">일당 단가</div>'    +'<div style="font-size:13px;font-weight:700;color:var(--navy);height:32px;display:flex;align-items:center">'+perDayFee.toLocaleString()+'원</div>'    +'</div>'    +'<div style="flex:1;background:#fff0f0;border-radius:6px;padding:6px 10px">'    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:4px">차감액</div>'    +'<div style="font-size:13px;font-weight:700;color:#dc2626;height:32px;display:flex;align-items:center" id="edm-absent-amt">'+absentDeduct.toLocaleString()+'원</div>'    +'</div>'    +'</div>'    +'<input type="hidden" id="edm-absent" value="0">'    +'<button id="edm-absent-apply-btn" class="btn btn-outline btn-block" style="margin-top:8px;color:#dc2626;border-color:#dc2626;font-size:12px">✂️ 위 차감액을 납부예정액에서 차감</button>'    +'</div>'
-    // 부교재    +'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'    +'<div style="display:flex;align-items:center;min-width:90px;white-space:nowrap"><span style="font-size:12px;color:var(--txt3)">부교재</span>'+infoBtn('submat','부교재 금액은 참고 > 교육비 기준 표의 교재비 항목에서 조회합니다.<br>합산 버튼을 눌러야 납부예정액에 반영됩니다.')+'</div>'    +'<select class="fi" id="edm-submat" style="flex:1;font-size:12px" onchange="edmSubmatChange()">'    +subMatOpts    +'</select>'    +'</div>'    +'<div style="display:flex;gap:8px;align-items:center;margin-top:6px">'    +'<div style="flex:1;background:#f0fdf4;border-radius:6px;padding:6px 10px">'    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">합산액</div>'    +'<div style="font-size:13px;font-weight:700;color:#16a34a" id="edm-submat-amt">'+subMatFee.toLocaleString()+'원</div>'    +'</div>'    +'<button id="edm-submat-apply-btn" class="btn btn-outline" style="color:#16a34a;border-color:#16a34a;font-size:12px;white-space:nowrap">＋ 납부예정액에 합산</button>'    +'</div>'    +'<input type="hidden" id="edm-submat-applied" value="0">'    +'</div>'
-    // 납부예정액    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;margin-top:4px;border-top:2px solid var(--navy)">'    +'<span style="font-size:13px;font-weight:800;color:var(--navy)">납부예정액</span>'    +'<span style="font-size:20px;font-weight:800;color:var(--navy)" id="edm-total">계산 중...</span>'    +'</div>'
-    +'<button id="edm-save-btn" class="btn btn-navy btn-block">저장</button>'
-    +'<button id="edm-reset-btn" class="btn btn-outline btn-block" style="color:#f59e0b;border-color:#f59e0b">↩ 자동 계산값으로 초기화</button>'
-    +'<button id="edm-cancel-btn" class="btn btn-outline btn-block">취소</button>'
-    +'</div>';
+    // 결석 차감
+    '<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+    '<span style="font-size:12px;font-weight:700;color:var(--txt2)">결석 차감</span>'+
+    '<button type="button" id="edm-absent-info-btn" style="font-size:11px;color:var(--txt3);background:none;border:1px solid var(--border);border-radius:4px;padding:1px 7px;cursor:pointer">계산기준 ⓘ</button>'+
+    '</div>'+
+    '<div id="edm-absent-tip" style="display:none;font-size:10px;color:var(--txt3);background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:8px;line-height:1.7">'+
+    '순수 수강료 '+puretuition.toLocaleString()+'원 ÷ 월 '+(weeklyDays*4.2).toFixed(1)+'회 = 회당 '+perDayFee.toLocaleString()+'원<br>차감액 = 회당 '+perDayFee.toLocaleString()+'원 × 결석 횟수</div>'+
+    '<div style="display:flex;gap:12px;align-items:center">'+
+    '<div style="display:flex;align-items:center;gap:6px">'+
+    '<span style="font-size:12px;color:var(--txt3)">결석 횟수</span>'+
+    '<input id="edm-absent-days" type="number" value="'+absentDays+'" min="0" style="width:52px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;padding:4px;background:var(--surface)" oninput="edmAbsentCalc()">'+
+    '<span style="font-size:12px;color:var(--txt3)">회</span>'+
+    '</div>'+
+    '<div style="flex:1;text-align:right">'+
+    '<div style="font-size:10px;color:var(--txt3)">회당 차감 '+perDayFee.toLocaleString()+'원</div>'+
+    '<div style="font-size:14px;font-weight:800;color:var(--navy)">-<span id="edm-absent-amt">'+absentDeduct.toLocaleString()+'</span>원</div>'+
+    '</div></div>'+
+    '<input type="hidden" id="edm-absent" value="'+absentDeduct+'">'+
+    '</div>'+
+
+    // 부교재
+    '<div style="background:var(--surface2);border-radius:10px;padding:12px 14px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:8px">부교재</div>'+
+    '<div style="display:flex;gap:8px;align-items:center">'+
+    '<select id="edm-submat" style="flex:1;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 6px;background:var(--surface)" onchange="edmSubmatChange()">'+
+    subMatOpts+
+    '</select>'+
+    '<div style="text-align:right;min-width:70px">'+
+    '<div style="font-size:10px;color:var(--txt3)">합산액</div>'+
+    '<div style="font-size:14px;font-weight:800;color:var(--navy)" id="edm-submat-amt">+'+subMatFee.toLocaleString()+'원</div>'+
+    '</div></div>'+
+    '<input type="hidden" id="edm-submat-applied" value="'+subMatFee+'">'+
+    '</div></div>'+
+
+    // 금액 요약
+    '<div style="border-top:1px solid var(--border);padding:14px 20px 0">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:10px">금액 요약</div>'+
+    '<div style="font-size:12px;display:flex;flex-direction:column;gap:5px;margin-bottom:12px">'+
+    '<div style="display:flex;justify-content:space-between"><span style="color:var(--txt3)">기본 금액</span><span id="edm-sum2-base">'+tuitionFee.toLocaleString()+'원</span></div>'+
+    '<div style="display:flex;justify-content:space-between"><span style="color:var(--txt3)">부교재</span><span style="color:var(--navy)" id="edm-sum2-submat">+'+subMatFee.toLocaleString()+'원</span></div>'+
+    '<div style="display:flex;justify-content:space-between"><span style="color:var(--txt3)">할인</span><span style="color:#f59e0b" id="edm-sum2-disc">-'+discountAmt.toLocaleString()+'원</span></div>'+
+    '<div style="display:flex;justify-content:space-between"><span style="color:var(--txt3)">결석 차감</span><span style="color:var(--txt2)" id="edm-sum2-absent">-'+absentDeduct.toLocaleString()+'원</span></div>'+
+    '<div style="display:flex;justify-content:space-between;border-top:2px solid var(--navy);padding-top:8px;margin-top:4px;font-size:15px;font-weight:800;color:var(--navy)">'+
+    '<span>납부예정액</span><span id="edm-total">'+initTotal.toLocaleString()+'원</span></div>'+
+    '</div>'+
+    '<button id="edm-save-btn" class="btn btn-navy btn-block" style="margin-bottom:6px">납부예정액 저장</button>'+
+    '<div style="display:flex;gap:6px">'+
+    '<button id="edm-reset-btn" class="btn btn-outline" style="flex:1;font-size:11px;color:var(--txt3)">↩ 자동 계산값으로 초기화</button>'+
+    '<button id="edm-cancel-btn" class="btn btn-outline" style="flex:1;font-size:11px">취소</button>'+
+    '</div></div></div>';
 
   document.body.appendChild(overlay);
-  // 툴팁 외부 클릭 시 닫기
-  overlay.addEventListener('click',function(e){
-    if(!e.target.closest('.edm-tip')&&!e.target.closest('button[onclick*="tip-"]')){
-      overlay.querySelectorAll('.edm-tip').forEach(function(el){el.style.display='none';});
-    }
-  });
-  var saveBtn=document.getElementById('edm-save-btn');
-  if(saveBtn)saveBtn.onclick=function(){saveExpectedDetailModal(studentId,yr,mo,overlay);};
-  var cancelBtn=document.getElementById('edm-cancel-btn');
-  if(cancelBtn)cancelBtn.onclick=function(){overlay.remove();};
 
-  // 초기화 버튼
-  var resetBtn=document.getElementById('edm-reset-btn');
-  if(resetBtn)resetBtn.onclick=function(){
-    var baseEl=$('edm-base');if(baseEl)baseEl.value=autoBase;
-    var discEl=$('edm-discount');if(discEl)discEl.value=autoDiscount;
-    var submatEl=$('edm-submat');if(submatEl)submatEl.value=autoSubMat;
-    var absentDaysEl=$('edm-absent-days');if(absentDaysEl)absentDaysEl.value=autoAbsentDays;
-    var absentEl=$('edm-absent');if(absentEl)absentEl.value=0;
-    var absentAmtEl=$('edm-absent-amt');if(absentAmtEl)absentAmtEl.textContent='0원';
-    var submatApplied=$('edm-submat-applied');if(submatApplied)submatApplied.value=0;
-    calcTotal();
+  // 이벤트 핸들러
+  document.getElementById('edm-save-btn').onclick=function(){saveExpectedDetailModal(studentId,yr,mo,overlay);};
+  document.getElementById('edm-cancel-btn').onclick=function(){overlay.remove();};
+  document.getElementById('edm-absent-info-btn').onclick=function(){
+    var t=document.getElementById('edm-absent-tip');
+    t.style.display=t.style.display==='none'?'block':'none';
+  };
+  document.getElementById('edm-reset-btn').onclick=function(){
+    document.getElementById('edm-base').value=tuitionFee.toLocaleString();
+    document.getElementById('edm-discount').value=discountAmt.toLocaleString();
+    document.getElementById('edm-disc-reason').value=discountReason||'';
+    document.getElementById('edm-disc-memo').value=discountMemo||'';
+    document.getElementById('edm-disc-memo-wrap').style.display='none';
+    document.getElementById('edm-absent-days').value=0;
+    document.getElementById('edm-absent').value=0;
+    document.getElementById('edm-absent-amt').textContent='0';
+    document.getElementById('edm-submat').value='';
+    document.getElementById('edm-submat-applied').value=0;
+    document.getElementById('edm-submat-amt').textContent='+0원';
+    edmCalc();
     toast('자동 계산값으로 초기화됐어요');
   };
 
-  // 결석 차감 버튼
-  var absentApplyBtn=document.getElementById('edm-absent-apply-btn');
-  if(absentApplyBtn)absentApplyBtn.onclick=function(){
-    var amt=perDayFee*(parseInt($('edm-absent-days').value)||0);
-    var absentEl=$('edm-absent');if(absentEl)absentEl.value=amt;
-    calcTotal();
-    toast('결석 차감액이 납부예정액에 반영됐어요');
+  window.edmDiscReasonChange=function(){
+    var v=document.getElementById('edm-disc-reason').value;
+    document.getElementById('edm-disc-memo-wrap').style.display=(v==='이벤트할인')?'flex':'none';
   };
-
-  // 부교재 합산 버튼
-  var submatApplyBtn=document.getElementById('edm-submat-apply-btn');
-  if(submatApplyBtn)submatApplyBtn.onclick=function(){
-    var submatVal=$('edm-submat')?$('edm-submat').value:'';
-    var fee=getSubMaterialFee(submatVal);
-    var appliedEl=$('edm-submat-applied');if(appliedEl)appliedEl.value=fee;
-    calcTotal();
-    toast('부교재 금액이 납부예정액에 합산됐어요');
+  window.edmFormatBase=function(el){
+    var raw=el.value.replace(/[^0-9]/g,'');
+    el.value=raw?parseInt(raw).toLocaleString():'';
   };
-
-  // 결석일 입력 시 차감액만 미리보기 (납부예정액 미반영)
-  function calcAbsent(){
-    var days=parseInt($('edm-absent-days').value)||0;
+  window.edmFormatDisc=function(el){
+    var raw=el.value.replace(/[^0-9]/g,'');
+    el.value=raw?parseInt(raw).toLocaleString():'';
+  };
+  window.edmAbsentCalc=function(){
+    var days=parseInt(document.getElementById('edm-absent-days').value)||0;
     var amt=perDayFee*days;
-    var amtEl=$('edm-absent-amt');
-    if(amtEl)amtEl.textContent=amt.toLocaleString()+'원';
-    // 납부예정액은 건드리지 않음 — 차감 버튼 눌러야 반영
-  }
-  window.edmAbsentCalc=calcAbsent;
-
-  // 부교재 변경 시 합산액만 미리보기 (납부예정액 미반영)
-  function edmSubmatChangeHandler(){
-    var submatVal=$('edm-submat')?$('edm-submat').value:'';
+    document.getElementById('edm-absent-amt').textContent=amt.toLocaleString();
+    document.getElementById('edm-absent').value=amt;
+    edmCalc();
+  };
+  window.edmSubmatChange=function(){
+    var submatVal=document.getElementById('edm-submat').value;
     var fee=getSubMaterialFee(submatVal);
-    var amtEl=$('edm-submat-amt');
-    if(amtEl)amtEl.textContent=fee.toLocaleString()+'원';
-    // 납부예정액은 건드리지 않음 — 합산 버튼 눌러야 반영
-  }
-  window.edmSubmatChange=edmSubmatChangeHandler;
+    document.getElementById('edm-submat-amt').textContent='+'+fee.toLocaleString()+'원';
+    document.getElementById('edm-submat-applied').value=fee;
+    edmCalc();
+  };
+  window.edmCalc=function(){
+    var rawBase=(document.getElementById('edm-base').value||'').replace(/[^0-9]/g,'');
+    var base=parseInt(rawBase)||0;
+    var rawDisc=(document.getElementById('edm-discount').value||'').replace(/[^0-9]/g,'');
+    var disc=parseInt(rawDisc)||0;
+    var absent=parseInt((document.getElementById('edm-absent')||{}).value)||0;
+    var subm=parseInt((document.getElementById('edm-submat-applied')||{}).value)||0;
+    var total=Math.max(0,base+subm-disc-absent);
+    // 상단 강조
+    document.getElementById('edm-total-top').textContent=total.toLocaleString()+'원';
+    document.getElementById('edm-total').textContent=total.toLocaleString()+'원';
+    // 요약 업데이트
+    document.getElementById('edm-sum-base').textContent=base.toLocaleString();
+    document.getElementById('edm-sum-disc-val').textContent=disc.toLocaleString();
+    document.getElementById('edm-sum-absent-val').textContent=absent.toLocaleString();
+    document.getElementById('edm-sum2-base').textContent=base.toLocaleString()+'원';
+    document.getElementById('edm-sum2-submat').textContent='+'+subm.toLocaleString()+'원';
+    document.getElementById('edm-sum2-disc').textContent='-'+disc.toLocaleString()+'원';
+    document.getElementById('edm-sum2-absent').textContent='-'+absent.toLocaleString()+'원';
+  };
 
-  function calcTotal(){
-    var base=parseInt($('edm-base').value)||0;
-    var disc=parseInt($('edm-discount').value)||0;
-    var absent=parseInt(($('edm-absent')||{}).value)||0;
-    var subm=parseInt(($('edm-submat-applied')||{}).value)||0;
-    var total=base+subm-disc-absent;
-    if(total<0)total=0;
-    var el=$('edm-total');
-    if(el)el.textContent=total.toLocaleString()+'원';
-  }
-  window.edmCalc=calcTotal;
-
-  calcTotal();
+  // 초기 계산 실행
+  edmCalc();
 }
 
+
 function saveExpectedDetailModal(studentId,yr,mo,overlay){
-  var base=parseInt($('edm-base').value)||0;
-  var disc=parseInt($('edm-discount').value)||0;
-  var absent=parseInt(($('edm-absent')||{}).value)||0;
-  var subMat=$('edm-submat')?$('edm-submat').value:'';
-  var subMatFee=parseInt(($('edm-submat-applied')||{}).value)||0;
+  var rawBase=(document.getElementById('edm-base').value||'').replace(/[^0-9]/g,'');
+  var base=parseInt(rawBase)||0;
+  var rawDisc=(document.getElementById('edm-discount').value||'').replace(/[^0-9]/g,'');
+  var disc=parseInt(rawDisc)||0;
+  var absent=parseInt((document.getElementById('edm-absent')||{}).value)||0;
+  var subMat=document.getElementById('edm-submat')?document.getElementById('edm-submat').value:'';
+  var subMatFee=parseInt((document.getElementById('edm-submat-applied')||{}).value)||0;
+  var discReason=document.getElementById('edm-disc-reason')?document.getElementById('edm-disc-reason').value:'';
+  var discMemo=document.getElementById('edm-disc-memo')?document.getElementById('edm-disc-memo').value:'';
   var total=Math.max(0,base+subMatFee-disc-absent);
 
   var list=revenues.filter(function(r){
@@ -9565,6 +9626,8 @@ function saveExpectedDetailModal(studentId,yr,mo,overlay){
     manualExpected:total,
     absentDeduction:absent,
     subMaterial:subMat,
+    discountReason:discReason,
+    discountMemo:discMemo,
     updatedAt:new Date().toISOString()
   };
 
