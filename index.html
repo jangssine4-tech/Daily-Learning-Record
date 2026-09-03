@@ -329,7 +329,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   </div>
   <div class="cp" id="meeting-area" style="overflow-y:auto"></div>
 </div>
-<div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">월간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">신규 학생 배정</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">전달 사항</button></div><div id="sch-panel-today"><div style="position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);padding:6px 12px"><div class="toolbar" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button class="btn btn-outline btn-xs" onclick="openSchRevModal()" style="color:#16a34a;border-color:#16a34a;font-size:11px">💰 회계</button></div><div id="schedule-notes-award" style="margin:0;padding:0"></div></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="assign-panel-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
+<div class="view active" id="view-schedule"><div class="page-top"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="position:sticky;top:0;z-index:50;background:var(--surface)"><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">월간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">신규 학생 배정</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">전달 사항</button></div><div id="sch-panel-today-header" style="background:var(--surface);border-bottom:1px solid var(--border);padding:6px 12px"><div class="toolbar" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button class="btn btn-outline btn-xs" onclick="openSchRevModal()" style="color:#16a34a;border-color:#16a34a;font-size:11px">💰 회계</button></div><div id="schedule-notes-award" style="margin:0;padding:0"></div><div id="schedule-legend" style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0 2px;font-size:11px;color:var(--txt2);align-items:center"><span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span><span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span><span><span style="color:#d97706;font-weight:700">▲</span> 조퇴/학습 마무리 못함</span><span>📝 일지 작성</span></div></div></div><div id="sch-panel-today"><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="assign-panel-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
 <div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
   <div style="display:flex;gap:16px;align-items:flex-start;padding:0 0 0 0">
   <div class="cp" style="max-width:560px;flex:0 0 auto"><div class="card" style="padding:16px">
@@ -2829,7 +2829,7 @@ function toggleCardTag(key,el){
 async function loadCardBadges(){
   try{var d=await db.collection('config').doc('cardBadges').get();window._cardBadges=d.exists?d.data():{};}catch(e){window._cardBadges={};}
 }
-function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();}
+function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();renderScheduleNotes();}
 function _schRevClick(el){
   var sid=el.dataset.sid;
   var yr=parseInt(el.dataset.yr);
@@ -2909,7 +2909,7 @@ function openSchRevModal(){
 }
 
 
-function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();}
+function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();renderScheduleNotes();}
 // ══════════════════════════════════════════════════════
 // 월간 시간표 전용 추가 슬롯 관리 (localStorage)
 // ══════════════════════════════════════════════════════
@@ -4861,12 +4861,7 @@ function renderSchedule(){
   });
   var sorted=Object.keys(byPeriod).sort(function(a,b){if(a==='미설정')return 1;if(b==='미설정')return-1;var na=parseInt(a),nb=parseInt(b);var aSpec=na<0,bSpec=nb<0;if(aSpec&&!bSpec)return -1;if(!aSpec&&bSpec)return 1;if(aSpec&&bSpec)return Math.abs(na)-Math.abs(nb);return na-nb;});
   if(!sorted.length){$('schedule-list').innerHTML='<div class="empty"><div class="ei">👥</div><div class="et">오늘 등록된 학생이 없습니다</div></div>';return;}
-  var html='<div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0 12px;font-size:11px;color:var(--txt2);align-items:center">'
-    +'<span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span>'
-    +'<span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span>'
-    +'<span><span style="color:#d97706;font-weight:700">▲</span> 조퇴/학습 마무리 못함</span>'
-    +'<span>📝 일지 작성</span>'
-    +'</div>';
+  var html='';  // 범례는 sticky 헤더로 이동
   // allActive for notToday section
   var allActive=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
   // Non-scheduled students (active but not coming today)
