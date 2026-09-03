@@ -9476,10 +9476,12 @@ function openExpectedDetailModal(studentId,yr,mo){
     // 결석 차감
     '<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+    '<div style="display:flex;align-items:center;gap:6px">'+
     '<span style="font-size:12px;font-weight:700;color:var(--txt2)">결석 차감</span>'+
+    '<button type="button" data-calcfor="edm-absent-days" onclick="edmOpenCalc(this.dataset.calcfor)" style="font-size:12px;background:none;border:1px solid var(--border);border-radius:4px;padding:1px 7px;cursor:pointer;color:var(--txt2)">🧮</button>'+
+    '</div>'+
     '<div style="display:flex;gap:6px">'+
     '<button type="button" id="edm-absent-info-btn" style="font-size:11px;color:var(--txt3);background:none;border:1px solid var(--border);border-radius:4px;padding:1px 7px;cursor:pointer">계산기준 ⓘ</button>'+
-    '<button type="button" data-calcfor="edm-absent-days" onclick="edmOpenCalc(this.dataset.calcfor)" style="font-size:12px;background:none;border:1px solid var(--border);border-radius:4px;padding:1px 7px;cursor:pointer;color:var(--txt2)">🧮</button>'+
     '<button type="button" id="edm-absent-apply-btn" style="font-size:11px;font-weight:700;color:#fff;background:var(--navy);border:none;border-radius:4px;padding:1px 10px;cursor:pointer">적용</button>'+
     '</div>'+
     '</div>'+
@@ -9540,14 +9542,36 @@ function openExpectedDetailModal(studentId,yr,mo){
     var t=document.getElementById('edm-absent-tip');
     t.style.display=t.style.display==='none'?'block':'none';
   };
-  document.getElementById('edm-absent-apply-btn').onclick=function(){
+  // 적용 토글 상태 — 초기값: 저장된 차감액이 있으면 적용됨 상태로 시작
+  var _absentApplied=absentDeduct>0;
+  var applyBtn=document.getElementById('edm-absent-apply-btn');
+  function updateAbsentApplyBtn(){
+    if(_absentApplied){
+      applyBtn.textContent='취소';
+      applyBtn.style.background='#6b7280';
+    }else{
+      applyBtn.textContent='적용';
+      applyBtn.style.background='var(--navy)';
+    }
+  }
+  updateAbsentApplyBtn();
+  applyBtn.onclick=function(){
+    _absentApplied=!_absentApplied;
     var days=parseInt(document.getElementById('edm-absent-days').value)||0;
-    var amt=perDayFee*days;
+    var amt=_absentApplied?perDayFee*days:0;
     document.getElementById('edm-absent').value=amt;
     var notice=document.getElementById('edm-absent-applied-notice');
-    if(notice){notice.style.display='block';notice.textContent='✅ 차감 적용됨 · '+amt.toLocaleString()+'원 차감 중';}
+    if(notice){
+      if(_absentApplied){
+        notice.style.display='block';
+        notice.textContent='✅ 차감 적용됨 · '+amt.toLocaleString()+'원 차감 중';
+      }else{
+        notice.style.display='none';
+      }
+    }
+    updateAbsentApplyBtn();
     edmCalc();
-    toast(amt.toLocaleString()+'원 차감이 납부예정액에 반영됐어요');
+    toast(_absentApplied?amt.toLocaleString()+'원 차감 적용됐어요':'차감이 취소됐어요');
   };
   document.getElementById('edm-reset-btn').onclick=function(){
     document.getElementById('edm-base').value=tuitionFee.toLocaleString();
@@ -9583,7 +9607,13 @@ function openExpectedDetailModal(studentId,yr,mo){
     var days=parseInt(document.getElementById('edm-absent-days').value)||0;
     var amt=perDayFee*days;
     document.getElementById('edm-absent-amt').textContent=amt.toLocaleString();
-    // 납부예정액은 차감 버튼 눌러야 반영 — 여기서는 미리보기만
+    // 적용 상태라면 횟수 바꿔도 즉시 반영
+    if(_absentApplied){
+      document.getElementById('edm-absent').value=amt;
+      var notice=document.getElementById('edm-absent-applied-notice');
+      if(notice){notice.textContent='✅ 차감 적용됨 · '+amt.toLocaleString()+'원 차감 중';}
+      edmCalc();
+    }
   };
   window.edmSubmatChange=function(){
     var submatVal=document.getElementById('edm-submat').value;
@@ -9690,10 +9720,26 @@ function openExpectedDetailModal(studentId,yr,mo){
         b.onclick=function(){edmCalcPress(b.dataset.val);};
       });
       // 단축 금액 버튼 이벤트
+      // 연산자(+−×÷)가 calcStr 끝에 있으면 → 그 뒤에 이 금액을 붙여서 계산
+      // 연산자 없으면 → display에 세팅 (숫자 입력과 동일하게)
       popup.querySelectorAll('.edm-calc-qbtn').forEach(function(b){
         b.onclick=function(){
-          display=parseInt(b.dataset.val).toLocaleString();
-          calcStr='';
+          var val=parseInt(b.dataset.val);
+          var ops=['÷','×','−','+'];
+          var lastOp=calcStr?calcStr.slice(-1):'';
+          if(calcStr&&ops.indexOf(lastOp)>=0){
+            // 연산자 다음 → 이어서 계산
+            var expr=calcStr+val;
+            try{
+              var r=Math.round(eval(expr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-')));
+              display=isFinite(r)?r.toLocaleString():'오류';
+            }catch(e){display='오류';}
+            calcStr='';
+          }else{
+            // 처음이거나 숫자 입력 중 → 새로 시작
+            display=val.toLocaleString();
+            calcStr='';
+          }
           render();
         };
       });
@@ -9739,8 +9785,16 @@ function openExpectedDetailModal(studentId,yr,mo){
         display=(n2/100).toLocaleString();render();return;
       }
       if(['÷','×','−','+'].indexOf(v)>=0){
-        var raw2=(display||'0').replace(/,/g,'');
-        calcStr=(calcStr||'')+raw2+v;
+        var raw2=(display||'').replace(/,/g,'');
+        // display가 비어있으면(단축버튼 후 연산자) calcStr 끝에 연산자만 추가
+        if(raw2!==''){
+          calcStr=(calcStr||'')+raw2+v;
+        }else if(calcStr){
+          // 이미 연산자가 있으면 마지막 연산자 교체
+          calcStr=calcStr.slice(0,-1)+v;
+        }else{
+          calcStr='0'+v;
+        }
         display='';render();return;
       }
       // 숫자/소수점
