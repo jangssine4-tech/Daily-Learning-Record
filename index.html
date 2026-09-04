@@ -12278,6 +12278,12 @@ function _renderTodayTaskSection(){
   var todayItems=(_dbTasks||[]).filter(function(t){
     return t.dueDate===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId;
   });
+
+  // 실행 계획 지연 업무 — 오늘 이전 날짜이고 완료 안 된 플랜 태스크
+  var planOverdue=getPlanTasksForRange('2000-01-01',addDays(today,-1)).filter(function(t){
+    return t.status!=='완료'&&t.status!=='done';
+  });
+
   var overdueItems=allGeneral.filter(function(t){return t.dueDate&&t.dueDate<today;});
   var prepItems=allGeneral.filter(function(t){return t.dueDate&&t.dueDate>today&&t.dueDate<=prep3End;});
   var done=todayItems.filter(function(t){return t.status==='완료';}).length;
@@ -12304,15 +12310,25 @@ function _renderTodayTaskSection(){
 
   var h='';
 
-  // 🚨 지연 업무
-  if(overdueItems.length){
+  // 🚨 지연 업무 (일반 + 실행 계획)
+  var totalOverdue=overdueItems.length+planOverdue.length;
+  if(totalOverdue){
     h+='<div style="border:1.5px solid #dc2626;border-radius:12px;overflow:hidden;margin-bottom:10px">';
     h+='<div style="background:#fee2e2;padding:8px 14px;display:flex;align-items:center;gap:8px">';
     h+='<span style="font-size:13px;font-weight:800;color:#991b1b">🚨 지연 업무</span>';
-    h+='<span style="margin-left:auto;font-size:11px;color:#991b1b;font-weight:700">'+overdueItems.length+'건 미완료</span>';
+    h+='<span style="margin-left:auto;font-size:11px;color:#991b1b;font-weight:700">'+totalOverdue+'건 미완료</span>';
     h+='</div><div style="padding:8px 14px;background:var(--surface)">';
     overdueItems.forEach(function(t){
       h+=taskRow(t,'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연</span>');
+    });
+    planOverdue.forEach(function(t){
+      var daysLate=Math.floor((new Date(today)-new Date(t.date))/(86400000));
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+      h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연</span>';
+      h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;border:1px solid #bfdbfe">📋 '+( t.planName||'실행계획').substring(0,10)+'</span>';
+      h+='<span style="flex:1;font-size:12px;color:var(--txt)">'+t.name+'</span>';
+      h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+daysLate+'일 지연</span>';
+      h+='</div>';
     });
     h+='</div></div>';
   }
