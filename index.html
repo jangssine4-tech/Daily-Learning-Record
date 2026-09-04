@@ -12316,11 +12316,11 @@ function _renderTodayTaskSection(){
     e.dataTransfer.effectAllowed='move';
   };
 
-  window._planSlotDragStart=function(e,elOrStr){
-    var el=typeof elOrStr==='string'?e.currentTarget:elOrStr;
+  window._planSlotDragStart=function(e,el){
+    if(!el||!el.dataset){el=e.currentTarget;}
     _draggingPlanInfo={planId:el.dataset.pid, taskIdx:parseInt(el.dataset.idx)};
     _draggingTid=null;
-    el.style.opacity='0.4';
+    if(el.style)el.style.opacity='0.4';
     e.dataTransfer.effectAllowed='move';
   };
 
@@ -12348,7 +12348,7 @@ function _renderTodayTaskSection(){
       if(plan&&plan.tasks&&plan.tasks[_draggingPlanInfo.taskIdx]){
         plan.tasks[_draggingPlanInfo.taskIdx].timeSlot=slot;
         db.collection('plans').doc(plan.id).update({tasks:plan.tasks}).then(function(){
-          _renderDashBoardUI($('dashboard-board-area'));
+          _renderBoardTodayPanel();
           toast(slotLabel+'로 이동됐어요');
         });
       }
@@ -12523,10 +12523,10 @@ function _renderTodayTaskSection(){
     h+='</div></div>';
   }
 
-  // 실행 계획 업무 — 오늘 날짜 포함 플랜 카드
+  // 실행 계획 업무 — 오늘까지 미완료 플랜 카드 (날짜 재필터 없이 전체 표시)
   var planTodayTasks=getPlanTasksForRange('2000-01-01',today).filter(function(t){return !t.done;});
   if(planTodayTasks.length){
-    h+=_renderPlanGroupCards(planTodayTasks,'today',today,today);
+    h+=_renderPlanGroupCards(planTodayTasks,'today',null,null);
   }
 
   // 🔔 마감 임박
@@ -15475,7 +15475,7 @@ function _renderPlanTaskRow(t,planId,ctxId){
   var hasDetail=isToday&&!!(tDetail||tCriterion);
   var detUid='ptrow-'+(t._planId||planId)+'-'+t._taskIdx+'-'+(ctxId||'');
   // 오늘 탭에서만 드래그 가능 (시간대 이동용)
-  var dragAttr=isToday?' draggable="true" data-plan-task="1" data-pid="'+(t._planId||planId)+'" data-idx="'+t._taskIdx+'" ondragstart="_planSlotDragStart(event,\''+detUid+'\')" ondragend="this.style.opacity=\'1\'"':'';
+  var dragAttr=isToday?' draggable="true" data-plan-task="1" data-pid="'+(t._planId||planId)+'" data-idx="'+t._taskIdx+'" ondragstart="_planSlotDragStart(event,this)" ondragend="this.style.opacity=\'1\'"':'';
   var h='<div'+dragAttr+' style="padding:5px 8px 5px 0;border-bottom:1px solid var(--border);'+(isToday?'cursor:grab;':'')+'">';
   h+='<div style="display:flex;align-items:center;gap:7px">';
   h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+(t._planId||planId)+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:13px;height:13px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
