@@ -12299,22 +12299,41 @@ function _renderTodayTaskSection(){
   window._changeTaskSlot=changeTaskSlot;
 
   var _draggingTid=null;
+  var _draggingPlanInfo=null;
+
   window._slotDragStart=function(e,tid){
     _draggingTid=tid;
+    _draggingPlanInfo=null;
     e.target.style.opacity='0.4';
     e.dataTransfer.effectAllowed='move';
   };
+
+  window._planSlotDragStart=function(e,detUid){
+    var el=e.currentTarget;
+    _draggingPlanInfo={planId:el.dataset.pid, taskIdx:parseInt(el.dataset.idx)};
+    _draggingTid=null;
+    e.currentTarget.style.opacity='0.4';
+    e.dataTransfer.effectAllowed='move';
+  };
+
   window._dropToSlot=function(e,slot){
     e.preventDefault();
-    if(!_draggingTid)return;
-    var t=(_dbTasks||[]).find(function(x){return x.id===_draggingTid;});
-    if(t){
-      t.timeSlot=slot;
-      saveTask(_draggingTid);
-      _renderDashBoardUI($('dashboard-board-area'));
-      toast(slot?(slot==='수업후'?'수업 후':slot==='오후'?'오후':'오전')+'로 이동됐어요':'📥 미배치로 이동됐어요');
+    var slotLabel=slot==='수업후'?'수업 후':slot==='오후'?'오후':slot==='오전'?'오전':'미배치';
+    if(_draggingTid){
+      var t=(_dbTasks||[]).find(function(x){return x.id===_draggingTid;});
+      if(t){t.timeSlot=slot;saveTask(_draggingTid);_renderDashBoardUI($('dashboard-board-area'));toast(slotLabel+'로 이동됐어요');}
+      _draggingTid=null;
+    } else if(_draggingPlanInfo){
+      var plan=(_plans||[]).find(function(p){return p.id===_draggingPlanInfo.planId;});
+      if(plan&&plan.tasks&&plan.tasks[_draggingPlanInfo.taskIdx]){
+        plan.tasks[_draggingPlanInfo.taskIdx].timeSlot=slot;
+        db.collection('plans').doc(plan.id).update({tasks:plan.tasks}).then(function(){
+          _renderDashBoardUI($('dashboard-board-area'));
+          toast(slotLabel+'로 이동됐어요');
+        });
+      }
+      _draggingPlanInfo=null;
     }
-    _draggingTid=null;
   };
 
   function taskRowWithSlot(t,badge){
@@ -15405,29 +15424,31 @@ function _pgcToggle(uid){
 
 function _renderPlanTaskRow(t,planId,ctxId){
   var isDone=t.done;
+  var isToday=ctxId==='today';
   var tName=t.name||'';var tDetail=t.detail||'';var tCriterion=t.criterion||'';
   if(!tDetail&&tName.indexOf(':')>0){var ci=tName.indexOf(':');tDetail=tName.slice(ci+1).trim();tName=tName.slice(0,ci).trim();}
   var pc=t.priority==='높음'?'#dc2626':t.priority==='낮음'?'#94a3b8':'#2563eb';
-  var today=todayISO();var isToday=t.date===today;
-  var hasDetail=!!(tDetail||tCriterion);
+  var today=todayISO();var isTodayDate=t.date===today;
+  // 오늘 탭에서만 세부내용 표시
+  var hasDetail=isToday&&!!(tDetail||tCriterion||t.stage||t.planName);
   var detUid='ptrow-'+(t._planId||planId)+'-'+t._taskIdx+'-'+(ctxId||'');
-  var h='<div style="padding:5px 8px 5px 0;border-bottom:1px solid var(--border)">';
+  // 오늘 탭에서만 드래그 가능 (시간대 이동용)
+  var dragAttr=isToday?' draggable="true" data-plan-task="1" data-pid="'+(t._planId||planId)+'" data-idx="'+t._taskIdx+'" ondragstart="_planSlotDragStart(event,\''+detUid+'\')" ondragend="this.style.opacity=\'1\'"':'';
+  var h='<div'+dragAttr+' style="padding:5px 8px 5px 0;border-bottom:1px solid var(--border);'+(isToday?'cursor:grab;':'')+'">';
   h+='<div style="display:flex;align-items:center;gap:7px">';
   h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+(t._planId||planId)+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:13px;height:13px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
   h+='<span style="flex:1;font-size:12px;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+tName+'</span>';
-  if(isToday)h+='<span style="font-size:9px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px;flex-shrink:0">오늘</span>';
+  if(isTodayDate&&!isToday)h+='<span style="font-size:9px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px;flex-shrink:0">오늘</span>';
   h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.manager+'</span>';
-  if(hasDetail)h+='<span onclick="_pgcToggle(\''+detUid+'\')" style="font-size:11px;color:var(--txt3);cursor:pointer;flex-shrink:0;padding:0 2px">▾</span>';
+  if(hasDetail)h+='<span onclick="_pgcToggle(\''+detUid+'\')" style="font-size:11px;color:var(--txt3);cursor:pointer;flex-shrink:0;padding:0 4px">▾</span>';
   h+='</div>';
   if(hasDetail){
-    // 오늘 탭에서는 세부내용 기본 접힘, 클릭해서 펼침
-    var detOpen=false;
-    h+='<div id="pgc-body-'+detUid+'" style="display:'+(detOpen?'':'none')+';margin:4px 0 2px 20px;padding:6px 10px;background:#f8fafc;border-radius:6px;border-left:2px solid '+pc+'">';
-    if(t.planName)h+='<div style="font-size:10px;color:#64748b;margin-bottom:4px;font-weight:600">'+t.planName+'</div>';
-    if(t.stage)h+='<div style="font-size:10px;color:#64748b;margin-bottom:4px">단계: '+t.stage+'</div>';
-    if(tDetail)h+='<div style="font-size:11px;color:#334155;line-height:1.7">'+tDetail+'</div>';
-    if(t.manager)h+='<div style="font-size:10px;color:#64748b;margin-top:4px">담당: '+t.manager+'</div>';
-    if(tCriterion)h+='<div style="font-size:10px;color:#1d4ed8;margin-top:4px;font-weight:600">완료기준: <span style="font-weight:400">'+tCriterion+'</span></div>';
+    h+='<div id="pgc-body-'+detUid+'" style="display:none;margin:4px 0 2px 20px;padding:6px 10px;background:#f8fafc;border-radius:6px;border-left:2px solid '+pc+'">';
+    if(t.planName)h+='<div style="font-size:10px;color:#64748b;margin-bottom:3px;font-weight:600">'+t.planName+'</div>';
+    if(t.stage)h+='<div style="font-size:10px;color:#64748b;margin-bottom:3px">단계: '+t.stage+'</div>';
+    if(tDetail)h+='<div style="font-size:11px;color:#334155;line-height:1.7;margin-bottom:3px">'+tDetail+'</div>';
+    if(t.manager)h+='<div style="font-size:10px;color:#64748b;margin-bottom:3px">담당: '+t.manager+'</div>';
+    if(tCriterion)h+='<div style="font-size:10px;color:#1d4ed8;font-weight:600">완료기준: <span style="font-weight:400">'+tCriterion+'</span></div>';
     h+='</div>';
   }
   h+='</div>';
