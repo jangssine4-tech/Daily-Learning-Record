@@ -12298,9 +12298,28 @@ function _renderTodayTaskSection(){
   }
   window._changeTaskSlot=changeTaskSlot;
 
+  var _draggingTid=null;
+  window._slotDragStart=function(e,tid){
+    _draggingTid=tid;
+    e.target.style.opacity='0.4';
+    e.dataTransfer.effectAllowed='move';
+  };
+  window._dropToSlot=function(e,slot){
+    e.preventDefault();
+    if(!_draggingTid)return;
+    var t=(_dbTasks||[]).find(function(x){return x.id===_draggingTid;});
+    if(t){
+      t.timeSlot=slot;
+      saveTask(_draggingTid);
+      _renderDashBoardUI($('dashboard-board-area'));
+      toast(slot?(slot==='수업후'?'🌙 수업 후':slot==='오후'?'🌤 오후':'☀️ 오전')+'로 이동됐어요':'📥 미배치로 이동됐어요');
+    }
+    _draggingTid=null;
+  };
+
   function taskRowWithSlot(t,badge){
     var isDone=t.status==='완료';
-    var r='<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)">';
+    var r='<div draggable="true" data-tid="'+t.id+'" ondragstart="_slotDragStart(event,\''+t.id+'\')" ondragend="this.style.opacity=\'1\'" style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);cursor:grab">';
     r+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleTodayTask(\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
     if(badge)r+=badge;
     if(t.area)r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
@@ -12394,13 +12413,13 @@ function _renderTodayTaskSection(){
   slots.forEach(function(slot){
     var items=grouped[slot];
     var slotEst=items.reduce(function(s,t){return s+(parseInt(t.estMin)||0);},0);
-    h+='<div style="border:1px solid '+slotBorder[slot]+';border-radius:12px;overflow:hidden;margin-bottom:8px">';
+    h+='<div style="border:1px solid '+slotBorder[slot]+';border-radius:12px;overflow:hidden;margin-bottom:8px" data-slot="'+slot+'" ondragover="event.preventDefault();this.style.outline=\'2px solid #3b82f6\'" ondragleave="this.style.outline=\'none\'" ondrop="_dropToSlot(event,\''+slot+'\');this.style.outline=\'none\'">';
     h+='<div style="background:'+slotColor[slot]+';padding:7px 14px;display:flex;align-items:center;gap:8px">';
     h+='<span style="font-size:12px;font-weight:800;color:'+slotTxt[slot]+'">'+slotLabel[slot]+'</span>';
     h+='<span style="font-size:10px;color:'+slotTxt[slot]+';opacity:.7">'+items.length+'건';
     if(slotEst)h+=' · '+(slotEst>=60?Math.floor(slotEst/60)+'시간'+(slotEst%60?slotEst%60+'분':''):slotEst+'분');
     h+='</span></div>';
-    h+='<div style="padding:6px 14px;background:var(--surface)">';
+    h+='<div style="padding:6px 14px;background:var(--surface)" data-slot-body="'+slot+'">';
     if(items.length){
       items.forEach(function(t){
         var typeBadge='';
@@ -12416,7 +12435,7 @@ function _renderTodayTaskSection(){
 
   // 미배치 업무
   if(grouped['미배치'].length||!todayItems.length){
-    h+='<div style="border:1.5px dashed var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px">';
+    h+='<div style="border:1.5px dashed var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px" data-slot="" ondragover="event.preventDefault();this.style.outline=\'2px solid #3b82f6\'" ondragleave="this.style.outline=\'none\'" ondrop="_dropToSlot(event,\'\');this.style.outline=\'none\'">';
     h+='<div style="background:var(--surface2);padding:7px 14px;display:flex;align-items:center;gap:8px">';
     h+='<span style="font-size:12px;font-weight:800;color:var(--txt2)">📥 미배치 업무</span>';
     h+='<span style="font-size:10px;color:var(--txt3)">'+grouped['미배치'].length+'건 · 시간대를 배정해 주세요</span>';
