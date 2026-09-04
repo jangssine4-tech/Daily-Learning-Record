@@ -12341,7 +12341,10 @@ function _renderTodayTaskSection(){
 
   // 실행 계획 업무 드래그 시작 — data-pid, data-idx를 가진 요소 자신을 전달
   window._planSlotDragStart=function(e){
+    // currentTarget 또는 가장 가까운 [data-pid] 조상 요소에서 데이터 읽기
     var el=e.currentTarget;
+    if(!el.getAttribute('data-pid')) el=el.closest('[data-pid]');
+    if(!el){console.warn('planDrag: data-pid 요소 없음');return;}
     var pid=el.getAttribute('data-pid');
     var idx=parseInt(el.getAttribute('data-idx'));
     if(!pid||isNaN(idx)){console.warn('planDrag: data-pid/data-idx 없음',el);return;}
@@ -12550,8 +12553,8 @@ function _renderTodayTaskSection(){
     h+='</div></div>';
   }
 
-  // 실행 계획 업무 — 오늘까지 미완료 플랜 카드 (날짜 재필터 없이 전체 표시)
-  var planTodayTasks=getPlanTasksForRange('2000-01-01',today).filter(function(t){return !t.done;});
+  // 실행 계획 업무 — 오늘 날짜 업무만 카드로 표시 (지연은 지연박스에서 별도 표시)
+  var planTodayTasks=getPlanTasksForDate(today).filter(function(t){return !t.done;});
   if(planTodayTasks.length){
     h+=_renderPlanGroupCards(planTodayTasks,'today',null,null);
   }
