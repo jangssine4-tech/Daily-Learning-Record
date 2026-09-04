@@ -12417,19 +12417,10 @@ function _renderTodayTaskSection(){
   var slotBorder={'오전':'#fde047','오후':'#7dd3fc','수업후':'#86efac'};
   var slotTxt={'오전':'#713f12','오후':'#0c4a6e','수업후':'#14532d'};
 
-  // 실행 계획 오늘 업무 가져오기
-  var planTodayTasks=getPlanTasksForDate(today);
-
   var grouped={'오전':[],'오후':[],'수업후':[],'미배치':[]};
   todayItems.filter(function(t){return t.status!=='완료';}).forEach(function(t){
     if(t.timeSlot&&grouped[t.timeSlot])grouped[t.timeSlot].push({_type:'task',data:t});
     else grouped['미배치'].push({_type:'task',data:t});
-  });
-  // 실행 계획 업무도 timeSlot에 따라 같은 버킷에
-  planTodayTasks.filter(function(t){return !t.done;}).forEach(function(t){
-    var slot=t.timeSlot||'';
-    if(slot&&grouped[slot])grouped[slot].push({_type:'plan',data:t});
-    else grouped['미배치'].push({_type:'plan',data:t});
   });
   var doneItems=todayItems.filter(function(t){return t.status==='완료';});
 
@@ -12509,7 +12500,11 @@ function _renderTodayTaskSection(){
     h+='</div></div>';
   }
 
-  // 실행 계획 업무는 시간대 버킷에 통합됨
+  // 실행 계획 업무 — 오늘 날짜 포함 플랜 카드
+  var planTodayTasks=getPlanTasksForRange('2000-01-01',today).filter(function(t){return !t.done;});
+  if(planTodayTasks.length){
+    h+=_renderPlanGroupCards(planTodayTasks,'today',today,today);
+  }
 
   // 🔔 마감 임박
   if(prepItems.length){
