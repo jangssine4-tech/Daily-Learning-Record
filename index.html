@@ -12496,6 +12496,9 @@ function loadDashBoard(forceReload){
   ]).then(function(results){
     var configDoc=results[0];
     var colTasks=results[1].docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    // 중복 ID 방어 — 같은 ID가 여러 번 있으면 첫 번째만 유지
+    var seenIds={};
+    colTasks=colTasks.filter(function(t){if(seenIds[t.id])return false;seenIds[t.id]=true;return true;});
     var configTasks=configDoc.exists?(configDoc.data().tasks||[]):[];
     // config 배열에만 있는 task → 컬렉션으로 마이그레이션
     var colIds=new Set(colTasks.map(function(t){return t.id;}));
@@ -14378,12 +14381,20 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var canB=document.createElement('button');canB.className='btn btn-outline btn-sm';canB.textContent='취소';
   canB.style.marginLeft='auto';canB.onclick=function(){modal.remove();};
   var savB=document.createElement('button');savB.className='btn btn-navy btn-sm';savB.textContent='저장';
-  (function(tid){savB.onclick=function(){_dbSaveTaskModal(tid);};})(id);
+  (function(tid){savB.onclick=function(){
+    savB.disabled=true;savB.textContent='저장 중...';
+    _dbSaveTaskModal(tid);
+  };})(id);
   br.appendChild(canB);br.appendChild(savB);box.appendChild(br);
   modal.appendChild(box);document.body.appendChild(modal);nameInp.focus();
 }
 
 function _dbSaveTaskModal(id){
+  // 중복 저장 방지
+  if(_dbSaveTaskModal._saving){return;}
+  _dbSaveTaskModal._saving=true;
+  setTimeout(function(){_dbSaveTaskModal._saving=false;},1000);
+
   var today=todayISO();
   var name=(document.getElementById('dbt-name')||{}).value||'';
   var area=(document.getElementById('dbt-area')||{}).value||'';
