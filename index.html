@@ -12984,7 +12984,50 @@ function _isOnTimeline(sh){
   // startHour가 실제 시간 숫자(0~24)인 경우만 타임라인에 배치된 것으로 판단
   return sh!==undefined&&sh!==null&&sh!==''&&sh!=='undefined'&&!isNaN(parseInt(sh));
 }
-function _parseDurationMin(str){
+// ── 오늘 수업 시간 기반 가용시간 계산 ──────────────────────
+var _AVAIL_KEY='tl_avail_override_v1';
+function _getTodayClassMinutes(){
+  // 오늘 요일
+  var DOW=['일','월','화','수','목','금','토'];
+  var todayDow=DOW[new Date().getDay()];
+  // 재원 학생 중 오늘 수업 있는 교시 집합
+  var activePeriodNums={};
+  (students||[]).forEach(function(s){
+    var st=s.status||'재원';
+    if(st!=='재원'&&st!=='신규')return;
+    if((s.days||[]).indexOf(todayDow)===-1)return;
+    var pObj=(s.periods||{})[todayDow];
+    if(!pObj)return;
+    Object.keys(pObj).forEach(function(pNum){if(pObj[pNum])activePeriodNums[pNum]=true;});
+  });
+  // 활성 교시들의 시간 합산
+  var totalMin=0;
+  customPeriods.forEach(function(cp){
+    if(!activePeriodNums[String(cp.period)])return;
+    if(!cp.time)return;
+    var m=cp.time.match(/(\d+):(\d+)/);if(!m)return;
+    var start=parseInt(m[1])*60+parseInt(m[2]);
+    var end;
+    if(cp.endTime){var em=cp.endTime.match(/(\d+):(\d+)/);end=em?parseInt(em[1])*60+parseInt(em[2]):start+60;}
+    else{end=start+60;}
+    totalMin+=Math.max(0,end-start);
+  });
+  return totalMin;
+}
+function _getTodayAvailMin(){
+  // 수동 오버라이드 확인
+  try{
+    var ov=JSON.parse(localStorage.getItem(_AVAIL_KEY)||'{}');
+    var today=todayISO();
+    if(ov.date===today&&typeof ov.min==='number')return ov.min;
+  }catch(e){}
+  // 자동: 07:00~22:00(900분) - 오늘 수업시간
+  var classMin=_getTodayClassMinutes();
+  return Math.max(0,900-classMin);
+}
+function _setTodayAvailMin(min){
+  try{localStorage.setItem(_AVAIL_KEY,JSON.stringify({date:todayISO(),min:parseInt(min)}));}catch(e){}
+}
   if(!str)return 0;
   var m=parseInt(str);return isNaN(m)?0:m;
 }
@@ -12997,19 +13040,50 @@ function _renderTodayCapacityBar(totalMin,scheduledMin){
   var color=over?'#ef4444':ratio>0.8?'#f59e0b':'#10b981';
   var statusIcon=over?'🔴':'🟢';
   var statusTxt=over?'초과 '+overMin+'분':'여유 '+freeMin+'분';
+  var classMin=_getTodayClassMinutes();
   var h='<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">';
   h+='<div style="display:flex;align-items:center;margin-bottom:6px">';
   h+='<span style="font-size:11px;font-weight:700;color:var(--navy)">📊 오늘 업무 계획</span>';
   h+='<span style="margin-left:auto;font-size:11px;font-weight:700;color:'+color+'">'+statusIcon+' '+statusTxt+'</span>';
+  h+='<button onclick="openAvailEditModal()" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:11px;padding:0 0 0 8px" title="가용시간 수정">✏️</button>';
   h+='</div>';
-  h+='<div style="display:flex;gap:6px;font-size:10px;color:var(--txt2);margin-bottom:6px">';
-  h+='<span>예정 <b style="color:var(--navy)">'+scheduledMin+'분</b></span><span style="color:var(--border2)">·</span>';
+  h+='<div style="display:flex;gap:8px;font-size:10px;color:var(--txt2);margin-bottom:6px;flex-wrap:wrap">';
+  h+='<span>예정 <b style="color:var(--navy)">'+scheduledMin+'분</b></span>';
+  h+='<span style="color:var(--border2)">·</span>';
   h+='<span>가용 <b>'+totalMin+'분</b></span>';
+  if(classMin>0){
+    h+='<span style="color:var(--border2)">·</span>';
+    h+='<span style="color:var(--txt3)">수업 <b>'+classMin+'분</b> 제외</span>';
+  }
   h+='</div>';
   h+='<div style="background:var(--surface2);border-radius:6px;height:6px;overflow:hidden">';
   h+='<div style="background:'+color+';width:'+Math.min(ratio*100,100)+'%;height:6px;border-radius:6px"></div>';
   h+='</div></div>';
   return h;
+}
+
+function openAvailEditModal(){
+  var cur=_getTodayAvailMin();
+  var classMin=_getTodayClassMinutes();
+  var old=document.getElementById('avail-edit-modal');if(old)old.remove();
+  var modal=document.createElement('div');
+  modal.id='avail-edit-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:320px';
+  box.innerHTML='<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:4px">⏱ 오늘 가용 시간 설정</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">수업 시간 자동 차감 기준: 07:00~22:00 (900분) - 수업 '+classMin+'분 = '+(900-classMin)+'분<br>직접 조정하고 싶을 때만 수정하세요.</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+    +'<input id="avail-min-inp" type="number" class="fi" min="0" max="900" step="10" value="'+cur+'" style="flex:1;font-size:14px;font-weight:700;text-align:center">'
+    +'<span style="font-size:13px;color:var(--txt2)">분</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="var m=document.getElementById(&apos;avail-min-inp&apos;).value;_setTodayAvailMin(m);document.getElementById(&apos;avail-edit-modal&apos;).remove();_refreshTodayPanel();toast(&apos;가용 시간이 설정됐습니다&apos;)" class="btn btn-navy btn-sm" style="flex:1">저장</button>'
+    +'<button onclick="_tlDate=null;localStorage.removeItem(&apos;tl_avail_override_v1&apos;);document.getElementById(&apos;avail-edit-modal&apos;).remove();_refreshTodayPanel();toast(&apos;자동 계산으로 복원됐습니다&apos;)" class="btn btn-outline btn-sm" style="flex:1">자동으로</button>'
+    +'</div>';
+  modal.appendChild(box);
+  document.body.appendChild(modal);
 }
 
 // 오른쪽 목록용 업무 행 (드래그 가능)
@@ -13174,7 +13248,7 @@ function _renderTodayTaskSection(){
 
   var scheduledMin=todayItems.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
   scheduledMin+=planTodayTasks.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
-  var totalAvailMin=240;
+  var totalAvailMin=_getTodayAvailMin();
 
   var h='';
 
