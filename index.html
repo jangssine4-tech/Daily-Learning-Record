@@ -3780,6 +3780,20 @@ function _refreshTaskList(){
   var right=document.getElementById('today-task-col');
   if(!right){_renderBoardTodayPanel();return;}
   var scrollTop=right.scrollTop;
+
+  // 용량바는 숫자만 빠르게 갱신
+  var today=todayISO();
+  function addDays(s,n){var d=new Date(s);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+  var todayItems=(_dbTasks||[]).filter(function(t){
+    return t.dueDate===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId&&t.status!=='완료';
+  });
+  var planTodayTasks=getPlanTasksForDate(today).filter(function(t){return t.done!==true;});
+  var scheduledMin=todayItems.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
+  scheduledMin+=planTodayTasks.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
+  var capBar=document.getElementById('tl-capacity-bar');
+  if(capBar)_patchCapacityBar(capBar,_getTodayAvailMin(),scheduledMin);
+
+  // 나머지 섹션 교체
   right.innerHTML=_renderTodayTaskSection();
   right.scrollTop=scrollTop;
   _initTimelineDnD();
@@ -12955,11 +12969,13 @@ function _savePlanTaskModal(planId,taskIdx){
     plan.tasks[taskIdx].estDuration=estDuration;
     plan.tasks[taskIdx].focusType=focusType;
   }
-  db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){
-    toast('✅ 저장됐어요');
-    var m=document.getElementById('plan-task-modal');if(m)m.remove();
-    _refreshTaskList();
-  }).catch(function(){toast('저장 실패');});
+  // UI 먼저 업데이트
+  var m=document.getElementById('plan-task-modal');if(m)m.remove();
+  _invalidatePlanCache();
+  _refreshTaskList();
+  toast('✅ 저장됐어요');
+  // Firestore 백그라운드 저장
+  db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(){toast('저장 실패');});
 }
 
 // _renderDashBoardUI: 이제 현재 활성 탭을 다시 그림 (board 뷰의 탭 분리 후 호환용)
@@ -14533,11 +14549,13 @@ function _dbSaveTaskModal(id){
     _dbTasks.push(newTask);
   }
   var savedId=id||(_dbTasks[_dbTasks.length-1]&&_dbTasks[_dbTasks.length-1].id);
-  if(savedId)saveTask(savedId); else saveDashBoard();
+  // UI 먼저 즉시 업데이트 — Firestore 저장 기다리지 않음
   _dbSaveTaskModal._saving=false;
   var m=document.getElementById('db-task-modal');if(m)m.remove();
   if(_boardCurrentTab==='today')_refreshTaskList();
   else _renderDashBoardUI($('dashboard-board-area'));
+  // Firestore 저장은 백그라운드
+  if(savedId)saveTask(savedId); else saveDashBoard();
 }
 
 // ── 기존 호환 함수 유지 (다른 탭에서 참조) ──────────
