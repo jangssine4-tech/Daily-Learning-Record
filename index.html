@@ -3704,7 +3704,6 @@ function tlDrop(e,hour){
     if(!t)return;
     t.startHour=hour;
     t.dueDate=todayISO();
-    // 시간대 필드 제거 (타임라인이 대신함)
     t.timeSlot=undefined;
     saveTask(meta.id);
   }else if(meta.type==='plan'){
@@ -3718,8 +3717,25 @@ function tlDrop(e,hour){
   _tlDragMeta=null;
   _tlDragCardId=null;
   _tlDragFrom=null;
-  _renderBoardTodayPanel();
+  _refreshTodayPanel();
   toast(_formatHour(hour)+'에 배치했습니다');
+}
+
+// ── 오늘 패널 부분 업데이트 (스크롤 위치 보존) ──────────────
+function _refreshTodayPanel(){
+  // 왼쪽 타임라인만 교체
+  var left=document.getElementById('today-timeline-col');
+  if(left){left.innerHTML=_buildTimeline();_initTimelineDnD();}
+  // 오른쪽은 스크롤 위치 보존하며 교체
+  var right=document.getElementById('today-task-col');
+  if(right){
+    var scrollTop=right.scrollTop;
+    right.innerHTML=_renderTodayTaskSection();
+    right.scrollTop=scrollTop;
+    _initTimelineDnD();
+  }
+  // 두 컬럼이 없으면(패널 미초기화) 전체 재렌더
+  if(!left&&!right)_renderBoardTodayPanel();
 }
 
 function _formatHour(h){
@@ -3732,7 +3748,7 @@ function tlToggleDbTask(id,checked){
   if(!t)return;
   t.status=checked?'완료':'대기';
   saveTask(id);
-  _renderBoardTodayPanel();
+  _refreshTodayPanel();
 }
 
 function tlRemoveDbTask(id){
@@ -3744,7 +3760,7 @@ function tlRemoveDbTask(id){
     startHour: firebase.firestore.FieldValue.delete(),
     timeSlot:'미배치'
   }).catch(function(){saveTask(id);});
-  _renderBoardTodayPanel();
+  _refreshTodayPanel();
 }
 
 function tlRemovePlanTask(planId,idx){
@@ -3752,7 +3768,7 @@ function tlRemovePlanTask(planId,idx){
   if(!plan||!plan.tasks)return;
   delete plan.tasks[idx].startHour;
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(){});
-  _renderBoardTodayPanel();
+  _refreshTodayPanel();
 }
 
 function _toggleTaskCol(){
