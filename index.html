@@ -3775,14 +3775,188 @@ function _refreshTodayPanel(timelineOnly){
   _initTimelineDnD();
 }
 
-// 오른쪽 목록만 빠르게 업데이트 (타임라인 배치 변경 없을 때)
+// ── 가상 DOM 패턴: 변경된 부분만 DOM 업데이트 ────────────────
 function _refreshTaskList(){
   var right=document.getElementById('today-task-col');
   if(!right){_renderBoardTodayPanel();return;}
-  var scrollTop=right.scrollTop;
-  right.innerHTML=_renderTodayTaskSection();
-  right.scrollTop=scrollTop;
+
+  var today=todayISO();
+  function addDays(s,n){var d=new Date(s);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+
+  // ── 데이터 수집 ──
+  var todayItems=(_dbTasks||[]).filter(function(t){
+    return t.dueDate===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId&&t.status!=='완료';
+  });
+  var planTodayTasks=getPlanTasksForDate(today).filter(function(t){return t.done!==true;});
+  var overdueItems=(_dbTasks||[]).filter(function(t){
+    return !(t.id&&t.id.startsWith('__'))&&!t.planId&&t.dueDate&&t.dueDate<today&&t.status!=='완료';
+  });
+  var planOverdue=getPlanTasksForRange('2000-01-01',addDays(today,-1)).filter(function(t){
+    return t.status!=='완료'&&t.done!==true;
+  });
+  var unplaced=todayItems.filter(function(t){return !_isOnTimeline(t.startHour);});
+  var planUnplaced=planTodayTasks.filter(function(t){return !_isOnTimeline(t.startHour);});
+
+  // ── 용량 바 업데이트 (숫자만 교체) ──
+  var scheduledMin=todayItems.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
+  scheduledMin+=planTodayTasks.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
+  var totalAvailMin=_getTodayAvailMin();
+  var capBar=document.getElementById('tl-capacity-bar');
+  if(capBar){
+    _patchCapacityBar(capBar,totalAvailMin,scheduledMin);
+  }
+
+  // ── 지연 업무 섹션 패치 ──
+  var overdueSection=document.getElementById('tl-overdue-section');
+  var totalOverdue=overdueItems.length+planOverdue.length;
+  if(totalOverdue){
+    if(!overdueSection){
+      // 새로 삽입 — 추가 버튼 다음에
+      var addBtn=document.getElementById('tl-add-btn');
+      if(addBtn){
+        var div=document.createElement('div');
+        div.id='tl-overdue-section';
+        div.innerHTML=_buildOverdueHTML(overdueItems,planOverdue,today);
+        addBtn.parentNode.insertBefore(div,addBtn.nextSibling);
+      }
+    }else{
+      overdueSection.innerHTML=_buildOverdueHTML(overdueItems,planOverdue,today);
+    }
+  }else if(overdueSection){
+    overdueSection.remove();
+  }
+
+  // ── 오늘의 업무 목록 패치 ──
+  _patchTaskList(unplaced,planUnplaced);
+
+  // ── 업무 건수 배지 업데이트 ──
+  var countBadge=document.getElementById('tl-task-count');
+  if(countBadge){
+    var total=unplaced.length+planUnplaced.length;
+    countBadge.textContent=total?total+'건':'';
+  }
+
   _initTimelineDnD();
+}
+
+function _patchCapacityBar(el,totalMin,scheduledMin){
+  var ratio=totalMin>0?Math.min(scheduledMin/totalMin,1):0;
+  var over=scheduledMin>totalMin;
+  var freeMin=Math.max(totalMin-scheduledMin,0);
+  var overMin=Math.max(scheduledMin-totalMin,0);
+  var color=over?'#ef4444':ratio>0.8?'#f59e0b':'#10b981';
+  var statusIcon=over?'🔴':'🟢';
+  var statusTxt=over?'초과 '+overMin+'분':'여유 '+freeMin+'분';
+  var classMin=_getTodayClassMinutes();
+  // 숫자 부분만 교체
+  var statusEl=el.querySelector('.cap-status');
+  if(statusEl){statusEl.style.color=color;statusEl.textContent=statusIcon+' '+statusTxt;}
+  var sMinEl=el.querySelector('.cap-scheduled');
+  if(sMinEl)sMinEl.textContent=scheduledMin+'분';
+  var barEl=el.querySelector('.cap-bar-fill');
+  if(barEl){barEl.style.background=color;barEl.style.width=Math.min(ratio*100,100)+'%';}
+  var classEl=el.querySelector('.cap-class');
+  if(classEl){classEl.style.display=classMin>0?'':'none';classEl.textContent='수업 '+classMin+'분 제외';}
+}
+
+function _buildOverdueHTML(overdueItems,planOverdue,today){
+  var h='<div style="border:1.5px solid #dc2626;border-radius:10px;overflow:hidden;margin-bottom:8px">';
+  h+='<div style="background:#fee2e2;padding:7px 10px;display:flex;align-items:center;gap:6px">';
+  h+='<span style="font-size:12px;font-weight:800;color:#991b1b">🚨 지연 업무 '+(overdueItems.length+planOverdue.length)+'건</span>';
+  h+='</div><div style="padding:6px 8px;background:var(--surface)">';
+  overdueItems.forEach(function(t){
+    var daysLate=Math.floor((new Date(today)-new Date(t.dueDate))/(86400000));
+    h+=_todayOverdueRow(t,daysLate);
+  });
+  planOverdue.forEach(function(t){
+    var daysLate=Math.floor((new Date(today)-new Date(t.date))/(86400000));
+    var isDone=t.done===true;
+    var meta=JSON.stringify({type:'plan',id:t._planId,idx:t._taskIdx}).replace(/"/g,'&quot;');
+    h+='<div data-dragtask="'+meta+'" draggable="true" style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid #fca5a5;cursor:grab">';
+    h+='<span style="color:#fca5a5;font-size:13px;flex-shrink:0">⠿</span>';
+    h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
+    h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연 '+daysLate+'일</span>';
+    h+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋 '+(t.planName||'플랜').substring(0,8)+'</span>';
+    h+='<span onclick="openPlanTaskModal(\''+t._planId+'\','+t._taskIdx+')" style="flex:1;font-size:12px;cursor:pointer;color:var(--txt)">'+t.name+'</span>';
+    h+='<button onclick="planOverdueToToday(\''+t._planId+'\','+t._taskIdx+')" style="font-size:10px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer">오늘</button>';
+    h+='</div>';
+  });
+  h+='</div></div>';
+  return h;
+}
+
+function _patchTaskList(unplaced,planUnplaced){
+  var listBody=document.getElementById('tl-task-list-body');
+  if(!listBody)return;
+
+  // 현재 DOM에 있는 행들의 ID 목록
+  var existingRows={};
+  listBody.querySelectorAll('[data-taskrow]').forEach(function(el){
+    existingRows[el.dataset.taskrow]=el;
+  });
+
+  // 새 순서로 정렬된 ID 목록
+  var newIds=[];
+  unplaced.forEach(function(t){newIds.push('db_'+t.id);});
+  planUnplaced.forEach(function(t){newIds.push('plan_'+t._planId+'_'+t._taskIdx);});
+
+  // 삭제: 새 목록에 없는 행 제거
+  Object.keys(existingRows).forEach(function(rowId){
+    if(newIds.indexOf(rowId)===-1){existingRows[rowId].remove();delete existingRows[rowId];}
+  });
+
+  // 추가/갱신: 새 목록 순서대로
+  var fragment=document.createDocumentFragment();
+  var needReorder=false;
+  var children=Array.from(listBody.querySelectorAll('[data-taskrow]'));
+  var childIds=children.map(function(c){return c.dataset.taskrow;});
+  if(JSON.stringify(childIds)!==JSON.stringify(newIds))needReorder=true;
+
+  unplaced.forEach(function(t){
+    var rowId='db_'+t.id;
+    var existing=existingRows[rowId];
+    var newHtml=_listTaskRow(t);
+    if(!existing){
+      var div=document.createElement('div');div.innerHTML=newHtml;
+      var node=div.firstElementChild;
+      if(node)fragment.appendChild(node);
+    }else{
+      // 내용이 바뀌었으면 교체
+      var newDiv=document.createElement('div');newDiv.innerHTML=newHtml;
+      var newNode=newDiv.firstElementChild;
+      if(newNode&&existing.outerHTML!==newNode.outerHTML){
+        existing.parentNode&&existing.parentNode.replaceChild(newNode,existing);
+        existingRows[rowId]=newNode;
+      }
+      if(needReorder)fragment.appendChild(existingRows[rowId]||existing);
+    }
+  });
+  planUnplaced.forEach(function(t){
+    var rowId='plan_'+t._planId+'_'+t._taskIdx;
+    var existing=existingRows[rowId];
+    var newHtml=_listPlanTaskRow(t);
+    if(!existing){
+      var div=document.createElement('div');div.innerHTML=newHtml;
+      var node=div.firstElementChild;
+      if(node)fragment.appendChild(node);
+    }else{
+      var newDiv=document.createElement('div');newDiv.innerHTML=newHtml;
+      var newNode=newDiv.firstElementChild;
+      if(newNode&&existing.outerHTML!==newNode.outerHTML){
+        existing.parentNode&&existing.parentNode.replaceChild(newNode,existing);
+        existingRows[rowId]=newNode;
+      }
+      if(needReorder)fragment.appendChild(existingRows[rowId]||existing);
+    }
+  });
+
+  if(needReorder)listBody.appendChild(fragment);
+  else if(fragment.childNodes.length)listBody.appendChild(fragment);
+
+  // 빈 상태 메시지
+  var emptyMsg=document.getElementById('tl-task-empty');
+  var total=unplaced.length+planUnplaced.length;
+  if(emptyMsg)emptyMsg.style.display=total?'none':'block';
 }
 
 function _formatHour(h){
@@ -12998,11 +13172,12 @@ function _isOnTimeline(sh){
 }
 // ── 오늘 수업 시간 기반 가용시간 계산 ──────────────────────
 var _AVAIL_KEY='tl_avail_override_v1';
+var _classMinCache={date:null,min:null};
 function _getTodayClassMinutes(){
-  // 오늘 요일
+  var todayStr=todayISO();
+  if(_classMinCache.date===todayStr&&_classMinCache.min!==null)return _classMinCache.min;
   var DOW=['일','월','화','수','목','금','토'];
   var todayDow=DOW[new Date().getDay()];
-  // 재원 학생 중 오늘 수업 있는 교시 집합
   var activePeriodNums={};
   (students||[]).forEach(function(s){
     var st=s.status||'재원';
@@ -13012,7 +13187,6 @@ function _getTodayClassMinutes(){
     if(!pObj)return;
     Object.keys(pObj).forEach(function(pNum){if(pObj[pNum])activePeriodNums[pNum]=true;});
   });
-  // 활성 교시들의 시간 합산
   var totalMin=0;
   customPeriods.forEach(function(cp){
     if(!activePeriodNums[String(cp.period)])return;
@@ -13024,18 +13198,23 @@ function _getTodayClassMinutes(){
     else{end=start+60;}
     totalMin+=Math.max(0,end-start);
   });
+  _classMinCache={date:todayStr,min:totalMin};
   return totalMin;
 }
+var _availMinCache={date:null,min:null};
 function _getTodayAvailMin(){
+  var todayStr=todayISO();
   // 수동 오버라이드 확인
   try{
     var ov=JSON.parse(localStorage.getItem(_AVAIL_KEY)||'{}');
-    var today=todayISO();
-    if(ov.date===today&&typeof ov.min==='number')return ov.min;
+    if(ov.date===todayStr&&typeof ov.min==='number')return ov.min;
   }catch(e){}
-  // 자동: 07:00~22:00(900분) - 오늘 수업시간
+  // 캐시 확인
+  if(_availMinCache.date===todayStr&&_availMinCache.min!==null)return _availMinCache.min;
   var classMin=_getTodayClassMinutes();
-  return Math.max(0,900-classMin);
+  var result=Math.max(0,900-classMin);
+  _availMinCache={date:todayStr,min:result};
+  return result;
 }
 function _setTodayAvailMin(min){
   try{localStorage.setItem(_AVAIL_KEY,JSON.stringify({date:todayISO(),min:parseInt(min)}));}catch(e){}
@@ -13057,20 +13236,18 @@ function _renderTodayCapacityBar(totalMin,scheduledMin){
   var h='<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">';
   h+='<div style="display:flex;align-items:center;margin-bottom:6px">';
   h+='<span style="font-size:11px;font-weight:700;color:var(--navy)">📊 오늘 업무 계획</span>';
-  h+='<span style="margin-left:auto;font-size:11px;font-weight:700;color:'+color+'">'+statusIcon+' '+statusTxt+'</span>';
+  h+='<span class="cap-status" style="margin-left:auto;font-size:11px;font-weight:700;color:'+color+'">'+statusIcon+' '+statusTxt+'</span>';
   h+='<button onclick="openAvailEditModal()" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:11px;padding:0 0 0 8px" title="가용시간 수정">✏️</button>';
   h+='</div>';
   h+='<div style="display:flex;gap:8px;font-size:10px;color:var(--txt2);margin-bottom:6px;flex-wrap:wrap">';
-  h+='<span>예정 <b style="color:var(--navy)">'+scheduledMin+'분</b></span>';
+  h+='<span>예정 <b class="cap-scheduled" style="color:var(--navy)">'+scheduledMin+'분</b></span>';
   h+='<span style="color:var(--border2)">·</span>';
   h+='<span>가용 <b>'+totalMin+'분</b></span>';
-  if(classMin>0){
-    h+='<span style="color:var(--border2)">·</span>';
-    h+='<span style="color:var(--txt3)">수업 <b>'+classMin+'분</b> 제외</span>';
-  }
+  h+='<span style="color:var(--border2)">·</span>';
+  h+='<span class="cap-class" style="color:var(--txt3);'+(classMin>0?'':'display:none')+'">'+(classMin>0?'수업 '+classMin+'분 제외':'')+'</span>';
   h+='</div>';
   h+='<div style="background:var(--surface2);border-radius:6px;height:6px;overflow:hidden">';
-  h+='<div style="background:'+color+';width:'+Math.min(ratio*100,100)+'%;height:6px;border-radius:6px"></div>';
+  h+='<div class="cap-bar-fill" style="background:'+color+';width:'+Math.min(ratio*100,100)+'%;height:6px;border-radius:6px"></div>';
   h+='</div></div>';
   return h;
 }
@@ -13108,7 +13285,7 @@ function _listTaskRow(t){
   var borderColor=isRecentlyMoved?'#86efac':'var(--border)';
   var rowBg=isRecentlyMoved?'background:#f0fdf4;':'';
   var meta=JSON.stringify({type:'db',id:t.id}).replace(/"/g,'&quot;');
-  var r='<div data-dragtask="'+meta+'" draggable="true" style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid '+borderColor+';cursor:grab;'+rowBg+'">';
+  var r='<div data-taskrow="db_'+t.id+'" data-dragtask="'+meta+'" draggable="true" style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid '+borderColor+';cursor:grab;'+rowBg+'">';
   r+='<span style="color:var(--txt3);font-size:13px;flex-shrink:0">⠿</span>';
   if(isRecentlyMoved)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dcfce7;color:#16a34a;flex-shrink:0;font-weight:700">이동됨</span>';
   if(t.area)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
@@ -13142,7 +13319,7 @@ function _listPlanTaskRow(t){
   var borderColor=isRecentlyMoved?'#86efac':'var(--border)';
   var rowBg=isRecentlyMoved?'background:#f0fdf4;':'';
   var meta=JSON.stringify({type:'plan',id:t._planId,idx:t._taskIdx}).replace(/"/g,'&quot;');
-  var r='<div data-dragtask="'+meta+'" draggable="true" style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid '+borderColor+';cursor:grab;'+rowBg+'">';
+  var r='<div data-taskrow="plan_'+t._planId+'_'+t._taskIdx+'" data-dragtask="'+meta+'" draggable="true" style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid '+borderColor+';cursor:grab;'+rowBg+'">';
   r+='<span style="color:var(--txt3);font-size:13px;flex-shrink:0">⠿</span>';
   if(isRecentlyMoved)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dcfce7;color:#16a34a;flex-shrink:0;font-weight:700">이동됨</span>';
   r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700;border:1px solid #bfdbfe">📋 '+t.planName.substring(0,8)+'</span>';
@@ -13258,68 +13435,35 @@ function _renderTodayTaskSection(){
   var planOverdue=getPlanTasksForRange('2000-01-01',addDays(today,-1)).filter(function(t){
     return t.status!=='완료'&&t.done!==true;
   });
-
   var scheduledMin=todayItems.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
   scheduledMin+=planTodayTasks.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
   var totalAvailMin=_getTodayAvailMin();
-
-  var h='';
-
-  // 용량 바
-  if(todayItems.length||planTodayTasks.length){
-    h+=_renderTodayCapacityBar(totalAvailMin,scheduledMin);
-  }
-
-  // + 추가 버튼
-  h+='<button class="btn btn-navy btn-sm" style="width:100%;margin-bottom:8px" onclick="openTodayTaskModal()">＋ 업무 추가</button>';
-
-  // 🚨 지연 업무
   var totalOverdue=overdueItems.length+planOverdue.length;
-  if(totalOverdue){
-    h+='<div style="border:1.5px solid #dc2626;border-radius:10px;overflow:hidden;margin-bottom:8px">';
-    h+='<div style="background:#fee2e2;padding:7px 10px;display:flex;align-items:center;gap:6px">';
-    h+='<span style="font-size:12px;font-weight:800;color:#991b1b">🚨 지연 업무 '+totalOverdue+'건</span>';
-    h+='</div><div style="padding:6px 8px;background:var(--surface)">';
-    overdueItems.forEach(function(t){
-      var daysLate=Math.floor((new Date(today)-new Date(t.dueDate))/(86400000));
-      h+=_todayOverdueRow(t,daysLate);
-    });
-    planOverdue.forEach(function(t){
-      var daysLate=Math.floor((new Date(today)-new Date(t.date))/(86400000));
-      var isDone=t.done===true;
-      var meta=JSON.stringify({type:'plan',id:t._planId,idx:t._taskIdx}).replace(/"/g,'&quot;');
-      h+='<div data-dragtask="'+meta+'" draggable="true" style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid #fca5a5;cursor:grab">';
-      h+='<span style="color:#fca5a5;font-size:13px;flex-shrink:0">⠿</span>';
-      h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
-      h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연 '+daysLate+'일</span>';
-      h+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋 '+(t.planName||'플랜').substring(0,8)+'</span>';
-      h+='<span onclick="openPlanTaskModal(\''+t._planId+'\','+t._taskIdx+')" style="flex:1;font-size:12px;cursor:pointer;color:var(--txt)">'+t.name+'</span>';
-      h+='<button onclick="planOverdueToToday(\''+t._planId+'\','+t._taskIdx+')" style="font-size:10px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer">오늘</button>';
-      h+='</div>';
-    });
-    h+='</div></div>';
-  }
-
-  // 📋 미배치 업무 (타임라인에 없는 것만)
   var unplaced=todayItems.filter(function(t){return !_isOnTimeline(t.startHour);});
   var planUnplaced=planTodayTasks.filter(function(t){return !_isOnTimeline(t.startHour);});
   var totalUnplaced=unplaced.length+planUnplaced.length;
 
+  var h='';
+  if(todayItems.length||planTodayTasks.length){
+    h+='<div id="tl-capacity-bar">'+_renderTodayCapacityBar(totalAvailMin,scheduledMin)+'</div>';
+  }
+  h+='<button id="tl-add-btn" class="btn btn-navy btn-sm" style="width:100%;margin-bottom:8px" onclick="openTodayTaskModal()">＋ 업무 추가</button>';
+  if(totalOverdue){
+    h+='<div id="tl-overdue-section">'+_buildOverdueHTML(overdueItems,planOverdue,today)+'</div>';
+  }
   h+='<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
   h+='<div style="background:var(--surface2);padding:7px 10px;display:flex;align-items:center;gap:6px">';
-  h+='<span style="font-size:12px;font-weight:800;color:var(--navy)">📋 오늘의 업무</span>';
-  if(totalUnplaced)h+='<span style="font-size:10px;color:var(--txt3)">'+totalUnplaced+'건</span>';
-  h+='<span style="font-size:10px;color:var(--txt3);margin-left:auto">← 드래그해서 배치</span>';
+  h+='<span style="font-size:12px;font-weight:800;color:var(--navy)">\uD83D\uDCCB 오늘의 업무</span>';
+  h+='<span id="tl-task-count" style="font-size:10px;color:var(--txt3)">'+(totalUnplaced?totalUnplaced+'건':'')+'</span>';
+  h+='<span style="font-size:10px;color:var(--txt3);margin-left:auto">\u2190 드래그해서 배치</span>';
   h+='</div>';
-  h+='<div style="padding:6px 8px;background:var(--bg)">';
+  h+='<div id="tl-task-list-body" style="padding:6px 8px;background:var(--bg)">';
   if(totalUnplaced){
     unplaced.forEach(function(t){h+=_listTaskRow(t);});
     planUnplaced.forEach(function(t){h+=_listPlanTaskRow(t);});
-  }else{
-    h+='<div style="text-align:center;padding:16px;color:var(--txt3);font-size:11px">✅ 모든 업무가 타임라인에 배치됐어요</div>';
   }
+  h+='<div id="tl-task-empty" style="text-align:center;padding:16px;color:var(--txt3);font-size:11px;'+(totalUnplaced?'display:none':'')+'">\u2705 모든 업무가 타임라인에 배치됐어요</div>';
   h+='</div></div>';
-
   return h;
 }
 // ── 아침 계획하기 모달 ──────────────────────────────────────
