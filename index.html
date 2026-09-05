@@ -105,8 +105,8 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .notes-bulb{display:inline-block;animation:bulbBlink 1.2s ease-in-out infinite;position:absolute;top:-10px;left:100%;font-size:13px;transform:rotate(45deg);transform-origin:bottom left;line-height:1;pointer-events:none;}
 .mh{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 16px}
 .mt{font-size:15px;font-weight:800;color:var(--navy);margin-bottom:14px;text-align:center}
-#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.92);color:#fff;padding:10px 20px;border-radius:30px;font-size:13px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999;white-space:nowrap;max-width:90vw}
-#toast.show{opacity:1}
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.92);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9999;max-width:90vw;display:flex;align-items:center;gap:10px}
+#toast.show{opacity:1;pointer-events:auto}
 #loading{position:fixed;inset:0;background:rgba(255,255,255,.7);display:none;align-items:center;justify-content:center;z-index:9998}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--mint);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -284,7 +284,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 </div></div>
 
 <div id="loading" style="display:none"><div class="spinner"></div></div>
-<div id="toast"></div>
+<div id="toast"><span></span></div>
 
 <div id="mob-overlay" onclick="toggleMobMenu()"></div>
 <nav id="sidebar">
@@ -1093,7 +1093,29 @@ var siblingCount=0, _goalTargets={};
 // Helpers
 var $=function(id){return document.getElementById(id);};
 var todayISO=function(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());};
-function toast(msg,dur){var t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},dur||2500);}
+function toast(msg,dur){
+  var t=document.getElementById('toast');
+  var s=t.querySelector('span')||t;
+  s.textContent=msg;
+  var ub=document.getElementById('toast-undo');
+  if(ub)ub.style.display='none';
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid=setTimeout(function(){t.classList.remove('show');},dur||2500);
+}
+function toastWithUndo(msg,undoFn){
+  var t=document.getElementById('toast');
+  t.innerHTML='<span style="flex:1">'+msg+'</span><button id="toast-undo" style="background:var(--mint);border:none;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;cursor:pointer;flex-shrink:0">취소</button>';
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  var done=false;
+  document.getElementById('toast-undo').onclick=function(){
+    if(done)return;done=true;
+    undoFn();
+    t.classList.remove('show');
+  };
+  t._tid=setTimeout(function(){done=true;t.classList.remove('show');},5000);
+}
 function loading(on){$('loading').style.display=on?'flex':'none';}
 function closeM(id){var el=$('modal-'+id);if(el){if(el.dataset.dynamic==='1')el.remove();else el.style.display='none';}}
 
@@ -3549,6 +3571,9 @@ function _buildTimeline(){
   HOURS.forEach(function(h){slotMap[h]=[];});
   timedTasks.forEach(function(t){var h=parseInt(t.startHour);if(slotMap[h]!==undefined)slotMap[h].push({type:'db',task:t});});
   planTimedTasks.forEach(function(t){var h=parseInt(t.startHour);if(slotMap[h]!==undefined)slotMap[h].push({type:'plan',task:t});});
+  // 루틴 슬롯 병합
+  var routines=_getRoutines();
+  routines.forEach(function(r){var h=parseInt(r.hour);if(slotMap[h]!==undefined)slotMap[h].unshift({type:'routine',task:r});});
 
   var d=new Date(selDate);
   var DOW=['일','월','화','수','목','금','토'];
@@ -3557,13 +3582,14 @@ function _buildTimeline(){
   var html='<div style="padding:0">';
   html+='<div style="position:sticky;top:0;z-index:10;background:var(--navy);padding:8px 12px;display:flex;align-items:center;gap:8px">';
   html+='<span style="font-size:13px;font-weight:800;color:#fff">📅 타임라인</span>';
-  html+='<button onclick="openTlCalendar()" style="display:flex;align-items:center;gap:5px;background:#1e40af;border:none;color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;margin-left:4px">';
+  html+='<button onclick="openTlCalendar()" style="display:flex;align-items:center;gap:5px;background:var(--mint);border:none;color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer;margin-left:4px">';
   if(isPastDate)html+='<span style="font-size:9px;background:#dc2626;padding:1px 4px;border-radius:3px;margin-right:3px">과거</span>';
   else if(isFutureDate)html+='<span style="font-size:9px;background:#16a34a;padding:1px 4px;border-radius:3px;margin-right:3px">미래</span>';
   html+=dateLabel+' 📆</button>';
   if(!isTodayDate){
     html+='<button onclick="tlCalSelect(\''+today+'\')" style="background:var(--mint);border:none;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;cursor:pointer">오늘</button>';
   }
+  html+='<button onclick="openRoutineModal()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer">🔁 루틴</button>';
   html+='<button onclick="_toggleTaskCol()" id="btn-toggle-taskcol" style="display:none;background:#1e40af;border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;margin-left:auto">📋 오늘의 업무</button>';
   html+='</div>';
 
@@ -3593,6 +3619,14 @@ function _buildTimeline(){
 
 function _tlTaskCard(item,isPastDate){
   var t=item.task;
+  // 루틴 카드
+  if(item.type==='routine'){
+    return '<div style="display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;background:#f0fdf4;border:1.5px dashed #86efac;opacity:0.85">'
+      +'<span style="font-size:11px">🔁</span>'
+      +'<span style="flex:1;font-size:12px;color:#15803d;font-weight:500">'+t.name+'</span>'
+      +(t.duration?'<span style="font-size:10px;color:#6b7280">'+t.duration+'분</span>':'')
+      +'</div>';
+  }
   var isDone=(t.status==='완료')||(t.done===true);
   var isPlan=item.type==='plan';
   var cardId=isPlan?('plan_'+t._planId+'_'+t._taskIdx):('db_'+t.id);
@@ -3653,19 +3687,18 @@ var _tlDragFrom=null; // 'timeline' or 'tasklist'
 var _tlDragMeta=null; // {type:'db'|'plan', id, idx}
 
 function _initTimelineDnD(){
-  // 오른쪽 업무 카드에 draggable 부여
   var right=document.getElementById('today-task-col');
   if(!right)return;
-  right.querySelectorAll('[data-dragtask]').forEach(function(el){
-    el.setAttribute('draggable','true');
-    el.addEventListener('dragstart',function(e){
-      _tlDragFrom='tasklist';
-      _tlDragCardId=null;
-      var meta=JSON.parse(el.dataset.dragtask||'{}');
-      _tlDragMeta=meta;
-      e.dataTransfer.effectAllowed='move';
-    });
-  });
+  if(right._tlDragHandler)right.removeEventListener('dragstart',right._tlDragHandler);
+  right._tlDragHandler=function(e){
+    var el=e.target.closest('[data-dragtask]');
+    if(!el)return;
+    _tlDragFrom='tasklist';
+    _tlDragCardId=null;
+    try{_tlDragMeta=JSON.parse(el.dataset.dragtask);}catch(ex){return;}
+    e.dataTransfer.effectAllowed='move';
+  };
+  right.addEventListener('dragstart',right._tlDragHandler);
 }
 
 function tlCardDragStart(e){
@@ -3775,6 +3808,97 @@ function _toggleTaskCol(){
   var col=document.getElementById('today-task-col');
   if(!col)return;
   col.style.display=col.style.display==='none'?'flex':'none';
+}
+
+// ── 루틴 관리 ────────────────────────────────────────────────
+var _ROUTINES_KEY='tl_routines_v1';
+function _getRoutines(){
+  try{return JSON.parse(localStorage.getItem(_ROUTINES_KEY)||'[]');}catch(e){return[];}
+}
+function _saveRoutines(arr){
+  try{localStorage.setItem(_ROUTINES_KEY,JSON.stringify(arr));}catch(e){}
+}
+
+function openRoutineModal(){
+  var routines=_getRoutines();
+  var old=document.getElementById('routine-modal');if(old)old.remove();
+  var modal=document.createElement('div');
+  modal.id='routine-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+
+  function renderBox(){
+    var routines=_getRoutines();
+    var h='<div style="background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+    h+='<div style="font-size:15px;font-weight:800;color:var(--navy)">🔁 루틴 관리</div>';
+    h+='<button onclick="document.getElementById('routine-modal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>';
+    h+='</div>';
+    h+='<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">매일 반복되는 루틴을 등록하면 타임라인에 자동으로 표시됩니다.</div>';
+
+    // 등록된 루틴 목록
+    if(routines.length){
+      h+='<div style="margin-bottom:14px">';
+      routines.forEach(function(r,i){
+        var hDisp=r.hour===24?'00':String(r.hour).padStart(2,'0');
+        h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">';
+        h+='<span style="font-size:11px;font-weight:700;color:var(--navy);flex-shrink:0;width:42px">'+hDisp+':00</span>';
+        h+='<span style="flex:1;font-size:12px;color:var(--txt)">'+r.name+'</span>';
+        if(r.duration)h+='<span style="font-size:10px;color:var(--txt3)">'+r.duration+'분</span>';
+        h+='<button onclick="deleteRoutine('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 2px">×</button>';
+        h+='</div>';
+      });
+      h+='</div>';
+    }else{
+      h+='<div style="text-align:center;padding:16px;color:var(--txt3);font-size:12px;margin-bottom:12px">등록된 루틴이 없습니다</div>';
+    }
+
+    // 추가 폼
+    h+='<div style="background:var(--surface2);border-radius:10px;padding:12px">';
+    h+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">+ 루틴 추가</div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+    // 시간 선택
+    h+='<div><div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">시작 시간</div>';
+    h+='<select id="routine-hour" class="fi" style="font-size:12px">';
+    for(var rh=7;rh<=24;rh++){var rd=rh===24?0:rh;h+='<option value="'+rh+'">'+String(rd).padStart(2,'0')+':00</option>';}
+    h+='</select></div>';
+    // 소요시간
+    h+='<div><div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">소요시간(분)</div>';
+    h+='<input id="routine-duration" class="fi" type="number" min="5" max="120" step="5" placeholder="30" style="font-size:12px">';
+    h+='</div></div>';
+    // 루틴명
+    h+='<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">루틴명</div>';
+    h+='<input id="routine-name" class="fi" placeholder="예: 아침 일지 작성" style="font-size:12px">';
+    h+='</div>';
+    h+='<button onclick="addRoutine()" class="btn btn-navy btn-sm" style="width:100%">추가</button>';
+    h+='</div>';
+    h+='<button onclick="document.getElementById('routine-modal').remove();var l=document.getElementById('today-timeline-col');if(l){l.innerHTML=_buildTimeline();_initTimelineDnD();}" class="btn btn-outline btn-sm" style="width:100%;margin-top:10px">완료</button>';
+    h+='</div>';
+    return h;
+  }
+
+  modal.innerHTML=renderBox();
+  document.body.appendChild(modal);
+  window._routineRenderBox=renderBox;
+  window._routineModal=modal;
+}
+
+function addRoutine(){
+  var name=(document.getElementById('routine-name')||{}).value||'';
+  var hour=parseInt((document.getElementById('routine-hour')||{}).value||'9');
+  var duration=parseInt((document.getElementById('routine-duration')||{}).value||'0')||0;
+  if(!name.trim()){toast('루틴명을 입력하세요');return;}
+  var routines=_getRoutines();
+  routines.push({id:'r_'+Date.now(),name:name,hour:hour,duration:duration||null});
+  _saveRoutines(routines);
+  if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
+}
+
+function deleteRoutine(idx){
+  var routines=_getRoutines();
+  routines.splice(idx,1);
+  _saveRoutines(routines);
+  if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
 }
 
 // ── 주간 할 일 드롭다운 ──
@@ -12937,6 +13061,7 @@ function overdueToToday(id){
   var today=todayISO();
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(!t)return;
+  var prevDate=t.dueDate;
   t.dueDate=today;
   delete t.startHour;
   delete t.timeSlot;
@@ -12945,9 +13070,13 @@ function overdueToToday(id){
     startHour:firebase.firestore.FieldValue.delete(),
     timeSlot:firebase.firestore.FieldValue.delete()
   }).catch(function(){saveTask(id);});
-  _tlDate=null; // 오늘 날짜로 타임라인 전환
-  toast('오늘 업무로 이동했습니다');
+  _tlDate=null;
   _renderBoardTodayPanel();
+  toastWithUndo('오늘 업무로 이동했습니다',function(){
+    t.dueDate=prevDate;
+    saveTask(id);
+    _renderBoardTodayPanel();
+  });
 }
 function overdueToTomorrow(id){
   var d=new Date();d.setDate(d.getDate()+1);
@@ -12961,12 +13090,16 @@ function overdueToTomorrow(id){
 function planOverdueToToday(planId,taskIdx){
   var plan=(_plans||[]).find(function(p){return p.id===planId;});
   if(!plan||!plan.tasks||plan.tasks[taskIdx]===undefined)return;
+  var prevDate=plan.tasks[taskIdx].date;
   plan.tasks[taskIdx].date=todayISO();
   delete plan.tasks[taskIdx].startHour;
-  _tlDate=null; // 오늘 날짜로 타임라인 전환
+  _tlDate=null;
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){
-    toast('오늘 업무로 이동했습니다');
     _renderBoardTodayPanel();
+    toastWithUndo('오늘 업무로 이동했습니다',function(){
+      plan.tasks[taskIdx].date=prevDate;
+      db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){_renderBoardTodayPanel();});
+    });
   }).catch(function(){toast('저장 실패');});
 }
 
