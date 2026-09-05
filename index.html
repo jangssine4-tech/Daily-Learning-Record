@@ -3779,63 +3779,9 @@ function _refreshTodayPanel(timelineOnly){
 function _refreshTaskList(){
   var right=document.getElementById('today-task-col');
   if(!right){_renderBoardTodayPanel();return;}
-
-  var today=todayISO();
-  function addDays(s,n){var d=new Date(s);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
-
-  // ── 데이터 수집 ──
-  var todayItems=(_dbTasks||[]).filter(function(t){
-    return t.dueDate===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId&&t.status!=='완료';
-  });
-  var planTodayTasks=getPlanTasksForDate(today).filter(function(t){return t.done!==true;});
-  var overdueItems=(_dbTasks||[]).filter(function(t){
-    return !(t.id&&t.id.startsWith('__'))&&!t.planId&&t.dueDate&&t.dueDate<today&&t.status!=='완료';
-  });
-  var planOverdue=getPlanTasksForRange('2000-01-01',addDays(today,-1)).filter(function(t){
-    return t.status!=='완료'&&t.done!==true;
-  });
-  var unplaced=todayItems.filter(function(t){return !_isOnTimeline(t.startHour);});
-  var planUnplaced=planTodayTasks.filter(function(t){return !_isOnTimeline(t.startHour);});
-
-  // ── 용량 바 업데이트 (숫자만 교체) ──
-  var scheduledMin=todayItems.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
-  scheduledMin+=planTodayTasks.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
-  var totalAvailMin=_getTodayAvailMin();
-  var capBar=document.getElementById('tl-capacity-bar');
-  if(capBar){
-    _patchCapacityBar(capBar,totalAvailMin,scheduledMin);
-  }
-
-  // ── 지연 업무 섹션 패치 ──
-  var overdueSection=document.getElementById('tl-overdue-section');
-  var totalOverdue=overdueItems.length+planOverdue.length;
-  if(totalOverdue){
-    if(!overdueSection){
-      // 새로 삽입 — 추가 버튼 다음에
-      var addBtn=document.getElementById('tl-add-btn');
-      if(addBtn){
-        var div=document.createElement('div');
-        div.id='tl-overdue-section';
-        div.innerHTML=_buildOverdueHTML(overdueItems,planOverdue,today);
-        addBtn.parentNode.insertBefore(div,addBtn.nextSibling);
-      }
-    }else{
-      overdueSection.innerHTML=_buildOverdueHTML(overdueItems,planOverdue,today);
-    }
-  }else if(overdueSection){
-    overdueSection.remove();
-  }
-
-  // ── 오늘의 업무 목록 패치 ──
-  _patchTaskList(unplaced,planUnplaced);
-
-  // ── 업무 건수 배지 업데이트 ──
-  var countBadge=document.getElementById('tl-task-count');
-  if(countBadge){
-    var total=unplaced.length+planUnplaced.length;
-    countBadge.textContent=total?total+'건':'';
-  }
-
+  var scrollTop=right.scrollTop;
+  right.innerHTML=_renderTodayTaskSection();
+  right.scrollTop=scrollTop;
   _initTimelineDnD();
 }
 
@@ -12742,8 +12688,11 @@ function renderDashBoard(){
 
 // ── 뷰 렌더링 ─────────────────────────────────────
 // ── 플랜 실행업무 자동 배치 헬퍼 ─────────────────
+var _planDateCache={};
 function getPlanTasksForDate(dateStr){
-  // 특정 날짜의 플랜 실행업무 반환
+  // 특정 날짜의 플랜 실행업무 반환 (캐시 적용)
+  var cacheKey=dateStr+'|'+((_plans||[]).length);
+  if(_planDateCache[cacheKey])return _planDateCache[cacheKey];
   var tasks=[];
   (_plans||[]).forEach(function(p){
     (p.tasks||[]).forEach(function(t,i){
@@ -12766,11 +12715,15 @@ function getPlanTasksForDate(dateStr){
       }
     });
   });
+  _planDateCache[cacheKey]=tasks;
   return tasks;
 }
 
+var _planRangeCache={key:null,result:null};
 function getPlanTasksForRange(startStr,endStr){
-  // 날짜 범위의 플랜 실행업무 반환
+  // 날짜 범위의 플랜 실행업무 반환 (캐시 적용)
+  var cacheKey=startStr+'|'+endStr+'|'+((_plans||[]).length);
+  if(_planRangeCache.key===cacheKey)return _planRangeCache.result;
   var tasks=[];
   (_plans||[]).forEach(function(p){
     (p.tasks||[]).forEach(function(t,i){
@@ -12794,7 +12747,14 @@ function getPlanTasksForRange(startStr,endStr){
       }
     });
   });
-  return tasks.sort(function(a,b){return a.date>b.date?1:-1;});
+  var result=tasks.sort(function(a,b){return a.date>b.date?1:-1;});
+  _planRangeCache={key:cacheKey,result:result};
+  return result;
+}
+// 플랜 변경 시 캐시 무효화
+function _invalidatePlanCache(){
+  _planRangeCache={key:null,result:null};
+  _planDateCache={};
 }
 
 function planTaskRow(t){
@@ -12817,8 +12777,9 @@ function _togglePlanTask(planId,idx,checked){
   if(!plan||!plan.tasks||!plan.tasks[idx])return;
   plan.tasks[idx].done=checked;
   plan.tasks[idx].doneAt=checked?todayISO():'';
+  _invalidatePlanCache();
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){
-    _renderBoardTodayPanel();
+    _refreshTaskList();
   }).catch(function(){toast('저장 실패');});
 }
 
@@ -13411,6 +13372,7 @@ function planOverdueToToday(planId,taskIdx){
   delete plan.tasks[taskIdx].startHour;
   _tlDate=null;
   _recentlyMoved[planKey]=prevDate;
+  _invalidatePlanCache();
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){
     _renderBoardTodayPanel();
     toastWithUndo('오늘 업무로 이동했습니다',function(){
