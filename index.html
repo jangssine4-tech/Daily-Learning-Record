@@ -3787,7 +3787,7 @@ function tlToggleDbTask(id,checked){
 function tlRemoveDbTask(id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(!t)return;
-  delete t.startHour;
+  t.startHour=null;
   t.timeSlot='미배치';
   db.collection('dashBoardV2').doc(id).update({
     startHour: firebase.firestore.FieldValue.delete(),
@@ -3799,7 +3799,7 @@ function tlRemoveDbTask(id){
 function tlRemovePlanTask(planId,idx){
   var plan=(_plans||[]).find(function(p){return p.id===planId;});
   if(!plan||!plan.tasks)return;
-  delete plan.tasks[idx].startHour;
+  plan.tasks[idx].startHour=null;
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(){});
   _refreshTodayPanel();
 }
@@ -12583,20 +12583,22 @@ function getPlanTasksForRange(startStr,endStr){
   var tasks=[];
   (_plans||[]).forEach(function(p){
     (p.tasks||[]).forEach(function(t,i){
-      if(t.date>=startStr&&t.date<=endStr){
+      var d=t.date||'';
+      if(d&&d>=startStr&&d<=endStr){
         tasks.push({
           _planId:p.id,_taskIdx:i,
           id:'plan_'+p.id+'_'+i,
           name:t.name,
-          date:t.date,
+          date:d,
           manager:t.manager,
           priority:t.priority,
-          done:t.done,
+          done:!!t.done,
           planName:p.name,
           area:p.area,
           timeSlot:t.timeSlot||'미배치',
           estDuration:t.estDuration||'',
-          focusType:t.focusType||''
+          focusType:t.focusType||'',
+          startHour:t.startHour!==undefined?t.startHour:undefined
         });
       }
     });
@@ -13004,7 +13006,7 @@ function _renderTodayCapacityBar(totalMin,scheduledMin){
 // 오른쪽 목록용 업무 행 (드래그 가능)
 function _listTaskRow(t){
   var isDone=t.status==='완료';
-  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null;
+  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null&&t.startHour!==''&&t.startHour!=='undefined';
   if(isOnTimeline)return '';
   var meta=JSON.stringify({type:'db',id:t.id}).replace(/"/g,'&quot;');
   var r='<div data-dragtask="'+meta+'" draggable="true" '
@@ -13020,7 +13022,7 @@ function _listTaskRow(t){
 
 function _listPlanTaskRow(t){
   var isDone=t.done===true;
-  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null;
+  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null&&t.startHour!==''&&t.startHour!=='undefined';
   if(isOnTimeline)return '';
   var meta=JSON.stringify({type:'plan',id:t._planId,idx:t._taskIdx}).replace(/"/g,'&quot;');
   var r='<div data-dragtask="'+meta+'" draggable="true" '
@@ -13160,8 +13162,8 @@ function _renderTodayTaskSection(){
   }
 
   // 📋 미배치 업무 (타임라인에 없는 것만)
-  var unplaced=todayItems.filter(function(t){return t.startHour===undefined||t.startHour===null||t.startHour==='';});
-  var planUnplaced=planTodayTasks.filter(function(t){return t.startHour===undefined||t.startHour===null||t.startHour==='';});
+  var unplaced=todayItems.filter(function(t){return !t.startHour&&t.startHour!==0;});
+  var planUnplaced=planTodayTasks.filter(function(t){return !t.startHour&&t.startHour!==0;});
   var totalUnplaced=unplaced.length+planUnplaced.length;
 
   h+='<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
