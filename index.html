@@ -3756,14 +3756,14 @@ function tlDrop(e,hour){
   toast(_formatHour(hour)+'에 배치했습니다');
 }
 
-// ── 오늘 패널 부분 업데이트 (스크롤 위치 보존) ──────────────
-function _refreshTodayPanel(){
+// ── 오늘 패널 부분 업데이트 ──────────────────────────────────
+function _refreshTodayPanel(timelineOnly){
   var left=document.getElementById('today-timeline-col');
   var right=document.getElementById('today-task-col');
   if(!left&&!right){_renderBoardTodayPanel();return;}
 
-  // 타임라인 먼저 — 데이터 변경 직후이므로 최신 _dbTasks 반영
-  if(left){left.innerHTML=_buildTimeline();}
+  // 타임라인 업데이트 (드래그/배치 변경 시만)
+  if(left&&timelineOnly!==false){left.innerHTML=_buildTimeline();}
 
   // 오른쪽 목록 — 스크롤 보존
   if(right){
@@ -3772,7 +3772,16 @@ function _refreshTodayPanel(){
     right.scrollTop=scrollTop;
   }
 
-  // DnD 이벤트 재등록 (한 번만)
+  _initTimelineDnD();
+}
+
+// 오른쪽 목록만 빠르게 업데이트 (타임라인 배치 변경 없을 때)
+function _refreshTaskList(){
+  var right=document.getElementById('today-task-col');
+  if(!right){_renderBoardTodayPanel();return;}
+  var scrollTop=right.scrollTop;
+  right.innerHTML=_renderTodayTaskSection();
+  right.scrollTop=scrollTop;
   _initTimelineDnD();
 }
 
@@ -12814,7 +12823,7 @@ function _savePlanTaskModal(planId,taskIdx){
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){
     toast('✅ 저장됐어요');
     var m=document.getElementById('plan-task-modal');if(m)m.remove();
-    _renderBoardTodayPanel();
+    _refreshTaskList();
   }).catch(function(){toast('저장 실패');});
 }
 
@@ -13796,12 +13805,12 @@ function openTodayTaskModal(defaultSlot){
 }
 function toggleTodayTask(id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
-  if(t){t.status=t.status==='완료'?'대기':'완료';saveTask(id);_renderBoardTodayPanel();}
+  if(t){t.status=t.status==='완료'?'대기':'완료';saveTask(id);_refreshTaskList();}
 }
 function deleteTodayTask(id){
   _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==id;});
   deleteTask(id);
-  _renderBoardTodayPanel();
+  _refreshTaskList();
 }
 var _todayDragSrcId=null;
 function todayDragStart(e,id){
@@ -14421,7 +14430,7 @@ function _dbSaveTaskModal(id){
   if(savedId)saveTask(savedId); else saveDashBoard();
   _dbSaveTaskModal._saving=false;
   var m=document.getElementById('db-task-modal');if(m)m.remove();
-  if(_boardCurrentTab==='today')_refreshTodayPanel();
+  if(_boardCurrentTab==='today')_refreshTaskList();
   else _renderDashBoardUI($('dashboard-board-area'));
 }
 
