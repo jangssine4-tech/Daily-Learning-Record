@@ -3745,9 +3745,11 @@ function tlDrop(e,hour){
     }
   }else if(meta.type==='plan'){
     var plan=(_plans||[]).find(function(p){return p.id===meta.id;});
-    if(plan&&plan.tasks&&plan.tasks[meta.idx]!==undefined){
-      plan.tasks[meta.idx].startHour=hour;
-      plan.tasks[meta.idx].date=todayISO();
+    var pidx=parseInt(meta.idx); // 반드시 정수로 변환
+    if(plan&&plan.tasks&&!isNaN(pidx)&&plan.tasks[pidx]!==undefined){
+      plan.tasks[pidx].startHour=hour;
+      plan.tasks[pidx].date=todayISO();
+      _invalidatePlanCache();
       db.collection('plans').doc(meta.id).update({tasks:plan.tasks}).catch(function(){});
     }
   }
@@ -3948,6 +3950,7 @@ function tlRemovePlanTask(planId,idx){
   var plan=(_plans||[]).find(function(p){return p.id===planId;});
   if(!plan||!plan.tasks)return;
   plan.tasks[idx].startHour=null;
+  _invalidatePlanCache();
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(){});
   _refreshTodayPanel();
 }
@@ -12802,8 +12805,9 @@ function changePlanTaskSlot(planId,idx,slot){
   var plan=(_plans||[]).find(function(p){return p.id===planId;});
   if(!plan||!plan.tasks||!plan.tasks[idx])return;
   plan.tasks[idx].timeSlot=slot;
+  _invalidatePlanCache();
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(){});
-  _renderBoardTodayPanel();
+  _refreshTodayPanel();
 }
 
 // ── 플랜 태스크 편집 모달 ──
