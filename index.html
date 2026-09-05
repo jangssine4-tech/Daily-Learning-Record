@@ -235,6 +235,21 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 #boot-overlay .boot-bar{width:160px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden}
 #boot-overlay .boot-fill{height:100%;background:#00b894;border-radius:2px;width:0%;transition:width .3s}
 #boot-overlay .boot-msg{color:rgba(255,255,255,.5);font-size:12px;margin-top:10px}
+
+/* ── 타임라인 레이아웃 ── */
+#board-panel-today{padding:0!important;overflow:hidden}
+.tl-row{transition:background .12s}
+.tl-row:hover{background:#f0f9ff!important}
+.tl-row.tl-drag-over{background:#dbeafe!important;border-left-color:var(--blue)!important}
+.tl-card{transition:box-shadow .12s}
+.tl-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.tl-card:active{cursor:grabbing}
+@media(max-width:700px){
+  #today-split-wrap{flex-direction:column;height:auto}
+  #today-timeline-col{border-right:none;border-bottom:2px solid var(--border);min-height:60vh}
+  #today-task-col{width:100%!important;max-height:50vh;overflow-y:auto}
+  #btn-toggle-taskcol{display:block!important}
+}
 </style>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -3395,10 +3410,279 @@ function toggleTaskDone(id,done){
 
 function _renderBoardTodayPanel(){
   var el=$('board-panel-today');if(!el)return;
-  var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
-  html+=_renderTodayTaskSection();
+  el.innerHTML='';
+  // 2열 래퍼
+  var wrap=document.createElement('div');
+  wrap.id='today-split-wrap';
+  wrap.style.cssText='display:flex;height:calc(100dvh - 100px);min-height:500px;overflow:hidden';
+
+  // ── 왼쪽: 타임라인 ──
+  var left=document.createElement('div');
+  left.id='today-timeline-col';
+  left.style.cssText='flex:1;min-width:0;overflow-y:auto;border-right:2px solid var(--border);background:var(--surface)';
+  left.innerHTML=_buildTimeline();
+
+  // ── 오른쪽: 업무 목록 (모바일에서 숨김) ──
+  var right=document.createElement('div');
+  right.id='today-task-col';
+  right.style.cssText='width:320px;flex-shrink:0;overflow-y:auto;background:var(--bg);padding:12px 10px;display:flex;flex-direction:column;gap:8px';
+  right.innerHTML=_renderTodayTaskSection();
+
+  wrap.appendChild(left);
+  wrap.appendChild(right);
+  el.appendChild(wrap);
+
+  // 모바일(<700px): 오른쪽 숨김
+  function applyResponsive(){
+    if(window.innerWidth<700){right.style.display='none';}
+    else{right.style.display='flex';}
+  }
+  applyResponsive();
+  if(!window._todayResizeHandler){
+    window._todayResizeHandler=function(){
+      var r=document.getElementById('today-task-col');
+      if(r){r.style.display=window.innerWidth<700?'none':'flex';}
+    };
+    window.addEventListener('resize',window._todayResizeHandler);
+  }
+
+  _initTimelineDnD();
+}
+
+// ── 타임라인 빌더 ──────────────────────────────────────────────
+function _buildTimeline(){
+  var today=todayISO();
+  var now=new Date();
+  var curH=now.getHours();
+  var HOURS=[];
+  for(var h=7;h<=24;h++)HOURS.push(h);
+
+  // 타임라인에 배치된 업무 수집
+  var timedTasks=(_dbTasks||[]).filter(function(t){
+    return t.dueDate===today&&t.startHour!==undefined&&t.startHour!==null&&t.status!=='완료'||
+           (t.dueDate===today&&t.startHour!==undefined&&t.startHour!==null&&t.status==='완료');
+  });
+  var planTimedTasks=getPlanTasksForDate(today).filter(function(t){
+    return t.startHour!==undefined&&t.startHour!==null;
+  });
+
+  var slotMap={};
+  HOURS.forEach(function(h){slotMap[h]=[];});
+  timedTasks.forEach(function(t){
+    var h=parseInt(t.startHour);
+    if(slotMap[h]!==undefined)slotMap[h].push({type:'db',task:t});
+  });
+  planTimedTasks.forEach(function(t){
+    var h=parseInt(t.startHour);
+    if(slotMap[h]!==undefined)slotMap[h].push({type:'plan',task:t});
+  });
+
+  var html='<div style="padding:0">';
+  // 헤더
+  html+='<div style="position:sticky;top:0;z-index:10;background:var(--navy);padding:10px 16px;display:flex;align-items:center;gap:10px">';
+  html+='<span style="font-size:14px;font-weight:800;color:#fff">📅 오늘의 타임라인</span>';
+  html+='<span style="font-size:11px;color:#93c5fd;margin-left:auto">'+today+'</span>';
+  // 모바일 업무 목록 토글 버튼
+  html+='<button onclick="_toggleTaskCol()" style="display:none;background:#1e40af;border:none;color:#fff;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer" id="btn-toggle-taskcol">📋 업무목록</button>';
   html+='</div>';
-  el.innerHTML=html;
+
+  // 모바일에서 토글 버튼 보이기
+  html+='<script>if(window.innerWidth<700){var b=document.getElementById("btn-toggle-taskcol");if(b)b.style.display="block";}<\/script>';
+
+  HOURS.forEach(function(h){
+    var displayH=h===24?'00':String(h).padStart(2,'0');
+    var timeLabel=displayH+':00';
+    var isPast=h<curH&&h!==24;
+    var isCurrent=h===curH;
+    var items=slotMap[h]||[];
+
+    var rowBg=isCurrent?'#eff6ff':isPast?'var(--surface2)':'var(--surface)';
+    var borderLeft=isCurrent?'4px solid var(--blue)':'4px solid transparent';
+
+    html+='<div class="tl-row" data-hour="'+h+'" '
+      +'ondragover="tlDragOver(event,'+h+')" '
+      +'ondrop="tlDrop(event,'+h+')" '
+      +'ondragleave="tlDragLeave(event)" '
+      +'style="display:flex;min-height:64px;border-bottom:1px solid var(--border);background:'+rowBg+';border-left:'+borderLeft+';transition:background .15s">';
+
+    // 시간 라벨
+    html+='<div style="width:54px;flex-shrink:0;padding:10px 0 0 10px">';
+    html+='<span style="font-size:11px;font-weight:700;color:'+(isCurrent?'var(--blue)':isPast?'var(--txt3)':'var(--txt2)')+'">'+timeLabel+'</span>';
+    if(isCurrent)html+='<div style="font-size:9px;color:var(--blue);font-weight:600">지금</div>';
+    html+='</div>';
+
+    // 업무 카드 영역
+    html+='<div class="tl-slot" style="flex:1;padding:6px 8px;display:flex;flex-direction:column;gap:4px">';
+    items.forEach(function(item){
+      html+=_tlTaskCard(item);
+    });
+    html+='</div></div>';
+  });
+
+  html+='</div>';
+  return html;
+}
+
+function _tlTaskCard(item){
+  var t=item.task;
+  var isDone=(t.status==='완료')||(t.done===true);
+  var isPlan=item.type==='plan';
+  var cardId=isPlan?('plan_'+t._planId+'_'+t._taskIdx):('db_'+t.id);
+  var lineThrough=isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)';
+  var bg=isDone?'var(--surface2)':(isPlan?'#eff6ff':'var(--surface)');
+  var border=isPlan?'1.5px solid #93c5fd':'1.5px solid var(--border)';
+
+  var r='<div class="tl-card" id="tlcard-'+cardId+'" draggable="true" '
+    +'data-cardid="'+cardId+'" data-tasktype="'+(isPlan?'plan':'db')+'" '
+    +'data-taskid="'+(isPlan?t._planId:t.id)+'" '
+    +(isPlan?'data-taskidx="'+t._taskIdx+'" ':'')
+    +'ondragstart="tlCardDragStart(event)" '
+    +'style="display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:8px;background:'+bg+';border:'+border+';cursor:grab">';
+
+  // 체크박스
+  if(isPlan){
+    r+='<input type="checkbox"'+(isDone?' checked':'')
+      +' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'"'
+      +' onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked);_renderBoardTodayPanel()"'
+      +' style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
+  }else{
+    r+='<input type="checkbox"'+(isDone?' checked':'')
+      +' onchange="tlToggleDbTask(''+t.id+'',this.checked)"'
+      +' style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
+  }
+
+  // 배지
+  if(isPlan)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋</span>';
+  if(t.area&&!isPlan)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
+
+  // 업무명
+  r+='<span style="flex:1;font-size:12px;font-weight:500;'+lineThrough+'">'+t.name+'</span>';
+
+  // 소요시간
+  if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
+
+  // 타임라인에서 제거 버튼
+  if(isPlan){
+    r+='<button onclick="tlRemovePlanTask(''+t._planId+'','+t._taskIdx+')" '
+      +'style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0" title="타임라인에서 제거">×</button>';
+  }else{
+    r+='<button onclick="tlRemoveDbTask(''+t.id+'')" '
+      +'style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0" title="타임라인에서 제거">×</button>';
+  }
+
+  r+='</div>';
+  return r;
+}
+
+// ── 타임라인 DnD ──────────────────────────────────────────────
+var _tlDragCardId=null;
+var _tlDragFrom=null; // 'timeline' or 'tasklist'
+var _tlDragMeta=null; // {type:'db'|'plan', id, idx}
+
+function _initTimelineDnD(){
+  // 오른쪽 업무 카드에 draggable 부여
+  var right=document.getElementById('today-task-col');
+  if(!right)return;
+  right.querySelectorAll('[data-dragtask]').forEach(function(el){
+    el.setAttribute('draggable','true');
+    el.addEventListener('dragstart',function(e){
+      _tlDragFrom='tasklist';
+      _tlDragCardId=null;
+      var meta=JSON.parse(el.dataset.dragtask||'{}');
+      _tlDragMeta=meta;
+      e.dataTransfer.effectAllowed='move';
+    });
+  });
+}
+
+function tlCardDragStart(e){
+  _tlDragFrom='timeline';
+  _tlDragCardId=e.currentTarget.dataset.cardid;
+  var tasktype=e.currentTarget.dataset.tasktype;
+  var taskid=e.currentTarget.dataset.taskid;
+  var taskidx=e.currentTarget.dataset.taskidx;
+  _tlDragMeta={type:tasktype,id:taskid,idx:taskidx!==undefined?parseInt(taskidx):undefined};
+  e.dataTransfer.effectAllowed='move';
+}
+
+function tlDragOver(e,hour){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  var row=e.currentTarget;
+  row.style.background='#dbeafe';
+}
+function tlDragLeave(e){
+  var row=e.currentTarget;
+  var h=parseInt(row.dataset.hour);
+  var now=new Date();
+  var isPast=h<now.getHours();
+  row.style.background=isPast?'var(--surface2)':'var(--surface)';
+}
+function tlDrop(e,hour){
+  e.preventDefault();
+  var row=e.currentTarget;
+  row.style.background='';
+
+  if(!_tlDragMeta)return;
+  var meta=_tlDragMeta;
+
+  if(meta.type==='db'){
+    var t=(_dbTasks||[]).find(function(x){return x.id===meta.id;});
+    if(!t)return;
+    t.startHour=hour;
+    t.dueDate=todayISO();
+    // 시간대 필드 제거 (타임라인이 대신함)
+    t.timeSlot=undefined;
+    saveTask(meta.id);
+  }else if(meta.type==='plan'){
+    var plan=(_plans||[]).find(function(p){return p.id===meta.id;});
+    if(!plan||!plan.tasks||plan.tasks[meta.idx]===undefined)return;
+    plan.tasks[meta.idx].startHour=hour;
+    plan.tasks[meta.idx].date=todayISO();
+    db.collection('plans').doc(meta.id).update({tasks:plan.tasks}).catch(function(){});
+  }
+
+  _tlDragMeta=null;
+  _tlDragCardId=null;
+  _tlDragFrom=null;
+  _renderBoardTodayPanel();
+  toast(_formatHour(hour)+'에 배치했습니다');
+}
+
+function _formatHour(h){
+  var d=h===24?0:h;
+  return String(d).padStart(2,'0')+':00';
+}
+
+function tlToggleDbTask(id,checked){
+  var t=(_dbTasks||[]).find(function(x){return x.id===id;});
+  if(!t)return;
+  t.status=checked?'완료':'대기';
+  saveTask(id);
+  _renderBoardTodayPanel();
+}
+
+function tlRemoveDbTask(id){
+  var t=(_dbTasks||[]).find(function(x){return x.id===id;});
+  if(!t)return;
+  t.startHour=undefined;
+  t.timeSlot='미배치';
+  saveTask(id);
+  _renderBoardTodayPanel();
+}
+
+function tlRemovePlanTask(planId,idx){
+  var plan=(_plans||[]).find(function(p){return p.id===planId;});
+  if(!plan||!plan.tasks)return;
+  plan.tasks[idx].startHour=undefined;
+  db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(){});
+  _renderBoardTodayPanel();
+}
+
+function _toggleTaskCol(){
+  var col=document.getElementById('today-task-col');
+  if(!col)return;
+  col.style.display=col.style.display==='none'?'flex':'none';
 }
 
 // ── 주간 할 일 드롭다운 ──
@@ -12187,6 +12471,12 @@ function openPlanTaskModal(planId,taskIdx){
   var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
   r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
 
+  // 타임라인 시작 시간
+  var pHourOpts=[{v:'',l:'시간 미배정'}];
+  for(var _ph=7;_ph<=24;_ph++){var _pd=_ph===24?0:_ph;pHourOpts.push({v:String(_ph),l:String(_pd).padStart(2,'0')+':00'});}
+  var pStartHourSel=mkSel('ptm-starthour',pHourOpts,t.startHour!==undefined?String(t.startHour):'');
+  var pshw=document.createElement('div');pshw.style.marginBottom='10px';pshw.appendChild(mkLbl('⏰ 타임라인 시작 시간'));pshw.appendChild(pStartHourSel);box.appendChild(pshw);
+
   // 담당자
   var mgInp=document.createElement('input');mgInp.className='fi';mgInp.id='ptm-manager';
   mgInp.placeholder='담당자 (선택)';mgInp.style.fontSize='12px';mgInp.value=t.manager||'';
@@ -12281,11 +12571,14 @@ function _savePlanTaskModal(planId,taskIdx){
   var estDuration=(document.getElementById('ptm-duration')||{}).value||'';
   var focusType=(document.getElementById('ptm-focus')||{}).value||'';
   if(!name.trim()){toast('업무명을 입력하세요');return;}
+  var ptmStartHourRaw=(document.getElementById('ptm-starthour')||{}).value||'';
+  var ptmStartHour=ptmStartHourRaw!==''?parseInt(ptmStartHourRaw):undefined;
   plan.tasks[taskIdx].name=name;
   plan.tasks[taskIdx].date=date;
   plan.tasks[taskIdx].priority=priority;
   plan.tasks[taskIdx].manager=manager;
   plan.tasks[taskIdx].memo=memo;
+  plan.tasks[taskIdx].startHour=ptmStartHour;
   if(date===today){
     plan.tasks[taskIdx].timeSlot=timeSlot;
     plan.tasks[taskIdx].estDuration=estDuration;
@@ -12453,7 +12746,7 @@ function deleteFocusTask(type,id){
   deleteTask(id);
   _renderDashBoardUI($('dashboard-board-area'));
 }
-// ── 오늘 할 일: 시간대 배치판 ──────────────────────────────
+// ── 오늘 할 일: 오른쪽 업무 목록 ────────────────────────────
 var _TODAY_TIME_SLOTS=['오전','오후','수업 후','미배치'];
 var _TODAY_TIME_SLOT_ICONS={'오전':'☀️','오후':'🌤','수업 후':'🌙','미배치':'📥'};
 var _TODAY_TIME_SLOT_COLORS={'오전':'#fef9c3','오후':'#ecfdf5','수업 후':'#eff6ff','미배치':'#f8fafc'};
@@ -12476,84 +12769,51 @@ function _renderTodayCapacityBar(totalMin,scheduledMin){
   var color=over?'#ef4444':ratio>0.8?'#f59e0b':'#10b981';
   var statusIcon=over?'🔴':'🟢';
   var statusTxt=over?'초과 '+overMin+'분':'여유 '+freeMin+'분';
-  var h='<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px">';
-  h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-  h+='<span style="font-size:12px;font-weight:700;color:var(--navy)">📊 오늘 업무 계획</span>';
+  var h='<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">';
+  h+='<div style="display:flex;align-items:center;margin-bottom:6px">';
+  h+='<span style="font-size:11px;font-weight:700;color:var(--navy)">📊 오늘 업무 계획</span>';
   h+='<span style="margin-left:auto;font-size:11px;font-weight:700;color:'+color+'">'+statusIcon+' '+statusTxt+'</span>';
   h+='</div>';
-  h+='<div style="display:flex;gap:6px;font-size:11px;color:var(--txt2);margin-bottom:8px">';
-  h+='<span>예정 <b style="color:var(--navy)">'+scheduledMin+'분</b></span>';
-  h+='<span style="color:var(--border2)">·</span>';
-  h+='<span>가용 <b style="color:var(--txt)">'+totalMin+'분</b></span>';
+  h+='<div style="display:flex;gap:6px;font-size:10px;color:var(--txt2);margin-bottom:6px">';
+  h+='<span>예정 <b style="color:var(--navy)">'+scheduledMin+'분</b></span><span style="color:var(--border2)">·</span>';
+  h+='<span>가용 <b>'+totalMin+'분</b></span>';
   h+='</div>';
-  h+='<div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden">';
-  h+='<div style="background:'+color+';width:'+Math.min(ratio*100,100)+'%;height:8px;border-radius:6px;transition:width .3s"></div>';
+  h+='<div style="background:var(--surface2);border-radius:6px;height:6px;overflow:hidden">';
+  h+='<div style="background:'+color+';width:'+Math.min(ratio*100,100)+'%;height:6px;border-radius:6px"></div>';
   h+='</div></div>';
   return h;
 }
 
-function _renderTodayTimeSlotSection(slotKey,items,planItems){
-  var icon=_TODAY_TIME_SLOT_ICONS[slotKey]||'📝';
-  var bg=_TODAY_TIME_SLOT_COLORS[slotKey]||'#f8fafc';
-  var bd=_TODAY_TIME_SLOT_BORDER[slotKey]||'#e2e8f0';
-  var allItems=items.concat(planItems||[]);
-  var doneCount=allItems.filter(function(t){return t.status==='완료'||(t.done===true);}).length;
-  var totalMin=allItems.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
-  var h='<div style="border:1.5px solid '+bd+';border-radius:12px;overflow:hidden;margin-bottom:10px">';
-  h+='<div style="background:'+bg+';padding:9px 14px;display:flex;align-items:center;gap:7px">';
-  h+='<span style="font-size:14px">'+icon+'</span>';
-  h+='<span style="font-size:13px;font-weight:800;color:var(--navy)">'+slotKey+'</span>';
-  if(allItems.length){
-    h+='<span style="font-size:11px;color:var(--txt3);margin-left:2px">'+doneCount+'/'+allItems.length+' 완료</span>';
-    if(totalMin>0)h+='<span style="font-size:11px;color:var(--txt3)">· '+totalMin+'분</span>';
-    h+='<button class="btn btn-navy btn-xs" style="margin-left:auto" onclick="openTodayTaskModal(\''+slotKey+'\')">＋</button>';
-  }else{
-    h+='<button class="btn btn-navy btn-xs" style="margin-left:auto" onclick="openTodayTaskModal(\''+slotKey+'\')">＋ 추가</button>';
-  }
-  h+='</div>';
-  if(allItems.length){
-    h+='<div style="padding:6px 14px;background:var(--surface)">';
-    items.forEach(function(t){h+=_todayTaskRow(t);});
-    (planItems||[]).forEach(function(t){
-      var isDone=t.done===true;
-      var focusCol=_TODAY_FOCUS_COLORS[t.focusType]||'#6b7280';
-      h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">';
-      h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)">';
-      h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;border:1px solid #bfdbfe">📋 '+t.planName.substring(0,10)+'</span>';
-      h+='<span onclick="openPlanTaskModal(\''+t._planId+'\','+t._taskIdx+')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
-      if(t.estDuration)h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
-      if(t.focusType)h+='<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;flex-shrink:0;color:'+focusCol+';background:'+(_TODAY_FOCUS_BG[t.focusType]||'#f8fafc')+'">'+t.focusType+'</span>';
-      h+='<select onchange="changePlanTaskSlot(\''+t._planId+'\','+t._taskIdx+',this.value)" style="font-size:10px;padding:1px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--txt3);cursor:pointer;flex-shrink:0">';
-      _TODAY_TIME_SLOTS.forEach(function(s){h+='<option value="'+s+'"'+(t.timeSlot===s?' selected':'')+'>'+_TODAY_TIME_SLOT_ICONS[s]+' '+s+'</option>';});
-      h+='</select>';
-      h+='<button onclick="openPlanTaskModal(\''+t._planId+'\','+t._taskIdx+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0" title="편집">✏️</button>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }else{
-    h+='<div style="padding:10px 14px;text-align:center;color:var(--txt3);font-size:11px">아직 배치된 업무가 없어요</div>';
-  }
-  h+='</div>';
-  return h;
+// 오른쪽 목록용 업무 행 (드래그 가능)
+function _listTaskRow(t){
+  var isDone=t.status==='완료';
+  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null;
+  if(isOnTimeline)return ''; // 타임라인에 배치된 업무는 목록에서 숨김
+  var meta=JSON.stringify({type:'db',id:t.id});
+  var r='<div data-dragtask=''+meta+'' draggable="true" '
+    +'style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;'
+    +'background:var(--surface);border:1.5px solid var(--border);margin-bottom:4px;cursor:grab">';
+  r+='<span style="color:var(--txt3);font-size:12px;cursor:grab">⠿</span>';
+  if(t.area)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
+  r+='<span onclick="openDbTaskModal(''+t.id+'')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+  if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
+  r+='<button onclick="deleteTodayTask(''+t.id+'')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0">×</button>';
+  r+='</div>';
+  return r;
 }
 
-function _todayTaskRow(t){
-  var isDone=t.status==='완료';
-  var today=todayISO();
-  var focusCol=_TODAY_FOCUS_COLORS[t.focusType]||'#6b7280';
-  var r='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">';
-  r+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="toggleTodayTask(\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--mint)">';
-  if(t.taskType==='이달의 중점')r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#dbeafe;color:#1d4ed8;flex-shrink:0">🎯 이달</span>';
-  else if(t.taskType==='이번 주 중점')r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#ede9fe;color:#6d28d9;flex-shrink:0">📅 주간</span>';
-  if(t.area)r+='<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
-  r+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+function _listPlanTaskRow(t){
+  var isDone=t.done===true;
+  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null;
+  if(isOnTimeline)return '';
+  var meta=JSON.stringify({type:'plan',id:t._planId,idx:t._taskIdx});
+  var r='<div data-dragtask=''+meta+'' draggable="true" '
+    +'style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;'
+    +'background:#eff6ff;border:1.5px solid #93c5fd;margin-bottom:4px;cursor:grab">';
+  r+='<span style="color:var(--txt3);font-size:12px;cursor:grab">⠿</span>';
+  r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700;border:1px solid #bfdbfe">📋 '+t.planName.substring(0,8)+'</span>';
+  r+='<span onclick="openPlanTaskModal(''+t._planId+'','+t._taskIdx+')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
   if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
-  if(t.focusType)r+='<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;flex-shrink:0;color:'+focusCol+';background:'+(_TODAY_FOCUS_BG[t.focusType]||'#f8fafc')+'">'+t.focusType+'</span>';
-  // 시간대 변경 드롭다운
-  r+='<select onchange="changeTodaySlot(\''+t.id+'\',this.value)" style="font-size:10px;padding:1px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--txt3);cursor:pointer;flex-shrink:0">';
-  _TODAY_TIME_SLOTS.forEach(function(s){r+='<option value="'+s+'"'+(t.timeSlot===s?' selected':'')+'>'+_TODAY_TIME_SLOT_ICONS[s]+' '+s+'</option>';});
-  r+='</select>';
-  r+='<button onclick="deleteTodayTask(\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;line-height:1;padding:0 2px;flex-shrink:0">×</button>';
   r+='</div>';
   return r;
 }
@@ -12567,20 +12827,15 @@ function changeTodaySlot(id,slot){
 }
 
 function _todayOverdueRow(t,daysLate){
-  var today=todayISO();
-  var r='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">';
-  r+='<input type="checkbox" onchange="toggleTodayTask(\''+t.id+'\')" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
+  var r='<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;background:#fff5f5;border:1.5px solid #fca5a5;margin-bottom:4px">';
+  r+='<input type="checkbox" onchange="toggleTodayTask(''+t.id+'')" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
   r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연 '+daysLate+'일</span>';
-  if(t.area)r+='<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
-  r+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;color:var(--txt);cursor:pointer">'+t.name+'</span>';
-  if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
-  // 지연 업무 처리 버튼
-  r+='<div style="display:flex;gap:4px;flex-shrink:0">';
-  r+='<button onclick="overdueToToday(\''+t.id+'\')" style="font-size:10px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer">오늘하기</button>';
-  r+='<button onclick="overdueToTomorrow(\''+t.id+'\')" style="font-size:10px;padding:2px 6px;background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:4px;cursor:pointer">내일</button>';
-  r+='<button onclick="deleteTodayTask(\''+t.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button>';
-  r+='</div>';
-  r+='</div>';
+  if(t.area)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
+  r+='<span onclick="openDbTaskModal(''+t.id+'')" style="flex:1;font-size:12px;cursor:pointer;color:var(--txt)">'+t.name+'</span>';
+  r+='<div style="display:flex;gap:3px;flex-shrink:0">';
+  r+='<button onclick="overdueToToday(''+t.id+'')" style="font-size:10px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer">오늘</button>';
+  r+='<button onclick="overdueToTomorrow(''+t.id+'')" style="font-size:10px;padding:2px 6px;background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:4px;cursor:pointer">내일</button>';
+  r+='</div></div>';
   return r;
 }
 
@@ -12589,17 +12844,16 @@ function overdueToToday(id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(!t)return;
   t.dueDate=today;
-  t.timeSlot=t.timeSlot||'미배치';
+  t.timeSlot=undefined;
   saveTask(id);
   toast('오늘 업무로 이동했습니다');
   _renderBoardTodayPanel();
 }
 function overdueToTomorrow(id){
   var d=new Date();d.setDate(d.getDate()+1);
-  var tomorrow=d.toISOString().slice(0,10);
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(!t)return;
-  t.dueDate=tomorrow;
+  t.dueDate=d.toISOString().slice(0,10);
   saveTask(id);
   toast('내일 업무로 이동했습니다');
   _renderBoardTodayPanel();
@@ -12608,7 +12862,6 @@ function planOverdueToToday(planId,taskIdx){
   var plan=(_plans||[]).find(function(p){return p.id===planId;});
   if(!plan||!plan.tasks||plan.tasks[taskIdx]===undefined)return;
   plan.tasks[taskIdx].date=todayISO();
-  plan.tasks[taskIdx].timeSlot=plan.tasks[taskIdx].timeSlot||'미배치';
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){
     toast('오늘 업무로 이동했습니다');
     _renderBoardTodayPanel();
@@ -12618,64 +12871,39 @@ function planOverdueToToday(planId,taskIdx){
 function _renderTodayTaskSection(){
   var today=todayISO();
   function addDays(dateStr,n){var d=new Date(dateStr);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
-  var prep3End=addDays(today,3);
-
-  var allGeneral=(_dbTasks||[]).filter(function(t){
-    return !(t.id&&t.id.startsWith('__'))&&t.status!=='완료'&&!t.planId;
-  });
 
   var todayItems=(_dbTasks||[]).filter(function(t){
-    return t.dueDate===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId;
+    return t.dueDate===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId&&t.status!=='완료';
   });
-
-  // 실행 계획 지연 업무
-  var planOverdue=getPlanTasksForRange('2000-01-01',addDays(today,-1)).filter(function(t){
-    return t.status!=='완료'&&t.status!=='done';
-  });
-
+  var planTodayTasks=getPlanTasksForDate(today);
   var overdueItems=(_dbTasks||[]).filter(function(t){
     return !(t.id&&t.id.startsWith('__'))&&!t.planId&&t.dueDate&&t.dueDate<today&&t.status!=='완료';
   });
-  var prepItems=(_dbTasks||[]).filter(function(t){
-    return !(t.id&&t.id.startsWith('__'))&&!t.planId&&t.dueDate&&t.dueDate>today&&t.dueDate<=prep3End&&t.status!=='완료';
+  var planOverdue=getPlanTasksForRange('2000-01-01',addDays(today,-1)).filter(function(t){
+    return t.status!=='완료'&&t.done!==true;
   });
 
-  // 오늘 업무를 시간대별로 분류
-  var slotMap={'오전':[],'오후':[],'수업 후':[],'미배치':[]};
-  todayItems.forEach(function(t){
-    var slot=(t.timeSlot&&slotMap[t.timeSlot]!==undefined)?t.timeSlot:'미배치';
-    slotMap[slot].push(t);
-  });
-
-  // 오늘 실행 계획 업무
-  var planTodayTasks=getPlanTasksForDate(today);
-  var planSlotMap={'오전':[],'오후':[],'수업 후':[],'미배치':[]};
-  planTodayTasks.forEach(function(t){
-    var slot=(t.timeSlot&&planSlotMap[t.timeSlot]!==undefined)?t.timeSlot:'미배치';
-    planSlotMap[slot].push(t);
-  });
-
-  // 전체 예상 시간 합산
   var scheduledMin=todayItems.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
   scheduledMin+=planTodayTasks.reduce(function(s,t){return s+_parseDurationMin(t.estDuration);},0);
-  var totalAvailMin=240; // 기본 가용 시간 4시간 (추후 설정 가능)
+  var totalAvailMin=240;
 
   var h='';
 
-  // ─ 오늘 업무 용량 표시바
+  // 용량 바
   if(todayItems.length||planTodayTasks.length){
     h+=_renderTodayCapacityBar(totalAvailMin,scheduledMin);
   }
 
+  // + 추가 버튼
+  h+='<button class="btn btn-navy btn-sm" style="width:100%;margin-bottom:8px" onclick="openTodayTaskModal()">＋ 업무 추가</button>';
+
   // 🚨 지연 업무
   var totalOverdue=overdueItems.length+planOverdue.length;
   if(totalOverdue){
-    h+='<div style="border:1.5px solid #dc2626;border-radius:12px;overflow:hidden;margin-bottom:10px">';
-    h+='<div style="background:#fee2e2;padding:9px 14px;display:flex;align-items:center;gap:8px">';
-    h+='<span style="font-size:13px;font-weight:800;color:#991b1b">🚨 지연 업무</span>';
-    h+='<span style="font-size:11px;color:#991b1b;font-weight:700;margin-left:4px">'+totalOverdue+'건</span>';
-    h+='<span style="margin-left:auto;font-size:11px;color:#6b7280">오늘 하기 / 내일로 미루기 선택</span>';
-    h+='</div><div style="padding:6px 14px;background:var(--surface)">';
+    h+='<div style="border:1.5px solid #dc2626;border-radius:10px;overflow:hidden;margin-bottom:8px">';
+    h+='<div style="background:#fee2e2;padding:7px 10px;display:flex;align-items:center;gap:6px">';
+    h+='<span style="font-size:12px;font-weight:800;color:#991b1b">🚨 지연 업무 '+totalOverdue+'건</span>';
+    h+='</div><div style="padding:6px 8px;background:var(--surface)">';
     overdueItems.forEach(function(t){
       var daysLate=Math.floor((new Date(today)-new Date(t.dueDate))/(86400000));
       h+=_todayOverdueRow(t,daysLate);
@@ -12683,71 +12911,39 @@ function _renderTodayTaskSection(){
     planOverdue.forEach(function(t){
       var daysLate=Math.floor((new Date(today)-new Date(t.date))/(86400000));
       var isDone=t.done===true;
-      h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">';
-      h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
+      h+='<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;background:#fff5f5;border:1.5px solid #fca5a5;margin-bottom:4px">';
+      h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
       h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연 '+daysLate+'일</span>';
-      h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;border:1px solid #bfdbfe">📋 '+(t.planName||'플랜').substring(0,8)+'</span>';
-      h+='<span onclick="openPlanTaskModal(\''+t._planId+'\','+t._taskIdx+')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
-      h+='<div style="display:flex;gap:4px;flex-shrink:0">';
-      h+='<button onclick="planOverdueToToday(\''+t._planId+'\','+t._taskIdx+')" style="font-size:10px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer">오늘하기</button>';
-      h+='<button onclick="openPlanTaskModal(\''+t._planId+'\','+t._taskIdx+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:13px;padding:0 2px" title="편집">✏️</button>';
-      h+='</div>';
+      h+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋 '+(t.planName||'플랜').substring(0,8)+'</span>';
+      h+='<span onclick="openPlanTaskModal(''+t._planId+'','+t._taskIdx+')" style="flex:1;font-size:12px;cursor:pointer;color:var(--txt)">'+t.name+'</span>';
+      h+='<button onclick="planOverdueToToday(''+t._planId+'','+t._taskIdx+')" style="font-size:10px;padding:2px 6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:4px;cursor:pointer">오늘</button>';
       h+='</div>';
     });
     h+='</div></div>';
   }
 
-  // 🌅 아침 계획하기 버튼 (미배치 업무 있을 때)
-  var unassignedCount=slotMap['미배치'].length;
-  if(unassignedCount>0){
-    h+='<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">';
-    h+='<div style="flex:1"><div style="font-size:12px;font-weight:700;color:#92400e">⏰ 미배치 업무 '+unassignedCount+'건</div>';
-    h+='<div style="font-size:11px;color:#a16207;margin-top:2px">시간대를 배정하면 하루 계획이 완성됩니다</div></div>';
-    h+='<button class="btn" style="background:#f59e0b;color:#fff;font-size:11px;padding:7px 12px" onclick="openMorningPlanModal()">🌅 아침 계획하기</button>';
-    h+='</div>';
-  }
+  // 📋 미배치 업무 (타임라인에 없는 것만)
+  var unplaced=todayItems.filter(function(t){return t.startHour===undefined||t.startHour===null;});
+  var planUnplaced=planTodayTasks.filter(function(t){return t.startHour===undefined||t.startHour===null;});
+  var totalUnplaced=unplaced.length+planUnplaced.length;
 
-  // ☀️ 오전 / 🌤 오후 / 🌙 수업 후 / 📥 미배치
-  ['오전','오후','수업 후','미배치'].forEach(function(slot){
-    var items=slotMap[slot];
-    var planItems=planSlotMap[slot];
-    if(slot!=='미배치'||items.length||planItems.length){
-      h+=_renderTodayTimeSlotSection(slot,items,planItems);
-    }
-  });
-
-  // 미배치가 비어 있고 전체 업무도 없으면 안내 메시지
-  if(!todayItems.length&&!planTodayTasks.length&&!totalOverdue){
-    h+='<div style="border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center;color:var(--txt3)">';
-    h+='<div style="font-size:32px;margin-bottom:8px">📋</div>';
-    h+='<div style="font-size:13px;font-weight:600;color:var(--txt2);margin-bottom:4px">오늘 등록된 업무가 없습니다</div>';
-    h+='<div style="font-size:11px">＋ 추가 버튼 또는 업무 기한을 오늘로 설정하면 자동으로 표시됩니다</div>';
-    h+='<button class="btn btn-navy btn-sm" style="margin-top:12px" onclick="openTodayTaskModal(\'미배치\')">+ 오늘 업무 추가</button>';
-    h+='</div>';
+  h+='<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
+  h+='<div style="background:var(--surface2);padding:7px 10px;display:flex;align-items:center;gap:6px">';
+  h+='<span style="font-size:12px;font-weight:800;color:var(--navy)">📥 미배치 업무</span>';
+  if(totalUnplaced)h+='<span style="font-size:10px;color:var(--txt3)">'+totalUnplaced+'건</span>';
+  h+='<span style="font-size:10px;color:var(--txt3);margin-left:auto">← 드래그해서 배치</span>';
+  h+='</div>';
+  h+='<div style="padding:6px 8px;background:var(--bg)">';
+  if(totalUnplaced){
+    unplaced.forEach(function(t){h+=_listTaskRow(t);});
+    planUnplaced.forEach(function(t){h+=_listPlanTaskRow(t);});
+  }else{
+    h+='<div style="text-align:center;padding:16px;color:var(--txt3);font-size:11px">✅ 모든 업무가 타임라인에 배치됐어요</div>';
   }
-
-  // 🔔 마감 임박
-  if(prepItems.length){
-    h+='<div style="border:1.5px solid #f59e0b;border-radius:12px;overflow:hidden;margin-bottom:10px">';
-    h+='<div style="background:#fffbeb;padding:9px 14px;display:flex;align-items:center;gap:8px">';
-    h+='<span style="font-size:13px;font-weight:800;color:#92400e">🔔 마감 임박 (3일 이내)</span>';
-    h+='<span style="margin-left:auto;font-size:11px;color:#92400e">'+prepItems.length+'건</span>';
-    h+='</div><div style="padding:6px 14px;background:var(--surface)">';
-    prepItems.forEach(function(t){
-      var daysLeft=Math.round((new Date(t.dueDate)-new Date(today))/(1000*60*60*24));
-      h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
-      h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fef3c7;color:#d97706;flex-shrink:0">D-'+daysLeft+'</span>';
-      if(t.area)h+='<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
-      h+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;color:var(--txt)">'+t.name+'</span>';
-      h+='<span style="font-size:10px;color:#92400e;flex-shrink:0">~'+t.dueDate.slice(5)+'</span>';
-      h+='</div>';
-    });
-    h+='</div></div>';
-  }
+  h+='</div></div>';
 
   return h;
 }
-
 // ── 아침 계획하기 모달 ──────────────────────────────────────
 function openMorningPlanModal(){
   var today=todayISO();
@@ -13721,6 +13917,12 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
   r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
 
+  // 타임라인 시작 시간
+  var hourOpts=[{v:'',l:'시간 미배정'}];
+  for(var _h=7;_h<=24;_h++){var _d=_h===24?0:_h;hourOpts.push({v:String(_h),l:String(_d).padStart(2,'0')+':00'});}
+  var startHourSel=mkSel('dbt-starthour',hourOpts,t&&t.startHour!==undefined?String(t.startHour):'');
+  var shw=document.createElement('div');shw.style.marginBottom='10px';shw.appendChild(mkLbl('⏰ 타임라인 시작 시간'));shw.appendChild(startHourSel);box.appendChild(shw);
+
   // ── 오늘 업무 전용 필드 ──────────────────────────────
   var todaySection=document.createElement('div');
   var isDueToday=(t&&t.dueDate===today)||(defaultDueDate===today);
@@ -13826,15 +14028,18 @@ function _dbSaveTaskModal(id){
   var timeSlot=(document.getElementById('dbt-timeslot')||{}).value||'미배치';
   var estDuration=(document.getElementById('dbt-duration')||{}).value||'';
   var focusType=(document.getElementById('dbt-focus')||{}).value||'';
+  var startHourRaw=(document.getElementById('dbt-starthour')||{}).value||'';
+  var startHour=startHourRaw!==''?parseInt(startHourRaw):undefined;
   if(!name.trim()){alert('업무명을 입력하세요');return;}
   if(!_dbTasks)_dbTasks=[];
   if(id){
     var t=_dbTasks.find(function(x){return x.id===id;});
     if(t){t.name=name;t.area=area;t.taskType=taskType;t.priority=priority;t.dueDate=dueDate;t.parentTask=parentTask;
+      t.startHour=startHour;
       if(dueDate===today){t.timeSlot=timeSlot;t.estDuration=estDuration;t.focusType=focusType;}
     }
   }else{
-    var newTask={id:'task_'+Date.now(),name:name,area:area,taskType:taskType,priority:priority,dueDate:dueDate,parentTask:parentTask,status:'대기',cycle:'반복없음',memo:'',createdAt:today};
+    var newTask={id:'task_'+Date.now(),name:name,area:area,taskType:taskType,priority:priority,dueDate:dueDate,parentTask:parentTask,status:'대기',cycle:'반복없음',memo:'',createdAt:today,startHour:startHour};
     if(dueDate===today){newTask.timeSlot=timeSlot;newTask.estDuration=estDuration;newTask.focusType=focusType;}
     _dbTasks.push(newTask);
   }
