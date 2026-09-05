@@ -3562,10 +3562,10 @@ function _buildTimeline(){
   for(var h=7;h<=24;h++)HOURS.push(h);
 
   var timedTasks=(_dbTasks||[]).filter(function(t){
-    return t.dueDate===selDate&&t.startHour!==undefined&&t.startHour!==null;
+    return t.dueDate===selDate&&_isOnTimeline(t.startHour);
   });
   var planTimedTasks=getPlanTasksForDate(selDate).filter(function(t){
-    return t.startHour!==undefined&&t.startHour!==null;
+    return _isOnTimeline(t.startHour);
   });
   var slotMap={};
   HOURS.forEach(function(h){slotMap[h]=[];});
@@ -3729,34 +3729,29 @@ function tlDrop(e,hour){
   var row=e.currentTarget;
   row.style.background='';
 
-  if(!_tlDragMeta)return;
+  if(!_tlDragMeta){return;}
   var meta=_tlDragMeta;
-
-  if(meta.type==='db'){
-    var t=(_dbTasks||[]).find(function(x){return x.id===meta.id;});
-    if(!t)return;
-    t.startHour=hour;
-    // 지연업무(dueDate가 오늘 이전)를 드래그하면 오늘로 날짜 이동 + 타임라인도 오늘로
-    var dropDate=_tlSelectedDate();
-    if(t.dueDate<dropDate||t.dueDate!==dropDate){
-      t.dueDate=dropDate;
-    }
-    _tlDate=null; // 항상 오늘 기준으로 보여주기
-    t.dueDate=todayISO();
-    t.timeSlot=undefined;
-    saveTask(meta.id);
-  }else if(meta.type==='plan'){
-    var plan=(_plans||[]).find(function(p){return p.id===meta.id;});
-    if(!plan||!plan.tasks||plan.tasks[meta.idx]===undefined)return;
-    plan.tasks[meta.idx].startHour=hour;
-    plan.tasks[meta.idx].date=todayISO();
-    _tlDate=null;
-    db.collection('plans').doc(meta.id).update({tasks:plan.tasks}).catch(function(){});
-  }
-
   _tlDragMeta=null;
   _tlDragCardId=null;
   _tlDragFrom=null;
+
+  if(meta.type==='db'){
+    var t=(_dbTasks||[]).find(function(x){return x.id===meta.id;});
+    if(t){
+      t.startHour=hour;
+      t.dueDate=todayISO();
+      delete t.timeSlot;
+      saveTask(meta.id);
+    }
+  }else if(meta.type==='plan'){
+    var plan=(_plans||[]).find(function(p){return p.id===meta.id;});
+    if(plan&&plan.tasks&&plan.tasks[meta.idx]!==undefined){
+      plan.tasks[meta.idx].startHour=hour;
+      plan.tasks[meta.idx].date=todayISO();
+      db.collection('plans').doc(meta.id).update({tasks:plan.tasks}).catch(function(){});
+    }
+  }
+  _tlDate=null;
   _refreshTodayPanel();
   toast(_formatHour(hour)+'에 배치했습니다');
 }
@@ -3767,18 +3762,18 @@ function _refreshTodayPanel(){
   var right=document.getElementById('today-task-col');
   if(!left&&!right){_renderBoardTodayPanel();return;}
 
-  // 오른쪽 목록 먼저 업데이트 (스크롤 보존)
+  // 타임라인 먼저 — 데이터 변경 직후이므로 최신 _dbTasks 반영
+  if(left){left.innerHTML=_buildTimeline();}
+
+  // 오른쪽 목록 — 스크롤 보존
   if(right){
     var scrollTop=right.scrollTop;
     right.innerHTML=_renderTodayTaskSection();
     right.scrollTop=scrollTop;
   }
-  // 타임라인은 한 틱 뒤 — _dbTasks 상태가 완전히 반영된 후 빌드
-  setTimeout(function(){
-    var l=document.getElementById('today-timeline-col');
-    if(l){l.innerHTML=_buildTimeline();}
-    _initTimelineDnD();
-  },0);
+
+  // DnD 이벤트 재등록 (한 번만)
+  _initTimelineDnD();
 }
 
 function _formatHour(h){
@@ -12985,6 +12980,10 @@ var _TODAY_FOCUS_OPTIONS=['집중 업무','일반 업무','짧은 업무'];
 var _TODAY_FOCUS_COLORS={'집중 업무':'#7c3aed','일반 업무':'#2563eb','짧은 업무':'#6b7280'};
 var _TODAY_FOCUS_BG={'집중 업무':'#f5f3ff','일반 업무':'#eff6ff','짧은 업무':'#f8fafc'};
 
+function _isOnTimeline(sh){
+  // startHour가 실제 시간 숫자(0~24)인 경우만 타임라인에 배치된 것으로 판단
+  return sh!==undefined&&sh!==null&&sh!==''&&sh!=='undefined'&&!isNaN(parseInt(sh));
+}
 function _parseDurationMin(str){
   if(!str)return 0;
   var m=parseInt(str);return isNaN(m)?0:m;
@@ -13016,7 +13015,7 @@ function _renderTodayCapacityBar(totalMin,scheduledMin){
 // 오른쪽 목록용 업무 행 (드래그 가능)
 function _listTaskRow(t){
   var isDone=t.status==='완료';
-  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null&&t.startHour!==''&&t.startHour!=='undefined';
+  var isOnTimeline=_isOnTimeline(t.startHour);
   if(isOnTimeline)return '';
   var isRecentlyMoved=!!(_recentlyMoved&&_recentlyMoved[t.id]);
   var borderColor=isRecentlyMoved?'#86efac':'var(--border)';
@@ -13049,7 +13048,7 @@ function undoOverdueMove(id,prevDate){
 
 function _listPlanTaskRow(t){
   var isDone=t.done===true;
-  var isOnTimeline=t.startHour!==undefined&&t.startHour!==null&&t.startHour!==''&&t.startHour!=='undefined';
+  var isOnTimeline=_isOnTimeline(t.startHour);
   if(isOnTimeline)return '';
   var planKey='plan_'+t._planId+'_'+t._taskIdx;
   var isRecentlyMoved=!!(_recentlyMoved&&_recentlyMoved[planKey]);
@@ -13215,8 +13214,8 @@ function _renderTodayTaskSection(){
   }
 
   // 📋 미배치 업무 (타임라인에 없는 것만)
-  var unplaced=todayItems.filter(function(t){return !t.startHour&&t.startHour!==0;});
-  var planUnplaced=planTodayTasks.filter(function(t){return !t.startHour&&t.startHour!==0;});
+  var unplaced=todayItems.filter(function(t){return !_isOnTimeline(t.startHour);});
+  var planUnplaced=planTodayTasks.filter(function(t){return !_isOnTimeline(t.startHour);});
   var totalUnplaced=unplaced.length+planUnplaced.length;
 
   h+='<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
