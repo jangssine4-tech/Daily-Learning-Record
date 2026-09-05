@@ -3738,16 +3738,19 @@ function tlToggleDbTask(id,checked){
 function tlRemoveDbTask(id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(!t)return;
-  t.startHour=undefined;
+  delete t.startHour;
   t.timeSlot='미배치';
-  saveTask(id);
+  db.collection('dashBoardV2').doc(id).update({
+    startHour: firebase.firestore.FieldValue.delete(),
+    timeSlot:'미배치'
+  }).catch(function(){saveTask(id);});
   _renderBoardTodayPanel();
 }
 
 function tlRemovePlanTask(planId,idx){
   var plan=(_plans||[]).find(function(p){return p.id===planId;});
   if(!plan||!plan.tasks)return;
-  plan.tasks[idx].startHour=undefined;
+  delete plan.tasks[idx].startHour;
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).catch(function(){});
   _renderBoardTodayPanel();
 }
@@ -12862,12 +12865,11 @@ function _renderTodayCapacityBar(totalMin,scheduledMin){
 function _listTaskRow(t){
   var isDone=t.status==='완료';
   var isOnTimeline=t.startHour!==undefined&&t.startHour!==null;
-  if(isOnTimeline)return ''; // 타임라인에 배치된 업무는 목록에서 숨김
+  if(isOnTimeline)return '';
   var meta=JSON.stringify({type:'db',id:t.id}).replace(/"/g,'&quot;');
   var r='<div data-dragtask="'+meta+'" draggable="true" '
-    +'style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;'
-    +'background:var(--surface);border:1.5px solid var(--border);margin-bottom:4px;cursor:grab">';
-  r+='<span style="color:var(--txt3);font-size:12px;cursor:grab">⠿</span>';
+    +'style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:grab">';
+  r+='<span style="color:var(--txt3);font-size:13px;flex-shrink:0">⠿</span>';
   if(t.area)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
   r+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
   if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
@@ -12882,9 +12884,8 @@ function _listPlanTaskRow(t){
   if(isOnTimeline)return '';
   var meta=JSON.stringify({type:'plan',id:t._planId,idx:t._taskIdx}).replace(/"/g,'&quot;');
   var r='<div data-dragtask="'+meta+'" draggable="true" '
-    +'style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;'
-    +'background:#eff6ff;border:1.5px solid #93c5fd;margin-bottom:4px;cursor:grab">';
-  r+='<span style="color:var(--txt3);font-size:12px;cursor:grab">⠿</span>';
+    +'style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:grab">';
+  r+='<span style="color:var(--txt3);font-size:13px;flex-shrink:0">⠿</span>';
   r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700;border:1px solid #bfdbfe">📋 '+t.planName.substring(0,8)+'</span>';
   r+='<span onclick="openPlanTaskModal(\''+t._planId+'\','+t._taskIdx+')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
   if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
@@ -12901,7 +12902,10 @@ function changeTodaySlot(id,slot){
 }
 
 function _todayOverdueRow(t,daysLate){
-  var r='<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;background:#fff5f5;border:1.5px solid #fca5a5;margin-bottom:4px">';
+  var meta=JSON.stringify({type:'db',id:t.id}).replace(/"/g,'&quot;');
+  var r='<div data-dragtask="'+meta+'" draggable="true" '
+    +'style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid #fca5a5;cursor:grab">';
+  r+='<span style="color:#fca5a5;font-size:13px;flex-shrink:0">⠿</span>';
   r+='<input type="checkbox" onchange="toggleTodayTask(\''+t.id+'\')" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
   r+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연 '+daysLate+'일</span>';
   if(t.area)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
@@ -12918,8 +12922,14 @@ function overdueToToday(id){
   var t=(_dbTasks||[]).find(function(x){return x.id===id;});
   if(!t)return;
   t.dueDate=today;
-  t.timeSlot=undefined;
-  saveTask(id);
+  delete t.startHour;
+  delete t.timeSlot;
+  db.collection('dashBoardV2').doc(id).update({
+    dueDate:today,
+    startHour:firebase.firestore.FieldValue.delete(),
+    timeSlot:firebase.firestore.FieldValue.delete()
+  }).catch(function(){saveTask(id);});
+  _tlDate=null; // 오늘 날짜로 타임라인 전환
   toast('오늘 업무로 이동했습니다');
   _renderBoardTodayPanel();
 }
@@ -12936,6 +12946,8 @@ function planOverdueToToday(planId,taskIdx){
   var plan=(_plans||[]).find(function(p){return p.id===planId;});
   if(!plan||!plan.tasks||plan.tasks[taskIdx]===undefined)return;
   plan.tasks[taskIdx].date=todayISO();
+  delete plan.tasks[taskIdx].startHour;
+  _tlDate=null; // 오늘 날짜로 타임라인 전환
   db.collection('plans').doc(planId).update({tasks:plan.tasks}).then(function(){
     toast('오늘 업무로 이동했습니다');
     _renderBoardTodayPanel();
@@ -12985,7 +12997,9 @@ function _renderTodayTaskSection(){
     planOverdue.forEach(function(t){
       var daysLate=Math.floor((new Date(today)-new Date(t.date))/(86400000));
       var isDone=t.done===true;
-      h+='<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;background:#fff5f5;border:1.5px solid #fca5a5;margin-bottom:4px">';
+      var meta=JSON.stringify({type:'plan',id:t._planId,idx:t._taskIdx}).replace(/"/g,'&quot;');
+      h+='<div data-dragtask="'+meta+'" draggable="true" style="display:flex;align-items:center;gap:7px;padding:6px 4px;border-bottom:1px solid #fca5a5;cursor:grab">';
+      h+='<span style="color:#fca5a5;font-size:13px;flex-shrink:0">⠿</span>';
       h+='<input type="checkbox"'+(isDone?' checked':'')+' data-pid="'+t._planId+'" data-idx="'+t._taskIdx+'" onchange="_togglePlanTask(this.dataset.pid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:#dc2626">';
       h+='<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:#fee2e2;color:#dc2626;flex-shrink:0">지연 '+daysLate+'일</span>';
       h+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋 '+(t.planName||'플랜').substring(0,8)+'</span>';
