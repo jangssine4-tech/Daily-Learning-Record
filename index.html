@@ -12353,7 +12353,8 @@ function getPlanTasksForDate(dateStr){
           area:p.area,
           timeSlot:t.timeSlot||'미배치',
           estDuration:t.estDuration||'',
-          focusType:t.focusType||''
+          focusType:t.focusType||'',
+          startHour:t.startHour!==undefined?t.startHour:undefined
         });
       }
     });
@@ -12875,7 +12876,7 @@ function _renderTodayTaskSection(){
   var todayItems=(_dbTasks||[]).filter(function(t){
     return t.dueDate===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId&&t.status!=='완료';
   });
-  var planTodayTasks=getPlanTasksForDate(today);
+  var planTodayTasks=getPlanTasksForDate(today).filter(function(t){return t.done!==true;});
   var overdueItems=(_dbTasks||[]).filter(function(t){
     return !(t.id&&t.id.startsWith('__'))&&!t.planId&&t.dueDate&&t.dueDate<today&&t.status!=='완료';
   });
@@ -12923,8 +12924,8 @@ function _renderTodayTaskSection(){
   }
 
   // 📋 미배치 업무 (타임라인에 없는 것만)
-  var unplaced=todayItems.filter(function(t){return t.startHour===undefined||t.startHour===null;});
-  var planUnplaced=planTodayTasks.filter(function(t){return t.startHour===undefined||t.startHour===null;});
+  var unplaced=todayItems.filter(function(t){return t.startHour===undefined||t.startHour===null||t.startHour==='';});
+  var planUnplaced=planTodayTasks.filter(function(t){return t.startHour===undefined||t.startHour===null||t.startHour==='';});
   var totalUnplaced=unplaced.length+planUnplaced.length;
 
   h+='<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
