@@ -3736,6 +3736,12 @@ function tlDrop(e,hour){
     var t=(_dbTasks||[]).find(function(x){return x.id===meta.id;});
     if(!t)return;
     t.startHour=hour;
+    // 지연업무(dueDate가 오늘 이전)를 드래그하면 오늘로 날짜 이동 + 타임라인도 오늘로
+    var dropDate=_tlSelectedDate();
+    if(t.dueDate<dropDate||t.dueDate!==dropDate){
+      t.dueDate=dropDate;
+    }
+    _tlDate=null; // 항상 오늘 기준으로 보여주기
     t.dueDate=todayISO();
     t.timeSlot=undefined;
     saveTask(meta.id);
@@ -3744,6 +3750,7 @@ function tlDrop(e,hour){
     if(!plan||!plan.tasks||plan.tasks[meta.idx]===undefined)return;
     plan.tasks[meta.idx].startHour=hour;
     plan.tasks[meta.idx].date=todayISO();
+    _tlDate=null;
     db.collection('plans').doc(meta.id).update({tasks:plan.tasks}).catch(function(){});
   }
 
