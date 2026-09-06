@@ -254,6 +254,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 </head>
 <body>
 <datalist id="time-slots-list"><option value="10:00"><option value="10:30"><option value="11:00"><option value="11:30"><option value="12:00"><option value="12:30"><option value="13:00"><option value="13:30"><option value="14:00"><option value="14:30"><option value="15:00"><option value="15:30"><option value="16:00"><option value="16:30"><option value="17:00"><option value="17:30"><option value="18:00"><option value="18:30"><option value="19:00"><option value="19:30"><option value="20:00"><option value="20:30"><option value="21:00"><option value="21:30"><option value="22:00"><option value="22:30"></datalist>
@@ -2676,6 +2677,7 @@ function goto(view){
       }).catch(function(){});
     }
   }
+  else if(view==='teacher-resources'){trInit();}
   else if(view==='goals'){initYearSelects('goals');if(!_goalTargets||Object.keys(_goalTargets).length===0){var yr2=new Date().getFullYear();loadGoalTargets(yr2).then(function(){renderGoalsView();});}else renderGoalsView();}
   else if(view==='acal'){
     var acalEl=$('acal-main-area');
@@ -20356,6 +20358,290 @@ if(document.readyState==='loading'){
 </div>
 </div>
 
+<div class="view" id="view-teacher-resources">
+  <div class="page-top"><h2>📁 교사 자료실</h2></div>
+  <div id="tr-root" style="padding:0 4px"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// 교사 자료실 (Teacher Resources)
+// Firebase Storage 기반 파일 업로드/다운로드/폴더 관리
+// ══════════════════════════════════════════════════════════════
+var _trStorage=null;
+var _trFolders=[]; // Firestore 폴더 목록
+var _trFiles=[];   // Firestore 파일 메타 목록
+var _trCurrentFolder=null; // 현재 선택된 폴더 id
+var _trLoaded=false;
+var TR_MAX_FILE_MB=50;
+var TR_COLL_FOLDERS='tr_folders';
+var TR_COLL_FILES='tr_files';
+var TR_STORAGE_PATH='teacher-resources';
+
+function trInit(){
+  // Storage 초기화
+  try{_trStorage=firebase.storage();}catch(e){
+    document.getElementById('tr-root').innerHTML='<div style="padding:20px;color:red">Firebase Storage를 사용할 수 없습니다: '+e.message+'</div>';
+    return;
+  }
+  if(_trLoaded){trRender();return;}
+  trLoad().then(function(){trRender();});
+}
+
+function trLoad(){
+  return Promise.all([
+    db.collection(TR_COLL_FOLDERS).orderBy('name').get(),
+    db.collection(TR_COLL_FILES).orderBy('uploadedAt','desc').get()
+  ]).then(function(rs){
+    _trFolders=rs[0].docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    _trFiles=rs[1].docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    _trLoaded=true;
+    // 기본 폴더 없으면 생성
+    if(!_trFolders.length){
+      var defaults=['단어장','수업 계획서','워크시트','기타'];
+      Promise.all(defaults.map(function(name){
+        return db.collection(TR_COLL_FOLDERS).add({name:name,createdAt:todayISO()});
+      })).then(function(){trLoad().then(trRender);});
+    }
+  }).catch(function(e){console.error('trLoad 오류:',e);});
+}
+
+function trRender(){
+  var el=document.getElementById('tr-root');if(!el)return;
+
+  // 레이아웃
+  var h='<div style="display:flex;gap:0;height:calc(100dvh - 110px);min-height:400px">';
+
+  // ── 왼쪽: 폴더 트리 ──
+  h+='<div style="width:160px;flex-shrink:0;border-right:2px solid var(--border);overflow-y:auto;background:var(--surface)">';
+  h+='<div style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--txt3);display:flex;align-items:center;gap:6px">';
+  h+='폴더<button onclick="trAddFolder()" style="margin-left:auto;background:var(--navy);border:none;color:#fff;border-radius:4px;padding:1px 7px;cursor:pointer;font-size:12px">+</button>';
+  h+='</div>';
+  // 전체 보기
+  h+='<div onclick="trSelectFolder(null)" style="padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;'
+    +(_trCurrentFolder===null?'background:var(--navy);color:#fff':'color:var(--txt)')+'">';
+  h+='📂 전체</div>';
+  _trFolders.forEach(function(f){
+    var active=_trCurrentFolder===f.id;
+    var cnt=_trFiles.filter(function(fi){return fi.folderId===f.id;}).length;
+    h+='<div onclick="trSelectFolder(\''+f.id+'\')" style="padding:8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;'
+      +(active?'background:var(--navy);color:#fff':'color:var(--txt)')+'">';
+    h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 '+f.name+'</span>';
+    if(cnt)h+='<span style="font-size:10px;'+(active?'color:#93c5fd':'color:var(--txt3)')+'">'+cnt+'</span>';
+    h+='<button onclick="event.stopPropagation();trDeleteFolder(\''+f.id+'\')" style="background:none;border:none;color:'+(active?'#fca5a5':'var(--txt3)')+';cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">×</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+
+  // ── 오른쪽: 파일 목록 ──
+  h+='<div style="flex:1;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column">';
+
+  // 툴바
+  var curFolder=_trFolders.find(function(f){return f.id===_trCurrentFolder;});
+  h+='<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface);flex-shrink:0">';
+  h+='<span style="font-size:13px;font-weight:700;color:var(--navy)">'+(curFolder?'📁 '+curFolder.name:'📂 전체 자료')+'</span>';
+  h+='<span style="font-size:11px;color:var(--txt3);margin-left:4px">';
+  var dispFiles=_trCurrentFolder?_trFiles.filter(function(f){return f.folderId===_trCurrentFolder;}):_trFiles;
+  h+=dispFiles.length+'개 파일</span>';
+  h+='<div style="margin-left:auto;display:flex;gap:6px">';
+  h+='<input type="text" id="tr-search" placeholder="파일 검색..." oninput="trRender()" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--txt);width:140px">';
+  h+='<label style="cursor:pointer"><input type="file" id="tr-file-input" multiple accept=".docx,.doc,.hwp,.hwpx,.pdf,.pptx,.ppt,.xlsx,.xls,.txt,.jpg,.png" style="display:none" onchange="trUploadFiles(this.files)">'
+    +'<span class="btn btn-navy btn-sm" style="display:inline-block">📤 업로드</span></label>';
+  h+='</div>';
+  h+='</div>';
+
+  // 파일 목록
+  var searchVal=(document.getElementById('tr-search')||{}).value||'';
+  var filteredFiles=dispFiles.filter(function(f){return !searchVal||f.name.toLowerCase().indexOf(searchVal.toLowerCase())!==-1;});
+
+  h+='<div style="flex:1;padding:8px">';
+  if(!filteredFiles.length){
+    h+='<div style="text-align:center;padding:40px;color:var(--txt3)">';
+    h+='<div style="font-size:40px;margin-bottom:10px">📂</div>';
+    h+='<div style="font-size:13px;font-weight:600">파일이 없습니다</div>';
+    h+='<div style="font-size:11px;margin-top:6px">📤 업로드 버튼으로 파일을 추가하세요</div>';
+    h+='<div style="font-size:10px;color:var(--txt3);margin-top:4px">지원 형식: docx, hwp, pdf, pptx, xlsx, 이미지 (최대 50MB)</div>';
+    h+='</div>';
+  }else{
+    // 헤더
+    h+='<div style="display:grid;grid-template-columns:1fr 100px 80px 120px;gap:8px;padding:6px 10px;font-size:10px;font-weight:700;color:var(--txt3);border-bottom:1px solid var(--border)">';
+    h+='<span>파일명</span><span>폴더</span><span style="text-align:right">크기</span><span style="text-align:right">업로드일</span>';
+    h+='</div>';
+    filteredFiles.forEach(function(f){
+      var folder=_trFolders.find(function(fd){return fd.id===f.folderId;});
+      var ext=(f.name.split('.').pop()||'').toLowerCase();
+      var icon=trFileIcon(ext);
+      h+='<div style="display:grid;grid-template-columns:1fr 100px 80px 120px;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);align-items:center;'
+        +'transition:background .1s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">';
+      // 파일명
+      h+='<div style="display:flex;align-items:center;gap:6px;min-width:0">';
+      h+='<span style="font-size:18px;flex-shrink:0">'+icon+'</span>';
+      h+='<span style="font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.name+'</span>';
+      h+='</div>';
+      // 폴더
+      h+='<span style="font-size:10px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(folder?folder.name:'-')+'</span>';
+      // 크기
+      h+='<span style="font-size:10px;color:var(--txt3);text-align:right">'+trFormatSize(f.size)+'</span>';
+      // 날짜 + 버튼
+      h+='<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">';
+      h+='<span style="font-size:10px;color:var(--txt3)">'+(f.uploadedAt||'').slice(5)+'</span>';
+      h+='<button onclick="trDownload(\''+f.id+'\')" title="다운로드" style="background:var(--navy);border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">⬇</button>';
+      h+='<button onclick="trDelete(\''+f.id+'\')" title="삭제" style="background:none;border:1px solid var(--border);color:var(--txt3);border-radius:4px;padding:2px 5px;cursor:pointer;font-size:12px">×</button>';
+      h+='</div>';
+      h+='</div>';
+    });
+  }
+  h+='</div>';
+  h+='</div>';
+  h+='</div>';
+
+  el.innerHTML=h;
+}
+
+function trFileIcon(ext){
+  var map={docx:'📝',doc:'📝',hwp:'📄',hwpx:'📄',pdf:'📕',pptx:'📊',ppt:'📊',xlsx:'📗',xls:'📗',txt:'📃',jpg:'🖼',jpeg:'🖼',png:'🖼',gif:'🖼'};
+  return map[ext]||'📎';
+}
+function trFormatSize(bytes){
+  if(!bytes)return '-';
+  if(bytes<1024)return bytes+'B';
+  if(bytes<1024*1024)return Math.round(bytes/1024)+'KB';
+  return (bytes/(1024*1024)).toFixed(1)+'MB';
+}
+
+function trSelectFolder(id){
+  _trCurrentFolder=id;
+  trRender();
+}
+
+function trAddFolder(){
+  var name=prompt('새 폴더 이름을 입력하세요');
+  if(!name||!name.trim())return;
+  db.collection(TR_COLL_FOLDERS).add({name:name.trim(),createdAt:todayISO()}).then(function(ref){
+    _trFolders.push({id:ref.id,name:name.trim(),createdAt:todayISO()});
+    _trFolders.sort(function(a,b){return a.name>b.name?1:-1;});
+    trRender();
+  }).catch(function(e){toast('폴더 생성 실패: '+e.message);});
+}
+
+function trDeleteFolder(id){
+  var haFiles=_trFiles.some(function(f){return f.folderId===id;});
+  if(haFiles){toast('폴더 안에 파일이 있어 삭제할 수 없습니다. 파일을 먼저 삭제해 주세요.');return;}
+  if(!confirm('폴더를 삭제할까요?'))return;
+  db.collection(TR_COLL_FOLDERS).doc(id).delete().then(function(){
+    _trFolders=_trFolders.filter(function(f){return f.id!==id;});
+    if(_trCurrentFolder===id)_trCurrentFolder=null;
+    trRender();
+  });
+}
+
+function trUploadFiles(files){
+  if(!files||!files.length)return;
+  var arr=Array.from(files);
+  // 폴더 선택 모달
+  trShowFolderPicker(function(folderId){
+    arr.forEach(function(file){
+      if(file.size>TR_MAX_FILE_MB*1024*1024){toast(file.name+': 파일이 너무 큽니다 (최대 '+TR_MAX_FILE_MB+'MB)');return;}
+      trUploadOne(file,folderId);
+    });
+  });
+  // input 초기화
+  document.getElementById('tr-file-input').value='';
+}
+
+function trShowFolderPicker(callback){
+  var old=document.getElementById('tr-folder-picker');if(old)old.remove();
+  var modal=document.createElement('div');
+  modal.id='tr-folder-picker';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--surface);border-radius:14px;padding:18px;width:100%;max-width:320px';
+  var h='<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📁 저장할 폴더 선택</div>';
+  h+='<div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto">';
+  _trFolders.forEach(function(f){
+    h+='<button onclick="trFolderPick(\''+f.id+'\')" '
+      +'style="text-align:left;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;font-size:13px;font-weight:600;color:var(--txt)">📁 '+f.name+'</button>';
+  });
+  h+='<button onclick="trFolderPick(null)" '
+    +'style="text-align:left;padding:10px 14px;border:1.5px dashed var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:12px;color:var(--txt3)">📂 폴더 미지정</button>';
+  h+='</div>';
+  box.innerHTML=h;
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+  // callback을 전역에 임시 등록
+  window._trFolderPickerCb=callback;
+}
+
+function trUploadOne(file,folderId){
+  if(!_trStorage)return;
+  var timestamp=Date.now();
+  var safeName=file.name.replace(/[^a-zA-Z0-9가-힣._-]/g,'_');
+  var path=TR_STORAGE_PATH+'/'+timestamp+'_'+safeName;
+  var ref=_trStorage.ref(path);
+
+  // 진행 토스트
+  toast('📤 '+file.name+' 업로드 중...',10000);
+
+  ref.put(file).then(function(snap){
+    return snap.ref.getDownloadURL();
+  }).then(function(url){
+    var meta={
+      name:file.name,
+      path:path,
+      url:url,
+      size:file.size,
+      type:file.type,
+      folderId:folderId||null,
+      uploadedAt:todayISO(),
+      uploadedBy:(currentUser&&currentUser.name)||'원장'
+    };
+    return db.collection(TR_COLL_FILES).add(meta).then(function(ref){
+      meta.id=ref.id;
+      _trFiles.unshift(meta);
+    });
+  }).then(function(){
+    toast('✅ '+file.name+' 업로드 완료');
+    trRender();
+  }).catch(function(e){
+    toast('❌ 업로드 실패: '+e.message);
+    console.error(e);
+  });
+}
+
+function trDownload(fileId){
+  var f=_trFiles.find(function(x){return x.id===fileId;});
+  if(!f||!f.url){toast('다운로드 링크를 찾을 수 없습니다');return;}
+  var a=document.createElement('a');
+  a.href=f.url;
+  a.download=f.name;
+  a.target='_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function trDelete(fileId){
+  var f=_trFiles.find(function(x){return x.id===fileId;});
+  if(!f)return;
+  if(!confirm('"'+f.name+'"을 삭제할까요?'))return;
+  var promises=[db.collection(TR_COLL_FILES).doc(fileId).delete()];
+  if(f.path&&_trStorage){
+    promises.push(_trStorage.ref(f.path).delete().catch(function(){}));
+  }
+  Promise.all(promises).then(function(){
+    _trFiles=_trFiles.filter(function(x){return x.id!==fileId;});
+    toast('삭제됐습니다');
+    trRender();
+  }).catch(function(e){toast('삭제 실패: '+e.message);});
+}
+
+// 폴더 피커에서 버튼 클릭 시 전역 콜백 호출
+function trFolderPick(id){
+  var modal=document.getElementById('tr-folder-picker');if(modal)modal.remove();
+  if(window._trFolderPickerCb)window._trFolderPickerCb(id);
+}
+</script>
 <script>
 window.addEventListener('resize', function(){_fixStickyPad&&_fixStickyPad();});
 document.addEventListener('DOMContentLoaded', function(){setTimeout(function(){_fixStickyPad&&_fixStickyPad();},500);});
