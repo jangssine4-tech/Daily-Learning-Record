@@ -15683,7 +15683,7 @@ function _ilAutoImport(lid){
     +'</div>';
 
   // 필터 영역
-  var grades=['초4','초5','초6','중1','중2','중3'];
+  var grades=['초1','초2','초3','초4','초5','초6','중1','중2','중3'];
   var statuses=['재원','신규','휴원'];
   var days=['월','화','수','목','금','토'];
 
@@ -15764,8 +15764,8 @@ function ilImportFilter(){
   });
 
   // 정렬: 초5,6 먼저 → 초4 → 나머지
-  var gradeOrder={'초5':0,'초6':0,'초4':1,'중1':2,'중2':2,'중3':2};
-  filtered.sort(function(a,b){return (gradeOrder[a.grade||'']||3)-(gradeOrder[b.grade||'']||3);});
+  var gradeOrder={'초5':0,'초6':0,'초4':1,'초3':2,'초2':2,'초1':2,'중1':3,'중2':3,'중3':3};
+  filtered.sort(function(a,b){return (gradeOrder[a.grade||'']||4)-(gradeOrder[b.grade||'']||4);});
 
   var el=document.getElementById('il-import-result');
   if(!el)return;
@@ -15858,57 +15858,265 @@ function _renderMeetingAttendees(el){
       .filter(function(e){return ['간담회','설명회'].includes(e.cat);})
       .sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
 
-  var html='<div style="max-width:700px;padding:14px">';
-  html+='<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:14px">간담회·설명회 참석자 관리</div>';
+    var html='<div style="padding:12px 4px">';
 
-  if(!calEvts.length){
-    html+='<div style="text-align:center;padding:40px;color:var(--txt3)">'
-      +'<div style="font-size:36px;margin-bottom:10px">📅</div>'
-      +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">등록된 간담회·설명회 일정이 없어요</div>'
-      +'<div style="font-size:12px">연간 학사일정에 간담회 또는 설명회를 등록하면 여기에 자동으로 표시됩니다</div>'
-      +'<button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="goto(\'acal\')">학사일정 등록하기 →</button>'
-      +'</div>';
-  }else{
-    calEvts.forEach(function(e){
-      var attendees=e.attendees||[];
-      var dateStr=e.date?(e.endDate&&e.endDate!==e.date?e.date.slice(5)+' ~ '+e.endDate.slice(5):e.date.slice(5)):'-';
-      var done=attendees.filter(function(a){return a.attended;}).length;
-      html+='<div class="card" style="padding:14px;margin-bottom:12px">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'
-        +'<div>'
-        +'<div style="font-size:13px;font-weight:700;color:var(--navy)">'+e.title+'</div>'
-        +'<div style="font-size:11px;color:var(--txt3)">'+dateStr+' · '+(e.cat||'-')+'</div>'
-        +'</div>'
-        +'<span style="font-size:12px;font-weight:700;color:var(--mint)">'+done+' / '+attendees.length+'명 참석</span>'
-        +'</div>'
-        // 참석자 목록
-        +(attendees.length?
-          '<div style="margin-bottom:10px">'
-          +attendees.map(function(a,i){
-            return'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
-              +'<input type="checkbox" data-evtid="'+e.id+'" data-idx="'+i+'"'+(a.attended?' checked':'')+' onchange="_toggleAttendee(this.dataset.evtid,parseInt(this.dataset.idx),this.checked)" style="width:14px;height:14px;accent-color:var(--navy)">'
-              +'<span style="flex:1;font-size:13px;'+(a.attended?'':'color:var(--txt3)')+'">'+a.name+'</span>'
-              +'<span style="font-size:11px;color:var(--txt3)">'+( a.memo||'')+'</span>'
-              +'<button onclick="_removeAttendee(\''+e.id+'\','+i+')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:12px">✕</button>'
-              +'</div>';
-          }).join('')
-          +'</div>'
-          :'<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">참석자를 추가해 주세요</div>')
-        // 참석자 추가
-        +'<div style="display:flex;gap:6px">'
-        +'<select class="fi" style="flex:1;font-size:12px" id="att-student-'+e.id+'">'
-        +'<option value="">학생 선택</option>'
-        +activeStudents.map(function(s){return'<option value="'+s.name+'">'+s.name+'</option>';}).join('')
-        +'</select>'
-        +'<input class="fi" style="width:80px;font-size:12px" id="att-memo-'+e.id+'" placeholder="메모">'
-        +'<button class="btn btn-outline btn-sm" data-evtid="'+e.id+'" onclick="_addAttendee(this.dataset.evtid)">추가</button>'
-        +'</div>'
+    if(!calEvts.length){
+      html+='<div style="text-align:center;padding:40px;color:var(--txt3)">'
+        +'<div style="font-size:36px;margin-bottom:10px">📅</div>'
+        +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">등록된 간담회·설명회 일정이 없어요</div>'
+        +'<div style="font-size:12px">연간 학사일정에 간담회 또는 설명회를 등록하면 여기에 자동으로 표시됩니다</div>'
+        +'<button class="btn btn-outline btn-sm" style="margin-top:12px" onclick="goto(\'acal\')">학사일정 등록하기 →</button>'
         +'</div>';
+      el.innerHTML=html+'</div>';
+      return;
+    }
+
+    // 초대 명단 먼저 로드 후 렌더
+    if(!_inviteListCache){
+      _ilLoad(function(){_renderMeetingAttendees(el);});
+      return;
+    }
+
+    calEvts.forEach(function(evt){
+      var eid=evt.id;
+      var dateStr=evt.date?(evt.endDate&&evt.endDate!==evt.date?evt.date.slice(5)+' ~ '+evt.endDate.slice(5):evt.date.slice(5)):'-';
+
+      // 초대 명단에서 "초대" 상태 인원 가져오기
+      var inviteData=(_inviteListCache&&_inviteListCache[eid])||{rows:[]};
+      var invitedRows=(inviteData.rows||[]).filter(function(r){return r.invite==='초대';});
+
+      // 당일 참석 데이터 (기존 attendees 구조 재활용)
+      if(!evt.attendees)evt.attendees=[];
+      // invitedRows 기준으로 attendees 동기화
+      invitedRows.forEach(function(r){
+        var found=evt.attendees.find(function(a){return a.name===r.parent||a.name===r.student;});
+        if(!found){
+          evt.attendees.push({
+            name:r.parent||r.student,
+            student:r.student,
+            grade:r.grade,
+            response:r.response||'미응답',
+            attended:r.response==='참석',
+            companion:0,
+            memo:r.concern||''
+          });
+        }
+      });
+
+      var total=evt.attendees.length;
+      var confirmed=evt.attendees.filter(function(a){return a.response==='참석';}).length;
+      var attended=evt.attendees.filter(function(a){return a.attended;}).length;
+      var companionTotal=evt.attendees.reduce(function(s,a){return s+(parseInt(a.companion)||0);},0);
+      var realTotal=attended+companionTotal;
+      var attendRate=total>0?Math.round(attended/total*100):0;
+
+      html+='<div class="card" style="padding:14px;margin-bottom:16px">';
+
+      // ── 헤더 ──
+      html+='<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
+      html+='<div style="flex:1">';
+      html+='<div style="font-size:14px;font-weight:800;color:var(--navy)">'+evt.title+'</div>';
+      html+='<div style="font-size:11px;color:var(--txt3)">'+dateStr+' · '+(evt.cat||'-')+'</div>';
+      html+='</div>';
+      html+='<button class="btn btn-outline btn-sm" onclick="attAddManual(\''+eid+'\')">+ 현장 등록</button>';
+      html+='</div>';
+
+      // ── 진행 요약 카드 ──
+      html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">';
+      var stats=[
+        {label:'초대',val:total,color:'var(--navy)',bg:'#eff6ff'},
+        {label:'참석 확정',val:confirmed,color:'#10b981',bg:'#f0fdf4'},
+        {label:'실참석',val:attended,color:'#2563eb',bg:'#dbeafe'},
+        {label:'지인 동반',val:companionTotal,color:'#7c3aed',bg:'#f5f3ff'}
+      ];
+      stats.forEach(function(s){
+        html+='<div style="background:'+s.bg+';border-radius:8px;padding:8px;text-align:center">';
+        html+='<div style="font-size:18px;font-weight:800;color:'+s.color+'">'+s.val+'</div>';
+        html+='<div style="font-size:10px;color:var(--txt3)">'+s.label+'</div>';
+        html+='</div>';
+      });
+      html+='</div>';
+
+      // 참석률 바
+      if(total>0){
+        html+='<div style="margin-bottom:12px">';
+        html+='<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--txt3);margin-bottom:3px">';
+        html+='<span>참석률 <b style="color:var(--navy)">'+attendRate+'%</b></span>';
+        html+='<span>실참석 '+realTotal+'명 (지인 포함)</span>';
+        html+='</div>';
+        var barColor=attendRate>=70?'#10b981':attendRate>=40?'#f59e0b':'#ef4444';
+        html+='<div style="background:var(--surface2);border-radius:6px;height:6px">';
+        html+='<div style="background:'+barColor+';width:'+attendRate+'%;height:6px;border-radius:6px"></div>';
+        html+='</div></div>';
+      }
+
+      // ── 응답 상태 탭 필터 ──
+      var curFilter=window['_attFilter_'+eid]||'전체';
+      html+='<div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">';
+      var filterCounts={
+        '전체':evt.attendees.length,
+        '참석':evt.attendees.filter(function(a){return a.response==='참석';}).length,
+        '미응답':evt.attendees.filter(function(a){return !a.response||a.response==='미응답';}).length,
+        '불참':evt.attendees.filter(function(a){return a.response==='불참';}).length
+      };
+      ['전체','참석','미응답','불참'].forEach(function(f){
+        var active=curFilter===f;
+        var fc={'참석':'#10b981','미응답':'#f59e0b','불참':'#ef4444','전체':'var(--navy)'}[f];
+        html+='<button onclick="attSetFilter(\''+eid+'\',\''+f+'\')" '
+          +'style="font-size:10px;padding:3px 10px;border-radius:12px;cursor:pointer;border:1.5px solid '+(active?fc:'var(--border)')+';'
+          +'background:'+(active?fc:'transparent')+';color:'+(active?'#fff':fc||'var(--txt)')+';font-weight:700">'
+          +f+' '+filterCounts[f]+'</button>';
+      });
+      html+='</div>';
+
+      // ── 참석자 목록 ──
+      html+='<div id="att-list-'+eid+'">';
+      html+=_buildAttList(eid,evt.attendees,curFilter);
+      html+='</div>';
+
+      // ── 결과 요약 (참석 후) ──
+      if(attended>0){
+        var memoList=evt.attendees.filter(function(a){return a.attended&&a.memo;});
+        html+='<div style="margin-top:12px;padding:10px 12px;background:#f8fafc;border-radius:8px;border-left:3px solid var(--navy)">';
+        html+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:6px">📊 설명회 결과 요약</div>';
+        html+='<div style="font-size:11px;color:var(--txt);line-height:1.8">';
+        html+='초대 '+total+'명 → 실참석 '+attended+'명 (참석률 '+attendRate+'%)<br>';
+        if(companionTotal>0)html+='지인 동반 '+companionTotal+'명 포함 총 '+realTotal+'명<br>';
+        if(memoList.length)html+='특이사항: '+memoList.map(function(a){return a.name+' — '+a.memo;}).join(' / ');
+        html+='</div></div>';
+      }
+
+      html+='</div>'; // card
     });
+
+    html+='</div>';
+    el.innerHTML=html;
+  });
+}
+
+function _buildAttList(eid,attendees,filter){
+  var filtered=attendees.filter(function(a){
+    if(filter==='전체')return true;
+    if(filter==='참석')return a.response==='참석';
+    if(filter==='미응답')return !a.response||a.response==='미응답';
+    if(filter==='불참')return a.response==='불참';
+    return true;
+  });
+
+  if(!filtered.length){
+    return '<div style="text-align:center;padding:16px;color:var(--txt3);font-size:12px">해당 상태의 참석자가 없습니다</div>';
   }
-  html+='</div>';
-  el.innerHTML=html;
-  }); // loadAcademicCalendar callback end
+
+  var RESP_COLOR={'참석':'#10b981','미응답':'#f59e0b','불참':'#ef4444'};
+  var h='';
+  filtered.forEach(function(a,i){
+    var origIdx=attendees.indexOf(a);
+    var respColor=RESP_COLOR[a.response]||'#94a3b8';
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">';
+    // 실참석 체크박스
+    h+='<input type="checkbox"'+(a.attended?' checked':'')+' '
+      +'onchange="attToggle(\''+eid+'\','+origIdx+',this.checked)" '
+      +'style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--navy)" title="당일 실참석">';
+    // 학부모/학생명
+    h+='<div style="flex:1;min-width:0">';
+    h+='<span style="font-size:12px;font-weight:600;'+(a.attended?'color:var(--txt)':'color:var(--txt3)')+'">'+a.name+'</span>';
+    if(a.student&&a.student!==a.name)h+='<span style="font-size:10px;color:var(--txt3);margin-left:4px">('+a.student+' '+( a.grade||'')+')</span>';
+    h+='</div>';
+    // 응답 상태 드롭다운
+    h+='<select onchange="attSetResponse(\''+eid+'\','+origIdx+',this.value)" '
+      +'style="font-size:10px;padding:2px 4px;border:1.5px solid '+respColor+';border-radius:6px;color:'+respColor+';font-weight:700;background:transparent;cursor:pointer">';
+    ['미응답','참석','불참'].forEach(function(s){
+      h+='<option value="'+s+'"'+(a.response===s?' selected':'')+'>'+s+'</option>';
+    });
+    h+='</select>';
+    // 지인 동반 수
+    h+='<div style="display:flex;align-items:center;gap:3px;flex-shrink:0">';
+    h+='<span style="font-size:10px;color:var(--txt3)">동반</span>';
+    h+='<input type="number" value="'+(a.companion||0)+'" min="0" max="9" '
+      +'onchange="attSetCompanion(\''+eid+'\','+origIdx+',this.value)" '
+      +'style="width:36px;font-size:11px;padding:2px 3px;border:1px solid var(--border);border-radius:4px;text-align:center">';
+    h+='<span style="font-size:10px;color:var(--txt3)">명</span>';
+    h+='</div>';
+    // 메모
+    h+='<input value="'+(a.memo||'')+'" placeholder="특이사항" '
+      +'onchange="attSetMemo(\''+eid+'\','+origIdx+',this.value)" '
+      +'style="width:110px;font-size:10px;padding:2px 5px;border:1px solid var(--border);border-radius:4px;flex-shrink:0">';
+    // 삭제
+    h+='<button onclick="attRemove(\''+eid+'\','+origIdx+')" '
+      +'style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0">×</button>';
+    h+='</div>';
+  });
+  return h;
+}
+
+function attSetFilter(eid,f){
+  window['_attFilter_'+eid]=f;
+  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===eid;});
+  if(!evt)return;
+  var el=document.getElementById('att-list-'+eid);
+  if(el)el.innerHTML=_buildAttList(eid,evt.attendees||[],f);
+  // 탭 버튼 스타일 갱신
+  _renderMeetingAttendees(document.getElementById('meeting-page-area'));
+}
+
+function attToggle(eid,idx,checked){
+  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===eid;});
+  if(!evt||!evt.attendees||!evt.attendees[idx])return;
+  evt.attendees[idx].attended=checked;
+  saveAcademicCalendar();
+  toast((checked?'✅ 실참석':'미참석')+' 처리됐어요');
+}
+
+function attSetResponse(eid,idx,val){
+  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===eid;});
+  if(!evt||!evt.attendees||!evt.attendees[idx])return;
+  evt.attendees[idx].response=val;
+  if(val==='참석')evt.attendees[idx].attended=true;
+  // 초대 명단에도 응답 상태 반영
+  var invData=(_inviteListCache&&_inviteListCache[eid]);
+  if(invData){
+    var name=evt.attendees[idx].name;
+    var student=evt.attendees[idx].student;
+    var row=(invData.rows||[]).find(function(r){return r.parent===name||r.student===student;});
+    if(row){row.response=val;_ilSave(eid);}
+  }
+  saveAcademicCalendar();
+  _renderMeetingAttendees(document.getElementById('meeting-page-area'));
+}
+
+function attSetCompanion(eid,idx,val){
+  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===eid;});
+  if(!evt||!evt.attendees||!evt.attendees[idx])return;
+  evt.attendees[idx].companion=parseInt(val)||0;
+  saveAcademicCalendar();
+}
+
+function attSetMemo(eid,idx,val){
+  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===eid;});
+  if(!evt||!evt.attendees||!evt.attendees[idx])return;
+  evt.attendees[idx].memo=val;
+  saveAcademicCalendar();
+}
+
+function attRemove(eid,idx){
+  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===eid;});
+  if(!evt||!evt.attendees)return;
+  evt.attendees.splice(idx,1);
+  saveAcademicCalendar();
+  _renderMeetingAttendees(document.getElementById('meeting-page-area'));
+}
+
+function attAddManual(eid){
+  var name=prompt('추가할 학부모/학생 이름을 입력하세요');
+  if(!name||!name.trim())return;
+  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===eid;});
+  if(!evt)return;
+  if(!evt.attendees)evt.attendees=[];
+  if(evt.attendees.find(function(a){return a.name===name.trim();})){toast('이미 등록된 분이에요');return;}
+  evt.attendees.push({name:name.trim(),student:'',grade:'',response:'참석',attended:true,companion:0,memo:'현장등록'});
+  saveAcademicCalendar();
+  toast('✅ 현장 등록됐어요');
+  _renderMeetingAttendees(document.getElementById('meeting-page-area'));
 }
 
 function _addAttendee(evtId){
@@ -15919,28 +16127,18 @@ function _addAttendee(evtId){
   if(!evt)return;
   if(!evt.attendees)evt.attendees=[];
   if(evt.attendees.find(function(a){return a.name===nameEl.value;})){toast('이미 추가된 학생이에요');return;}
-  evt.attendees.push({name:nameEl.value,memo:memoEl?memoEl.value:'',attended:false});
+  evt.attendees.push({name:nameEl.value,student:nameEl.value,grade:'',response:'미응답',attended:false,companion:0,memo:memoEl?memoEl.value:''});
   saveAcademicCalendar();
   _renderMeetingAttendees(document.getElementById('meeting-page-area'));
   toast('추가됐어요');
 }
 
 function _removeAttendee(evtId,idx){
-  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===evtId;});
-  if(!evt||!evt.attendees)return;
-  evt.attendees.splice(idx,1);
-  saveAcademicCalendar();
-  _renderMeetingAttendees(document.getElementById('meeting-page-area'));
+  attRemove(evtId,idx);
 }
 
 function _toggleAttendee(evtId,idx,checked){
-  var evt=(_academicCalendar.events||[]).find(function(e){return e.id===evtId;});
-  if(!evt||!evt.attendees||!evt.attendees[idx])return;
-  evt.attendees[idx].attended=checked;
-  saveAcademicCalendar();
-  // 참석 수만 업데이트
-  var done=evt.attendees.filter(function(a){return a.attended;}).length;
-  toast((checked?'✅ 참석':'미참석')+' 처리됐어요 ('+done+'/'+evt.attendees.length+'명)');
+  attToggle(evtId,idx,checked);
 }
 
 function _renderParentMeetingAnnual(el){
