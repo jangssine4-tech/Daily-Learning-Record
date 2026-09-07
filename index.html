@@ -21167,7 +21167,9 @@ function trRender(){
   h+='<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--surface);flex-shrink:0">';
   h+='<span style="font-size:13px;font-weight:700;color:var(--navy)">'+(curFolder?'📁 '+curFolder.name:'📂 전체 자료')+'</span>';
   h+='<span style="font-size:11px;color:var(--txt3);margin-left:4px">';
-  var dispFiles=_trCurrentFolder?_trFiles.filter(function(f){return f.folderId===_trCurrentFolder;}):_trFiles;
+  var dispFiles=_trCurrentFolder
+    ?_trFiles.filter(function(f){return (f.folderId||null)===_trCurrentFolder;})
+    :_trFiles;
   h+=dispFiles.length+'개 파일</span>';
   h+='<div style="margin-left:auto;display:flex;gap:6px">';
   h+='<input type="text" id="tr-search" placeholder="파일 검색..." oninput="trRender()" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--txt);width:140px">';
@@ -21286,8 +21288,11 @@ function trShowFolderPicker(callback){
   var h='<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📁 저장할 폴더 선택</div>';
   h+='<div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto">';
   _trFolders.forEach(function(f){
+    var isCurrent=f.id===_trCurrentFolder;
     h+='<button onclick="trFolderPick(\''+f.id+'\')" '
-      +'style="text-align:left;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;font-size:13px;font-weight:600;color:var(--txt)">📁 '+f.name+'</button>';
+      +'style="text-align:left;padding:10px 14px;border:1.5px solid '+(isCurrent?'var(--navy)':'var(--border)')+';border-radius:8px;'
+      +'background:'+(isCurrent?'var(--navy)':'var(--surface2)')+';cursor:pointer;font-size:13px;font-weight:600;'
+      +'color:'+(isCurrent?'#fff':'var(--txt)')+'">📁 '+f.name+(isCurrent?' ✓':'')+'</button>';
   });
   h+='<button onclick="trFolderPick(null)" '
     +'style="text-align:left;padding:10px 14px;border:1.5px dashed var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:12px;color:var(--txt3)">📂 폴더 미지정</button>';
@@ -21420,15 +21425,19 @@ function trUploadOne(file,folderId){
       uploadedAt:todayISO(),
       uploadedBy:(currentUser&&currentUser.name)||'원장'
     };
-    return db.collection(TR_COLL_FILES).add(meta).then(function(ref){
-      meta.id=ref.id;
+    return db.collection(TR_COLL_FILES).add(meta).then(function(docRef){
+      meta.id=docRef.id;
+      meta.folderId=folderId||null; // null로 명시
       _trFiles.unshift(meta);
     });
   }).then(function(){
     toast('✅ '+file.name+' 업로드 완료');
-    // 업로드한 폴더로 자동 이동해서 파일이 바로 보이도록
-    if(folderId)_trCurrentFolder=folderId;
+    _trCurrentFolder=folderId||null;
+    // 전체 재렌더
     trRender();
+    // 혹시 trRender가 DOM에 없으면 폴더만 강제 선택
+    var right=document.getElementById('tr-file-list-right');
+    if(right)trRefreshRight();
   }).catch(function(e){
     toast('❌ 업로드 실패: '+e.message);
     console.error(e);
