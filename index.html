@@ -3660,7 +3660,13 @@ function _tlTaskCard(item,isPastDate){
 
   if(isPlan)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋</span>';
   if(t.area&&!isPlan)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
-  r+='<span style="flex:1;font-size:12px;font-weight:500;'+lineThrough+'">'+t.name+'</span>';
+  // 업무명 + 시작 시간 배지
+  var timeLabel='';
+  if(t.startHour!==undefined&&t.startHour!==null){
+    var th=t.startHour===24?0:t.startHour;
+    timeLabel='<span style="font-size:10px;font-weight:700;color:var(--blue);background:#eff6ff;padding:1px 5px;border-radius:4px;flex-shrink:0;margin-right:2px">'+String(th).padStart(2,'0')+':00</span>';
+  }
+  r+='<span style="flex:1;font-size:12px;font-weight:500;'+lineThrough+'">'+timeLabel+t.name+'</span>';
   if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
 
   // 플랜 업무 세부 내용 드롭다운 버튼
@@ -12907,11 +12913,16 @@ function openPlanTaskModal(planId,taskIdx){
   var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
   r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
 
-  // 타임라인 시작 시간
-  var pHourOpts=[{v:'',l:'시간 미배정'}];
-  for(var _ph=7;_ph<=24;_ph++){var _pd=_ph===24?0:_ph;pHourOpts.push({v:String(_ph),l:String(_pd).padStart(2,'0')+':00'});}
-  var pStartHourSel=mkSel('ptm-starthour',pHourOpts,t.startHour!==undefined?String(t.startHour):'');
-  var pshw=document.createElement('div');pshw.style.marginBottom='10px';pshw.appendChild(mkLbl('⏰ 타임라인 시작 시간'));pshw.appendChild(pStartHourSel);box.appendChild(pshw);
+  // 타임라인 시작 시간 (직접 입력)
+  var pCurHourVal=t.startHour!==undefined&&t.startHour!==null
+    ?(t.startHour===24?'00':String(t.startHour).padStart(2,'0'))+':00'
+    :'';
+  var pStartHourInp=document.createElement('input');
+  pStartHourInp.className='fi';pStartHourInp.id='ptm-starthour';
+  pStartHourInp.type='time';pStartHourInp.style.fontSize='13px';
+  pStartHourInp.value=pCurHourVal;
+  var pshw=document.createElement('div');pshw.style.marginBottom='10px';
+  pshw.appendChild(mkLbl('⏰ 타임라인 시작 시간'));pshw.appendChild(pStartHourInp);box.appendChild(pshw);
 
   // 담당자
   var mgInp=document.createElement('input');mgInp.className='fi';mgInp.id='ptm-manager';
@@ -13008,7 +13019,12 @@ function _savePlanTaskModal(planId,taskIdx){
   var focusType=(document.getElementById('ptm-focus')||{}).value||'';
   if(!name.trim()){toast('업무명을 입력하세요');return;}
   var ptmStartHourRaw=(document.getElementById('ptm-starthour')||{}).value||'';
-  var ptmStartHour=ptmStartHourRaw!==''?parseInt(ptmStartHourRaw):undefined;
+  var ptmStartHour=undefined;
+  if(ptmStartHourRaw){
+    var ptmParts=ptmStartHourRaw.split(':');
+    var ptmHH=parseInt(ptmParts[0]);
+    ptmStartHour=(ptmHH===0)?24:ptmHH;
+  }
   plan.tasks[taskIdx].name=name;
   plan.tasks[taskIdx].date=date;
   plan.tasks[taskIdx].priority=priority;
@@ -14472,11 +14488,17 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var pw=document.createElement('div');pw.appendChild(mkLbl('우선순위'));pw.appendChild(prSel);
   r1.appendChild(dw);r1.appendChild(pw);box.appendChild(r1);
 
-  // 타임라인 시작 시간
-  var hourOpts=[{v:'',l:'시간 미배정'}];
-  for(var _h=7;_h<=24;_h++){var _d=_h===24?0:_h;hourOpts.push({v:String(_h),l:String(_d).padStart(2,'0')+':00'});}
-  var startHourSel=mkSel('dbt-starthour',hourOpts,t&&t.startHour!==undefined?String(t.startHour):'');
-  var shw=document.createElement('div');shw.style.marginBottom='10px';shw.appendChild(mkLbl('⏰ 타임라인 시작 시간'));shw.appendChild(startHourSel);box.appendChild(shw);
+  // 타임라인 시작 시간 (직접 입력)
+  var curHourVal=t&&t.startHour!==undefined&&t.startHour!==null
+    ?(t.startHour===24?'00':String(t.startHour).padStart(2,'0'))+':00'
+    :'';
+  var startHourInp=document.createElement('input');
+  startHourInp.className='fi';startHourInp.id='dbt-starthour';
+  startHourInp.type='time';startHourInp.style.fontSize='13px';
+  startHourInp.value=curHourVal;
+  startHourInp.min='07:00';startHourInp.max='24:00';
+  var shw=document.createElement('div');shw.style.marginBottom='10px';
+  shw.appendChild(mkLbl('⏰ 타임라인 시작 시간'));shw.appendChild(startHourInp);box.appendChild(shw);
 
   // ── 오늘 업무 전용 필드 ──────────────────────────────
   var todaySection=document.createElement('div');
@@ -14589,7 +14611,14 @@ function _dbSaveTaskModal(id){
   var estDuration=(document.getElementById('dbt-duration')||{}).value||'';
   var focusType=(document.getElementById('dbt-focus')||{}).value||'';
   var startHourRaw=(document.getElementById('dbt-starthour')||{}).value||'';
-  var startHour=startHourRaw!==''?parseInt(startHourRaw):undefined;
+  // time input은 "HH:MM" 형태 → 시(Hour)만 추출, 분은 반올림해서 가장 가까운 정수 시간
+  var startHour=undefined;
+  if(startHourRaw){
+    var parts=startHourRaw.split(':');
+    var hh=parseInt(parts[0]);var mm=parseInt(parts[1]||0);
+    // 00:xx → 24시(자정)로 처리, 그 외는 그대로
+    startHour=(hh===0&&mm===0)?24:hh;
+  }
   if(!name.trim()){alert('업무명을 입력하세요');return;}
   if(!_dbTasks)_dbTasks=[];
   if(id){
@@ -15638,29 +15667,175 @@ function _ilDeleteRow(lid,idx){
 }
 
 function _ilAutoImport(lid){
+  var old=document.getElementById('il-import-modal');if(old)old.remove();
+  var modal=document.createElement('div');
+  modal.id='il-import-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;gap:0';
+
+  // 헤더
+  var hdr='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--navy)">📥 학생 불러오기</div>'
+    +'<button onclick="document.getElementById(&apos;il-import-modal&apos;).remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>'
+    +'</div>';
+
+  // 필터 영역
+  var grades=['초4','초5','초6','중1','중2','중3'];
+  var statuses=['재원','신규','휴원'];
+  var days=['월','화','수','목','금','토'];
+
+  var filterHtml='<div style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:10px">';
+  // 학년
+  filterHtml+='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:6px">학년</div>';
+  filterHtml+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  grades.forEach(function(g){
+    filterHtml+='<label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:12px">'
+      +'<input type="checkbox" class="il-f-grade" value="'+g+'" checked style="accent-color:var(--navy)">'+g+'</label>';
+  });
+  filterHtml+='</div></div>';
+  // 재원 상태
+  filterHtml+='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:6px">재원 상태</div>';
+  filterHtml+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  statuses.forEach(function(s,i){
+    filterHtml+='<label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:12px">'
+      +'<input type="checkbox" class="il-f-status" value="'+s+'"'+(i===0?' checked':'')+' style="accent-color:var(--navy)">'+s+'</label>';
+  });
+  filterHtml+='</div></div>';
+  // 수업 요일
+  filterHtml+='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:6px">수업 요일 <span style="font-weight:400;color:var(--txt3)">(미선택 시 전체)</span></div>';
+  filterHtml+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  days.forEach(function(d){
+    filterHtml+='<label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:12px">'
+      +'<input type="checkbox" class="il-f-day" value="'+d+'" style="accent-color:var(--navy)">'+d+'</label>';
+  });
+  filterHtml+='</div></div>';
+  // 이름 검색
+  filterHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:6px">이름 검색</div>';
+  filterHtml+='<input id="il-f-name" type="text" placeholder="학생 이름 입력..." oninput="ilImportFilter()" '
+    +'style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--txt);box-sizing:border-box">';
+  filterHtml+='</div></div>';
+
+  // 결과 목록
+  var resultHtml='<div id="il-import-result" style="flex:1;overflow-y:auto;max-height:260px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px"></div>';
+
+  // 하단 버튼
+  var footer='<div style="display:flex;gap:8px">'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(&apos;il-import-modal&apos;).remove()">취소</button>'
+    +'<button class="btn btn-navy btn-sm" style="flex:1" id="il-import-confirm-btn" onclick="ilImportConfirm(\''+lid+'\')">선택 추가</button>'
+    +'</div>';
+
+  box.innerHTML=hdr+filterHtml+resultHtml+footer;
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+
+  // 필터 이벤트 연결
+  box.querySelectorAll('.il-f-grade,.il-f-status,.il-f-day').forEach(function(el){
+    el.addEventListener('change',ilImportFilter);
+  });
+
+  window._ilImportLid=lid;
+  ilImportFilter();
+}
+
+function ilImportFilter(){
+  var modal=document.getElementById('il-import-modal');if(!modal)return;
+  var selectedGrades=Array.from(modal.querySelectorAll('.il-f-grade:checked')).map(function(e){return e.value;});
+  var selectedStatuses=Array.from(modal.querySelectorAll('.il-f-status:checked')).map(function(e){return e.value;});
+  var selectedDays=Array.from(modal.querySelectorAll('.il-f-day:checked')).map(function(e){return e.value;});
+  var nameQ=(document.getElementById('il-f-name')||{}).value||'';
+
+  var lid=window._ilImportLid;
+  var existing=((_inviteListCache&&_inviteListCache[lid]&&_inviteListCache[lid].rows)||[]).map(function(r){return r.student;});
+
+  var filtered=(students||[]).filter(function(s){
+    var st=s.status||'재원';
+    if(selectedStatuses.length&&selectedStatuses.indexOf(st)===-1)return false;
+    if(selectedGrades.length&&selectedGrades.indexOf(s.grade||'')===-1)return false;
+    if(selectedDays.length){
+      var sDays=s.days||[];
+      var hasDay=selectedDays.some(function(d){return sDays.indexOf(d)!==-1;});
+      if(!hasDay)return false;
+    }
+    if(nameQ&&(s.name||'').indexOf(nameQ)===-1)return false;
+    return true;
+  });
+
+  // 정렬: 초5,6 먼저 → 초4 → 나머지
+  var gradeOrder={'초5':0,'초6':0,'초4':1,'중1':2,'중2':2,'중3':2};
+  filtered.sort(function(a,b){return (gradeOrder[a.grade||'']||3)-(gradeOrder[b.grade||'']||3);});
+
+  var el=document.getElementById('il-import-result');
+  if(!el)return;
+
+  if(!filtered.length){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">조건에 맞는 학생이 없습니다</div>';
+    return;
+  }
+
+  var h='<div style="padding:6px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;background:var(--surface2)">';
+  h+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;font-weight:700">'
+    +'<input type="checkbox" id="il-select-all" onchange="ilSelectAll(this.checked)" style="accent-color:var(--navy)">전체 선택</label>';
+  h+='<span style="margin-left:auto;font-size:10px;color:var(--txt3)">'+filtered.length+'명</span>';
+  h+='</div>';
+
+  filtered.forEach(function(s){
+    var alreadyIn=existing.indexOf(s.name)!==-1;
+    var daysStr=(s.days||[]).join('');
+    var st=s.status||'재원';
+    var stColor=st==='휴원'?'#f59e0b':st==='신규'?'#10b981':'var(--txt3)';
+    h+='<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;'
+      +(alreadyIn?'opacity:0.4':'')
+      +'">';
+    h+='<input type="checkbox" class="il-import-chk" value="'+s.name+'" data-grade="'+(s.grade||'')+'" data-parent="'+(s.parentName||s.motherName||s.fatherName||'')+'" '
+      +(alreadyIn?'disabled':'')+' style="accent-color:var(--navy)">';
+    h+='<span style="font-size:12px;font-weight:600;flex:1">'+s.name+'</span>';
+    h+='<span style="font-size:11px;color:var(--txt3);width:32px">'+s.grade+'</span>';
+    h+='<span style="font-size:10px;color:var(--txt3);width:50px">'+daysStr+'</span>';
+    h+='<span style="font-size:10px;font-weight:600;color:'+stColor+'">'+st+'</span>';
+    if(alreadyIn)h+='<span style="font-size:10px;color:var(--txt3)">등록됨</span>';
+    h+='</label>';
+  });
+
+  el.innerHTML=h;
+
+  // 선택 수 업데이트
+  el.querySelectorAll('.il-import-chk').forEach(function(chk){
+    chk.addEventListener('change',ilUpdateConfirmBtn);
+  });
+  ilUpdateConfirmBtn();
+}
+
+function ilSelectAll(checked){
+  var modal=document.getElementById('il-import-modal');if(!modal)return;
+  modal.querySelectorAll('.il-import-chk:not(:disabled)').forEach(function(chk){chk.checked=checked;});
+  ilUpdateConfirmBtn();
+}
+
+function ilUpdateConfirmBtn(){
+  var modal=document.getElementById('il-import-modal');if(!modal)return;
+  var cnt=modal.querySelectorAll('.il-import-chk:checked').length;
+  var btn=document.getElementById('il-import-confirm-btn');
+  if(btn)btn.textContent='선택 추가 ('+cnt+'명)';
+}
+
+function ilImportConfirm(lid){
+  var modal=document.getElementById('il-import-modal');if(!modal)return;
+  var checked=Array.from(modal.querySelectorAll('.il-import-chk:checked'));
+  if(!checked.length){toast('추가할 학생을 선택해 주세요');return;}
   if(!_inviteListCache)_inviteListCache={};
   if(!_inviteListCache[lid])_inviteListCache[lid]={rows:[],goal:20};
   var existing=_inviteListCache[lid].rows.map(function(r){return r.student;});
-  // 초4~6 재원생 필터
-  var targets=(students||[]).filter(function(s){
-    var st=s.status||'재원';
-    if(st!=='재원'&&st!=='신규')return false;
-    var gr=s.grade||'';
-    return ['초4','초5','초6'].indexOf(gr)!==-1;
-  });
-  // 우선순위 정렬: 초5,6 먼저 → 초4
-  targets.sort(function(a,b){
-    var order={'초5':0,'초6':0,'초4':1};
-    return (order[a.grade||'']||2)-(order[b.grade||'']||2);
-  });
   var added=0;
-  targets.forEach(function(s){
-    if(existing.indexOf(s.name)!==-1)return; // 이미 있으면 스킵
-    var parent=s.parentName||s.motherName||s.fatherName||'';
+  checked.forEach(function(chk){
+    var name=chk.value;
+    if(existing.indexOf(name)!==-1)return;
     _inviteListCache[lid].rows.push({
-      student:s.name,
-      grade:s.grade||'',
-      parent:parent,
+      student:name,
+      grade:chk.dataset.grade||'',
+      parent:chk.dataset.parent||'',
       type:'기존',
       concern:'',
       possibility:'보통',
@@ -15670,10 +15845,10 @@ function _ilAutoImport(lid){
     });
     added++;
   });
-  if(added===0){toast('추가할 초4~6 재원생이 없습니다 (이미 모두 등록됨)');return;}
   _ilSave(lid);
+  modal.remove();
   _ilRenderTable(lid);
-  toast('✅ '+added+'명 자동 추가됐어요 (초대 여부를 설정해 주세요)');
+  toast('✅ '+added+'명 추가됐어요 (초대 여부를 설정해 주세요)');
 }
 
 function _renderMeetingAttendees(el){
