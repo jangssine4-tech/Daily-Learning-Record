@@ -16602,6 +16602,7 @@ function _deletePlan(planId){
     _plans=_plans.filter(function(p){return p.id!==planId;});
     _dbTasks=(_dbTasks||[]).filter(function(t){return t.planId!==planId;});
     _selectedPlanId=null;
+    _invalidatePlanCache();
     toast('삭제됐어요');
     renderPlansView();
     if($('board-area-area'))_renderBoardAreaPanel();
@@ -17069,6 +17070,7 @@ function _savePlan(overlay,editId){
       toast('저장됐어요');
       if(overlay)overlay.remove();
       _selectedPlanId=editId;
+      _invalidatePlanCache();
       renderPlansView();
     }).catch(function(){toast('저장 실패');});
   }else{
@@ -17077,6 +17079,9 @@ function _savePlan(overlay,editId){
     db.collection('plans').add(newPlan).then(function(ref){
       newPlan.id=ref.id;
       _plans.push(newPlan);
+      _invalidatePlanCache();
+      // 오늘 할 일 탭 열려있으면 갱신
+      if(_boardCurrentTab==='today')_refreshTaskList();
 
       toast('플랜이 등록됐어요 ✅');
       if(overlay)overlay.remove();
