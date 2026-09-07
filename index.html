@@ -21149,10 +21149,13 @@ function trRender(){
   _trFolders.forEach(function(f){
     var active=_trCurrentFolder===f.id;
     var cnt=_trFiles.filter(function(fi){return fi.folderId===f.id;}).length;
-    h+='<div onclick="trSelectFolder(\''+f.id+'\')" style="padding:8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;'
+    h+='<div onclick="trSelectFolder(\''+f.id+'\')" style="padding:8px 10px 8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;'
       +(active?'background:var(--navy);color:#fff':'color:var(--txt)')+'">';
     h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 '+f.name+'</span>';
     if(cnt)h+='<span style="font-size:10px;'+(active?'color:#93c5fd':'color:var(--txt3)')+'">'+cnt+'</span>';
+    // 이름 변경 버튼
+    h+='<button onclick="event.stopPropagation();trRenameFolder(\''+f.id+'\',\''+f.name.replace(/'/g,"\\'")+'\')" '
+      +'style="background:none;border:none;color:'+(active?'#bfdbfe':'var(--txt3)')+';cursor:pointer;font-size:12px;padding:0 2px;flex-shrink:0" title="이름 변경">✏️</button>';
     h+='<button onclick="event.stopPropagation();trDeleteFolder(\''+f.id+'\')" style="background:none;border:none;color:'+(active?'#fca5a5':'var(--txt3)')+';cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">×</button>';
     h+='</div>';
   });
@@ -21298,6 +21301,18 @@ function trShowFolderPicker(callback){
   window._trFolderPickerCb=callback;
 }
 
+function trRenameFolder(id,currentName){
+  var newName=prompt('새 폴더 이름을 입력하세요',currentName);
+  if(!newName||!newName.trim()||newName.trim()===currentName)return;
+  db.collection(TR_COLL_FOLDERS).doc(id).update({name:newName.trim()}).then(function(){
+    var f=_trFolders.find(function(x){return x.id===id;});
+    if(f)f.name=newName.trim();
+    _trFolders.sort(function(a,b){return a.name>b.name?1:-1;});
+    trRender();
+    toast('폴더 이름이 변경됐습니다');
+  }).catch(function(e){toast('변경 실패: '+e.message);});
+}
+
 function trUploadOne(file,folderId){
   if(!_trStorage)return;
   var timestamp=Date.now();
@@ -21327,6 +21342,8 @@ function trUploadOne(file,folderId){
     });
   }).then(function(){
     toast('✅ '+file.name+' 업로드 완료');
+    // 업로드한 폴더로 자동 이동해서 파일이 바로 보이도록
+    if(folderId)_trCurrentFolder=folderId;
     trRender();
   }).catch(function(e){
     toast('❌ 업로드 실패: '+e.message);
