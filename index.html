@@ -21149,18 +21149,12 @@ function trRender(){
   _trFolders.forEach(function(f){
     var active=_trCurrentFolder===f.id;
     var cnt=_trFiles.filter(function(fi){return fi.folderId===f.id;}).length;
-    h+='<div style="padding:4px 10px 4px 14px;font-size:12px;display:flex;align-items:center;gap:4px;'
+    h+='<div ondblclick="trSelectFolder(\''+f.id+'\')" '
+      +'oncontextmenu="event.preventDefault();trContextMenu(event,\''+f.id+'\',\''+f.name.replace(/'/g,"\\'")+'\')" '
+      +'style="padding:8px 14px;font-size:12px;cursor:default;display:flex;align-items:center;gap:4px;user-select:none;'
       +(active?'background:var(--navy);color:#fff':'color:var(--txt)')+'">';
-    // 폴더명 - 클릭 시 인라인 편집
-    h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:4px 0" '
-      +'onclick="event.stopPropagation();trInlineRename(\''+f.id+'\')" '
-      +'id="tr-folder-label-'+f.id+'">📁 '+f.name+'</span>';
+    h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 '+f.name+'</span>';
     if(cnt)h+='<span style="font-size:10px;'+(active?'color:#93c5fd':'color:var(--txt3)')+'">'+cnt+'</span>';
-    h+='<button onclick="trSelectFolder(\''+f.id+'\')" '
-      +'style="background:none;border:none;color:'+(active?'#bfdbfe':'var(--txt3)')+';cursor:pointer;font-size:11px;padding:2px 4px;flex-shrink:0;border-radius:4px;'
-      +(active?'':'hover:background:var(--surface2)')+'">열기</button>';
-    h+='<button onclick="event.stopPropagation();trDeleteFolder(\''+f.id+'\')" '
-      +'style="background:none;border:none;color:'+(active?'#fca5a5':'var(--txt3)')+';cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">×</button>';
     h+='</div>';
   });
   h+='</div>';
@@ -21317,32 +21311,89 @@ function trRenameFolder(id,currentName){
   }).catch(function(e){toast('변경 실패: '+e.message);});
 }
 
+function trContextMenu(e,id,name){
+  // 기존 컨텍스트 메뉴 제거
+  var old=document.getElementById('tr-ctx-menu');if(old)old.remove();
+
+  var menu=document.createElement('div');
+  menu.id='tr-ctx-menu';
+  menu.style.cssText='position:fixed;z-index:9999;background:var(--surface);border:1.5px solid var(--border);'
+    +'border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:4px;min-width:140px;'
+    +'left:'+e.clientX+'px;top:'+e.clientY+'px';
+
+  var items=[
+    {icon:'📂',label:'열기',fn:function(){trSelectFolder(id);}},
+    {icon:'✏️',label:'이름 바꾸기',fn:function(){trInlineRename(id);}},
+    {divider:true},
+    {icon:'🗑️',label:'삭제',fn:function(){trDeleteFolder(id);},danger:true}
+  ];
+
+  items.forEach(function(item){
+    if(item.divider){
+      var sep=document.createElement('div');
+      sep.style.cssText='height:1px;background:var(--border);margin:3px 0';
+      menu.appendChild(sep);
+      return;
+    }
+    var btn=document.createElement('div');
+    btn.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;'
+      +(item.danger?'color:#dc2626':'color:var(--txt)');
+    btn.innerHTML='<span>'+item.icon+'</span><span>'+item.label+'</span>';
+    btn.onmouseenter=function(){this.style.background='var(--surface2)';};
+    btn.onmouseleave=function(){this.style.background='';};
+    btn.onclick=function(){
+      menu.remove();
+      document.removeEventListener('click',closeMenu);
+      item.fn();
+    };
+    menu.appendChild(btn);
+  });
+
+  document.body.appendChild(menu);
+
+  // 화면 밖으로 넘어가면 위치 조정
+  setTimeout(function(){
+    var r=menu.getBoundingClientRect();
+    if(r.right>window.innerWidth)menu.style.left=(e.clientX-r.width)+'px';
+    if(r.bottom>window.innerHeight)menu.style.top=(e.clientY-r.height)+'px';
+  },0);
+
+  function closeMenu(ev){
+    if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',closeMenu);}
+  }
+  setTimeout(function(){document.addEventListener('click',closeMenu);},0);
+}
+
 function trInlineRename(id){
-  var labelEl=document.getElementById('tr-folder-label-'+id);
-  if(!labelEl)return;
   var f=_trFolders.find(function(x){return x.id===id;});
   if(!f)return;
-  // input으로 교체
+  // 폴더 span 찾기 (📁 텍스트를 가진 span)
+  var spans=document.querySelectorAll('[ondblclick*="'+id+'"] span');
+  var labelSpan=null;
+  spans.forEach(function(s){if(s.textContent.startsWith('📁'))labelSpan=s;});
+  if(!labelSpan)return;
+
   var inp=document.createElement('input');
   inp.value=f.name;
-  inp.style.cssText='flex:1;font-size:12px;padding:2px 4px;border:1.5px solid var(--mint);border-radius:4px;background:var(--surface);color:var(--txt);min-width:0;outline:none';
-  labelEl.replaceWith(inp);
+  inp.style.cssText='flex:1;font-size:12px;padding:2px 4px;border:1.5px solid var(--mint);border-radius:4px;'
+    +'background:var(--surface);color:var(--navy);min-width:0;outline:none;font-weight:600';
+  labelSpan.replaceWith(inp);
   inp.focus();inp.select();
 
   function save(){
     var newName=inp.value.trim();
-    if(!newName){inp.replaceWith(labelEl);return;}
-    if(newName===f.name){inp.replaceWith(labelEl);return;}
+    if(!newName||newName===f.name){trRender();return;}
     f.name=newName;
     db.collection(TR_COLL_FOLDERS).doc(id).update({name:newName}).then(function(){
       _trFolders.sort(function(a,b){return a.name>b.name?1:-1;});
       trRender();
+      toast('이름이 변경됐습니다');
     }).catch(function(e){toast('저장 실패: '+e.message);trRender();});
   }
   inp.addEventListener('blur',save);
   inp.addEventListener('keydown',function(e){
     if(e.key==='Enter'){inp.blur();}
-    if(e.key==='Escape'){inp.replaceWith(labelEl);}
+    if(e.key==='Escape'){trRender();}
   });
 }
 
