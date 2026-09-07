@@ -3662,6 +3662,23 @@ function _tlTaskCard(item,isPastDate){
   r+='<span style="flex:1;font-size:12px;font-weight:500;'+lineThrough+'">'+t.name+'</span>';
   if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
 
+  // 플랜 업무 세부 내용 드롭다운 버튼
+  if(isPlan){
+    var planForDetail=(_plans||[]).find(function(p){return p.id===t._planId;});
+    var rawTask=planForDetail&&planForDetail.tasks&&planForDetail.tasks[t._taskIdx];
+    var tDetail=(rawTask&&rawTask.detail)||'';
+    var tCriterion=(rawTask&&rawTask.criterion)||'';
+    // name에 콜론이 있으면 뒤를 detail로
+    if(!tDetail&&t.name&&t.name.indexOf(':')>0){
+      var ci=t.name.indexOf(':');tDetail=t.name.slice(ci+1).trim();
+    }
+    var hasDetail=!!(tDetail||tCriterion);
+    if(hasDetail){
+      var detId='tl-det-'+cardId;
+      r+='<button onclick="tlToggleDetail(\''+detId+'\')" style="background:none;border:none;color:#3b82f6;cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0" title="세부 내용">▾</button>';
+    }
+  }
+
   if(isPastDate&&!isDone){
     // 미완료 → 오늘로 이동
     if(isPlan){
@@ -3681,8 +3698,35 @@ function _tlTaskCard(item,isPastDate){
     }
   }
   r+='</div>';
+  // 세부 내용 패널 (플랜 업무만)
+  if(isPlan){
+    var planForDetail2=(_plans||[]).find(function(p){return p.id===t._planId;});
+    var rawTask2=planForDetail2&&planForDetail2.tasks&&planForDetail2.tasks[t._taskIdx];
+    var tDetail2=(rawTask2&&rawTask2.detail)||'';
+    var tCriterion2=(rawTask2&&rawTask2.criterion)||'';
+    if(!tDetail2&&t.name&&t.name.indexOf(':')>0){var ci2=t.name.indexOf(':');tDetail2=t.name.slice(ci2+1).trim();}
+    if(tDetail2||tCriterion2){
+      var detId2='tl-det-'+cardId;
+      var pc=rawTask2&&rawTask2.priority==='높음'?'#dc2626':rawTask2&&rawTask2.priority==='낮음'?'#94a3b8':'#2563eb';
+      r+='<div id="'+detId2+'" style="display:none;margin:3px 0 2px 22px;padding:6px 10px;background:#f8fafc;border-radius:6px;border-left:2px solid '+pc+'">';
+      if(tDetail2)r+='<div style="font-size:11px;color:#334155;line-height:1.7">'+tDetail2+'</div>';
+      if(tCriterion2)r+='<div style="font-size:10px;color:#1d4ed8;margin-top:4px;font-weight:600">✅ 완료기준: <span style="font-weight:400">'+tCriterion2+'</span></div>';
+      r+='</div>';
+    }
+  }
   return r;
 }
+
+function tlToggleDetail(id){
+  var el=document.getElementById(id);if(!el)return;
+  var isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'block';
+  var btn=el.previousElementSibling&&el.previousElementSibling.querySelector?null:el.previousSibling;
+  // 화살표 버튼 찾기 (카드 내 마지막 button)
+  var card=el.parentElement;
+  if(card){var btns=card.querySelectorAll('button[onclick*="tlToggleDetail"]');if(btns.length)btns[btns.length-1].textContent=isOpen?'▾':'▴';}
+}
+
 // ── 타임라인 DnD ──────────────────────────────────────────────
 var _tlDragCardId=null;
 var _tlDragFrom=null; // 'timeline' or 'tasklist'
@@ -13444,7 +13488,11 @@ function _renderTodayTaskSection(){
   h+='<div id="tl-task-list-body" style="padding:6px 8px;background:var(--bg)">';
   if(totalUnplaced){
     unplaced.forEach(function(t){h+=_listTaskRow(t);});
-    planUnplaced.forEach(function(t){h+=_listPlanTaskRow(t);});
+    if(planUnplaced.length){
+      h+='<div style="margin-top:6px">';
+      h+=_renderPlanGroupCards(planUnplaced,'today-unplaced');
+      h+='</div>';
+    }
   }
   h+='<div id="tl-task-empty" style="text-align:center;padding:16px;color:var(--txt3);font-size:11px;'+(totalUnplaced?'display:none':'')+'">\u2705 모든 업무가 타임라인에 배치됐어요</div>';
   h+='</div></div>';
