@@ -6689,8 +6689,11 @@ function getEvalModuleForLevel(level){
 function onReportLevelChange(){
   var newLevel=$('r-level').value;
   var da=$('dictation-area');if(da)da.style.display='block';
-  updateDictationDropdown(newLevel,'');
-  populateProgressDropdown(newLevel,'');
+  // 현재 입력값 보존
+  var curProgress=($('r-progress')||{}).value||'';
+  var curDictation=($('r-dictation')||{}).value||'';
+  updateDictationDropdown(newLevel,curDictation);
+  populateProgressDropdown(newLevel,curProgress);
   var sId=$('r-student-id').value;
   var s=students.find(function(x){return x.id===sId;});
   if(s){$('write-student-info').textContent=s.name+' · '+newLevel+' · '+(s.grade||'');}
@@ -6701,7 +6704,6 @@ function onReportLevelChange(){
   // 단계 변경 시 학생 정보도 자동 업데이트
   if(s&&newLevel&&newLevel!==s.level){
     s.level=newLevel;
-    // levelHistory에도 오늘 날짜로 추가
     if(!s.levelHistory)s.levelHistory=[];
     var today=todayISO();
     var lastHist=s.levelHistory[s.levelHistory.length-1];
@@ -21340,10 +21342,9 @@ function trContextMenu(e,id,name){
     +'left:'+e.clientX+'px;top:'+e.clientY+'px';
 
   var items=[
-    {icon:'📂',label:'열기',fn:function(){trSelectFolder(id);}},
-    {icon:'✏️',label:'이름 바꾸기',fn:function(){trInlineRename(id);}},
+    {label:'이름 바꾸기',fn:function(){trInlineRename(id);}},
     {divider:true},
-    {icon:'🗑️',label:'삭제',fn:function(){trDeleteFolder(id);},danger:true}
+    {label:'삭제',fn:function(){trDeleteFolder(id);},danger:true}
   ];
 
   items.forEach(function(item){
@@ -21356,7 +21357,7 @@ function trContextMenu(e,id,name){
     var btn=document.createElement('div');
     btn.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;'
       +(item.danger?'color:#dc2626':'color:var(--txt)');
-    btn.innerHTML='<span>'+item.icon+'</span><span>'+item.label+'</span>';
+    btn.innerHTML='<span>'+item.label+'</span>';
     btn.onmouseenter=function(){this.style.background='var(--surface2)';};
     btn.onmouseleave=function(){this.style.background='';};
     btn.onclick=function(){
