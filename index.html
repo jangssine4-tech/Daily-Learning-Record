@@ -254,7 +254,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
-<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 </head>
 <body>
 <datalist id="time-slots-list"><option value="10:00"><option value="10:30"><option value="11:00"><option value="11:30"><option value="12:00"><option value="12:30"><option value="13:00"><option value="13:30"><option value="14:00"><option value="14:30"><option value="15:00"><option value="15:30"><option value="16:00"><option value="16:30"><option value="17:00"><option value="17:30"><option value="18:00"><option value="18:30"><option value="19:00"><option value="19:30"><option value="20:00"><option value="20:30"><option value="21:00"><option value="21:30"><option value="22:00"><option value="22:30"></datalist>
@@ -21105,8 +21105,21 @@ var TR_STORAGE_PATH='teacher-resources';
 
 function trInit(){
   // Storage 초기화
-  try{_trStorage=firebase.storage();}catch(e){
-    document.getElementById('tr-root').innerHTML='<div style="padding:20px;color:red">Firebase Storage를 사용할 수 없습니다: '+e.message+'</div>';
+  try{
+    var cfg=getCfg()||{};
+    if(!cfg.storageBucket){
+      document.getElementById('tr-root').innerHTML=
+        '<div style="padding:30px;text-align:center">'
+        +'<div style="font-size:32px;margin-bottom:12px">⚙️</div>'
+        +'<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:8px">Firebase Storage 설정 필요</div>'
+        +'<div style="font-size:12px;color:var(--txt3);margin-bottom:16px">시스템 설정에서 <b>storageBucket</b> 값을 입력해 주세요.<br>형식: <code>프로젝트ID.appspot.com</code></div>'
+        +'<button class="btn btn-navy btn-sm" onclick="goto(\'settings\')">설정으로 이동</button>'
+        +'</div>';
+      return;
+    }
+    _trStorage=firebase.storage();
+  }catch(e){
+    document.getElementById('tr-root').innerHTML='<div style="padding:20px;color:red;font-size:12px">Firebase Storage 오류: '+e.message+'</div>';
     return;
   }
   if(_trLoaded){trRender();return;}
@@ -21149,9 +21162,9 @@ function trRender(){
   _trFolders.forEach(function(f){
     var active=_trCurrentFolder===f.id;
     var cnt=_trFiles.filter(function(fi){return fi.folderId===f.id;}).length;
-    h+='<div ondblclick="trSelectFolder(\''+f.id+'\')" '
+    h+='<div onclick="trSelectFolder(\''+f.id+'\')" '
       +'oncontextmenu="event.preventDefault();trContextMenu(event,\''+f.id+'\',\''+f.name.replace(/'/g,"\\'")+'\')" '
-      +'style="padding:8px 14px;font-size:12px;cursor:default;display:flex;align-items:center;gap:4px;user-select:none;'
+      +'style="padding:8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;'
       +(active?'background:var(--navy);color:#fff':'color:var(--txt)')+'">';
     h+='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 '+f.name+'</span>';
     if(cnt)h+='<span style="font-size:10px;'+(active?'color:#93c5fd':'color:var(--txt3)')+'">'+cnt+'</span>';
@@ -21373,7 +21386,7 @@ function trInlineRename(id){
   var f=_trFolders.find(function(x){return x.id===id;});
   if(!f)return;
   // 폴더 span 찾기 (📁 텍스트를 가진 span)
-  var spans=document.querySelectorAll('[ondblclick*="'+id+'"] span');
+  var spans=document.querySelectorAll('[onclick*="trSelectFolder(\\''+id+'\\')"] span');
   var labelSpan=null;
   spans.forEach(function(s){if(s.textContent.startsWith('📁'))labelSpan=s;});
   if(!labelSpan)return;
