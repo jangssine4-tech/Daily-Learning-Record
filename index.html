@@ -254,7 +254,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 </head>
 <body>
 <datalist id="time-slots-list"><option value="10:00"><option value="10:30"><option value="11:00"><option value="11:30"><option value="12:00"><option value="12:30"><option value="13:00"><option value="13:30"><option value="14:00"><option value="14:30"><option value="15:00"><option value="15:30"><option value="16:00"><option value="16:30"><option value="17:00"><option value="17:30"><option value="18:00"><option value="18:30"><option value="19:00"><option value="19:30"><option value="20:00"><option value="20:30"><option value="21:00"><option value="21:30"><option value="22:00"><option value="22:30"></datalist>
@@ -21164,7 +21164,7 @@ function trRender(){
   _trFolders.forEach(function(f){
     var active=_trCurrentFolder===f.id;
     var cnt=_trFiles.filter(function(fi){return fi.folderId===f.id;}).length;
-    h+='<div onclick="trSelectFolder(\''+f.id+'\')" '
+    h+='<div data-folderid="'+f.id+'" onclick="trSelectFolder(\''+f.id+'\')" '
       +'oncontextmenu="event.preventDefault();trContextMenu(event,\''+f.id+'\',\''+f.name.replace(/'/g,"\\'")+'\')" '
       +'style="padding:8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;'
       +(active?'background:var(--navy);color:#fff':'color:var(--txt)')+'">';
@@ -21386,10 +21386,10 @@ function trContextMenu(e,id,name){
 function trInlineRename(id){
   var f=_trFolders.find(function(x){return x.id===id;});
   if(!f)return;
-  // 폴더 span 찾기 (📁 텍스트를 가진 span)
-  var spans=document.querySelectorAll('[onclick*="trSelectFolder(\\''+id+'\\')"] span');
-  var labelSpan=null;
-  spans.forEach(function(s){if(s.textContent.startsWith('📁'))labelSpan=s;});
+  // data-folderid 속성으로 폴더 div 찾기
+  var folderDiv=document.querySelector('[data-folderid="'+id+'"]');
+  if(!folderDiv)return;
+  var labelSpan=folderDiv.querySelector('span');
   if(!labelSpan)return;
 
   var inp=document.createElement('input');
