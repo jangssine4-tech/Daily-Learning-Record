@@ -15346,38 +15346,141 @@ function _renderParentMeetingGuide(el){
     }
   ];
 
+  // ── 수준 B: 날짜 기반 현재 단계 감지 ──
+  var today=todayISO();
+  var calEvts=((_academicCalendar&&_academicCalendar.events)||[])
+    .filter(function(e){return ['간담회','설명회'].includes(e.cat);})
+    .sort(function(a,b){return (a.date||'')>(b.date||'')?1:-1;});
+  // 가장 가까운 설명회 찾기 (오늘 이후 우선, 없으면 가장 최근 과거)
+  var targetEvt=calEvts.find(function(e){return e.date>=today;})||calEvts[calEvts.length-1];
+  var dDay=null,currentStepNum=0;
+  if(targetEvt&&targetEvt.date){
+    var evtDate=new Date(targetEvt.date);
+    var todayDate=new Date(today);
+    dDay=Math.round((evtDate-todayDate)/(86400000));
+    if(dDay>28)currentStepNum=1;
+    else if(dDay>14)currentStepNum=2;
+    else if(dDay>7)currentStepNum=3;
+    else if(dDay>3)currentStepNum=4;
+    else if(dDay>=0)currentStepNum=5;
+    else if(dDay>=-7)currentStepNum=6;
+    else currentStepNum=7;
+  }
+
+  // ── 수준 B: 각 STEP별 실제 데이터 수집 ──
+  var stepData={};
+  if(targetEvt){
+    var eid=targetEvt.id;
+    // STEP2: 실행계획
+    var planTasks=(_plans||[]).reduce(function(arr,p){return arr.concat(p.tasks||[]);},[] );
+    var relTasks=planTasks.filter(function(t){return t.date&&t.date<=targetEvt.date;});
+    var doneTasks=relTasks.filter(function(t){return t.done;});
+    stepData[2]={label:'실행계획 '+relTasks.length+'건 중 '+doneTasks.length+'건 완료',
+      link:function(){switchMeetingTab('detail');}};
+    // STEP4: 초대 명단
+    var invData=(_inviteListCache&&_inviteListCache[eid])||{rows:[]};
+    var invited=(invData.rows||[]).filter(function(r){return r.invite==='초대';}).length;
+    var confirmed=(invData.rows||[]).filter(function(r){return r.response==='참석';}).length;
+    stepData[4]={label:'초대 '+invited+'명 · 참석 확정 '+confirmed+'명',
+      link:function(){switchMeetingTab('invitelist');}};
+    // STEP5: 참석자
+    var attList=(targetEvt.attendees||[]);
+    var attended=attList.filter(function(a){return a.attended;}).length;
+    stepData[5]={label:'실참석 '+attended+'명 / 초대 '+invited+'명',
+      link:function(){switchMeetingTab('attendees');}};
+    // STEP6: 상담
+    var consultCnt=0;
+    db.collection('meetingConsults').get().then(function(snap){consultCnt=snap.size;});
+    stepData[6]={label:'상담 기록 '+consultCnt+'건',
+      link:function(){switchMeetingTab('consult');}};
+  }
+
   var html='<div style="padding:8px 4px">';
 
-  // 전체 흐름 바
-  html+='<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px">';
-  html+='<div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:8px">전체 흐름</div>';
-  html+='<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:11px">';
+  // ── 설명회 날짜 배너 ──
+  if(targetEvt){
+    var dLabel=dDay===0?'D-Day':dDay>0?'D-'+dDay:'D+'+Math.abs(dDay);
+    var bannerColor=dDay===0?'#dc2626':dDay>0?'var(--navy)':'#6b7280';
+    html+='<div style="background:'+bannerColor+';border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">';
+    html+='<div style="font-size:22px;font-weight:900;color:#fff;flex-shrink:0">'+dLabel+'</div>';
+    html+='<div>';
+    html+='<div style="font-size:13px;font-weight:800;color:#fff">'+targetEvt.title+'</div>';
+    html+='<div style="font-size:11px;color:rgba(255,255,255,.8)">'+targetEvt.date.slice(5).replace('-','/')+'</div>';
+    html+='</div>';
+    if(currentStepNum>0){
+      html+='<div style="margin-left:auto;background:rgba(255,255,255,.2);border-radius:8px;padding:4px 10px;text-align:center">';
+      html+='<div style="font-size:10px;color:rgba(255,255,255,.8)">현재 단계</div>';
+      html+='<div style="font-size:12px;font-weight:800;color:#fff">STEP'+currentStepNum+'</div>';
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+
+  // ── 전체 흐름 바 ──
+  html+='<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:12px">';
+  html+='<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">';
   STEPS.forEach(function(s,i){
-    html+='<span style="background:var(--navy);color:#fff;padding:3px 8px;border-radius:12px;font-weight:700">STEP'+s.num+' '+s.title+'</span>';
-    if(i<STEPS.length-1)html+='<span style="color:var(--txt3)">→</span>';
+    var isCurrent=s.num===currentStepNum;
+    var isDone=s.num<currentStepNum;
+    var bg=isCurrent?'#dc2626':isDone?'#10b981':'var(--surface2)';
+    var col=isCurrent||isDone?'#fff':'var(--txt3)';
+    html+='<span onclick="_guideToggleStep('+s.num+')" style="background:'+bg+';color:'+col+';padding:3px 8px;border-radius:10px;font-weight:700;font-size:11px;cursor:pointer">'+
+      (isDone?'✓ ':'')+'STEP'+s.num+'</span>';
+    if(i<STEPS.length-1)html+='<span style="color:var(--border2);font-size:10px">→</span>';
   });
   html+='</div></div>';
 
-  // STEP 카드
+  // ── STEP 카드 ──
   STEPS.forEach(function(s){
     var isOpen=!!window._guideOpenSteps[s.num];
-    html+='<div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px">';
+    var isCurrent=s.num===currentStepNum;
+    var isDone=s.num<currentStepNum;
+    var borderColor=isCurrent?'#dc2626':isDone?'#10b981':'var(--border)';
+    var headerBg=isOpen?'var(--navy)':isCurrent?'#fff7f7':isDone?'#f0fdf4':'var(--surface)';
 
-    // 헤더 (클릭으로 열기/닫기)
+    html+='<div style="border:1.5px solid '+borderColor+';border-radius:12px;overflow:hidden;margin-bottom:8px">';
+
+    // 헤더
     html+='<div onclick="_guideToggleStep('+s.num+')" '
-      +'style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:'+(isOpen?'var(--navy)':'var(--surface)')+';user-select:none">';
-    html+='<span style="font-size:13px;font-weight:800;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;'
-      +'background:'+(isOpen?'rgba(255,255,255,.2)':'var(--navy)')+';color:#fff;flex-shrink:0">'+s.num+'</span>';
-    html+='<div style="flex:1">';
-    html+='<div style="font-size:13px;font-weight:800;color:'+(isOpen?'#fff':'var(--navy)')+'">STEP'+s.num+' — '+s.title+'</div>';
-    html+='<div style="font-size:11px;color:'+(isOpen?'#93c5fd':'var(--txt3)')+'">'+s.desc+'</div>';
+      +'style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;background:'+headerBg+';user-select:none">';
+    var numBg=isOpen?'rgba(255,255,255,.2)':isCurrent?'#dc2626':isDone?'#10b981':'var(--navy)';
+    html+='<span style="font-size:12px;font-weight:800;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;'
+      +'background:'+numBg+';color:#fff;flex-shrink:0">'+(isDone?'✓':s.num)+'</span>';
+    html+='<div style="flex:1;min-width:0">';
+    html+='<div style="display:flex;align-items:center;gap:6px">';
+    html+='<span style="font-size:13px;font-weight:800;color:'+(isOpen?'#fff':'var(--navy)')+'">STEP'+s.num+' — '+s.title+'</span>';
+    if(isCurrent)html+='<span style="font-size:10px;background:#dc2626;color:#fff;padding:1px 6px;border-radius:8px;font-weight:700">지금 여기</span>';
     html+='</div>';
-    html+='<span style="font-size:14px;color:'+(isOpen?'#fff':'var(--txt3)')+';">'+(isOpen?'▲':'▼')+'</span>';
+    // 실제 데이터 요약
+    if(stepData[s.num]){
+      html+='<div style="font-size:10px;color:'+(isOpen?'#93c5fd':'var(--mint)')+';margin-top:2px">'+stepData[s.num].label+'</div>';
+    }else{
+      html+='<div style="font-size:11px;color:'+(isOpen?'#93c5fd':'var(--txt3)')+'">'+s.desc+'</div>';
+    }
+    html+='</div>';
+    html+='<span style="font-size:13px;color:'+(isOpen?'#fff':'var(--txt3)')+';">'+(isOpen?'▲':'▼')+'</span>';
     html+='</div>';
 
-    // 본문 (열렸을 때만)
+    // 본문
     if(isOpen){
       html+='<div style="padding:14px;background:var(--bg)">';
+
+      // 관련 탭 이동 버튼
+      var quickLinks={
+        2:[{label:'실행계획 관리',tab:'detail'},{label:'초대 명단',tab:'invitelist'}],
+        4:[{label:'초대 명단',tab:'invitelist'}],
+        5:[{label:'참석자 관리',tab:'attendees'}],
+        6:[{label:'상담 기록',tab:'consult'},{label:'참석자 관리',tab:'attendees'}],
+        7:[{label:'참석자 관리',tab:'attendees'}]
+      };
+      if(quickLinks[s.num]){
+        html+='<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">';
+        quickLinks[s.num].forEach(function(lk){
+          html+='<button onclick="switchMeetingTab(''+lk.tab+'')" '
+            +'style="font-size:11px;padding:5px 10px;background:var(--navy);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">→ '+lk.label+'</button>';
+        });
+        html+='</div>';
+      }
 
       // 체크리스트
       html+='<div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:8px">체크리스트</div>';
