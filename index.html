@@ -399,6 +399,26 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <button class="rev-tab"        id="btab-crm"        onclick="switchBoardTab('crm')"        style="font-size:13px;font-weight:700">👥 상담</button>
     <button class="rev-tab"        id="btab-mk"         onclick="switchBoardTab('mk')"         style="font-size:13px;font-weight:700">📣 마케팅</button>
     <button class="rev-tab"        id="btab-conditions" onclick="switchBoardTab('conditions')" style="font-size:13px;font-weight:700">⚙️</button>
+    <!-- 통일 업무 추가 버튼 -->
+    <div style="margin-left:auto;padding:0 8px;flex-shrink:0;position:relative">
+      <button id="board-add-btn" onclick="openBoardAddMenu()" class="btn btn-navy btn-sm" style="font-size:12px;padding:5px 12px;white-space:nowrap">+ 업무 추가</button>
+      <div id="board-add-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:500;min-width:170px;padding:4px">
+        <div style="padding:6px 10px;font-size:10px;font-weight:700;color:var(--txt3)">일반 업무 추가</div>
+        <button onclick="closeBoardAddMenu();openDbTaskModal(null,null,null,todayISO())" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt);border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+          오늘 할 일
+        </button>
+        <button onclick="closeBoardAddMenu();openDbTaskModalWeekly()" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt);border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+          주간 할 일
+        </button>
+        <button onclick="closeBoardAddMenu();openDbTaskModalMonthly()" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt);border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+          이달의 할 일
+        </button>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <button onclick="closeBoardAddMenu();goto('board');setTimeout(function(){switchBoardTab('focus');},100)" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:#1d4ed8;border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+          실행계획 관리로 이동 →
+        </button>
+      </div>
+    </div>
   </div>
   <!-- 오늘 할 일 패널 -->
   <div id="board-panel-today" class="cp"><div style="padding:20px;text-align:center;color:var(--txt3)">⏳ 로딩 중...</div></div>
@@ -423,7 +443,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <!-- 참고 자료 아코디언 -->
     <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden">
       <div onclick="_toggleFocusRef()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);cursor:pointer;user-select:none">
-        <span style="font-size:12px;font-weight:700;color:var(--navy)">📋 이달의 참고 자료</span>
+        <span style="font-size:13px;font-weight:700;color:var(--navy)">📋 이달의 참고 자료</span>
         <span id="focus-ref-icon" style="font-size:13px;color:var(--txt3);transition:transform .2s;transform:rotate(-90deg)">▾</span>
       </div>
       <div id="focus-ref-body" style="display:none;padding:10px 14px">
@@ -3356,6 +3376,44 @@ function switchDashTab(tab){
 
 // ── 할 일 페이지 탭 전환 ──────────────────────────────
 var _boardCurrentTab='today';
+function openBoardAddMenu(){
+  var menu=document.getElementById('board-add-menu');
+  if(!menu)return;
+  var isOpen=menu.style.display!=='none';
+  menu.style.display=isOpen?'none':'block';
+  if(!isOpen){
+    // 외부 클릭 시 닫기
+    setTimeout(function(){
+      document.addEventListener('click',function handler(e){
+        var btn=document.getElementById('board-add-btn');
+        if(btn&&!btn.contains(e.target)&&!menu.contains(e.target)){
+          menu.style.display='none';
+        }
+        document.removeEventListener('click',handler);
+      });
+    },0);
+  }
+}
+function closeBoardAddMenu(){
+  var menu=document.getElementById('board-add-menu');
+  if(menu)menu.style.display='none';
+}
+// 주간 할 일 추가 — 이번 주 월요일을 실행 예정일 기본값으로
+function openDbTaskModalWeekly(){
+  var d=new Date();
+  var day=d.getDay();
+  var diff=day===0?-6:1-day;
+  d.setDate(d.getDate()+diff);
+  var mon=d.toISOString().slice(0,10);
+  openDbTaskModal(null,null,null,null,null,mon);
+}
+// 이달의 할 일 추가 — 이번 달 말일을 완료 기한, 오늘을 실행 예정일로
+function openDbTaskModalMonthly(){
+  var d=new Date();
+  var lastDay=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+  openDbTaskModal(null,null,null,lastDay,null,todayISO());
+}
+
 function switchBoardTab(tab){
   _boardCurrentTab=tab;
   var allTabs=['today','weekly','focus','area','crm','mk','conditions'];
@@ -4443,7 +4501,6 @@ function _renderBoardAreaPanel(){
   var el=$('board-area-area');if(!el)return;
   var today=todayISO();
   var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
-  html+='<div style="display:flex;justify-content:flex-end"><button class="btn btn-navy btn-sm" onclick="openDbTaskModal(null)">+ 업무 추가</button></div>';
 
 
   html+=_renderDbAreaView();
@@ -13556,7 +13613,7 @@ function _renderTodayTaskSection(){
   if(todayItems.length||planTodayTasks.length){
     h+='<div id="tl-capacity-bar">'+_renderTodayCapacityBar(totalAvailMin,scheduledMin)+'</div>';
   }
-  h+='<button id="tl-add-btn" class="btn btn-navy btn-sm" style="width:100%;margin-bottom:8px" onclick="openTodayTaskModal()">＋ 업무 추가</button>';
+  h+='<button id="tl-add-btn" class="btn btn-outline btn-sm" style="width:100%;margin-bottom:8px;display:none" onclick="openTodayTaskModal()">＋ 업무 추가</button>';
   if(totalOverdue){
     h+='<div id="tl-overdue-section">'+_buildOverdueHTML(overdueItems,planOverdue,today)+'</div>';
   }
@@ -14400,7 +14457,7 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
   html+='<span style="font-size:13px;font-weight:800;color:#7c3aed">📆 이번 주 업무</span>';
   html+='<span style="font-size:11px;color:var(--txt3)">'+monStr.slice(5)+' ~ '+sunStr.slice(5)+'</span>';
   if(weekTasks.length)html+='<span style="margin-left:auto;font-size:11px;color:var(--txt3)">'+done+'/'+weekTasks.length+' 완료</span>';
-  html+='<button class="btn btn-navy btn-xs" style="margin-left:'+(weekTasks.length?'4px':'auto')+'" onclick="openDbTaskModal(null)">＋ 추가</button>';
+  html+='<button class="btn btn-navy btn-xs" style="margin-left:auto" onclick="openDbTaskModal(null)">＋ 추가</button>';
   html+='</div>';
   html+='<div style="padding:6px 14px;background:var(--surface)">';
   if(weekTasks.length){
@@ -14500,7 +14557,7 @@ function _dbToggleAutoTask(date,label,checked){
 }
 
 // ── 업무 추가/편집 모달 ───────────────────────────
-function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSlot){
+function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSlot,defaultScheduleDate){
   var t=id?(_dbTasks||[]).find(function(x){return x.id===id;}):null;
   _dbEditId=id||null;
   var today=todayISO();
@@ -14556,7 +14613,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';
   dueInp.value=t&&t.dueDate?t.dueDate:(defaultDueDate||'');
   var schInp=document.createElement('input');schInp.className='fi';schInp.id='dbt-scheduledate';schInp.type='date';schInp.style.fontSize='12px';
-  schInp.value=t&&t.scheduleDate?t.scheduleDate:(defaultDueDate||today);
+  schInp.value=t&&t.scheduleDate?t.scheduleDate:(defaultScheduleDate||defaultDueDate||today);
   var dueDateW=document.createElement('div');dueDateW.appendChild(mkLbl('완료 기한'));dueDateW.appendChild(dueInp);
   var schDateW=document.createElement('div');schDateW.appendChild(mkLbl('실행 예정일 *'));schDateW.appendChild(schInp);
   rDate.appendChild(dueDateW);rDate.appendChild(schDateW);box.appendChild(rDate);
