@@ -401,7 +401,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <button class="rev-tab"        id="btab-conditions" onclick="switchBoardTab('conditions')" style="font-size:13px;font-weight:700">⚙️</button>
     <!-- 통일 업무 추가 버튼 -->
     <div style="margin-left:auto;padding:0 8px;flex-shrink:0">
-      <button onclick="openUnifiedAddModal()" class="btn btn-navy btn-sm" style="font-size:12px;padding:5px 12px;white-space:nowrap">+ 업무 추가</button>
+      <button onclick="openDbTaskModal(null)" class="btn btn-navy btn-sm" style="font-size:12px;padding:5px 12px;white-space:nowrap">+ 업무 추가</button>
     </div>
   </div>
   <!-- 오늘 할 일 패널 -->
@@ -14600,11 +14600,63 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
     return s;
   }
 
-  // ── 업무 유형 ──
-  var curType=t?t.taskType||'일반 업무':(defaultTaskType||'일반 업무');
-  var typeSel=mkSel('dbt-tasktype',_DB_TASK_TYPES.map(function(tp){return{v:tp,l:_DB_TASK_TYPE_ICONS[tp]+' '+tp};}),curType);
-  typeSel.style.cssText='font-size:13px;font-weight:600;background:var(--surface2);border-color:var(--navy);color:var(--navy)';
-  var tw=document.createElement('div');tw.style.marginBottom='10px';tw.appendChild(mkLbl('업무 유형'));tw.appendChild(typeSel);box.appendChild(tw);
+  // ── 목록 선택 (업무 유형 대체) ──
+  var LIST_OPTS=[
+    {v:'today',  l:'오늘 할 일',   desc:'오늘 실행할 업무'},
+    {v:'weekly', l:'주간 할 일',   desc:'이번 주 안에 할 업무'},
+    {v:'monthly',l:'이달의 할 일', desc:'이번 달 안에 할 업무'},
+  ];
+  // 기존 taskType으로 기본 목록 결정
+  var curList=t?(t.taskType==='이번 주 중점'?'weekly':t.taskType==='이달의 중점'?'monthly':'today'):'today';
+  if(defaultScheduleDate&&defaultScheduleDate!==todayISO()){
+    // 주간이면 weekly, 이달말이면 monthly
+    var endOfMonth=new Date();endOfMonth=new Date(endOfMonth.getFullYear(),endOfMonth.getMonth()+1,0).toISOString().slice(0,10);
+    if(defaultScheduleDate===endOfMonth)curList='monthly';
+    else curList='weekly';
+  }
+  var listWrap=document.createElement('div');listWrap.style.marginBottom='12px';
+  listWrap.appendChild(mkLbl('목록'));
+  var listBtnRow=document.createElement('div');
+  listBtnRow.style.cssText='display:flex;gap:6px';
+  LIST_OPTS.forEach(function(opt){
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.id='dbt-list-btn-'+opt.v;
+    btn.dataset.list=opt.v;
+    btn.textContent=opt.l;
+    var active=curList===opt.v;
+    btn.style.cssText='flex:1;font-size:11px;font-weight:700;padding:7px 4px;border-radius:8px;cursor:pointer;border:1.5px solid '+(active?'var(--navy)':'var(--border)')+';background:'+(active?'var(--navy)':'var(--surface2)')+';color:'+(active?'#fff':'var(--txt3)');
+    btn.onclick=function(){
+      curList=opt.v;
+      LIST_OPTS.forEach(function(o){
+        var b=document.getElementById('dbt-list-btn-'+o.v);if(!b)return;
+        var a=o.v===opt.v;
+        b.style.borderColor=a?'var(--navy)':'var(--border)';
+        b.style.background=a?'var(--navy)':'var(--surface2)';
+        b.style.color=a?'#fff':'var(--txt3)';
+      });
+      // scheduleDate 자동 설정
+      var schEl=document.getElementById('dbt-scheduledate');
+      if(schEl){
+        var d=new Date();
+        if(opt.v==='today'){schEl.value=todayISO();}
+        else if(opt.v==='weekly'){var day=d.getDay(),diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);schEl.value=d.toISOString().slice(0,10);}
+        else{schEl.value=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);}
+      }
+      // 실행계획 버튼 클릭 시 이동
+      document.getElementById('dbt-list-hidden').value=opt.v;
+    };
+    listBtnRow.appendChild(btn);
+  });
+  // 실행계획 이동 버튼
+  var planBtn=document.createElement('button');
+  planBtn.type='button';
+  planBtn.textContent='실행계획 →';
+  planBtn.style.cssText='font-size:11px;font-weight:700;padding:7px 8px;border-radius:8px;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:#1d4ed8;white-space:nowrap;flex-shrink:0';
+  planBtn.onclick=function(){modal.remove();goto('board');setTimeout(function(){switchBoardTab('focus');},100);};
+  listBtnRow.appendChild(planBtn);
+  var listHid=document.createElement('input');listHid.type='hidden';listHid.id='dbt-list-hidden';listHid.value=curList;
+  listWrap.appendChild(listBtnRow);listWrap.appendChild(listHid);box.appendChild(listWrap);
 
   // ── 업무명 ──
   var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';
@@ -14701,7 +14753,9 @@ function _dbSaveTaskModal(id){
   var today=todayISO();
   var name=(document.getElementById('dbt-name')||{}).value||'';
   var area=(document.getElementById('dbt-area')||{}).value||'';
-  var taskType=(document.getElementById('dbt-tasktype')||{}).value||'일반 업무';
+  var listChoice=(document.getElementById('dbt-list-hidden')||{}).value||'today';
+  // listChoice → taskType 매핑 (하위 호환)
+  var taskType=listChoice==='weekly'?'이번 주 중점':listChoice==='monthly'?'이달의 중점':'일반 업무';
   var dueDate=(document.getElementById('dbt-due')||{}).value||'';
   var scheduleDate=(document.getElementById('dbt-scheduledate')||{}).value||today;
   var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
