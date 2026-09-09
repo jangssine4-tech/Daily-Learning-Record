@@ -400,24 +400,8 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <button class="rev-tab"        id="btab-mk"         onclick="switchBoardTab('mk')"         style="font-size:13px;font-weight:700">📣 마케팅</button>
     <button class="rev-tab"        id="btab-conditions" onclick="switchBoardTab('conditions')" style="font-size:13px;font-weight:700">⚙️</button>
     <!-- 통일 업무 추가 버튼 -->
-    <div style="margin-left:auto;padding:0 8px;flex-shrink:0;position:relative">
-      <button id="board-add-btn" onclick="openBoardAddMenu()" class="btn btn-navy btn-sm" style="font-size:12px;padding:5px 12px;white-space:nowrap">+ 업무 추가</button>
-      <div id="board-add-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:500;min-width:170px;padding:4px">
-        <div style="padding:6px 10px;font-size:10px;font-weight:700;color:var(--txt3)">일반 업무 추가</div>
-        <button onclick="closeBoardAddMenu();openDbTaskModal(null,null,null,todayISO())" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt);border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
-          오늘 할 일
-        </button>
-        <button onclick="closeBoardAddMenu();openDbTaskModalWeekly()" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt);border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
-          주간 할 일
-        </button>
-        <button onclick="closeBoardAddMenu();openDbTaskModalMonthly()" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt);border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
-          이달의 할 일
-        </button>
-        <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <button onclick="closeBoardAddMenu();goto('board');setTimeout(function(){switchBoardTab('focus');},100)" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:#1d4ed8;border-radius:6px;text-align:left" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
-          실행계획 관리로 이동 →
-        </button>
-      </div>
+    <div style="margin-left:auto;padding:0 8px;flex-shrink:0">
+      <button onclick="openUnifiedAddModal()" class="btn btn-navy btn-sm" style="font-size:12px;padding:5px 12px;white-space:nowrap">+ 업무 추가</button>
     </div>
   </div>
   <!-- 오늘 할 일 패널 -->
@@ -3376,28 +3360,58 @@ function switchDashTab(tab){
 
 // ── 할 일 페이지 탭 전환 ──────────────────────────────
 var _boardCurrentTab='today';
-function openBoardAddMenu(){
-  var menu=document.getElementById('board-add-menu');
-  if(!menu)return;
-  var isOpen=menu.style.display!=='none';
-  menu.style.display=isOpen?'none':'block';
-  if(!isOpen){
-    // 외부 클릭 시 닫기
-    setTimeout(function(){
-      document.addEventListener('click',function handler(e){
-        var btn=document.getElementById('board-add-btn');
-        if(btn&&!btn.contains(e.target)&&!menu.contains(e.target)){
-          menu.style.display='none';
-        }
-        document.removeEventListener('click',handler);
-      });
-    },0);
-  }
+function openUnifiedAddModal(){
+  var old=document.getElementById('unified-add-modal');if(old)old.remove();
+  var modal=document.createElement('div');
+  modal.id='unified-add-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+
+  var box=document.createElement('div');
+  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:360px';
+
+  // 헤더
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--navy)">업무 추가</div>'
+    +'<button onclick="document.getElementById(&apos;unified-add-modal&apos;).remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>'
+    +'</div>'
+    // 안내 문구
+    +'<div style="font-size:12px;color:var(--txt3);margin-bottom:14px">어느 목록에 추가할까요?</div>'
+    // 선택 버튼들
+    +'<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">'
+    +_uamBtn('오늘 할 일','오늘 실행할 업무','today')
+    +_uamBtn('주간 할 일','이번 주 안에 할 업무','weekly')
+    +_uamBtn('이달의 할 일','이번 달 안에 할 업무','monthly')
+    +'</div>'
+    // 구분선 + 실행계획 이동
+    +'<div style="height:1px;background:var(--border);margin-bottom:12px"></div>'
+    +'<button onclick="document.getElementById(&apos;unified-add-modal&apos;).remove();goto(\'board\');setTimeout(function(){switchBoardTab(\'focus\');},100)" '
+    +'style="width:100%;padding:10px;background:none;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:#1d4ed8;font-weight:600">실행계획 관리로 이동 →</button>';
+
+  modal.appendChild(box);
+  document.body.appendChild(modal);
 }
+
+function _uamBtn(label,desc,type){
+  var fn='';
+  if(type==='today') fn="document.getElementById('unified-add-modal').remove();openDbTaskModal(null,null,null,todayISO(),null,todayISO())";
+  else if(type==='weekly') fn="document.getElementById('unified-add-modal').remove();openDbTaskModalWeekly()";
+  else fn="document.getElementById('unified-add-modal').remove();openDbTaskModalMonthly()";
+  return '<button onclick="'+fn+'" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;text-align:left;transition:border-color .15s" '
+    +'onmouseover="this.style.borderColor=\'var(--navy)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
+    +'<div>'
+    +'<div style="font-size:13px;font-weight:700;color:var(--navy)">'+label+'</div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+desc+'</div>'
+    +'</div>'
+    +'<span style="margin-left:auto;font-size:16px;color:var(--txt3)">→</span>'
+    +'</button>';
+}
+
+function openBoardAddMenu(){} // 하위 호환용 빈 함수
 function closeBoardAddMenu(){
-  var menu=document.getElementById('board-add-menu');
-  if(menu)menu.style.display='none';
+  var m=document.getElementById('unified-add-modal');if(m)m.remove();
 }
+
 // 주간 할 일 추가 — 이번 주 월요일을 실행 예정일 기본값으로
 function openDbTaskModalWeekly(){
   var d=new Date();
