@@ -3641,9 +3641,13 @@ function _buildTimeline(){
   HOURS.forEach(function(h){slotMap[h]=[];});
   timedTasks.forEach(function(t){var h=parseInt(t.startHour);if(slotMap[h]!==undefined)slotMap[h].push({type:'db',task:t});});
   planTimedTasks.forEach(function(t){var h=parseInt(t.startHour);if(slotMap[h]!==undefined)slotMap[h].push({type:'plan',task:t});});
-  // 루틴 슬롯 병합
+  // 루틴 슬롯 병합 (반복 요일 필터 적용)
   var routines=_getRoutines();
-  routines.forEach(function(r){var h=parseInt(r.hour);if(slotMap[h]!==undefined)slotMap[h].unshift({type:'routine',task:r});});
+  var selDOW=['일','월','화','수','목','금','토'][new Date(selDate).getDay()];
+  routines.forEach(function(r){
+    if(r.days&&r.days.length>0&&!r.days.includes(selDOW))return;
+    var h=parseInt(r.hour);if(slotMap[h]!==undefined)slotMap[h].unshift({type:'routine',task:r});
+  });
 
   var d=new Date(selDate);
   var DOW=['일','월','화','수','목','금','토'];
@@ -3727,7 +3731,6 @@ function _tlTaskCard(item,isPastDate){
   }
 
   if(isPlan)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋</span>';
-  if(t.area&&!isPlan)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0">'+t.area+'</span>';
   // 업무명 + 시작 시간 배지
   var timeLabel='';
   if(t.startHour!==undefined&&t.startHour!==null){
@@ -4096,88 +4099,93 @@ function _saveRoutines(arr){
 }
 
 function openRoutineModal(){
-  var routines=_getRoutines();
   var old=document.getElementById('routine-modal');if(old)old.remove();
   var modal=document.createElement('div');
   modal.id='routine-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
   modal.onclick=function(e){if(e.target===modal)modal.remove();};
 
+  var DAYS_KR=['월','화','수','목','금','토','일'];
+  var DURATION_PRESETS=[15,30,45,60,90];
+
   function renderBox(){
     var routines=_getRoutines();
-    var h='<div style="background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto">';
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+    var h='<div style="background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:400px;max-height:88vh;overflow-y:auto">';
+
+    // 헤더
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
     h+='<div style="font-size:15px;font-weight:800;color:var(--navy)">🔁 루틴 관리</div>';
-    h+='<button onclick="document.getElementById(&apos;routine-modal&apos;).remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>';
+    h+='<button onclick="document.getElementById(\'routine-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>';
     h+='</div>';
-    h+='<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">매일 반복되는 루틴을 등록하면 타임라인에 자동으로 표시됩니다.</div>';
+    h+='<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">매일 반복되는 루틴을 등록하면 타임라인에 자동 표시됩니다.</div>';
 
     // 등록된 루틴 목록
     if(routines.length){
-      h+='<div style="margin-bottom:14px">';
+      h+='<div style="margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
       routines.forEach(function(r,i){
         var hDisp=r.hour===24?'00':String(r.hour).padStart(2,'0');
         var mDisp=String(r.min||0).padStart(2,'0');
-        h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">';
-        h+='<span style="font-size:11px;font-weight:700;color:var(--navy);flex-shrink:0;width:46px">'+hDisp+':'+mDisp+'</span>';
+        var daysLabel=(r.days&&r.days.length&&r.days.length<7)?r.days.join('·'):'매일';
+        h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;'+(i>0?'border-top:1px solid var(--border)':'')+'">';
+        h+='<span style="font-size:12px;font-weight:700;color:var(--navy);flex-shrink:0;min-width:42px">'+hDisp+':'+mDisp+'</span>';
         h+='<span style="flex:1;font-size:12px;color:var(--txt)">'+r.name+'</span>';
-        if(r.duration)h+='<span style="font-size:10px;color:var(--txt3)">'+r.duration+'분</span>';
-        h+='<button onclick="deleteRoutine('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 2px">×</button>';
+        h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+daysLabel+'</span>';
+        if(r.duration)h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0;margin-left:4px">·'+r.duration+'분</span>';
+        h+='<button onclick="deleteRoutine('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;padding:0 2px;line-height:1">×</button>';
         h+='</div>';
       });
       h+='</div>';
     }else{
-      h+='<div style="text-align:center;padding:16px;color:var(--txt3);font-size:12px;margin-bottom:12px">등록된 루틴이 없습니다</div>';
+      h+='<div style="text-align:center;padding:14px;color:var(--txt3);font-size:12px;border:1px dashed var(--border);border-radius:10px;margin-bottom:12px">등록된 루틴이 없습니다</div>';
     }
 
-    // 추가 폼
-    h+='<div style="background:var(--surface2);border-radius:10px;padding:12px">';
-    h+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px">+ 루틴 추가</div>';
+    // + 루틴 추가 버튼 (폼 토글)
+    h+='<button onclick="_toggleRoutineForm()" id="routine-add-toggle" class="btn btn-outline btn-sm" style="width:100%;margin-bottom:0">＋ 루틴 추가</button>';
 
-    // 시작 시간 다이얼 (시/분)
-    h+='<div style="margin-bottom:12px">';
-    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:8px">시작 시간</div>';
-    h+='<div style="display:flex;align-items:center;justify-content:center;gap:4px">';
-    // 시 다이얼
-    h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
-    h+='<button type="button" onclick="_routineDialStep(\'routine-hour\',1,1,24)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;width:36px;height:28px;cursor:pointer;font-size:16px;font-weight:700">▲</button>';
-    h+='<div id="routine-hour-display" style="font-size:22px;font-weight:800;color:var(--navy);width:52px;text-align:center;background:var(--surface);border:2px solid var(--navy);border-radius:8px;padding:4px 0">01</div>';
-    h+='<input type="hidden" id="routine-hour" value="1">';
-    h+='<button type="button" onclick="_routineDialStep(\'routine-hour\',-1,1,24)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;width:36px;height:28px;cursor:pointer;font-size:16px;font-weight:700">▼</button>';
-    h+='<div style="font-size:10px;color:var(--txt3);margin-top:2px">시</div>';
-    h+='</div>';
-    h+='<div style="font-size:24px;font-weight:800;color:var(--txt3);margin-bottom:16px">:</div>';
-    // 분 다이얼 (0, 5, 10 ... 55)
-    h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
-    h+='<button type="button" onclick="_routineDialStep(\'routine-min\',5,0,55)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;width:36px;height:28px;cursor:pointer;font-size:16px;font-weight:700">▲</button>';
-    h+='<div id="routine-min-display" style="font-size:22px;font-weight:800;color:var(--navy);width:52px;text-align:center;background:var(--surface);border:2px solid var(--navy);border-radius:8px;padding:4px 0">00</div>';
-    h+='<input type="hidden" id="routine-min" value="0">';
-    h+='<button type="button" onclick="_routineDialStep(\'routine-min\',-5,0,55)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;width:36px;height:28px;cursor:pointer;font-size:16px;font-weight:700">▼</button>';
-    h+='<div style="font-size:10px;color:var(--txt3);margin-top:2px">분</div>';
-    h+='</div>';
-    h+='</div></div>';
+    // 입력 폼 (기본 숨김)
+    h+='<div id="routine-form" style="display:none;background:var(--surface2);border-radius:10px;padding:14px;margin-top:10px">';
 
-    // 소요시간 다이얼 (분 단위, 1~120)
-    h+='<div style="margin-bottom:12px">';
-    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:8px">소요시간</div>';
-    h+='<div style="display:flex;align-items:center;justify-content:center;gap:4px">';
-    h+='<button type="button" onclick="_routineDialStep(\'routine-duration\',5,5,120)" style="background:var(--surface);color:var(--txt);border:1.5px solid var(--border);border-radius:6px;width:36px;height:28px;cursor:pointer;font-size:16px;font-weight:700">▲</button>';
-    h+='<div style="display:flex;align-items:baseline;gap:3px">';
-    h+='<div id="routine-duration-display" style="font-size:22px;font-weight:800;color:var(--txt);width:52px;text-align:center;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:4px 0">30</div>';
-    h+='<span style="font-size:12px;color:var(--txt3)">분</span>';
+    // ① 루틴명
+    h+='<div style="margin-bottom:10px">';
+    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">루틴명 *</div>';
+    h+='<input id="routine-name" class="fi" placeholder="예: 아침 출결 확인" style="font-size:13px">';
     h+='</div>';
-    h+='<button type="button" onclick="_routineDialStep(\'routine-duration\',-5,5,120)" style="background:var(--surface);color:var(--txt);border:1.5px solid var(--border);border-radius:6px;width:36px;height:28px;cursor:pointer;font-size:16px;font-weight:700">▼</button>';
+
+    // ② 시작 시간 + 소요시간 (한 줄)
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+    // 시작 시간
+    h+='<div>';
+    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">시작 시간</div>';
+    h+='<input type="time" id="routine-time" class="fi" value="09:00" style="font-size:13px;font-weight:700;color:var(--navy)">';
+    h+='</div>';
+    // 소요시간
+    h+='<div>';
+    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">소요시간</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    DURATION_PRESETS.forEach(function(d){
+      h+='<button type="button" onclick="_selectRoutineDuration('+d+',this)" class="routine-dur-btn" style="font-size:11px;padding:3px 7px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--txt2);cursor:pointer">'+d+'분</button>';
+    });
+    h+='<input type="number" id="routine-duration-custom" placeholder="직접" min="1" max="480" style="width:46px;font-size:11px;padding:3px 5px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--txt)" oninput="_routineCustomDur(this)">';
     h+='</div>';
     h+='<input type="hidden" id="routine-duration" value="30">';
     h+='</div>';
+    h+='</div>';
 
-    // 루틴명
-    h+='<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">루틴명</div>';
-    h+='<input id="routine-name" class="fi" placeholder="예: 아침 일지 작성" style="font-size:12px">';
+    // ③ 반복 요일
+    h+='<div style="margin-bottom:12px">';
+    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:6px">반복 요일 <span style="font-weight:400">(미선택 시 매일)</span></div>';
+    h+='<div style="display:flex;gap:4px">';
+    DAYS_KR.forEach(function(d){
+      h+='<button type="button" onclick="_toggleRoutineDay(this,\''+d+'\')" data-day="'+d+'" style="flex:1;font-size:11px;font-weight:600;padding:4px 0;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--txt3);cursor:pointer">'+d+'</button>';
+    });
     h+='</div>';
-    h+='<button onclick="addRoutine()" class="btn btn-navy btn-sm" style="width:100%">추가</button>';
     h+='</div>';
-    h+='<button onclick="document.getElementById(&apos;routine-modal&apos;).remove();var l=document.getElementById(&apos;today-timeline-col&apos;);if(l){l.innerHTML=_buildTimeline();_initTimelineDnD();}" class="btn btn-outline btn-sm" style="width:100%;margin-top:10px">완료</button>';
+
+    h+='<button onclick="addRoutine()" class="btn btn-navy btn-sm" style="width:100%">루틴 추가</button>';
+    h+='</div>'; // form 끝
+
+    // 닫기
+    h+='<button onclick="document.getElementById(\'routine-modal\').remove();var l=document.getElementById(\'today-timeline-col\');if(l){l.innerHTML=_buildTimeline();_initTimelineDnD();}" class="btn btn-outline btn-sm" style="width:100%;margin-top:10px">닫기</button>';
     h+='</div>';
     return h;
   }
@@ -4188,29 +4196,57 @@ function openRoutineModal(){
   window._routineModal=modal;
 }
 
-function _routineDialStep(id,step,min,max){
-  var inp=document.getElementById(id);
-  var display=document.getElementById(id+'-display');
-  if(!inp)return;
-  var cur=parseInt(inp.value)||0;
-  var next=cur+step;
-  if(next>max)next=min;
-  if(next<min)next=max;
-  inp.value=next;
-  if(display){
-    if(id==='routine-hour'){var d=next===24?0:next;display.textContent=String(d).padStart(2,'0');}
-    else{display.textContent=String(next).padStart(2,'0');}
-  }
+function _toggleRoutineForm(){
+  var f=document.getElementById('routine-form');
+  if(!f)return;
+  var open=f.style.display==='none';
+  f.style.display=open?'block':'none';
+  var btn=document.getElementById('routine-add-toggle');
+  if(btn)btn.textContent=open?'▲ 접기':'＋ 루틴 추가';
+  if(open){setTimeout(function(){var n=document.getElementById('routine-name');if(n)n.focus();},50);}
+}
+
+function _selectRoutineDuration(val,el){
+  var inp=document.getElementById('routine-duration');
+  if(inp)inp.value=val;
+  var cust=document.getElementById('routine-duration-custom');
+  if(cust)cust.value='';
+  document.querySelectorAll('.routine-dur-btn').forEach(function(b){
+    b.style.background=b===el?'var(--navy)':'var(--surface)';
+    b.style.color=b===el?'#fff':'var(--txt2)';
+    b.style.borderColor=b===el?'var(--navy)':'var(--border)';
+  });
+}
+
+function _routineCustomDur(el){
+  var v=parseInt(el.value);
+  var inp=document.getElementById('routine-duration');
+  if(inp&&v>0)inp.value=v;
+  document.querySelectorAll('.routine-dur-btn').forEach(function(b){
+    b.style.background='var(--surface)';b.style.color='var(--txt2)';b.style.borderColor='var(--border)';
+  });
+}
+
+function _toggleRoutineDay(el,day){
+  var on=el.dataset.on==='1';
+  el.dataset.on=on?'':'1';
+  el.style.background=on?'var(--surface)':'var(--navy)';
+  el.style.color=on?'var(--txt3)':'#fff';
+  el.style.borderColor=on?'var(--border)':'var(--navy)';
 }
 
 function addRoutine(){
   var name=(document.getElementById('routine-name')||{}).value||'';
-  var hour=parseInt((document.getElementById('routine-hour')||{}).value||'1');
-  var min=parseInt((document.getElementById('routine-min')||{}).value||'0');
-  var duration=parseInt((document.getElementById('routine-duration')||{}).value||'30')||30;
   if(!name.trim()){toast('루틴명을 입력하세요');return;}
+  var timeVal=(document.getElementById('routine-time')||{}).value||'09:00';
+  var parts=timeVal.split(':');
+  var hour=parseInt(parts[0])||9;
+  var min=parseInt(parts[1])||0;
+  var duration=parseInt((document.getElementById('routine-duration')||{}).value||'30')||30;
+  var selectedDays=[];
+  document.querySelectorAll('[data-day]').forEach(function(b){if(b.dataset.on==='1')selectedDays.push(b.dataset.day);});
   var routines=_getRoutines();
-  routines.push({id:'r_'+Date.now(),name:name,hour:hour,min:min,duration:duration||null});
+  routines.push({id:'r_'+Date.now(),name:name,hour:hour,min:min,duration:duration,days:selectedDays});
   _saveRoutines(routines);
   if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
 }
@@ -5797,6 +5833,7 @@ function renderSchedule(){
         html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'absent\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✕</span></button>';
         html+='<button class="att-btn early-btn'+(early?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'early\',\''+_mkId+'\')" title="조퇴/학습 마무리 못함"><span style="font-size:15px;font-weight:700">▲</span></button>';
         if(done||absent||early)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\',\''+_mkId+'\',\''+pTime2+'\')" title="일지 작성">📝</button>';
+        html+='<button class="att-btn" onclick="openReadingRecordModal(\''+s.id+'\',\''+s.name+'\')" title="Reading 녹화" style="background:#7c3aed;color:#fff;border-color:#7c3aed;font-size:13px">🎥</button>';
         html+='</div>';
         // 메모 (출석 버튼 아래)
         aMemos.forEach(function(aMemo){
@@ -21958,5 +21995,249 @@ function trFolderPick(id){
 window.addEventListener('resize', function(){_fixStickyPad&&_fixStickyPad();});
 document.addEventListener('DOMContentLoaded', function(){setTimeout(function(){_fixStickyPad&&_fixStickyPad();},500);});
 </script>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- 📹 READING 녹화 모달                                    -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="reading-record-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:12px" onclick="if(event.target===this)closeReadingModal()">
+  <div style="background:var(--surface);border-radius:16px;width:100%;max-width:780px;max-height:95vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)">
+    <div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);padding:14px 18px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">🎥</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#fff">Reading 녹화</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.75)" id="rr-student-label">학생 선택 중...</div>
+        </div>
+      </div>
+      <button onclick="closeReadingModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div style="background:#f3e8ff;border:1.5px solid #c4b5fd;border-radius:12px;padding:12px">
+        <div style="font-size:12px;font-weight:700;color:#6d28d9;margin-bottom:8px">📁 저장 위치</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px"><input type="radio" name="rr-save-type" value="pc" onchange="rrUpdateSavePath()" checked> 💻 PC 내부</label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px"><input type="radio" name="rr-save-type" value="external" onchange="rrUpdateSavePath()"> 🗄 외장하드</label>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px"><input type="radio" name="rr-save-type" value="nas" onchange="rrUpdateSavePath()"> 🌐 NAS</label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="rr-save-path" class="fi" style="flex:1;font-size:12px;font-family:monospace" placeholder="저장 경로" value="D:\ReadingVideos">
+          <button onclick="rrSelectFolder()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;white-space:nowrap">📂 직접 선택</button>
+        </div>
+        <div id="rr-path-status" style="font-size:11px;margin-top:6px;color:var(--txt3)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:4px">📚 교재</div><input id="rr-book" class="fi" style="font-size:13px" placeholder="예: Reading 3"></div>
+        <div><div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:4px">📖 Unit / Lesson</div><input id="rr-unit" class="fi" style="font-size:13px" placeholder="예: Unit 07"></div>
+      </div>
+      <div><div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:4px">💬 메모 (선택)</div><input id="rr-memo" class="fi" style="font-size:13px" placeholder="특이사항 등"></div>
+      <div style="background:#0f0f0f;border-radius:12px;overflow:hidden;position:relative">
+        <video id="rr-preview" autoplay muted playsinline style="width:100%;max-height:320px;display:block;object-fit:cover"></video>
+        <div id="rr-no-camera" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:13px;gap:8px"><span style="font-size:36px">📷</span><span>카메라를 선택해주세요</span></div>
+        <div id="rr-rec-indicator" style="display:none;position:absolute;top:10px;left:10px;background:rgba(220,38,38,.9);color:#fff;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;align-items:center;gap:5px"><span style="width:8px;height:8px;background:#fff;border-radius:50%;display:inline-block;animation:rrBlink 1s infinite"></span> 녹화 중</div>
+        <div id="rr-timer" style="display:none;position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;font-family:monospace">00:00</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--txt2);white-space:nowrap">카메라:</span>
+        <select id="rr-camera-sel" class="fi" style="flex:1;font-size:12px" onchange="rrSwitchCamera(this.value)"><option value="">카메라 목록 로딩 중...</option></select>
+        <button onclick="rrLoadCameras()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer">🔄</button>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button id="rr-btn-start" onclick="rrStartRecording()" style="flex:1;padding:16px;font-size:16px;font-weight:800;background:#7c3aed;color:#fff;border:none;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">⏺ 녹화 시작</button>
+        <button id="rr-btn-stop" onclick="rrStopRecording()" style="flex:1;padding:16px;font-size:16px;font-weight:800;background:#dc2626;color:#fff;border:none;border-radius:12px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:8px">⏹ 녹화 종료</button>
+      </div>
+      <div id="rr-result" style="display:none;background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:12px;font-size:12px;color:#15803d"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes rrBlink{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
+
+<script>
+var _rrStudentId='',_rrStudentName='',_rrStream=null,_rrRecorder=null,_rrChunks=[],_rrTimerInt=null,_rrSeconds=0,_rrRecording=false;
+var _rrPathDefaults={pc:'D:\\ReadingVideos',external:'E:\\ReadingVideos',nas:'\\\\AcademyNAS\\ReadingVideos'};
+
+function openReadingRecordModal(studentId,studentName){
+  _rrStudentId=studentId;_rrStudentName=studentName;
+  var s=(students||[]).find(function(x){return x.id===studentId;});
+  var level=s?getStudentLevel(s):'';
+  document.getElementById('rr-student-label').textContent=studentName+(level?' · '+level:'');
+  var saved=localStorage.getItem('rr_save_path');
+  var savedType=localStorage.getItem('rr_save_type')||'pc';
+  if(saved)document.getElementById('rr-save-path').value=saved;
+  document.querySelectorAll('input[name="rr-save-type"]').forEach(function(r){r.checked=(r.value===savedType);});
+  document.getElementById('rr-book').value=s&&s.level?s.level:'';
+  document.getElementById('rr-unit').value='';
+  document.getElementById('rr-memo').value='';
+  document.getElementById('rr-result').style.display='none';
+  document.getElementById('rr-result').style.background='#f0fdf4';
+  document.getElementById('rr-result').style.borderColor='#86efac';
+  document.getElementById('rr-result').style.color='#15803d';
+  var modal=document.getElementById('reading-record-modal');
+  modal.style.display='flex';
+  rrLoadCameras();
+}
+
+function closeReadingModal(){
+  if(_rrRecording){if(!confirm('녹화 중입니다. 정말 닫으시겠습니까?'))return;rrStopRecording(true);}
+  rrStopStream();
+  document.getElementById('reading-record-modal').style.display='none';
+}
+
+function rrUpdateSavePath(){
+  var type=document.querySelector('input[name="rr-save-type"]:checked').value;
+  document.getElementById('rr-save-path').value=_rrPathDefaults[type]||'D:\\ReadingVideos';
+}
+
+async function rrSelectFolder(){
+  if(window.electronAPI){
+    var folder=await window.electronAPI.selectFolder();
+    if(folder){document.getElementById('rr-save-path').value=folder;localStorage.setItem('rr_save_path',folder);rrCheckPath(folder);}
+  }else{alert('폴더 직접 선택은 Electron 앱에서만 가능합니다.');}
+}
+
+async function rrCheckPath(dirPath){
+  var statusEl=document.getElementById('rr-path-status');
+  if(!dirPath){statusEl.textContent='';return true;}
+  if(window.electronAPI){
+    var res=await window.electronAPI.checkPath(dirPath);
+    if(res.ok){statusEl.style.color='#16a34a';statusEl.textContent='✅ 저장 가능한 경로입니다';return true;}
+    else{statusEl.style.color='#dc2626';statusEl.textContent='❌ 경로에 접근할 수 없습니다. 저장장치 연결 상태를 확인해주세요.';return false;}
+  }
+  statusEl.textContent='';return true;
+}
+
+async function rrLoadCameras(){
+  try{
+    var tmp=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    tmp.getTracks().forEach(function(t){t.stop();});
+    var devices=await navigator.mediaDevices.enumerateDevices();
+    var cameras=devices.filter(function(d){return d.kind==='videoinput';});
+    var sel=document.getElementById('rr-camera-sel');
+    sel.innerHTML=cameras.length?cameras.map(function(c,i){return'<option value="'+c.deviceId+'">'+(c.label||'카메라 '+(i+1))+'</option>';}).join(''):'<option value="">카메라를 찾을 수 없습니다</option>';
+    if(cameras.length)rrSwitchCamera(cameras[0].deviceId);
+  }catch(e){document.getElementById('rr-camera-sel').innerHTML='<option value="">카메라 권한을 허용해주세요</option>';console.error(e);}
+}
+
+async function rrSwitchCamera(deviceId){
+  if(!deviceId)return;
+  rrStopStream();
+  try{
+    _rrStream=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}},audio:true});
+    var video=document.getElementById('rr-preview');
+    video.srcObject=_rrStream;
+    document.getElementById('rr-no-camera').style.display='none';
+  }catch(e){console.error(e);toast('카메라 연결 실패: '+e.message);}
+}
+
+function rrStopStream(){
+  if(_rrStream){_rrStream.getTracks().forEach(function(t){t.stop();});_rrStream=null;}
+  document.getElementById('rr-preview').srcObject=null;
+  document.getElementById('rr-no-camera').style.display='flex';
+}
+
+function rrBuildFileName(){
+  var now=new Date();
+  var d=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  var book=(document.getElementById('rr-book').value||'NoBook').replace(/\s+/g,'').replace(/[\\\/:*?"<>|]/g,'');
+  var unit=(document.getElementById('rr-unit').value||'').replace(/\s+/g,'').replace(/[\\\/:*?"<>|]/g,'');
+  return [_rrStudentId,d,book].concat(unit?[unit]:[]).join('_')+'.webm';
+}
+
+function rrBuildFolderPath(base){
+  var now=new Date();
+  var yr=String(now.getFullYear());
+  var mo=String(now.getMonth()+1).padStart(2,'0');
+  var sep='\\';
+  return base.replace(/[\\/]+$/,'')+sep+_rrStudentId+sep+yr+sep+mo;
+}
+
+async function rrStartRecording(){
+  if(!_rrStream){toast('카메라를 먼저 선택해주세요.');return;}
+  var basePath=document.getElementById('rr-save-path').value.trim();
+  if(!basePath){toast('저장 경로를 입력해주세요.');return;}
+  if(window.electronAPI){var ok=await rrCheckPath(basePath);if(!ok){toast('❌ 저장 경로에 접근할 수 없습니다.');return;}}
+  localStorage.setItem('rr_save_path',basePath);
+  var ct=document.querySelector('input[name="rr-save-type"]:checked');
+  if(ct)localStorage.setItem('rr_save_type',ct.value);
+  _rrChunks=[];
+  var mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':'video/webm';
+  _rrRecorder=new MediaRecorder(_rrStream,{mimeType:mime});
+  _rrRecorder.ondataavailable=function(e){if(e.data&&e.data.size>0)_rrChunks.push(e.data);};
+  _rrRecorder.onstop=function(){rrOnRecordingStop(basePath);};
+  _rrRecorder.start(1000);
+  _rrRecording=true;_rrSeconds=0;
+  document.getElementById('rr-btn-start').style.display='none';
+  document.getElementById('rr-btn-stop').style.display='flex';
+  document.getElementById('rr-rec-indicator').style.display='flex';
+  document.getElementById('rr-timer').style.display='block';
+  _rrTimerInt=setInterval(function(){_rrSeconds++;var m=String(Math.floor(_rrSeconds/60)).padStart(2,'0'),s2=String(_rrSeconds%60).padStart(2,'0');document.getElementById('rr-timer').textContent=m+':'+s2;},1000);
+  toast('🔴 녹화가 시작됐습니다.');
+}
+
+function rrStopRecording(silent){
+  if(!_rrRecorder||!_rrRecording)return;
+  clearInterval(_rrTimerInt);_rrRecording=false;_rrRecorder.stop();
+  document.getElementById('rr-btn-start').style.display='flex';
+  document.getElementById('rr-btn-stop').style.display='none';
+  document.getElementById('rr-rec-indicator').style.display='none';
+  document.getElementById('rr-timer').style.display='none';
+  if(!silent)toast('⏹ 녹화 종료. 파일 저장 중...');
+}
+
+async function rrOnRecordingStop(basePath){
+  var fileName=rrBuildFileName();
+  var folderPath=rrBuildFolderPath(basePath);
+  var filePath=folderPath+'\\'+fileName;
+  var duration=_rrSeconds;
+  var blob=new Blob(_rrChunks,{type:'video/webm'});
+  var resultEl=document.getElementById('rr-result');
+  if(window.electronAPI){
+    try{
+      var dirRes=await window.electronAPI.ensureDir(folderPath);
+      if(!dirRes.ok)throw new Error('폴더 생성 실패: '+dirRes.error);
+      var buf=await blob.arrayBuffer();
+      var saveRes=await window.electronAPI.saveVideo(filePath,buf);
+      if(!saveRes.ok)throw new Error('파일 저장 실패: '+saveRes.error);
+      var savedPath=saveRes.savedPath;
+      await rrSaveMetadata(savedPath,duration,blob.size);
+      resultEl.style.display='block';
+      resultEl.innerHTML='✅ 저장 완료!<br><span style="font-family:monospace;font-size:11px;word-break:break-all">'+savedPath+'</span><br><span style="color:#6b7280">크기: '+(blob.size/1024/1024).toFixed(1)+'MB · 시간: '+String(Math.floor(duration/60)).padStart(2,'0')+':'+String(duration%60).padStart(2,'0')+'</span>';
+      toast('✅ Reading 녹화가 저장됐습니다!');
+    }catch(e){
+      resultEl.style.display='block';resultEl.style.background='#fef2f2';resultEl.style.borderColor='#fca5a5';resultEl.style.color='#dc2626';
+      resultEl.innerHTML='❌ 저장 실패: '+e.message;toast('❌ 저장 실패: '+e.message);
+    }
+  }else{
+    var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fileName;a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);},3000);
+    resultEl.style.display='block';
+    resultEl.innerHTML='✅ 파일 다운로드: '+fileName+'<br><span style="color:#6b7280;font-size:11px">※ Electron 앱에서 실행 시 자동 폴더 저장이 됩니다.</span>';
+    await rrSaveMetadata(filePath,duration,blob.size);
+  }
+}
+
+async function rrSaveMetadata(videoPath,duration,fileSize){
+  if(!db)return;
+  try{
+    var now=new Date();
+    var dateStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+    var teacher=(typeof currentUser!=='undefined'&&currentUser)?currentUser:{name:'알 수 없음',docId:''};
+    await db.collection('readingRecords').add({
+      studentId:_rrStudentId,studentName:_rrStudentName,recordedAt:dateStr,
+      bookName:document.getElementById('rr-book').value||'',
+      unit:document.getElementById('rr-unit').value||'',
+      teacherId:teacher.docId||teacher.id||'',teacherName:teacher.name||'',
+      videoPath:videoPath,duration:duration,fileSize:fileSize,
+      memo:document.getElementById('rr-memo').value||'',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      feedbackStatus:'미작성',feedback:'',
+      fluencyScore:0,pronunciationScore:0,intonationScore:0,phrasingScore:0
+    });
+  }catch(e){console.error('Reading 메타데이터 저장 오류:',e);}
+}
+</script>
+
 </body>
 </html>
