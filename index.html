@@ -343,8 +343,8 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       </div>
       <div id="rr-result" style="display:none;margin-top:8px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px;font-size:11px;color:#15803d;line-height:1.6"></div>
     </div>
-    <div id="eval-area"></div>
     <div id="dictation-area"><div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📝 받아쓰기</div><div style="display:flex;align-items:center;gap:6px"><select class="fi" id="r-dictation-correct" style="width:65px;font-size:13px;text-align:center;padding:6px 4px" onchange="updateDictationValue()"><option value="">-</option></select><span style="font-size:13px;font-weight:700">/</span><select class="fi" id="r-dictation-total" style="width:65px;font-size:13px;text-align:center;padding:6px 4px" onchange="updateDictationValue();updateDictationCorrectOptions()"><option value="">-</option></select><span style="font-size:11px;color:var(--txt3)">개</span><input type="hidden" id="r-dictation" value=""></div></div></div>
+    <div id="eval-area"></div>
     <div class="field"><div class="fl">칭찬 스티커</div><div id="praise-area" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div></div>
     <div class="field"><div class="fl">선생님 코멘트 (태블릿)</div><textarea class="fi" id="r-comment-tablet" rows="2" placeholder="태블릿 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
@@ -363,8 +363,26 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   </div><!-- end flex wrapper -->
 </div>
 <div class="view" id="view-history"><div class="page-top"><h2>기록 조회</h2></div>
-  <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-student" onchange="renderHistory()"><option value="">전체 학생</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-period" onchange="renderHistory()"><option value="all">전체</option><option value="today">오늘</option><option value="week">이번 주</option><option value="month" id="h-period-month">이번 달</option><option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option><option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option></select><button class="btn btn-outline btn-sm" onclick="exportHistoryCSV()">📥 CSV</button><button class="btn btn-outline btn-sm" id="h-comment-btn" onclick="renderCommentView()">💬 코멘트 모아보기</button><button class="btn btn-red btn-sm" id="h-bulk-delete-btn" style="display:none" onclick="bulkDeleteReports()">🗑 선택 삭제</button><button class="btn btn-outline btn-sm" id="h-select-all-btn" style="display:none" onclick="toggleSelectAllReports()">☑ 전체선택</button></div>
-  <div id="history-scroll-wrap" style="flex:1;overflow:auto;padding:0 16px 16px;min-height:0"></div>
+  <!-- 탭 -->
+  <div style="background:var(--surface);border-bottom:2px solid var(--border);display:flex;overflow-x:auto">
+    <button class="rev-tab active" id="htab-journal" onclick="switchHistoryTab('journal')">📝 학습 일지</button>
+    <button class="rev-tab" id="htab-reading" onclick="switchHistoryTab('reading')">📹 Reading 기록</button>
+  </div>
+  <!-- 학습 일지 패널 -->
+  <div id="h-panel-journal">
+    <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-student" onchange="renderHistory()"><option value="">전체 학생</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-period" onchange="renderHistory()"><option value="all">전체</option><option value="today">오늘</option><option value="week">이번 주</option><option value="month" id="h-period-month">이번 달</option><option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option><option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option></select><button class="btn btn-outline btn-sm" onclick="exportHistoryCSV()">📥 CSV</button><button class="btn btn-outline btn-sm" id="h-comment-btn" onclick="renderCommentView()">💬 코멘트 모아보기</button><button class="btn btn-red btn-sm" id="h-bulk-delete-btn" style="display:none" onclick="bulkDeleteReports()">🗑 선택 삭제</button><button class="btn btn-outline btn-sm" id="h-select-all-btn" style="display:none" onclick="toggleSelectAllReports()">☑ 전체선택</button></div>
+    <div id="history-scroll-wrap" style="flex:1;overflow:auto;padding:0 16px 16px;min-height:0"></div>
+  </div>
+  <!-- Reading 기록 패널 -->
+  <div id="h-panel-reading" style="display:none">
+    <div class="toolbar" style="flex-wrap:wrap;gap:6px">
+      <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-student" onchange="renderHistoryReading()"><option value="">전체 학생</option></select>
+      <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-feedback" onchange="renderHistoryReading()">
+        <option value="">전체</option><option value="미작성">피드백 미작성</option><option value="완료">피드백 완료</option>
+      </select>
+    </div>
+    <div id="hrr-list" class="cp" style="padding:12px 16px"></div>
+  </div>
 </div>
 <div class="view" id="view-students"><div class="page-top"><h2>학생 정보</h2></div>
   <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-year" onchange="renderStudents()"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-month" onchange="renderStudents()"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-status" onchange="renderStudents()"><option value="">전체</option><option value="재원">재원</option><option value="신규">신규</option><option value="휴원">휴원</option><option value="퇴원">퇴원</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-cls" onchange="renderStudents()"><option value="">전체 모듈</option></select><input class="fi" style="flex:1;max-width:200px;font-size:12px;padding:6px 10px" id="s-search" placeholder="🔍 이름 검색" oninput="renderStudents()"><button class="btn btn-green btn-sm" onclick="openStudentModal()">+ 학생 등록</button></div>
@@ -773,19 +791,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 채널 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div class="field"><div class="fl">카카오 채널 보강 예약 링크</div><input class="fi" id="kakao-booking-url" placeholder="https://pf.kakao.com/xxxxx 또는 예약 링크"></div><div class="field" style="margin-top:10px"><div class="fl">결석 알림 메시지 템플릿</div><textarea class="fi" id="kakao-absent-msg" rows="6" style="font-size:12px;line-height:1.6" placeholder="메시지를 입력하세요. {이름}, {날짜}, {링크}를 사용할 수 있습니다."></textarea><div style="font-size:10px;color:var(--txt3);margin-top:4px">사용 가능 변수: <b>{이름}</b> = 학생 이름, <b>{날짜}</b> = 오늘 날짜, <b>{링크}</b> = 보강 예약 링크</div></div><div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-green btn-sm" onclick="saveKakaoConfig()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="$('kakao-absent-msg').value='안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';toast('기본 메시지 복원됨')">기본값 복원</button></div></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><button class="btn btn-outline btn-sm" onclick="if(confirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
 <!-- MODALS -->
 <div id="modal-student" style="display:none" class="mo" onclick="if(event.target===this)closeM('student')"><div class="ms"><div class="mh"></div><div class="mt" id="s-modal-title">학생 등록</div>
-<div id="s-modal-tabs" style="display:none;border-bottom:2px solid var(--border);margin-bottom:12px;display:flex;gap:0">
-  <button id="stab-info" onclick="switchStudentTab('info')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--navy);color:#fff;cursor:pointer;border-radius:8px 0 0 0">👤 학생 정보</button>
-  <button id="stab-reading" onclick="switchStudentTab('reading')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--surface2);color:var(--txt2);cursor:pointer;border-radius:0 8px 0 0">📹 Reading 기록</button>
-</div>
-<div id="s-panel-info">
 <input type="hidden" id="s-id"><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">👤 기본 정보</div><div class="r2"><div class="field"><div class="fl">이름 *</div><input class="fi" id="s-name" placeholder="홍길동"></div><div class="field"><div class="fl">ID</div><input class="fi" id="s-number" type="number" placeholder="1" min="1"></div></div><div class="r2"><div class="field"><div class="fl">재원 상태</div><select class="fi" id="s-status" onchange="onStudentStatusChange()"><option value="재원">재원</option><option value="신규">신규</option><option value="휴원">휴원</option><option value="퇴원">퇴원</option></select></div><div class="field"><div class="fl">유입 경로</div><select class="fi" id="s-inflow"><option value="">선택</option><option value="소개">소개</option><option value="블로그">블로그</option><option value="당근">당근</option><option value="오프라인">오프라인</option></select></div></div><div id="s-quit-reason-row" style="display:none" class="r2"><div class="field"><div class="fl">휴/퇴원 사유</div><select class="fi" id="s-quit-reason"><option value="">사유 선택</option><option value="이사">이사</option><option value="타학원 이동">타학원 이동</option><option value="학습량 부담">학습량 부담</option><option value="비용 문제">비용 문제</option><option value="기타">기타</option></select></div><div class="field"><div class="fl">휴/퇴원일</div><input type="date" class="fi" id="s-quit-date"></div></div><div class="r2"><div class="field"><div class="fl">학년</div><select class="fi" id="s-grade"><option value="">선택</option><option>초1</option><option>초2</option><option>초3</option><option>초4</option><option>초5</option><option>초6</option><option>중1</option><option>중2</option><option>중3</option><option>고1</option><option>고2</option><option>고3</option></select></div><div class="field"><div class="fl">상담 주기</div><select class="fi" id="s-consult-cycle"><option value="">선택</option><option value="2주">2주</option><option value="1개월">1개월</option><option value="2개월">2개월</option><option value="3개월">3개월</option></select></div></div><div class="r2"><div class="field"><div class="fl">모듈</div><select class="fi" id="s-class" onchange="onSClassChange()"><option value="">모듈 미배정</option></select></div><div class="field"><div class="fl">할인</div><select class="fi" id="s-discount"><option value="">없음</option><option value="형제할인">형제 할인</option><option value="수학할인">수학 할인</option><option value="장기수강할인">장기수강 할인</option><option value="장학할인">장학 할인</option></select></div></div><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">📞 연락처</div><div class="r2"><div class="field"><div class="fl">학부모 연락처</div><input class="fi" id="s-phone-mom" placeholder="010-0000-0000" type="tel"></div><div class="field"><div class="fl">학교</div><input class="fi" id="s-school" placeholder="군포초등학교"></div></div><div class="r2"><div class="field"><div class="fl">메시지 수신 동의</div><select class="fi" id="s-msg-consent"><option value="동의">동의</option><option value="미동의">미동의</option></select></div><div class="field"><div class="fl">등록일</div><input type="date" class="fi" id="s-enroll-date"></div></div><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">📚 수업 정보</div><div class="r2"><div class="field"><div class="fl">📚 본수업 단계 *</div><select class="fi" id="s-level" onchange="document.getElementById('s-custom-level').style.display=this.value==='직접입력'?'block':'none';onSLevelChange()"><option value="">선택</option><optgroup label="Phonics"><option>Hello Phonics 1</option><option>Hello Phonics 2</option><option>Phonics1A</option><option>Phonics1B</option><option>Phonics 2A</option><option>Phonics 2B</option><option>Phonics 3A</option><option>Phonics 3B</option><option>Master Phonics 1</option><option>Master Phonics 2</option></optgroup><optgroup label="Basic"><option>Joy 1A</option><option>Joy 1B</option><option>Joy 1C</option><option>Joy 2A</option><option>Joy 2B</option><option>Joy 2C</option><option>Wise 1A</option><option>Wise 1B</option><option>Wise 1C</option><option>Wise 2A</option><option>Wise 2B</option><option>Wise 2C</option><option>Pride 1A</option><option>Pride 1B</option><option>Pride 1C</option><option>Pride 2A</option><option>Pride 2B</option><option>Pride 2C</option></optgroup><optgroup label="Grammar"><option>Grammar Plus 1</option><option>Grammar Plus 2</option><option>Grammar Plus 3</option><option>Grammar Plus 4</option><option>Grammar Plus 5</option><option>Grammar Plus 6</option><option>First Grammar 1</option><option>First Grammar 2</option><option>First Grammar 3</option></optgroup><optgroup label="Prime"><option>Prime 1A</option><option>Prime 1B</option><option>Prime 2A</option><option>Prime 2B</option><option>Prime 3A</option><option>Prime 3B</option><option>Prime 4A</option><option>Prime 4B</option></optgroup><optgroup label="Advanced"><option>Advanced 1A</option><option>Advanced 1B</option><option>Advanced 2A</option><option>Advanced 2B</option><option>Advanced 3A</option><option>Advanced 3B</option><option>Advanced 4A</option><option>Advanced 4B</option></optgroup><optgroup label="Elite"><option>Elite 1-1</option><option>Elite 1-2</option><option>Elite 1-3</option><option>Elite 2-1</option><option>Elite 2-2</option><option>Elite 2-3</option><option>Elite 3-1</option><option>Elite 3-2</option><option>Elite 3-3</option></optgroup><optgroup label="중고등"><option>내신콘서트</option><option>Reader's Bank 1</option><option>Reader's Bank 2</option><option>Reader's Bank 3</option><option>Reader's Bank 4</option><option>Reader's Bank 5</option><option>천일문 입문</option><option>천일문 기본</option><option>천일문 실력</option><option>빠바 구문</option><option>빠바 유형</option></optgroup><option value="직접입력">직접 입력</option></select><input class="fi" id="s-custom-level" placeholder="직접 입력" style="display:none;margin-top:6px"></div><div class="field"><div class="fl">⭐ 특강 단계</div><select class="fi" id="s-special-level"><option value="">본수업 단계와 동일</option><optgroup label="Phonics"><option>Hello Phonics 1</option><option>Hello Phonics 2</option><option>Phonics1A</option><option>Phonics1B</option><option>Phonics 2A</option><option>Phonics 2B</option><option>Phonics 3A</option><option>Phonics 3B</option><option>Master Phonics 1</option><option>Master Phonics 2</option></optgroup><optgroup label="Basic"><option>Joy 1A</option><option>Joy 1B</option><option>Joy 1C</option><option>Joy 2A</option><option>Joy 2B</option><option>Joy 2C</option><option>Wise 1A</option><option>Wise 1B</option><option>Wise 1C</option><option>Wise 2A</option><option>Wise 2B</option><option>Wise 2C</option><option>Pride 1A</option><option>Pride 1B</option><option>Pride 1C</option><option>Pride 2A</option><option>Pride 2B</option><option>Pride 2C</option></optgroup><optgroup label="Grammar"><option>Grammar Plus 1</option><option>Grammar Plus 2</option><option>Grammar Plus 3</option><option>Grammar Plus 4</option><option>Grammar Plus 5</option><option>Grammar Plus 6</option><option>First Grammar 1</option><option>First Grammar 2</option><option>First Grammar 3</option></optgroup><optgroup label="Prime"><option>Prime 1A</option><option>Prime 1B</option><option>Prime 2A</option><option>Prime 2B</option><option>Prime 3A</option><option>Prime 3B</option><option>Prime 4A</option><option>Prime 4B</option></optgroup><optgroup label="Advanced"><option>Advanced 1A</option><option>Advanced 1B</option><option>Advanced 2A</option><option>Advanced 2B</option><option>Advanced 3A</option><option>Advanced 3B</option><option>Advanced 4A</option><option>Advanced 4B</option></optgroup><optgroup label="Elite"><option>Elite 1-1</option><option>Elite 1-2</option><option>Elite 1-3</option><option>Elite 2-1</option><option>Elite 2-2</option><option>Elite 2-3</option><option>Elite 3-1</option><option>Elite 3-2</option><option>Elite 3-3</option></optgroup><optgroup label="중고등"><option>내신콘서트</option><option>Reader's Bank 1</option><option>Reader's Bank 2</option><option>Reader's Bank 3</option><option>Reader's Bank 4</option><option>Reader's Bank 5</option><option>천일문 입문</option><option>천일문 기본</option><option>천일문 실력</option><option>빠바 구문</option><option>빠바 유형</option></optgroup></select></div></div><div class="field"><div class="fl">수업 요일 및 시수</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px"><div style="background:var(--surface2);border-radius:10px;padding:10px;overflow:hidden;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📚 본수업</div><div id="s-days" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px"><div class="day-pill" data-day="월" onclick="toggleDay(this)">월</div><div class="day-pill" data-day="화" onclick="toggleDay(this)">화</div><div class="day-pill" data-day="수" onclick="toggleDay(this)">수</div><div class="day-pill" data-day="목" onclick="toggleDay(this)">목</div><div class="day-pill" data-day="금" onclick="toggleDay(this)">금</div></div><div id="s-periods-area"></div><div id="s-weekly-hours-display" style="font-size:11px;color:var(--mint);margin-top:4px;font-weight:600"></div></div><div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:10px;overflow:hidden;min-width:0"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:#92400e">⭐</span><select id="s-extra-class-type" class="fi" style="font-size:12px;font-weight:700;color:#92400e;background:transparent;border:none;padding:0;cursor:pointer;width:70px"><option value="special">특강</option><option value="main">본수업</option></select><button type="button" onclick="clearSpecialDays()" style="margin-left:auto;font-size:11px;color:#92400e;background:none;border:1px solid #f59e0b;border-radius:4px;padding:3px 10px;cursor:pointer;white-space:nowrap">초기화</button></div><div id="s-special-days" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px"><div class="day-pill" data-day="월" onclick="toggleSpecialDay(this)">월</div><div class="day-pill" data-day="화" onclick="toggleSpecialDay(this)">화</div><div class="day-pill" data-day="수" onclick="toggleSpecialDay(this)">수</div><div class="day-pill" data-day="목" onclick="toggleSpecialDay(this)">목</div><div class="day-pill" data-day="금" onclick="toggleSpecialDay(this)">금</div></div><div id="s-special-periods-area"></div><div id="s-special-hours-display" style="font-size:11px;color:#92400e;margin-top:4px;font-weight:600"></div></div></div></div><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">👨‍👩‍👧 기타</div><div class="field"><div class="fl">형제 정보</div><div id="siblings-area"></div><button class="btn btn-outline btn-xs" onclick="addSibling()" style="margin-top:6px">+ 형제 추가</button></div><div class="field"><div class="fl">메모</div><textarea class="fi" id="s-memo" rows="2" placeholder="특이사항 등"></textarea></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveStudent()">저장</button><div style="height:6px"></div><div id="s-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteStudent()">학생 삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('student')">취소</button>
-</div><!-- end s-panel-info -->
-<!-- ── Reading 기록 패널 ── -->
-<div id="s-panel-reading" style="display:none">
-  <div id="rr-records-list" style="min-height:120px">
-    <div style="text-align:center;padding:30px;color:var(--txt3);font-size:13px">불러오는 중...</div>
-  </div>
-</div>
 </div></div>
 <div id="modal-revenue" style="display:none" class="mo" onclick="if(event.target===this)closeM('revenue')"><div class="ms"><div class="mh"></div><div class="mt" id="rev-modal-title">수납 등록</div><input type="hidden" id="rev-id"><div class="r2"><div class="field"><div class="fl">학생</div><select class="fi" id="rev-student"></select></div><div class="field"><div class="fl">납부일</div><input type="date" class="fi" id="rev-paid-date"></div></div><div class="r2"><div class="field"><div class="fl">수강료 (원)</div><input type="number" class="fi" id="rev-amount" placeholder="250000"></div><div class="field"><div class="fl">납부 방법</div><select class="fi" id="rev-method"><option>계좌이체</option><option>카드</option><option>현금</option><option>결제 선생</option><option>지역화폐</option></select></div></div><div style="background:var(--surface2);border-radius:var(--r);padding:10px 12px;margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:7px">기타비 1</div><div class="r2"><div class="field"><div class="fl">종류</div><select class="fi" id="rev-extra1-type"><option value="">없음</option><option value="특강">특강</option><option value="PFC">PFC</option><option value="캠프">캠프</option></select></div><div class="field"><div class="fl">금액</div><input type="number" class="fi" id="rev-extra1-amount" placeholder="0"></div></div><div class="r2"><div class="field"><div class="fl">결제일</div><input type="date" class="fi" id="rev-extra1-date"></div><div class="field"><div class="fl">결제수단</div><select class="fi" id="rev-extra1-method"><option>카드</option><option>현금</option><option>계좌이체</option><option>지역화폐</option></select></div></div></div><div style="background:var(--surface2);border-radius:var(--r);padding:10px 12px;margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:7px">기타비 2</div><div class="r2"><div class="field"><div class="fl">종류</div><select class="fi" id="rev-extra2-type"><option value="">없음</option><option value="특강">특강</option><option value="PFC">PFC</option><option value="캠프">캠프</option></select></div><div class="field"><div class="fl">금액</div><input type="number" class="fi" id="rev-extra2-amount" placeholder="0"></div></div><div class="r2"><div class="field"><div class="fl">결제일</div><input type="date" class="fi" id="rev-extra2-date"></div><div class="field"><div class="fl">결제수단</div><select class="fi" id="rev-extra2-method"><option>카드</option><option>현금</option><option>계좌이체</option><option>지역화폐</option></select></div></div></div><div class="field" style="margin-bottom:18px"><div class="fl">메모</div><input class="fi" id="rev-memo" placeholder="메모"></div><button class="btn btn-green btn-block" onclick="saveRevenue()">저장</button><div style="height:6px"></div><div id="rev-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteCurrentRevenue()">🗑 삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('revenue')">취소</button></div></div>
 <div id="modal-expense" style="display:none" class="mo" onclick="if(event.target===this)closeM('expense')"><div class="ms"><div class="mh"></div><div class="mt">지출 추가</div><input type="hidden" id="exp-id"><div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="exp-date"></div><div class="field"><div class="fl">카테고리</div><select class="fi" id="exp-category"><optgroup label="── 학원 운영비 · 고정비 ──"><option value="학원 임대료">학원 임대료</option><option value="복사기 임대료">복사기 임대료</option><option value="정수기 임대료">정수기 임대료</option><option value="세무 기장료">세무 기장료</option><option value="카드 단말기">카드 단말기</option></optgroup><optgroup label="── 학원 운영비 · 변동비 ──"><option value="인건비">인건비</option><option value="학원 관리비">학원 관리비</option><option value="교재비">교재비</option><option value="홍보비-블로그 광고">홍보비-블로그 광고</option><option value="홍보비-당근마켓 광고">홍보비-당근마켓 광고</option><option value="홍보비-인스타 광고">홍보비-인스타 광고</option><option value="홍보비-콘텐츠 제작">홍보비-콘텐츠 제작</option><option value="홍보비">홍보비</option><option value="차량 유지비">차량 유지비</option><option value="통신비">통신비</option><option value="세금-원천 소득세">세금-원천 소득세</option><option value="세금-원천 지방 소득세">세금-원천 지방 소득세</option><option value="세금-종합 소득세">세금-종합 소득세</option><option value="세금-자동차세">세금-자동차세</option><option value="세금-지방교육세">세금-지방교육세</option><option value="세금-등록 면허세">세금-등록 면허세</option><option value="대출">대출</option><option value="기타">기타</option></optgroup><optgroup label="── 개인 지출 · 고정비 ──"><option value="보험료-국민연금">보험료-국민연금</option><option value="보험료-건강보험">보험료-건강보험</option><option value="보험료-노란우산 공제">보험료-노란우산 공제</option><option value="보험료-롯데 손해보험">보험료-롯데 손해보험</option><option value="보험료-KB 손해보험">보험료-KB 손해보험</option><option value="보험료-메리츠">보험료-메리츠</option></optgroup><optgroup label="── 개인 지출 · 변동비 ──"><option value="카드-농협 BC카드">카드-농협 BC카드</option><option value="카드-현대카드">카드-현대카드</option><option value="카드">카드</option><option value="아파트-임대료">아파트-임대료</option><option value="아파트-관리비">아파트-관리비</option><option value="아파트-대출 원리금 상환">아파트-대출 원리금 상환</option></optgroup></select></div></div><div class="r2"><div class="field"><div class="fl">항목명</div><input class="fi" id="exp-name" placeholder="월세 등"></div><div class="field"><div class="fl">금액</div><input type="number" class="fi" id="exp-amount" placeholder="500000"></div></div><div class="r2"><div class="field"><div class="fl">결제 방법</div><select class="fi" id="exp-method"><option>계좌이체</option><option>카드</option><option>현금</option><option>지역화폐</option></select></div><div class="field"><div class="fl">메모</div><input class="fi" id="exp-memo" placeholder="메모"></div></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveExpense()">저장</button><div style="height:6px"></div><div id="exp-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteExpenseFromModal()">삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('expense')">취소</button></div></div>
@@ -6742,6 +6748,9 @@ function startReport(studentId,makeupId,sessionTime){
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
   }
   goto('write');
+  // Reading 녹화 섹션 학생 정보 동기화
+  var _rrS=students.find(function(x){return x.id===studentId;});
+  if(typeof rrInitForStudent==='function')rrInitForStudent(studentId,(_rrS&&_rrS.name)||'',_rrS);
   // Auto-set teachers AFTER goto (which rebuilds dropdowns via populateTeacherSelects)
   if(tempData&&(tempData.teacherTablet||tempData.teacher)){
     if($('r-teacher-tablet'))$('r-teacher-tablet').value=tempData.teacherTablet||tempData.teacher||'';
@@ -7662,10 +7671,6 @@ function openStudentModal(id){
   var sibArea=$('siblings-area');if(sibArea)sibArea.innerHTML='';siblingCount=0;
   (s?.siblings||[]).forEach(function(sib){var i=siblingCount++;var d2=document.createElement('div');d2.id='sib-'+i;d2.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px';d2.innerHTML='<input class="fi" value="'+sib.name+'" id="sib-name-'+i+'" style="flex:2;font-size:11px;padding:5px 8px"><select class="fi" id="sib-grade-'+i+'" style="flex:1;font-size:11px;padding:5px 8px"><option value="">학년</option>'+GRADE_ORDER.map(function(g){return'<option value="'+g+'"'+(g===sib.grade?' selected':'')+'>'+g+'</option>';}).join('')+'</select><label style="font-size:11px;white-space:nowrap"><input type="checkbox" id="sib-enrolled-'+i+'"'+(sib.enrolled===false?'':' checked')+'> 재원중</label><button class="btn btn-red btn-xs" onclick="document.getElementById(\'sib-'+i+'\').remove()">✕</button>';sibArea.appendChild(d2);});
   $('modal-student').style.display='flex';
-  // 탭: 기존 학생이면 탭 표시, 신규면 숨김
-  var tabBar=document.getElementById('s-modal-tabs');
-  if(tabBar)tabBar.style.display=id?'flex':'none';
-  switchStudentTab('info');
 }
 async function saveStudent(){
   var name=$('s-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}
@@ -22538,6 +22543,148 @@ async function rrDeleteRecord(recordId,videoPath){
     if(typeof toast==='function')toast('❌ 삭제 실패: '+e.message);
   }
 }
+
+</script>
+<script>
+
+// ── 기록 조회 탭 전환 ──────────────────────────────────
+function switchHistoryTab(tab){
+  var journalBtn=document.getElementById('htab-journal');
+  var readingBtn=document.getElementById('htab-reading');
+  var journalPanel=document.getElementById('h-panel-journal');
+  var readingPanel=document.getElementById('h-panel-reading');
+  if(!journalBtn)return;
+  if(tab==='journal'){
+    journalBtn.classList.add('active'); readingBtn.classList.remove('active');
+    journalPanel.style.display=''; readingPanel.style.display='none';
+  }else{
+    readingBtn.classList.add('active'); journalBtn.classList.remove('active');
+    journalPanel.style.display='none'; readingPanel.style.display='';
+    // 학생 필터 셀렉트 채우기
+    var sel=document.getElementById('hrr-student');
+    if(sel&&sel.options.length<=1){
+      var activeStudents=(students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';});
+      activeStudents.sort(function(a,b){return(a.studentNumber||0)-(b.studentNumber||0);});
+      activeStudents.forEach(function(s){
+        var opt=document.createElement('option');
+        opt.value=s.id;
+        opt.textContent=s.name+(s.studentNumber?' ('+s.studentNumber+')':'');
+        sel.appendChild(opt);
+      });
+    }
+    renderHistoryReading();
+  }
+}
+
+// ── Reading 기록 전체 목록 렌더링 ─────────────────────
+async function renderHistoryReading(){
+  var el=document.getElementById('hrr-list');
+  if(!el||!db)return;
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--txt3);font-size:12px">불러오는 중...</div>';
+
+  var studentId=document.getElementById('hrr-student').value;
+  var fbFilter=document.getElementById('hrr-feedback').value;
+
+  try{
+    var query=db.collection('readingRecords').orderBy('recordedAt','desc');
+    if(studentId)query=query.where('studentId','==',studentId);
+    if(fbFilter)query=query.where('feedbackStatus','==',fbFilter);
+    var snap=await query.get();
+
+    if(snap.empty){
+      el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';
+      return;
+    }
+
+    var html='';
+    snap.docs.forEach(function(doc){
+      var d=doc.data(); var id=doc.id;
+      var dur=d.duration?String(Math.floor(d.duration/60)).padStart(2,'0')+':'+String(d.duration%60).padStart(2,'0'):'--:--';
+      var fbBadge=d.feedbackStatus==='완료'
+        ?'<span style="background:#dcfce7;color:#16a34a;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">완료</span>'
+        :'<span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">미작성</span>';
+      var scores='';
+      if(d.feedbackStatus==='완료'){
+        scores='<div style="font-size:10px;color:var(--txt3);margin-top:3px">'
+          +'유창성 '+rrStar(d.fluencyScore)+' 발음 '+rrStar(d.pronunciationScore)
+          +' 억양 '+rrStar(d.intonationScore)+' 끊어읽기 '+rrStar(d.phrasingScore)+'</div>';
+      }
+      html+='<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface)">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:800;color:var(--navy)">'+d.studentName+'</span>'
+        +(d.studentNumber?'<span style="font-size:11px;color:var(--txt3)">('+d.studentNumber+')</span>':'')
+        +'<span style="font-size:11px;color:var(--txt3)">'+d.recordedAt+'</span>'
+        +'<span style="font-size:11px;color:var(--txt3)">'+(d.bookName||'-')+' · '+(d.unit||'-')+'</span>'
+        +'<span style="font-size:11px;color:var(--txt3);margin-left:auto">'+(d.teacherName||'-')+'</span>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
+        +fbBadge
+        +'<button onclick="rrPlayVideo(''+id+'','+JSON.stringify(d.videoPath)+')" '
+        +'style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">▶ 영상</button>'
+        +'<button onclick="rrOpenFeedback(''+id+'')" '
+        +'style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">✏️ 피드백</button>'
+        +'<button onclick="rrDeleteRecordFromHistory(''+id+'','+JSON.stringify(d.videoPath)+')" '
+        +'style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🗑</button>'
+        +'</div>'
+        +scores
+        +(d.feedback?'<div style="margin-top:6px;font-size:11px;color:var(--txt2);background:var(--surface2);border-radius:6px;padding:6px 8px">💬 '+d.feedback+'</div>':'')
+        +'</div>';
+    });
+    el.innerHTML=html;
+  }catch(e){
+    // orderBy 인덱스 없을 때 fallback
+    try{
+      var q2=db.collection('readingRecords');
+      if(studentId)q2=q2.where('studentId','==',studentId);
+      var snap2=await q2.get();
+      var docs=snap2.docs
+        .filter(function(doc){return !fbFilter||doc.data().feedbackStatus===fbFilter;})
+        .sort(function(a,b){return b.data().recordedAt.localeCompare(a.data().recordedAt);});
+      if(!docs.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">Reading 기록이 없습니다</div>';return;}
+      el.innerHTML=docs.map(function(doc){
+        var d=doc.data();var id=doc.id;
+        var dur=d.duration?String(Math.floor(d.duration/60)).padStart(2,'0')+':'+String(d.duration%60).padStart(2,'0'):'--:--';
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface)">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
+          +'<span style="font-size:13px;font-weight:800;color:var(--navy)">'+d.studentName+'</span>'
+          +(d.studentNumber?'<span style="font-size:11px;color:var(--txt3)">('+d.studentNumber+')</span>':'')
+          +'<span style="font-size:11px;color:var(--txt3)">'+d.recordedAt+' · '+(d.bookName||'-')+' · '+(d.unit||'-')+'</span>'
+          +'<span style="font-size:11px;color:var(--txt3);margin-left:auto">'+(d.teacherName||'-')+'</span>'
+          +'</div>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+          +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
+          +'<button onclick="rrPlayVideo(''+id+'','+JSON.stringify(d.videoPath)+')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">▶ 영상</button>'
+          +'<button onclick="rrOpenFeedback(''+id+'')" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">✏️ 피드백</button>'
+          +'<button onclick="rrDeleteRecordFromHistory(''+id+'','+JSON.stringify(d.videoPath)+')" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🗑</button>'
+          +'</div></div>';
+      }).join('');
+    }catch(e2){el.innerHTML='<div style="padding:12px;color:red;font-size:12px">오류: '+e2.message+'</div>';}
+  }
+}
+
+async function rrDeleteRecordFromHistory(recordId,videoPath){
+  if(!confirm('이 Reading 기록을 삭제하시겠습니까?\n\n영상 파일은 직접 삭제해야 합니다.\n경로: '+videoPath))return;
+  try{
+    await db.collection('readingRecords').doc(recordId).delete();
+    if(typeof toast==='function')toast('🗑 기록이 삭제됐습니다.');
+    renderHistoryReading();
+  }catch(e){
+    if(typeof toast==='function')toast('❌ 삭제 실패: '+e.message);
+  }
+}
+
+// rrOpenFeedback 저장 후 목록 새로고침 오버라이드
+var _origRrSaveFeedback=null;
+document.addEventListener('DOMContentLoaded',function(){
+  _origRrSaveFeedback=window.rrSaveFeedback;
+  window.rrSaveFeedback=async function(recordId){
+    if(_origRrSaveFeedback)await _origRrSaveFeedback(recordId);
+    // 기록 조회 탭이 열려있으면 새로고침
+    var readingPanel=document.getElementById('h-panel-reading');
+    if(readingPanel&&readingPanel.style.display!=='none')renderHistoryReading();
+  };
+});
 
 </script>
 </body>
