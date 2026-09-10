@@ -329,6 +329,28 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">칭찬 포인트</div><textarea class="fi" id="r-memo" rows="2"></textarea></div>
     <div class="field" style="background:var(--surface2);border-radius:var(--r);padding:10px 12px"><div style="display:flex;align-items:center;gap:16px;margin-bottom:6px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-makeup-check" onchange="$('r-makeup-content-wrap').style.display=this.checked?'block':'none'"> 보강 필요</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)"><input type="checkbox" id="r-parent-contact" onchange="onParentContactChange(this)"> 학부모 연락 필요</label></div><div id="r-makeup-content-wrap" style="display:none"><textarea class="fi" id="r-makeup-content" rows="2" placeholder="보강 사유 및 내용 (보강 계획표 메모에 연동됩니다)"></textarea></div></div>
+    <!-- ── Reading 녹화 섹션 ───────────────────────────── -->
+    <div id="rr-inline-section" style="background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:12px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:800;color:#6d28d9">📹 Reading 녹화</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <select id="rr-camera-sel" class="fi" style="font-size:11px;padding:4px 6px;width:auto;max-width:160px" onchange="rrSwitchCamera(this.value)"><option value="">카메라 선택</option></select>
+          <button onclick="rrLoadCameras()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;cursor:pointer" title="카메라 새로고침">🔄</button>
+        </div>
+      </div>
+      <div style="background:#0f0f0f;border-radius:10px;overflow:hidden;position:relative;margin-bottom:10px">
+        <video id="rr-preview" autoplay muted playsinline style="width:100%;max-height:240px;display:block;object-fit:cover"></video>
+        <div id="rr-no-camera" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:12px;gap:6px;background:#1a1a2e"><span style="font-size:28px">📷</span><span>카메라를 선택해주세요</span></div>
+        <div id="rr-rec-indicator" style="display:none;position:absolute;top:8px;left:8px;background:rgba(220,38,38,.9);color:#fff;border-radius:16px;padding:3px 8px;font-size:10px;font-weight:700;align-items:center;gap:4px"><span style="width:6px;height:6px;background:#fff;border-radius:50%;display:inline-block;animation:rrBlink 1s infinite"></span> 녹화 중</div>
+        <div id="rr-timer" style="display:none;position:absolute;top:8px;right:8px;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700;font-family:monospace">00:00</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="rr-btn-start" onclick="rrStartRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;background:#7c3aed;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">⏺ 녹화 시작</button>
+        <button id="rr-btn-stop" onclick="rrStopRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;background:#dc2626;color:#fff;border:none;border-radius:10px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px">⏹ 녹화 종료</button>
+      </div>
+      <div id="rr-result" style="display:none;margin-top:8px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px;font-size:11px;color:#15803d;line-height:1.6"></div>
+    </div>
+    <!-- ── 저장 버튼 ──────────────────────────────────────── -->
     <div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap"><button class="btn btn-green" style="flex:1;min-width:80px" onclick="saveReport()">💾 저장</button><button class="btn btn-navy" style="flex:1;min-width:80px" onclick="saveReportAndImage()">📷 저장 + 이미지</button><button class="btn btn-outline" style="min-width:50px;color:var(--txt3)" onclick="returnToSchedule()">← 시간표</button></div>
     <div id="temp-save-indicator" style="display:none;text-align:center;margin-top:6px;font-size:11px;color:var(--blue)">📋 임시 저장된 데이터가 있습니다</div>
   </div></div>
@@ -5833,7 +5855,7 @@ function renderSchedule(){
         html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'absent\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✕</span></button>';
         html+='<button class="att-btn early-btn'+(early?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'early\',\''+_mkId+'\')" title="조퇴/학습 마무리 못함"><span style="font-size:15px;font-weight:700">▲</span></button>';
         if(done||absent||early)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\',\''+_mkId+'\',\''+pTime2+'\')" title="일지 작성">📝</button>';
-        html+='<button class="att-btn" onclick="openReadingRecordModal(\''+s.id+'\',\''+s.name+'\')" title="Reading 녹화" style="background:#7c3aed;color:#fff;border-color:#7c3aed;font-size:13px">🎥</button>';
+        html+='<button class="att-btn" onclick="openReadingRecordModal(\''+s.id+'\',\''+s.name+'\')" title="Reading 녹화" style="background:#eff6ff;color:#1e40af;border-color:#93c5fd;font-size:12px">📹</button>';
         html+='</div>';
         // 메모 (출석 버튼 아래)
         aMemos.forEach(function(aMemo){
@@ -22055,57 +22077,59 @@ document.addEventListener('DOMContentLoaded', function(){setTimeout(function(){_
 </style>
 
 <script>
-var _rrStudentId='',_rrStudentName='',_rrStream=null,_rrRecorder=null,_rrChunks=[],_rrTimerInt=null,_rrSeconds=0,_rrRecording=false;
+var _rrStudentId='',_rrStudentName='',_rrStudentNumber='';
+var _rrStream=null,_rrRecorder=null,_rrChunks=[],_rrTimerInt=null,_rrSeconds=0,_rrRecording=false;
 var _rrPathDefaults={pc:'D:\\ReadingVideos',external:'E:\\ReadingVideos',nas:'\\\\AcademyNAS\\ReadingVideos'};
 
 function openReadingRecordModal(studentId,studentName){
-  _rrStudentId=studentId;_rrStudentName=studentName;
   var s=(students||[]).find(function(x){return x.id===studentId;});
-  var level=s?getStudentLevel(s):'';
-  document.getElementById('rr-student-label').textContent=studentName+(level?' · '+level:'');
-  var saved=localStorage.getItem('rr_save_path');
-  var savedType=localStorage.getItem('rr_save_type')||'pc';
-  if(saved)document.getElementById('rr-save-path').value=saved;
-  document.querySelectorAll('input[name="rr-save-type"]').forEach(function(r){r.checked=(r.value===savedType);});
-  document.getElementById('rr-book').value=s&&s.level?s.level:'';
-  document.getElementById('rr-unit').value='';
-  document.getElementById('rr-memo').value='';
-  document.getElementById('rr-result').style.display='none';
-  document.getElementById('rr-result').style.background='#f0fdf4';
-  document.getElementById('rr-result').style.borderColor='#86efac';
-  document.getElementById('rr-result').style.color='#15803d';
-  var modal=document.getElementById('reading-record-modal');
-  modal.style.display='flex';
-  rrLoadCameras();
+  startReport(studentId,'','');
+  setTimeout(function(){
+    var sec=document.getElementById('rr-inline-section');
+    if(sec)sec.scrollIntoView({behavior:'smooth',block:'center'});
+    rrInitForStudent(studentId,studentName,s);
+  },400);
 }
 
-function closeReadingModal(){
-  if(_rrRecording){if(!confirm('녹화 중입니다. 정말 닫으시겠습니까?'))return;rrStopRecording(true);}
-  rrStopStream();
-  document.getElementById('reading-record-modal').style.display='none';
+function rrInitForStudent(studentId,studentName,s){
+  _rrStudentId=studentId;_rrStudentName=studentName;
+  if(!s)s=(students||[]).find(function(x){return x.id===studentId;});
+  _rrStudentNumber=s&&s.number?String(s.number):'';
+  var res=document.getElementById('rr-result');
+  if(res){res.style.display='none';res.style.background='#f0fdf4';res.style.borderColor='#86efac';res.style.color='#15803d';}
+  var saved=localStorage.getItem('rr_save_path');
+  var pathEl=document.getElementById('rr-save-path');
+  if(pathEl&&saved)pathEl.value=saved;
 }
 
 function rrUpdateSavePath(){
-  var type=document.querySelector('input[name="rr-save-type"]:checked').value;
-  document.getElementById('rr-save-path').value=_rrPathDefaults[type]||'D:\\ReadingVideos';
+  var type='pc';
+  document.querySelectorAll('input[name="rr-save-type"]').forEach(function(r){if(r.checked)type=r.value;});
+  var pathEl=document.getElementById('rr-save-path');
+  if(pathEl)pathEl.value=_rrPathDefaults[type]||'D:\\ReadingVideos';
 }
 
 async function rrSelectFolder(){
   if(window.electronAPI){
     var folder=await window.electronAPI.selectFolder();
-    if(folder){document.getElementById('rr-save-path').value=folder;localStorage.setItem('rr_save_path',folder);rrCheckPath(folder);}
+    if(folder){
+      var pathEl=document.getElementById('rr-save-path');
+      if(pathEl)pathEl.value=folder;
+      localStorage.setItem('rr_save_path',folder);
+      rrCheckPath(folder);
+    }
   }else{alert('폴더 직접 선택은 Electron 앱에서만 가능합니다.');}
 }
 
 async function rrCheckPath(dirPath){
   var statusEl=document.getElementById('rr-path-status');
-  if(!dirPath){statusEl.textContent='';return true;}
+  if(!dirPath){if(statusEl)statusEl.textContent='';return true;}
   if(window.electronAPI){
     var res=await window.electronAPI.checkPath(dirPath);
-    if(res.ok){statusEl.style.color='#16a34a';statusEl.textContent='✅ 저장 가능한 경로입니다';return true;}
-    else{statusEl.style.color='#dc2626';statusEl.textContent='❌ 경로에 접근할 수 없습니다. 저장장치 연결 상태를 확인해주세요.';return false;}
+    if(res.ok){if(statusEl){statusEl.style.color='#16a34a';statusEl.textContent='✅ 저장 가능한 경로입니다';}return true;}
+    else{if(statusEl){statusEl.style.color='#dc2626';statusEl.textContent='❌ 경로에 접근할 수 없습니다.';}return false;}
   }
-  statusEl.textContent='';return true;
+  if(statusEl)statusEl.textContent='';return true;
 }
 
 async function rrLoadCameras(){
@@ -22115,52 +22139,66 @@ async function rrLoadCameras(){
     var devices=await navigator.mediaDevices.enumerateDevices();
     var cameras=devices.filter(function(d){return d.kind==='videoinput';});
     var sel=document.getElementById('rr-camera-sel');
-    sel.innerHTML=cameras.length?cameras.map(function(c,i){return'<option value="'+c.deviceId+'">'+(c.label||'카메라 '+(i+1))+'</option>';}).join(''):'<option value="">카메라를 찾을 수 없습니다</option>';
+    if(!sel)return;
+    sel.innerHTML=cameras.length
+      ?cameras.map(function(c,i){return'<option value="'+c.deviceId+'">'+(c.label||'카메라 '+(i+1))+'</option>';}).join('')
+      :'<option value="">카메라를 찾을 수 없습니다</option>';
     if(cameras.length)rrSwitchCamera(cameras[0].deviceId);
-  }catch(e){document.getElementById('rr-camera-sel').innerHTML='<option value="">카메라 권한을 허용해주세요</option>';console.error(e);}
+  }catch(e){
+    var sel2=document.getElementById('rr-camera-sel');
+    if(sel2)sel2.innerHTML='<option value="">카메라 권한을 허용해주세요</option>';
+  }
 }
 
 async function rrSwitchCamera(deviceId){
   if(!deviceId)return;
   rrStopStream();
   try{
-    _rrStream=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}},audio:true});
+    _rrStream=await navigator.mediaDevices.getUserMedia({
+      video:{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}},audio:true
+    });
     var video=document.getElementById('rr-preview');
-    video.srcObject=_rrStream;
-    document.getElementById('rr-no-camera').style.display='none';
-  }catch(e){console.error(e);toast('카메라 연결 실패: '+e.message);}
+    if(video)video.srcObject=_rrStream;
+    var nc=document.getElementById('rr-no-camera');
+    if(nc)nc.style.display='none';
+  }catch(e){console.error(e);if(typeof toast==='function')toast('카메라 연결 실패: '+e.message);}
 }
 
 function rrStopStream(){
   if(_rrStream){_rrStream.getTracks().forEach(function(t){t.stop();});_rrStream=null;}
-  document.getElementById('rr-preview').srcObject=null;
-  document.getElementById('rr-no-camera').style.display='flex';
+  var video=document.getElementById('rr-preview');
+  if(video)video.srcObject=null;
+  var nc=document.getElementById('rr-no-camera');
+  if(nc)nc.style.display='flex';
 }
 
 function rrBuildFileName(){
   var now=new Date();
   var d=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  var book=(document.getElementById('rr-book').value||'NoBook').replace(/\s+/g,'').replace(/[\\\/:*?"<>|]/g,'');
-  var unit=(document.getElementById('rr-unit').value||'').replace(/\s+/g,'').replace(/[\\\/:*?"<>|]/g,'');
-  return [_rrStudentId,d,book].concat(unit?[unit]:[]).join('_')+'.webm';
+  var nameNum=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\\/:*?"<>|]/g,'');
+  var levelEl=document.getElementById('r-level');
+  var book=(levelEl&&levelEl.value?levelEl.value:'NoBook').replace(/\s+/g,'').replace(/[\\/:*?"<>|]/g,'');
+  var unitKey='rr_last_unit_'+_rrStudentId;
+  var unit=(localStorage.getItem(unitKey)||'').replace(/\s+/g,'').replace(/[\\/:*?"<>|]/g,'');
+  return [nameNum,d,book].concat(unit?[unit]:[]).join('_')+'.webm';
 }
 
 function rrBuildFolderPath(base){
   var now=new Date();
   var yr=String(now.getFullYear());
   var mo=String(now.getMonth()+1).padStart(2,'0');
-  var sep='\\';
-  return base.replace(/[\\/]+$/,'')+sep+_rrStudentId+sep+yr+sep+mo;
+  var b=base.replace(/[\/]+$/,'');
+  return b+'\\'+_rrStudentId+'\\'+yr+'\\'+mo;
 }
 
 async function rrStartRecording(){
-  if(!_rrStream){toast('카메라를 먼저 선택해주세요.');return;}
-  var basePath=document.getElementById('rr-save-path').value.trim();
-  if(!basePath){toast('저장 경로를 입력해주세요.');return;}
-  if(window.electronAPI){var ok=await rrCheckPath(basePath);if(!ok){toast('❌ 저장 경로에 접근할 수 없습니다.');return;}}
+  if(!_rrStream){if(typeof toast==='function')toast('카메라를 먼저 선택해주세요.');return;}
+  var basePath='D:\\ReadingVideos';
+  var pathEl=document.getElementById('rr-save-path');
+  if(pathEl&&pathEl.value.trim())basePath=pathEl.value.trim();
+  else{var saved=localStorage.getItem('rr_save_path');if(saved)basePath=saved;}
+  if(window.electronAPI){var ok=await rrCheckPath(basePath);if(!ok){if(typeof toast==='function')toast('❌ 저장 경로에 접근할 수 없습니다.');return;}}
   localStorage.setItem('rr_save_path',basePath);
-  var ct=document.querySelector('input[name="rr-save-type"]:checked');
-  if(ct)localStorage.setItem('rr_save_type',ct.value);
   _rrChunks=[];
   var mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':'video/webm';
   _rrRecorder=new MediaRecorder(_rrStream,{mimeType:mime});
@@ -22168,22 +22206,24 @@ async function rrStartRecording(){
   _rrRecorder.onstop=function(){rrOnRecordingStop(basePath);};
   _rrRecorder.start(1000);
   _rrRecording=true;_rrSeconds=0;
-  document.getElementById('rr-btn-start').style.display='none';
-  document.getElementById('rr-btn-stop').style.display='flex';
-  document.getElementById('rr-rec-indicator').style.display='flex';
-  document.getElementById('rr-timer').style.display='block';
-  _rrTimerInt=setInterval(function(){_rrSeconds++;var m=String(Math.floor(_rrSeconds/60)).padStart(2,'0'),s2=String(_rrSeconds%60).padStart(2,'0');document.getElementById('rr-timer').textContent=m+':'+s2;},1000);
-  toast('🔴 녹화가 시작됐습니다.');
+  var s=document.getElementById('rr-btn-start');var e2=document.getElementById('rr-btn-stop');
+  var ri=document.getElementById('rr-rec-indicator');var t=document.getElementById('rr-timer');
+  if(s)s.style.display='none';if(e2)e2.style.display='flex';if(ri)ri.style.display='flex';if(t)t.style.display='block';
+  _rrTimerInt=setInterval(function(){
+    _rrSeconds++;
+    var m=String(Math.floor(_rrSeconds/60)).padStart(2,'0'),s2=String(_rrSeconds%60).padStart(2,'0');
+    if(t)t.textContent=m+':'+s2;
+  },1000);
+  if(typeof toast==='function')toast('🔴 녹화가 시작됐습니다.');
 }
 
 function rrStopRecording(silent){
   if(!_rrRecorder||!_rrRecording)return;
   clearInterval(_rrTimerInt);_rrRecording=false;_rrRecorder.stop();
-  document.getElementById('rr-btn-start').style.display='flex';
-  document.getElementById('rr-btn-stop').style.display='none';
-  document.getElementById('rr-rec-indicator').style.display='none';
-  document.getElementById('rr-timer').style.display='none';
-  if(!silent)toast('⏹ 녹화 종료. 파일 저장 중...');
+  var s=document.getElementById('rr-btn-start');var e2=document.getElementById('rr-btn-stop');
+  var ri=document.getElementById('rr-rec-indicator');var t=document.getElementById('rr-timer');
+  if(s)s.style.display='flex';if(e2)e2.style.display='none';if(ri)ri.style.display='none';if(t)t.style.display='none';
+  if(!silent&&typeof toast==='function')toast('⏹ 녹화 종료. 파일 저장 중...');
 }
 
 async function rrOnRecordingStop(basePath){
@@ -22202,19 +22242,20 @@ async function rrOnRecordingStop(basePath){
       if(!saveRes.ok)throw new Error('파일 저장 실패: '+saveRes.error);
       var savedPath=saveRes.savedPath;
       await rrSaveMetadata(savedPath,duration,blob.size);
-      resultEl.style.display='block';
-      resultEl.innerHTML='✅ 저장 완료!<br><span style="font-family:monospace;font-size:11px;word-break:break-all">'+savedPath+'</span><br><span style="color:#6b7280">크기: '+(blob.size/1024/1024).toFixed(1)+'MB · 시간: '+String(Math.floor(duration/60)).padStart(2,'0')+':'+String(duration%60).padStart(2,'0')+'</span>';
-      toast('✅ Reading 녹화가 저장됐습니다!');
+      if(resultEl){
+        resultEl.style.display='block';
+        resultEl.innerHTML='✅ 저장 완료!<br><span style="font-family:monospace;font-size:10px;word-break:break-all;color:#374151">'+savedPath+'</span><br><span style="color:#6b7280">크기: '+(blob.size/1024/1024).toFixed(1)+'MB · '+String(Math.floor(duration/60)).padStart(2,'0')+':'+String(duration%60).padStart(2,'0')+'</span>';
+      }
+      if(typeof toast==='function')toast('✅ Reading 녹화가 저장됐습니다!');
     }catch(e){
-      resultEl.style.display='block';resultEl.style.background='#fef2f2';resultEl.style.borderColor='#fca5a5';resultEl.style.color='#dc2626';
-      resultEl.innerHTML='❌ 저장 실패: '+e.message;toast('❌ 저장 실패: '+e.message);
+      if(resultEl){resultEl.style.display='block';resultEl.style.background='#fef2f2';resultEl.style.borderColor='#fca5a5';resultEl.style.color='#dc2626';resultEl.innerHTML='❌ 저장 실패: '+e.message;}
+      if(typeof toast==='function')toast('❌ 저장 실패: '+e.message);
     }
   }else{
     var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=fileName;a.click();
     setTimeout(function(){URL.revokeObjectURL(url);},3000);
-    resultEl.style.display='block';
-    resultEl.innerHTML='✅ 파일 다운로드: '+fileName+'<br><span style="color:#6b7280;font-size:11px">※ Electron 앱에서 실행 시 자동 폴더 저장이 됩니다.</span>';
     await rrSaveMetadata(filePath,duration,blob.size);
+    if(resultEl){resultEl.style.display='block';resultEl.innerHTML='✅ 파일 다운로드: '+fileName+'<br><span style="color:#6b7280;font-size:10px">※ Electron 앱에서 실행 시 자동 폴더 저장됩니다.</span>';}
   }
 }
 
@@ -22224,19 +22265,31 @@ async function rrSaveMetadata(videoPath,duration,fileSize){
     var now=new Date();
     var dateStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
     var teacher=(typeof currentUser!=='undefined'&&currentUser)?currentUser:{name:'알 수 없음',docId:''};
+    var levelEl=document.getElementById('r-level');
+    var progressEl=document.getElementById('r-progress');
+    var bookName=levelEl?levelEl.value:'';
+    var unit=progressEl?progressEl.value:'';
+    if(unit&&_rrStudentId)localStorage.setItem('rr_last_unit_'+_rrStudentId,unit);
     await db.collection('readingRecords').add({
-      studentId:_rrStudentId,studentName:_rrStudentName,recordedAt:dateStr,
-      bookName:document.getElementById('rr-book').value||'',
-      unit:document.getElementById('rr-unit').value||'',
+      studentId:_rrStudentId,studentName:_rrStudentName,studentNumber:_rrStudentNumber,
+      recordedAt:dateStr,bookName:bookName,unit:unit,
       teacherId:teacher.docId||teacher.id||'',teacherName:teacher.name||'',
       videoPath:videoPath,duration:duration,fileSize:fileSize,
-      memo:document.getElementById('rr-memo').value||'',
       createdAt:firebase.firestore.FieldValue.serverTimestamp(),
       feedbackStatus:'미작성',feedback:'',
       fluencyScore:0,pronunciationScore:0,intonationScore:0,phrasingScore:0
     });
   }catch(e){console.error('Reading 메타데이터 저장 오류:',e);}
 }
+
+async function rrDeleteRecord(recordId,videoPath){
+  if(!confirm('이 Reading 기록을 삭제하시겠습니까?\n\n영상 파일은 직접 삭제해야 합니다.\n경로: '+videoPath))return;
+  try{
+    await db.collection('readingRecords').doc(recordId).delete();
+    if(typeof toast==='function')toast('🗑 기록이 삭제됐습니다. 영상 파일도 확인해주세요.');
+  }catch(e){if(typeof toast==='function')toast('❌ 삭제 실패: '+e.message);}
+}
+</script>
 </script>
 
 </body>
