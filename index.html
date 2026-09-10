@@ -3637,7 +3637,7 @@ function _buildTimeline(){
   var now=new Date();
   var curH=now.getHours();
   var HOURS=[];
-  for(var h=7;h<=24;h++)HOURS.push(h);
+  for(var h=1;h<=24;h++)HOURS.push(h);
 
   var timedTasks=(_dbTasks||[]).filter(function(t){
     return t.dueDate===selDate&&_isOnTimeline(t.startHour);
@@ -3713,11 +3713,12 @@ function _tlTaskCard(item,isPastDate){
   var border=isPlan?'1.5px solid #93c5fd':'1.5px solid var(--border)';
   var draggable=(!isPastDate)?'draggable="true" ondragstart="tlCardDragStart(event)"':'';
 
-  var r='<div class="tl-card" id="tlcard-'+cardId+'" '+draggable
+  var tlCardClick=(!isPlan&&!isPastDate)?(' onclick="event.stopPropagation();if(!event.target.closest(\'input\')&&!event.target.closest(\'button\')&&!event.target.closest(\'select\')){openDbTaskModal(\''+t.id+'\')}"'):'';
+  var r='<div class="tl-card" id="tlcard-'+cardId+'" '+draggable+tlCardClick
     +' data-cardid="'+cardId+'" data-tasktype="'+(isPlan?'plan':'db')+'"'
     +' data-taskid="'+(isPlan?t._planId:t.id)+'"'
     +(isPlan?' data-taskidx="'+t._taskIdx+'"':'')+' '
-    +'style="display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:8px;background:'+bg+';border:'+border+';'+(isPastDate?'cursor:default':'cursor:grab')+'">';
+    +'style="display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:8px;background:'+bg+';border:'+border+';'+(isPastDate?'cursor:default':isPlan?'cursor:grab':'cursor:pointer')+'">';
 
   // 체크박스 — 과거 미완료는 생략
   if(!(isPastDate&&!isDone)){
@@ -14666,6 +14667,12 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   nameInp.placeholder='업무 내용을 입력하세요';nameInp.style.fontSize='13px';nameInp.value=t?t.name:'';
   var nw=document.createElement('div');nw.style.marginBottom='10px';nw.appendChild(mkLbl('업무명 *'));nw.appendChild(nameInp);box.appendChild(nw);
 
+  // ── 메모 ──
+  var memoTa=document.createElement('textarea');memoTa.className='fi';memoTa.id='dbt-memo';
+  memoTa.rows=3;memoTa.style.cssText='font-size:12px;resize:vertical;line-height:1.5';
+  memoTa.placeholder='메모 (선택)';memoTa.value=t?t.memo||'':'';
+  var mw=document.createElement('div');mw.style.marginBottom='10px';mw.appendChild(mkLbl('메모'));mw.appendChild(memoTa);box.appendChild(mw);
+
   // ── 업무 영역 ──
   var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
   var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
@@ -14766,6 +14773,7 @@ function _dbSaveTaskModal(id){
   var urgency=(document.getElementById('dbt-urgency')||{}).value||'일반';
   var timeSlot=(document.getElementById('dbt-timeslot')||{}).value||'미정';
   var estDuration=(document.getElementById('dbt-duration')||{}).value||'';
+  var memo=(document.getElementById('dbt-memo')||{}).value||'';
   var startHourRaw=(document.getElementById('dbt-starthour')||{}).value||'';
   var startHour=undefined;
   if(startHourRaw){
@@ -14785,13 +14793,13 @@ function _dbSaveTaskModal(id){
       t.scheduleDate=scheduleDate;
       t.parentTask=parentTask;
       t.importance=importance;t.urgency=urgency;t.priority=priority;
-      t.timeSlot=timeSlot;t.estDuration=estDuration;t.startHour=startHour;
+      t.timeSlot=timeSlot;t.estDuration=estDuration;t.startHour=startHour;t.memo=memo;
     }
   }else{
     var newTask={
       id:'task_'+Date.now(),name:name,area:area,taskType:taskType,
       dueDate:dueDate||scheduleDate,scheduleDate:scheduleDate,
-      parentTask:parentTask,status:'대기',cycle:'반복없음',memo:'',createdAt:today,
+      parentTask:parentTask,status:'대기',cycle:'반복없음',memo:memo,createdAt:today,
       importance:importance,urgency:urgency,priority:priority,
       timeSlot:timeSlot,estDuration:estDuration,startHour:startHour
     };
