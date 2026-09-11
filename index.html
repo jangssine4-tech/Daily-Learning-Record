@@ -22421,6 +22421,33 @@ function rrShowDeleteInfo(){
 }
 
 
+function switchHistoryTab(tab){
+  var journalBtn=document.getElementById('htab-journal');
+  var readingBtn=document.getElementById('htab-reading');
+  var journalPanel=document.getElementById('h-panel-journal');
+  var readingPanel=document.getElementById('h-panel-reading');
+  if(!journalBtn)return;
+  if(tab==='journal'){
+    journalBtn.classList.add('active');readingBtn.classList.remove('active');
+    journalPanel.style.display='';readingPanel.style.display='none';
+  }else{
+    readingBtn.classList.add('active');journalBtn.classList.remove('active');
+    journalPanel.style.display='none';readingPanel.style.display='';
+    var sel=document.getElementById('hrr-student');
+    if(sel&&sel.options.length<=1){
+      var activeStudents=(students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';});
+      activeStudents.sort(function(a,b){return(a.studentNumber||0)-(b.studentNumber||0);});
+      activeStudents.forEach(function(s){
+        var opt=document.createElement('option');
+        opt.value=s.id;
+        opt.textContent=s.name+(s.studentNumber?' ('+s.studentNumber+')':'');
+        sel.appendChild(opt);
+      });
+    }
+    renderHistoryReading();
+  }
+}
+
 async function renderHistoryReading(){
   var el=document.getElementById('hrr-list');
   if(!el||!db)return;
