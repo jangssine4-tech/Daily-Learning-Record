@@ -255,34 +255,6 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-<script>
-function switchHistoryTab(tab){
-  var journalBtn=document.getElementById('htab-journal');
-  var readingBtn=document.getElementById('htab-reading');
-  var journalPanel=document.getElementById('h-panel-journal');
-  var readingPanel=document.getElementById('h-panel-reading');
-  if(!journalBtn)return;
-  if(tab==='journal'){
-    journalBtn.classList.add('active');readingBtn.classList.remove('active');
-    journalPanel.style.display='';readingPanel.style.display='none';
-  }else{
-    readingBtn.classList.add('active');journalBtn.classList.remove('active');
-    journalPanel.style.display='none';readingPanel.style.display='';
-    var sel=document.getElementById('hrr-student');
-    if(sel&&sel.options.length<=1){
-      var activeStudents=(window.students||[]).filter(function(s){return s.status==='재원'||s.status==='신규';});
-      activeStudents.sort(function(a,b){return(a.studentNumber||0)-(b.studentNumber||0);});
-      activeStudents.forEach(function(s){
-        var opt=document.createElement('option');
-        opt.value=s.id;
-        opt.textContent=s.name+(s.studentNumber?' ('+s.studentNumber+')':'');
-        sel.appendChild(opt);
-      });
-    }
-    if(typeof renderHistoryReading==='function')renderHistoryReading();
-  }
-}
-</script>
 </head>
 <body>
 <datalist id="time-slots-list"><option value="10:00"><option value="10:30"><option value="11:00"><option value="11:30"><option value="12:00"><option value="12:30"><option value="13:00"><option value="13:30"><option value="14:00"><option value="14:30"><option value="15:00"><option value="15:30"><option value="16:00"><option value="16:30"><option value="17:00"><option value="17:30"><option value="18:00"><option value="18:30"><option value="19:00"><option value="19:30"><option value="20:00"><option value="20:30"><option value="21:00"><option value="21:30"><option value="22:00"><option value="22:30"></datalist>
@@ -22341,7 +22313,7 @@ async function renderReadingRecords(studentId){
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">불러오는 중...</div>';
   try{
     var snap=await db.collection('readingRecords').where('studentId','==',studentId).get();
-    var docs=snap.docs.sort(function(a,b){return b.data().recordedAt.localeCompare(a.data().recordedAt);});
+    var docs=snap.docs.sort(function(a,b){return (b.data().recordedAt||'').localeCompare(a.data().recordedAt||'');});
     if(!docs.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';return;}
     el.innerHTML=docs.map(function(doc){
       var d=doc.data();var rid=doc.id;
@@ -22487,7 +22459,7 @@ async function renderHistoryReading(){
     if(studentId)q=q.where('studentId','==',studentId);
     if(fbFilter)q=q.where('feedbackStatus','==',fbFilter);
     var snap=await q.get();
-    var docs=snap.docs.sort(function(a,b){return b.data().recordedAt.localeCompare(a.data().recordedAt);});
+    var docs=snap.docs.sort(function(a,b){return (b.data().recordedAt||'').localeCompare(a.data().recordedAt||'');});
     if(!docs.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';return;}
     el.innerHTML=docs.map(function(doc){
       var d=doc.data();var rid=doc.id;
