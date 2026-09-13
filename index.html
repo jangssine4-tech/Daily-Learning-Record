@@ -341,7 +341,6 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       <div style="display:flex;gap:8px">
         <button id="rr-btn-start" onclick="rrStartRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;background:#7c3aed;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">⏺ 녹화 시작</button>
         <button id="rr-btn-stop" onclick="rrStopRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;background:#dc2626;color:#fff;border:none;border-radius:10px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px">⏹ 녹화 종료</button>
-        <button onclick="rrTakeSnapshot()" title="스냅샷 촬영" style="padding:12px 14px;font-size:18px;background:#0369a1;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center">📸</button>
       </div>
       <div id="rr-result" style="display:none;margin-top:8px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px;font-size:11px;color:#15803d;line-height:1.6"></div>
     </div>
@@ -8087,10 +8086,7 @@ async function saveMakeupUnified(){
       var absentDate=absentDays[di];
       var data={studentId:sId,studentName:s.name,absentDate:absentDate,absentDateEnd:absentDays.length>1&&di===0?absentDateEnd:'',absentReason:mkNote||'보강',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
       var ref=await db.collection('makeups').add(data);
-      // 중복 방지: 이미 있으면 추가하지 않음
-      if(!makeups.find(function(m){return m.id===ref.id;})){
-        makeups.push(Object.assign({id:ref.id},data));
-      }
+      // onSnapshot이 자동으로 배열 업데이트하므로 직접 push 안 함
       if(absentDate){
         await autoCreateAbsentReport(sId,absentDate,ref.id);
         reports.filter(function(r){return r.studentId===sId&&r.date===absentDate&&r.absent&&r.absentReason!=='결석';}).forEach(function(r){
@@ -22193,7 +22189,8 @@ async function rrSwitchCamera(deviceId){
   rrStopStream();
   try{
     _rrStream=await navigator.mediaDevices.getUserMedia({
-      video:{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}},audio:true
+      video:{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}},
+      audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}
     });
     var video=document.getElementById('rr-preview');
     if(video)video.srcObject=_rrStream;
@@ -22442,9 +22439,41 @@ async function rrPlayVideo(recordId,videoPath){
     var openVideoModal=function(srcUrl,revokeFn){
       var modal=document.createElement('div');
       modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
-      modal.innerHTML='<div style="width:100%;max-width:800px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="color:#fff;font-size:13px;font-weight:700">📹 Reading 영상</span><button id="rr-play-close-btn" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:16px">×</button></div><video id="rr-play-video" src="'+srcUrl+'" controls autoplay style="width:100%;border-radius:10px;max-height:70vh"></video><div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:6px;word-break:break-all">'+videoPath+'</div></div>';
+      modal.innerHTML='<div style="width:100%;max-width:800px">'        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'        +'<span style="color:#fff;font-size:13px;font-weight:700">📹 Reading 영상</span>'        +'<div style="display:flex;gap:8px;align-items:center">'        +'<button id="rr-play-snap-btn" title="현재 프레임 스냅샷" style="background:#0369a1;border:none;color:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px">📸 스냅샷</button>'        +'<button id="rr-play-close-btn" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:16px">×</button>'        +'</div></div>'        +'<video id="rr-play-video" src="'+srcUrl+'" controls autoplay style="width:100%;border-radius:10px;max-height:70vh"></video>'        +'<div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:6px;word-break:break-all">'+videoPath+'</div>'        +'</div>';
       document.body.appendChild(modal);
       document.getElementById('rr-play-close-btn').onclick=function(){if(revokeFn)revokeFn();modal.remove();};
+      // 스냅샷 버튼
+      document.getElementById('rr-play-snap-btn').onclick=async function(){
+        var vid=document.getElementById('rr-play-video');
+        if(!vid)return;
+        var canvas=document.createElement('canvas');
+        canvas.width=vid.videoWidth||640;canvas.height=vid.videoHeight||480;
+        canvas.getContext('2d').drawImage(vid,0,0,canvas.width,canvas.height);
+        var now=new Date();
+        var dateStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+        var timeStr=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+String(now.getSeconds()).padStart(2,'0');
+        var nameNum=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
+        var fileName=nameNum+'_'+dateStr+'_'+timeStr+'_snap.png';
+        if(window.electronAPI&&window.electronAPI.saveSnapshot){
+          var pathEl=document.getElementById('rr-save-path');
+          var basePath=(pathEl&&pathEl.value.trim())||'C:\Users\gentl\Downloads\ReadingVideos';
+          var folderKey=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
+          var yr=String(now.getFullYear());var mo=String(now.getMonth()+1).padStart(2,'0');
+          var folderPath=basePath+'\\'+folderKey+'\\'+yr+'\\'+mo;
+          var filePath=folderPath+'\\'+fileName;
+          var dirRes=await window.electronAPI.ensureDir(folderPath);
+          if(!dirRes.ok){if(typeof toast==='function')toast('❌ 폴더 생성 실패');return;}
+          canvas.toBlob(async function(blob){
+            var buf=await blob.arrayBuffer();
+            var saveRes=await window.electronAPI.saveSnapshot(filePath,buf);
+            if(saveRes&&saveRes.ok){if(typeof toast==='function')toast('📸 스냅샷 저장: '+saveRes.savedPath);}
+            else{if(typeof toast==='function')toast('❌ 저장 실패');}
+          },'image/png');
+        }else{
+          var a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download=fileName;a.click();
+          if(typeof toast==='function')toast('📸 스냅샷 다운로드');
+        }
+      };
     };
     if(window.electronAPI.readVideoFile){
       if(typeof toast==='function')toast('영상 불러오는 중...');
