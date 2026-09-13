@@ -3396,46 +3396,7 @@ function switchDashTab(tab){
 // ── 할 일 페이지 탭 전환 ──────────────────────────────
 var _boardCurrentTab='today';
 function openUnifiedAddModal(){
-  var old=document.getElementById('unified-add-modal');if(old)old.remove();
-  var modal=document.createElement('div');
-  modal.id='unified-add-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.onclick=function(e){if(e.target===modal)modal.remove();};
-
-  var box=document.createElement('div');
-  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:360px';
-
-  // 헤더
-  var hdr=document.createElement('div');
-  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px';
-  hdr.innerHTML='<div style="font-size:15px;font-weight:800;color:var(--navy)">업무 추가</div>'
-    +'<button onclick="document.getElementById(\'unified-add-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>';
-  box.appendChild(hdr);
-
-  var guide=document.createElement('div');
-  guide.style.cssText='font-size:12px;color:var(--txt3);margin-bottom:14px';
-  guide.textContent='어느 목록에 추가할까요?';
-  box.appendChild(guide);
-
-  var btnWrap=document.createElement('div');
-  btnWrap.style.cssText='display:flex;flex-direction:column;gap:8px;margin-bottom:16px';
-  btnWrap.innerHTML=_uamBtn('오늘 할 일','오늘 실행할 업무','today')
-    +_uamBtn('주간 할 일','이번 주 안에 할 업무','weekly')
-    +_uamBtn('이달의 할 일','이번 달 안에 할 업무','monthly');
-  box.appendChild(btnWrap);
-
-  var divider=document.createElement('div');
-  divider.style.cssText='height:1px;background:var(--border);margin-bottom:12px';
-  box.appendChild(divider);
-
-  var planBtn=document.createElement('button');
-  planBtn.onclick=function(){modal.remove();goto('board');setTimeout(function(){switchBoardTab('focus');},100);};
-  planBtn.style.cssText='width:100%;padding:10px;background:none;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:#1d4ed8;font-weight:600';
-  planBtn.textContent='실행계획 관리로 이동 →';
-  box.appendChild(planBtn);
-
-  modal.appendChild(box);
-  document.body.appendChild(modal);
+  openDbTaskModal(null,null,null,todayISO(),null,todayISO());
 }
 
 function _uamBtn(label,desc,type){
@@ -14693,9 +14654,58 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
     return s;
   }
 
-  // 목록 구분 제거 - 항상 일반 업무로 통일
-  var listHid=document.createElement('input');listHid.type='hidden';listHid.id='dbt-list-hidden';listHid.value='today';
-  box.appendChild(listHid);
+  // 목록 선택 버튼 (신규 추가 시에만 표시)
+  if(!id){
+    var LIST_OPTS=[
+      {v:'today',  l:'오늘 할 일',   desc:'오늘 실행할 업무'},
+      {v:'weekly', l:'주간 할 일',   desc:'이번 주 안에 할 업무'},
+      {v:'monthly',l:'이달의 할 일', desc:'이번 달 안에 할 업무'},
+    ];
+    var curList='today';
+    var listWrap=document.createElement('div');listWrap.style.marginBottom='12px';
+    listWrap.appendChild(mkLbl('목록'));
+    var listBtnRow=document.createElement('div');
+    listBtnRow.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+    LIST_OPTS.forEach(function(opt){
+      var btn=document.createElement('button');
+      btn.type='button';
+      btn.id='dbt-list-btn-'+opt.v;
+      btn.textContent=opt.l;
+      var active=curList===opt.v;
+      btn.style.cssText='flex:1;font-size:11px;font-weight:700;padding:7px 4px;border-radius:8px;cursor:pointer;border:1.5px solid '+(active?'var(--navy)':'var(--border)')+';background:'+(active?'var(--navy)':'var(--surface2)')+';color:'+(active?'#fff':'var(--txt3)');
+      btn.onclick=function(){
+        curList=opt.v;
+        LIST_OPTS.forEach(function(o){
+          var b=document.getElementById('dbt-list-btn-'+o.v);if(!b)return;
+          var a=o.v===opt.v;
+          b.style.borderColor=a?'var(--navy)':'var(--border)';
+          b.style.background=a?'var(--navy)':'var(--surface2)';
+          b.style.color=a?'#fff':'var(--txt3)';
+        });
+        var schEl=document.getElementById('dbt-scheduledate');
+        var dueEl=document.getElementById('dbt-due');
+        if(schEl){
+          var d=new Date();
+          if(opt.v==='today'){schEl.value=todayISO();if(dueEl)dueEl.value=todayISO();}
+          else if(opt.v==='weekly'){var day=d.getDay(),diff=day===0?6:day-1;d.setDate(d.getDate()+(7-diff));schEl.value=d.toISOString().slice(0,10);if(dueEl)dueEl.value=schEl.value;}
+          else{var eom=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);schEl.value=eom;if(dueEl)dueEl.value=eom;}
+        }
+        document.getElementById('dbt-list-hidden').value=opt.v;
+      };
+      listBtnRow.appendChild(btn);
+    });
+    var planBtn2=document.createElement('button');
+    planBtn2.type='button';
+    planBtn2.textContent='실행계획 →';
+    planBtn2.style.cssText='font-size:11px;font-weight:700;padding:7px 8px;border-radius:8px;cursor:pointer;border:1.5px solid var(--border);background:var(--surface2);color:#1d4ed8;white-space:nowrap';
+    planBtn2.onclick=function(){modal.remove();goto('board');setTimeout(function(){switchBoardTab('focus');},100);};
+    listBtnRow.appendChild(planBtn2);
+    var listHid=document.createElement('input');listHid.type='hidden';listHid.id='dbt-list-hidden';listHid.value='today';
+    listWrap.appendChild(listBtnRow);listWrap.appendChild(listHid);box.appendChild(listWrap);
+  } else {
+    var listHid=document.createElement('input');listHid.type='hidden';listHid.id='dbt-list-hidden';listHid.value='today';
+    box.appendChild(listHid);
+  }
 
   // ── 업무명 ──
   var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';
