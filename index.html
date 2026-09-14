@@ -21816,6 +21816,12 @@ function trRender(){
       // 날짜 + 버튼
       h+='<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">';
       h+='<span style="font-size:10px;color:var(--txt3)">'+(f.uploadedAt||'').slice(5)+'</span>';
+      // 미리보기 가능한 파일 타입
+      var _ext=(f.name||'').split('.').pop().toLowerCase();
+      var _previewable=['pdf','jpg','jpeg','png','txt'].indexOf(_ext)>=0;
+      if(_previewable){
+        h+='<button onclick="trPreview(\''+f.id+'\')" title="미리보기" style="background:#0369a1;border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">👁</button>';
+      }
       h+='<button onclick="trDownload(\''+f.id+'\')" title="다운로드" style="background:var(--navy);border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">⬇</button>';
       h+='<button onclick="trDelete(\''+f.id+'\')" title="삭제" style="background:none;border:1px solid var(--border);color:var(--txt3);border-radius:4px;padding:2px 5px;cursor:pointer;font-size:12px">×</button>';
       h+='</div>';
@@ -22044,6 +22050,53 @@ function trUploadOne(file,folderId){
     toast('❌ 업로드 실패: '+e.message);
     console.error(e);
   });
+}
+
+function trPreview(fileId){
+  var f=_trFiles.find(function(x){return x.id===fileId;});
+  if(!f)return;
+  var ext=(f.name||'').split('.').pop().toLowerCase();
+  // URL 가져오기
+  var ref=_trStorage.ref(TR_STORAGE_PATH+'/'+f.storageName);
+  ref.getDownloadURL().then(function(url){
+    var modal=document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
+    var inner='<div style="width:100%;max-width:900px;height:85vh;display:flex;flex-direction:column">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<span style="color:#fff;font-size:13px;font-weight:700">📄 '+f.name+'</span>'
+      +'<div style="display:flex;gap:8px">';
+    // 인쇄 버튼 (PDF, 이미지만)
+    if(['pdf','jpg','jpeg','png'].indexOf(ext)>=0){
+      inner+='<button onclick="trPrintFrame()" style="background:#16a34a;border:none;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700">🖨 인쇄</button>';
+    }
+    inner+='<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:16px">×</button>'
+      +'</div></div>';
+    // 파일 타입별 미리보기
+    if(ext==='pdf'){
+      inner+='<iframe id="tr-preview-frame" src="'+url+'" style="flex:1;width:100%;border:none;border-radius:8px;background:#fff"></iframe>';
+    }else if(['jpg','jpeg','png'].indexOf(ext)>=0){
+      inner+='<div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:auto">'
+        +'<img id="tr-preview-frame" src="'+url+'" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain"></div>';
+    }else if(ext==='txt'){
+      inner+='<iframe id="tr-preview-frame" src="'+url+'" style="flex:1;width:100%;border:none;border-radius:8px;background:#fff"></iframe>';
+    }
+    inner+='</div>';
+    modal.innerHTML=inner;
+    document.body.appendChild(modal);
+  }).catch(function(e){toast('미리보기 실패: '+e.message);});
+}
+
+function trPrintFrame(){
+  var frame=document.getElementById('tr-preview-frame');
+  if(!frame)return;
+  if(frame.tagName==='IFRAME'){
+    try{frame.contentWindow.print();}catch(e){toast('인쇄 창을 열 수 없습니다. 다운로드 후 인쇄해주세요.');}
+  }else if(frame.tagName==='IMG'){
+    var w=window.open('');
+    w.document.write('<img src="'+frame.src+'" style="max-width:100%">');
+    w.document.close();
+    w.print();
+  }
 }
 
 function trDownload(fileId){
