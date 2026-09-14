@@ -22595,7 +22595,7 @@ async function renderReadingRecords(studentId){
         +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
         +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
         +fbBadge
-        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">▶ 영상</button>'
+        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">▶ 영상</button>'
         +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">✏️ 피드백</button>'
         +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrDeleteRecord(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🗑 삭제</button>'
         +'<button onclick="rrShowDeleteInfo()" style="background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;font-weight:700;flex-shrink:0" title="삭제 안내">?</button>'
@@ -22642,11 +22642,16 @@ function rrShowCameraHelp(){
   document.body.appendChild(modal);
 }
 
-async function rrPlayVideo(recordId,videoPath){
+async function rrPlayVideo(recordId,videoPath,studentName,studentNumber){
   if(!videoPath||videoPath==='undefined'){if(typeof toast==='function')toast('저장된 영상 경로가 없습니다.');return;}
+  // 전달된 값 우선, 없으면 전역변수 fallback
+  var sName=studentName||_rrStudentName||'';
+  var sNum=studentNumber||_rrStudentNumber||'';
   if(electronAPI){
     // 경로 정규화 (/ → \)
     var normPath=videoPath.replace(/\//g,'\\');
+    // ★ 디버그: 실제 경로 확인
+    alert('[디버그] 원본경로:\n'+videoPath+'\n\n정규화경로:\n'+normPath+'\n\n학생이름: '+sName+'\n학생번호: '+sNum);
     var res=await electronAPI.fileExists(normPath);
     if(!res.exists){
       // 역슬래시로도 시도
@@ -22657,7 +22662,7 @@ async function rrPlayVideo(recordId,videoPath){
         if(electronAPI.listFiles){
           var listRes=await electronAPI.listFiles(folderPath);
           if(listRes.ok&&listRes.files.length){
-            var nameKey=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\\/:*?"<>|]/g,'');
+            var nameKey=(sName+(sNum?'('+sNum+')':'')).replace(/[\\/:*?"<>|]/g,'');
             var matched=listRes.files.find(function(f){return f.indexOf(nameKey)>=0&&f.endsWith('.webm');});
             if(matched){normPath=folderPath+'\\'+matched;}
             else{alert('영상 파일을 찾을 수 없습니다.\n\n경로: '+videoPath);return;}
@@ -22683,12 +22688,12 @@ async function rrPlayVideo(recordId,videoPath){
         var now=new Date();
         var dateStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
         var timeStr=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+String(now.getSeconds()).padStart(2,'0');
-        var nameNum=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
+        var nameNum=(sName+(sNum?'('+sNum+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
         var fileName=nameNum+'_'+dateStr+'_'+timeStr+'_snap.png';
         if(electronAPI&&electronAPI.saveSnapshot){
           var pathEl=document.getElementById('rr-save-path');
-          var basePath=(pathEl&&pathEl.value.trim())||'C:\Users\gentl\Downloads\ReadingVideos';
-          var folderKey=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
+          var basePath=(pathEl&&pathEl.value.trim())||'C:\\Users\\gentl\\Downloads\\ReadingVideos';
+          var folderKey=(sName+(sNum?'('+sNum+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
           var yr=String(now.getFullYear());var mo=String(now.getMonth()+1).padStart(2,'0');
           var folderPath=basePath+'\\'+folderKey+'\\'+yr+'\\'+mo;
           var filePath=folderPath+'\\'+fileName;
@@ -22852,7 +22857,7 @@ async function renderHistoryReading(){
         +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
         +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
         +fbBadge
-        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">▶ 영상</button>'
+        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">▶ 영상</button>'
         +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">✏️ 피드백</button>'
         +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrDeleteRecordFromHistory(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🗑 삭제</button>'
         +'<button onclick="rrShowDeleteInfo()" style="background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;font-weight:700;flex-shrink:0" title="삭제 안내">?</button>'
