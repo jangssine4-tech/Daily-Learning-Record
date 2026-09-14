@@ -22645,8 +22645,19 @@ async function rrPlayVideo(recordId,videoPath){
     if(!res.exists){
       // 역슬래시로도 시도
       var res2=await window.electronAPI.fileExists(videoPath);
-      if(!res2.exists){alert('영상 파일을 찾을 수 없습니다.\n저장장치 연결 상태를 확인해주세요.\n\n경로: '+videoPath);return;}
-      normPath=videoPath;
+      if(!res2.exists){
+        // 폴더에서 학생이름 포함 .webm 파일 찾기
+        var folderPath=normPath.substring(0,normPath.lastIndexOf('\\'));
+        if(window.electronAPI.listFiles){
+          var listRes=await window.electronAPI.listFiles(folderPath);
+          if(listRes.ok&&listRes.files.length){
+            var nameKey=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\\/:*?"<>|]/g,'');
+            var matched=listRes.files.find(function(f){return f.indexOf(nameKey)>=0&&f.endsWith('.webm');});
+            if(matched){normPath=folderPath+'\\'+matched;}
+            else{alert('영상 파일을 찾을 수 없습니다.\n\n경로: '+videoPath);return;}
+          }else{alert('영상 파일을 찾을 수 없습니다.\n\n경로: '+videoPath);return;}
+        }else{alert('영상 파일을 찾을 수 없습니다.\n저장장치 연결 상태를 확인해주세요.\n\n경로: '+videoPath);return;}
+      }else{normPath=videoPath;}
     }
     videoPath=normPath;
     // 파일을 읽어서 blob URL로 변환 (readVideoFile 지원 시)
