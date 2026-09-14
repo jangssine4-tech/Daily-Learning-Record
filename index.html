@@ -21816,7 +21816,7 @@ function trRender(){
   h+='</div>';
 
   // ── 오른쪽: 파일 목록 ──
-  h+='<div style="flex:1;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column">';
+  h+='<div style="flex:1;overflow-y:auto;background:var(--bg);display:flex;flex-direction:column" '    +'ondragover="event.preventDefault();this.style.background=\'var(--surface2)\'" '    +'ondragleave="this.style.background=\'\'" '    +'ondrop="event.preventDefault();this.style.background=\'\';trUploadFiles(event.dataTransfer.files)">';
 
   // 툴바
   var curFolder=_trFolders.find(function(f){return f.id===_trCurrentFolder;});
@@ -21952,15 +21952,20 @@ function trDeleteFolder(id){
 function trUploadFiles(files){
   if(!files||!files.length)return;
   var arr=Array.from(files);
-  // 폴더 선택 모달
-  trShowFolderPicker(function(folderId){
+  var doUpload=function(folderId){
     arr.forEach(function(file){
       if(file.size>TR_MAX_FILE_MB*1024*1024){toast(file.name+': 파일이 너무 큽니다 (최대 '+TR_MAX_FILE_MB+'MB)');return;}
       trUploadOne(file,folderId);
     });
-  });
-  // input 초기화
-  document.getElementById('tr-file-input').value='';
+  };
+  // 현재 폴더가 선택되어 있으면 바로 업로드
+  if(_trCurrentFolder){
+    doUpload(_trCurrentFolder);
+  }else{
+    trShowFolderPicker(doUpload);
+  }
+  var inp=document.getElementById('tr-file-input');
+  if(inp)inp.value='';
 }
 
 function trShowFolderPicker(callback){
@@ -21973,12 +21978,23 @@ function trShowFolderPicker(callback){
   box.style.cssText='background:var(--surface);border-radius:14px;padding:18px;width:100%;max-width:320px';
   var h='<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px">📁 저장할 폴더 선택</div>';
   h+='<div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto">';
-  _trFolders.forEach(function(f){
+  // 2단계 폴더 구조로 표시
+  var rootFoldersPicker=_trFolders.filter(function(f){return !f.parentId;});
+  rootFoldersPicker.forEach(function(f){
     var isCurrent=f.id===_trCurrentFolder;
     h+='<button onclick="trFolderPick(\''+f.id+'\')" '
-      +'style="text-align:left;padding:10px 14px;border:1.5px solid '+(isCurrent?'var(--navy)':'var(--border)')+';border-radius:8px;'
+      +'style="text-align:left;padding:8px 14px;border:1.5px solid '+(isCurrent?'var(--navy)':'var(--border)')+';border-radius:8px;'
       +'background:'+(isCurrent?'var(--navy)':'var(--surface2)')+';cursor:pointer;font-size:13px;font-weight:600;'
       +'color:'+(isCurrent?'#fff':'var(--txt)')+'">📁 '+f.name+(isCurrent?' ✓':'')+'</button>';
+    // 하위 폴더
+    var children=_trFolders.filter(function(c){return c.parentId===f.id;});
+    children.forEach(function(c){
+      var cCurrent=c.id===_trCurrentFolder;
+      h+='<button onclick="trFolderPick(\''+c.id+'\')" '
+        +'style="text-align:left;padding:7px 14px 7px 28px;border:1.5px solid '+(cCurrent?'var(--navy)':'var(--border)')+';border-radius:8px;'
+        +'background:'+(cCurrent?'var(--navy)':'var(--surface2)')+';cursor:pointer;font-size:12px;font-weight:500;'
+        +'color:'+(cCurrent?'#fff':'var(--txt)')+'">📂 '+c.name+(cCurrent?' ✓':'')+'</button>';
+    });
   });
   h+='<button onclick="trFolderPick(null)" '
     +'style="text-align:left;padding:10px 14px;border:1.5px dashed var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:12px;color:var(--txt3)">📂 폴더 미지정</button>';
