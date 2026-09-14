@@ -340,7 +340,9 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       </div>
       <div style="display:flex;gap:8px">
         <button id="rr-btn-start" onclick="rrStartRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;background:#7c3aed;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">⏺ 녹화 시작</button>
+        <button id="rr-btn-pause" onclick="rrPauseRecording()" style="padding:12px 14px;font-size:14px;font-weight:800;background:#f59e0b;color:#fff;border:none;border-radius:10px;cursor:pointer;display:none;white-space:nowrap">⏸ 일시정지</button>
         <button id="rr-btn-stop" onclick="rrStopRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;background:#dc2626;color:#fff;border:none;border-radius:10px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px">⏹ 녹화 종료</button>
+        <button onclick="rrTakeSnapshot()" style="padding:12px 14px;font-size:14px;font-weight:800;background:#0369a1;color:#fff;border:none;border-radius:10px;cursor:pointer;white-space:nowrap">스냅샷</button>
       </div>
       <div id="rr-result" style="display:none;margin-top:8px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px;font-size:11px;color:#15803d;line-height:1.6"></div>
     </div>
@@ -22275,7 +22277,9 @@ document.addEventListener('DOMContentLoaded', function(){setTimeout(function(){_
       </div>
       <div style="display:flex;gap:10px">
         <button id="rr-btn-start" onclick="rrStartRecording()" style="flex:1;padding:16px;font-size:16px;font-weight:800;background:#7c3aed;color:#fff;border:none;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">⏺ 녹화 시작</button>
+        <button id="rr-btn-pause" onclick="rrPauseRecording()" style="padding:16px 14px;font-size:14px;font-weight:800;background:#f59e0b;color:#fff;border:none;border-radius:12px;cursor:pointer;display:none;white-space:nowrap">⏸ 일시정지</button>
         <button id="rr-btn-stop" onclick="rrStopRecording()" style="flex:1;padding:16px;font-size:16px;font-weight:800;background:#dc2626;color:#fff;border:none;border-radius:12px;cursor:pointer;display:none;align-items:center;justify-content:center;gap:8px">⏹ 녹화 종료</button>
+        <button onclick="rrTakeSnapshot()" style="padding:16px 14px;font-size:14px;font-weight:800;background:#0369a1;color:#fff;border:none;border-radius:12px;cursor:pointer;white-space:nowrap">스냅샷</button>
       </div>
       <div id="rr-result" style="display:none;background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:12px;font-size:12px;color:#15803d"></div>
     </div>
@@ -22459,7 +22463,8 @@ async function rrStartRecording(){
   _rrRecording=true;_rrSeconds=0;
   var s=document.getElementById('rr-btn-start');var e2=document.getElementById('rr-btn-stop');
   var ri=document.getElementById('rr-rec-indicator');var t=document.getElementById('rr-timer');
-  if(s)s.style.display='none';if(e2)e2.style.display='flex';if(ri)ri.style.display='flex';if(t)t.style.display='block';
+  var bp=document.getElementById('rr-btn-pause');
+  if(s)s.style.display='none';if(e2)e2.style.display='flex';if(bp)bp.style.display='flex';if(ri)ri.style.display='flex';if(t)t.style.display='block';
   _rrTimerInt=setInterval(function(){
     _rrSeconds++;
     var m=String(Math.floor(_rrSeconds/60)).padStart(2,'0'),s2=String(_rrSeconds%60).padStart(2,'0');
@@ -22468,12 +22473,37 @@ async function rrStartRecording(){
   if(typeof toast==='function')toast('🔴 녹화가 시작됐습니다.');
 }
 
+function rrPauseRecording(){
+  if(!_rrRecorder||!_rrRecording)return;
+  var bp=document.getElementById('rr-btn-pause');
+  var ri=document.getElementById('rr-rec-indicator');
+  if(_rrRecorder.state==='recording'){
+    _rrRecorder.pause();
+    clearInterval(_rrTimerInt);
+    if(bp){bp.textContent='▶ 재개';bp.style.background='#16a34a';}
+    if(ri)ri.style.opacity='0.3';
+    if(typeof toast==='function')toast('⏸ 일시정지됐습니다.');
+  }else if(_rrRecorder.state==='paused'){
+    _rrRecorder.resume();
+    if(bp){bp.textContent='⏸ 일시정지';bp.style.background='#f59e0b';}
+    if(ri)ri.style.opacity='1';
+    _rrTimerInt=setInterval(function(){
+      _rrSeconds++;
+      var t=document.getElementById('rr-timer');
+      var m=String(Math.floor(_rrSeconds/60)).padStart(2,'0'),s2=String(_rrSeconds%60).padStart(2,'0');
+      if(t)t.textContent=m+':'+s2;
+    },1000);
+    if(typeof toast==='function')toast('▶ 녹화가 재개됐습니다.');
+  }
+}
+
 function rrStopRecording(silent){
   if(!_rrRecorder||!_rrRecording)return;
   clearInterval(_rrTimerInt);_rrRecording=false;_rrRecorder.stop();
   var s=document.getElementById('rr-btn-start');var e2=document.getElementById('rr-btn-stop');
   var ri=document.getElementById('rr-rec-indicator');var t=document.getElementById('rr-timer');
-  if(s)s.style.display='flex';if(e2)e2.style.display='none';if(ri)ri.style.display='none';if(t)t.style.display='none';
+  var bp2=document.getElementById('rr-btn-pause');
+  if(s)s.style.display='flex';if(e2)e2.style.display='none';if(bp2)bp2.style.display='none';if(ri)ri.style.display='none';if(t)t.style.display='none';
   if(!silent&&typeof toast==='function')toast('⏹ 녹화 종료. 파일 저장 중...');
 }
 
