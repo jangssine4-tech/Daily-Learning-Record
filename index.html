@@ -22055,9 +22055,17 @@ function trPreview(fileId){
   var f=_trFiles.find(function(x){return x.id===fileId;});
   if(!f)return;
   var ext=(f.name||'').split('.').pop().toLowerCase();
-  // URL 가져오기
-  var ref=_trStorage.ref(TR_STORAGE_PATH+'/'+f.storageName);
-  ref.getDownloadURL().then(function(url){
+  // 저장된 URL 직접 사용
+  if(f.url){
+    _trShowPreviewModal(f,ext,f.url);
+  }else if(_trStorage&&f.path){
+    _trStorage.ref(f.path).getDownloadURL().then(function(url){
+      _trShowPreviewModal(f,ext,url);
+    }).catch(function(e){toast('미리보기 실패: '+e.message);});
+  }else{toast('미리보기를 사용할 수 없습니다.');}
+}
+
+function _trShowPreviewModal(f,ext,url){
     var modal=document.createElement('div');
     modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
     var inner='<div style="width:100%;max-width:900px;height:85vh;display:flex;flex-direction:column">'
@@ -22082,7 +22090,6 @@ function trPreview(fileId){
     inner+='</div>';
     modal.innerHTML=inner;
     document.body.appendChild(modal);
-  }).catch(function(e){toast('미리보기 실패: '+e.message);});
 }
 
 function trPrintFrame(){
