@@ -21805,13 +21805,8 @@ function trRender(){
       h+='<div style="display:grid;grid-template-columns:1fr 100px 80px 120px;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);align-items:center;'
         +'transition:background .1s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">';
       // 파일명
-      var _ext2=(f.name||'').split('.').pop().toLowerCase();
-      var _previewable2=['pdf','jpg','jpeg','png','txt'].indexOf(_ext2)>=0;
-      var _nameStyle=_previewable2?'cursor:pointer;color:var(--blue);text-decoration:underline;':'';
-      var _nameClick=_previewable2?'onclick="trPreview(\''+f.id+'\')"':'';
       h+='<div style="display:flex;align-items:center;gap:6px;min-width:0">';
-      h+='<span style="font-size:18px;flex-shrink:0">'+icon+'</span>';
-      h+='<span '+_nameClick+' style="font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+_nameStyle+'">'+f.name+'</span>';
+      h+='<span style="font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f.name+'</span>';
       h+='</div>';
       // 폴더
       h+='<span style="font-size:10px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(folder?folder.name:'-')+'</span>';
@@ -21821,6 +21816,11 @@ function trRender(){
       h+='<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">';
       h+='<span style="font-size:10px;color:var(--txt3)">'+(f.uploadedAt||'').slice(5)+'</span>';
 
+      var _ext3=(f.name||'').split('.').pop().toLowerCase();
+      var _previewable3=['pdf','jpg','jpeg','png','txt'].indexOf(_ext3)>=0;
+      if(_previewable3){
+        h+='<button onclick="trPreview(\''+f.id+'\')" style="background:#0369a1;border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">미리보기</button>';
+      }
       h+='<button onclick="trDownload(\''+f.id+'\')" title="다운로드" style="background:var(--navy);border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">⬇</button>';
       h+='<button onclick="trDelete(\''+f.id+'\')" title="삭제" style="background:none;border:1px solid var(--border);color:var(--txt3);border-radius:4px;padding:2px 5px;cursor:pointer;font-size:12px">×</button>';
       h+='</div>';
@@ -22126,12 +22126,16 @@ function trDelete(fileId){
     var storagePath=f.path||(f.storageName?TR_STORAGE_PATH+'/'+f.storageName:null);
     if(storagePath){storagePromise=_trStorage.ref(storagePath).delete().catch(function(){});}
   }
+  // 즉시 화면에서 제거
+  _trFiles=_trFiles.filter(function(x){return x.id!==fileId;});
+  trRender();
   Promise.all([db.collection(TR_COLL_FILES).doc(fileId).delete(),storagePromise]).then(function(){
-    _trFiles=_trFiles.filter(function(x){return x.id!==fileId;});
-    _trLoaded=false;
     toast('삭제됐습니다');
-    trRender();
-  }).catch(function(e){toast('삭제 실패: '+e.message);});
+  }).catch(function(e){
+    // 실패 시 복원
+    toast('삭제 실패: '+e.message);
+    trLoad().then(trRender);
+  });
 }
 
 // 폴더 피커에서 버튼 클릭 시 전역 콜백 호출
