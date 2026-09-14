@@ -22143,7 +22143,7 @@ function trPreview(fileId){
 
 function _trShowPreviewModal(f,ext,url){
     // Electron에서는 브라우저로 안내
-    if(window.electronAPI){
+    if(electronAPI){
       toast('📌 미리보기는 브라우저에서 이용해주세요.\n주소: jangssine4-tech.github.io/Daily-Learning-Record');
       return;
     }
@@ -22324,8 +22324,8 @@ function rrUpdateSavePath(){
 }
 
 async function rrSelectFolder(){
-  if(window.electronAPI){
-    var folder=await window.electronAPI.selectFolder();
+  if(electronAPI){
+    var folder=await electronAPI.selectFolder();
     if(folder){
       var pathEl=document.getElementById('rr-save-path');
       if(pathEl)pathEl.value=folder;
@@ -22338,8 +22338,8 @@ async function rrSelectFolder(){
 async function rrCheckPath(dirPath){
   var statusEl=document.getElementById('rr-path-status');
   if(!dirPath){if(statusEl)statusEl.textContent='';return true;}
-  if(window.electronAPI){
-    var res=await window.electronAPI.checkPath(dirPath);
+  if(electronAPI){
+    var res=await electronAPI.checkPath(dirPath);
     if(res.ok){if(statusEl){statusEl.style.color='#16a34a';statusEl.textContent='✅ 저장 가능한 경로입니다';}return true;}
     else{if(statusEl){statusEl.style.color='#dc2626';statusEl.textContent='❌ 경로에 접근할 수 없습니다.';}return false;}
   }
@@ -22421,7 +22421,7 @@ async function rrTakeSnapshot(){
   var timeStr=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+String(now.getSeconds()).padStart(2,'0');
   var nameNum=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\\/:*?"<>|]/g,'')||'unknown';
   var fileName=nameNum+'_'+dateStr+'_'+timeStr+'.png';
-  if(window.electronAPI){
+  if(electronAPI){
     var pathEl=document.getElementById('rr-save-path');
     var basePath=(pathEl&&pathEl.value.trim())||'C:\\Users\\gentl\\Downloads\\ReadingVideos';
     var folderKey=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\\/:*?"<>|]/g,'')||_rrStudentId;
@@ -22429,11 +22429,11 @@ async function rrTakeSnapshot(){
     var mo=String(now.getMonth()+1).padStart(2,'0');
     var folderPath=basePath+'\\'+folderKey+'\\'+yr+'\\'+mo;
     var filePath=folderPath+'\\'+fileName;
-    var dirRes=await window.electronAPI.ensureDir(folderPath);
+    var dirRes=await electronAPI.ensureDir(folderPath);
     if(!dirRes.ok){if(typeof toast==='function')toast('❌ 폴더 생성 실패: '+dirRes.error);return;}
     canvas.toBlob(async function(blob){
       var buf=await blob.arrayBuffer();
-      var saveRes=await window.electronAPI.saveSnapshot(filePath,buf);
+      var saveRes=await electronAPI.saveSnapshot(filePath,buf);
       if(saveRes&&saveRes.ok){if(typeof toast==='function')toast('📸 스냅샷 저장: '+saveRes.savedPath);}
       else{if(typeof toast==='function')toast('❌ 저장 실패: '+(saveRes&&saveRes.error||''));}
     },'image/png');
@@ -22452,7 +22452,7 @@ async function rrStartRecording(){
   var pathEl=document.getElementById('rr-save-path');
   if(pathEl&&pathEl.value.trim())basePath=pathEl.value.trim();
   else{var saved=localStorage.getItem('rr_save_path');if(saved)basePath=saved;}
-  if(window.electronAPI){var ok=await rrCheckPath(basePath);if(!ok){if(typeof toast==='function')toast('❌ 저장 경로에 접근할 수 없습니다.');return;}}
+  if(electronAPI){var ok=await rrCheckPath(basePath);if(!ok){if(typeof toast==='function')toast('❌ 저장 경로에 접근할 수 없습니다.');return;}}
   localStorage.setItem('rr_save_path',basePath);
   _rrChunks=[];
   var mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':'video/webm';
@@ -22514,12 +22514,12 @@ async function rrOnRecordingStop(basePath){
   var duration=_rrSeconds;
   var blob=new Blob(_rrChunks,{type:'video/webm'});
   var resultEl=document.getElementById('rr-result');
-  if(window.electronAPI){
+  if(electronAPI){
     try{
-      var dirRes=await window.electronAPI.ensureDir(folderPath);
+      var dirRes=await electronAPI.ensureDir(folderPath);
       if(!dirRes.ok)throw new Error('폴더 생성 실패: '+dirRes.error);
       var buf=await blob.arrayBuffer();
-      var saveRes=await window.electronAPI.saveVideo(filePath,buf);
+      var saveRes=await electronAPI.saveVideo(filePath,buf);
       if(!saveRes.ok)throw new Error('파일 저장 실패: '+saveRes.error);
       var savedPath=saveRes.savedPath;
       await rrSaveMetadata(savedPath,duration,blob.size);
@@ -22638,18 +22638,18 @@ function rrShowCameraHelp(){
 
 async function rrPlayVideo(recordId,videoPath){
   if(!videoPath||videoPath==='undefined'){if(typeof toast==='function')toast('저장된 영상 경로가 없습니다.');return;}
-  if(window.electronAPI){
+  if(electronAPI){
     // 경로 정규화 (/ → \)
     var normPath=videoPath.replace(/\//g,'\\');
-    var res=await window.electronAPI.fileExists(normPath);
+    var res=await electronAPI.fileExists(normPath);
     if(!res.exists){
       // 역슬래시로도 시도
-      var res2=await window.electronAPI.fileExists(videoPath);
+      var res2=await electronAPI.fileExists(videoPath);
       if(!res2.exists){
         // 폴더에서 학생이름 포함 .webm 파일 찾기
         var folderPath=normPath.substring(0,normPath.lastIndexOf('\\'));
-        if(window.electronAPI.listFiles){
-          var listRes=await window.electronAPI.listFiles(folderPath);
+        if(electronAPI.listFiles){
+          var listRes=await electronAPI.listFiles(folderPath);
           if(listRes.ok&&listRes.files.length){
             var nameKey=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\\/:*?"<>|]/g,'');
             var matched=listRes.files.find(function(f){return f.indexOf(nameKey)>=0&&f.endsWith('.webm');});
@@ -22679,18 +22679,18 @@ async function rrPlayVideo(recordId,videoPath){
         var timeStr=String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+String(now.getSeconds()).padStart(2,'0');
         var nameNum=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
         var fileName=nameNum+'_'+dateStr+'_'+timeStr+'_snap.png';
-        if(window.electronAPI&&window.electronAPI.saveSnapshot){
+        if(electronAPI&&electronAPI.saveSnapshot){
           var pathEl=document.getElementById('rr-save-path');
           var basePath=(pathEl&&pathEl.value.trim())||'C:\Users\gentl\Downloads\ReadingVideos';
           var folderKey=(_rrStudentName+(_rrStudentNumber?'('+_rrStudentNumber+')':'')).replace(/[\/:*?"<>|]/g,'')||'snapshot';
           var yr=String(now.getFullYear());var mo=String(now.getMonth()+1).padStart(2,'0');
           var folderPath=basePath+'\\'+folderKey+'\\'+yr+'\\'+mo;
           var filePath=folderPath+'\\'+fileName;
-          var dirRes=await window.electronAPI.ensureDir(folderPath);
+          var dirRes=await electronAPI.ensureDir(folderPath);
           if(!dirRes.ok){if(typeof toast==='function')toast('❌ 폴더 생성 실패');return;}
           canvas.toBlob(async function(blob){
             var buf=await blob.arrayBuffer();
-            var saveRes=await window.electronAPI.saveSnapshot(filePath,buf);
+            var saveRes=await electronAPI.saveSnapshot(filePath,buf);
             if(saveRes&&saveRes.ok){if(typeof toast==='function')toast('📸 스냅샷 저장: '+saveRes.savedPath);}
             else{if(typeof toast==='function')toast('❌ 저장 실패');}
           },'image/png');
@@ -22700,9 +22700,9 @@ async function rrPlayVideo(recordId,videoPath){
         }
       };
     };
-    if(window.electronAPI.readVideoFile){
+    if(electronAPI.readVideoFile){
       if(typeof toast==='function')toast('영상 불러오는 중...');
-      var fileRes=await window.electronAPI.readVideoFile(videoPath);
+      var fileRes=await electronAPI.readVideoFile(videoPath);
       if(!fileRes.ok){alert('영상 파일을 읽을 수 없습니다: '+fileRes.error);return;}
       var blob=new Blob([fileRes.buffer],{type:'video/webm'});
       var blobUrl=URL.createObjectURL(blob);
@@ -22763,8 +22763,8 @@ async function rrDeleteRecord(recordId,videoPath){
   if(!confirm('이 Reading 기록을 삭제하시겠습니까?\n\nFirebase 기록과 영상 파일이 함께 삭제됩니다.'))return;
   try{
     // 영상 파일 삭제 (Electron)
-    if(window.electronAPI&&videoPath){
-      var delRes=await window.electronAPI.deleteFile(videoPath);
+    if(electronAPI&&videoPath){
+      var delRes=await electronAPI.deleteFile(videoPath);
       if(!delRes.ok)console.warn('영상 삭제 실패:',delRes.error);
     }
     await db.collection('readingRecords').doc(recordId).delete();
@@ -22858,8 +22858,8 @@ async function rrDeleteRecordFromHistory(recordId,videoPath){
   if(!confirm('이 Reading 기록을 삭제하시겠습니까?\n\nFirebase 기록과 영상 파일이 함께 삭제됩니다.'))return;
   try{
     // 영상 파일 삭제 (Electron)
-    if(window.electronAPI&&videoPath){
-      var delRes=await window.electronAPI.deleteFile(videoPath);
+    if(electronAPI&&videoPath){
+      var delRes=await electronAPI.deleteFile(videoPath);
       if(!delRes.ok)console.warn('영상 삭제 실패:',delRes.error);
     }
     await db.collection('readingRecords').doc(recordId).delete();
