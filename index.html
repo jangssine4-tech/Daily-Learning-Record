@@ -12812,7 +12812,7 @@ function renderRevExpense(yr,mo){
     +'<div class="rev-sum-card" style="border-style:dashed;padding:10px"><div style="font-size:15px;font-weight:700;color:var(--red)">'+estExp.toLocaleString()+'원</div><div style="font-size:11px;font-weight:600;color:var(--txt3);margin-top:2px">전월 지출</div></div>'
     +'<div class="rev-sum-card" style="border-style:dashed;padding:10px"><div style="font-size:15px;font-weight:700;color:'+estColor+'">'+estNet.toLocaleString()+'원</div><div style="font-size:11px;font-weight:600;color:var(--txt3);margin-top:2px">전월 순이익</div></div>'
     +'</div>'
-    +'<div class="expense-section"><h4>📊 카테고리별 지출 <button class="btn btn-green btn-xs" onclick="openExpenseModal()">+ 추가</button></h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'+catGroupsHTML+'</div></div><div class="expense-section"><h4>📝 지출 상세</h4>'+listHTML+'</div>';
+    +'<div class="expense-section"><h4>📊 카테고리별 지출 &nbsp;&nbsp;<button class="btn btn-green btn-xs" onclick="openExpenseModal()">+ 추가</button></h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'+catGroupsHTML+'</div></div><div class="expense-section"><h4>📝 지출 상세</h4>'+listHTML+'</div>';
 }
 function openExpenseModal(id){var e=id?expenses.find(function(x){return x.id===id;}):null;$('exp-id').value=id||'';$('exp-del-wrap').style.display=id?'block':'none';var selYr=parseInt($('exp-year')?.value)||parseInt($('rev-year')?.value)||new Date().getFullYear();var selMo=parseInt($('exp-month')?.value)||parseInt($('rev-month')?.value)||new Date().getMonth()+1;$('exp-date').value=e?.originalDate||e?.date||selYr+'-'+String(selMo).padStart(2,'0')+'-01';$('exp-category').value=e?.category||'학원 임대료';$('exp-name').value=e?.name||'';$('exp-amount').value=e?.amount||'';$('exp-method').value=e?.method||'계좌이체';$('exp-memo').value=e?.memo||'';$('exp-installment').value=e?.installment||'1';$('modal-expense').style.display='flex';}
 function openExpenseByCat(cat,firstExpId){
@@ -21803,7 +21803,7 @@ function trRender(){
       children.forEach(function(c){
         var cActive=_trCurrentFolder===c.id;
         var cCnt=_trFiles.filter(function(fi){return fi.folderId===c.id;}).length;
-        h+='<div style="display:flex;align-items:center;padding:6px 8px 6px 28px;font-size:12px;cursor:pointer;user-select:none;'
+        h+='<div style="display:flex;align-items:center;padding:6px 8px 6px 40px;font-size:12px;cursor:pointer;user-select:none;'
           +(cActive?'background:var(--navy);color:#fff':'color:var(--txt)')+'">';
         h+='<span onclick="trSelectFolder(\''+c.id+'\')" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📂 '+c.name+'</span>';
         if(cCnt)h+='<span style="font-size:10px;'+(cActive?'color:#93c5fd':'color:var(--txt3)')+'">'+cCnt+'</span>';
@@ -22057,34 +22057,14 @@ function trContextMenu(e,id,name){
 function trInlineRename(id){
   var f=_trFolders.find(function(x){return x.id===id;});
   if(!f)return;
-  // data-folderid 속성으로 폴더 div 찾기
-  var folderDiv=document.querySelector('[data-folderid="'+id+'"]');
-  if(!folderDiv)return;
-  var labelSpan=folderDiv.querySelector('span');
-  if(!labelSpan)return;
-
-  var inp=document.createElement('input');
-  inp.value=f.name;
-  inp.style.cssText='flex:1;font-size:12px;padding:2px 4px;border:1.5px solid var(--mint);border-radius:4px;'
-    +'background:var(--surface);color:var(--navy);min-width:0;outline:none;font-weight:600';
-  labelSpan.replaceWith(inp);
-  inp.focus();inp.select();
-
-  function save(){
-    var newName=inp.value.trim();
-    if(!newName||newName===f.name){trRender();return;}
-    f.name=newName;
-    db.collection(TR_COLL_FOLDERS).doc(id).update({name:newName}).then(function(){
-      _trFolders.sort(function(a,b){return a.name>b.name?1:-1;});
-      trRender();
-      toast('이름이 변경됐습니다');
-    }).catch(function(e){toast('저장 실패: '+e.message);trRender();});
-  }
-  inp.addEventListener('blur',save);
-  inp.addEventListener('keydown',function(e){
-    if(e.key==='Enter'){inp.blur();}
-    if(e.key==='Escape'){trRender();}
-  });
+  var newName=prompt('새 폴더 이름을 입력하세요',f.name);
+  if(!newName||!newName.trim()||newName.trim()===f.name)return;
+  db.collection(TR_COLL_FOLDERS).doc(id).update({name:newName.trim()}).then(function(){
+    f.name=newName.trim();
+    _trFolders.sort(function(a,b){return a.name>b.name?1:-1;});
+    trRender();
+    toast('이름이 변경됐습니다');
+  }).catch(function(e){toast('저장 실패: '+e.message);});
 }
 
 function trUploadOne(file,folderId){
