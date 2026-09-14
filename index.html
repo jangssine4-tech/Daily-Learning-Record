@@ -22704,7 +22704,11 @@ async function rrPlayVideo(recordId,videoPath){
       if(typeof toast==='function')toast('영상 불러오는 중...');
       var fileRes=await electronAPI.readVideoFile(videoPath);
       if(!fileRes.ok){alert('영상 파일을 읽을 수 없습니다: '+fileRes.error);return;}
-      var blob=new Blob([fileRes.buffer],{type:'video/webm'});
+      // Base64 → Uint8Array → Blob 변환
+      var binary=atob(fileRes.base64);
+      var bytes=new Uint8Array(binary.length);
+      for(var i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      var blob=new Blob([bytes],{type:'video/webm'});
       var blobUrl=URL.createObjectURL(blob);
       openVideoModal(blobUrl,function(){URL.revokeObjectURL(blobUrl);});
     }else{
