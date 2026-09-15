@@ -325,7 +325,10 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <!-- ── Reading 녹화 섹션 ───────────────────────────── -->
     <div id="rr-inline-section" style="background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:12px;padding:12px;margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-size:13px;font-weight:800;color:#6d28d9">📹 Reading 녹화</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;font-weight:800;color:#6d28d9">📹 Reading 녹화</span>
+          <button onclick="rrShowSavePath()" style="background:#ede9fe;border:1px solid #c4b5fd;color:#7c3aed;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:800;cursor:pointer;padding:0;flex-shrink:0" title="저장 경로 확인">?</button>
+        </div>
         <span style="font-size:11px;color:#7c3aed;font-weight:400">녹화 종료 시 자동으로 저장됩니다.</span>
         <div style="display:flex;align-items:center;gap:6px">
           <select id="rr-camera-sel" class="fi" style="font-size:11px;padding:4px 6px;width:auto;max-width:160px" onchange="rrSwitchCamera(this.value)"><option value="">카메라 선택</option></select>
@@ -373,7 +376,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   </div>
   <!-- 학습 일지 패널 -->
   <div id="h-panel-journal">
-    <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-student" onchange="renderHistory()"><option value="">전체 학생</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-period" onchange="renderHistory()"><option value="all">전체</option><option value="today">오늘</option><option value="week">이번 주</option><option value="month" id="h-period-month">이번 달</option><option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option><option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option></select><button class="btn btn-outline btn-sm" onclick="exportHistoryCSV()">📥 CSV</button><button class="btn btn-outline btn-sm" id="h-comment-btn" onclick="renderCommentView()">💬 코멘트 모아보기</button><button class="btn btn-red btn-sm" id="h-bulk-delete-btn" style="display:none" onclick="bulkDeleteReports()">🗑 선택 삭제</button><button class="btn btn-outline btn-sm" id="h-select-all-btn" style="display:none" onclick="toggleSelectAllReports()">☑ 전체선택</button></div>
+    <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-student" onchange="renderHistory()"><option value="">전체 학생</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="h-period" onchange="renderHistory()"><option value="all">전체</option><option value="today">오늘</option><option value="week">이번 주</option><option value="month" id="h-period-month">이번 달</option><option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option><option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option></select><button class="btn btn-outline btn-sm" onclick="exportHistoryCSV()">📥 CSV</button><button class="btn btn-outline btn-sm" id="h-comment-btn" onclick="renderCommentView()">💬 코멘트 모아보기</button><button class="btn btn-red btn-sm" id="h-bulk-delete-btn" style="display:none" onclick="bulkDeleteReports()">선택 삭제</button></div>
     <div id="history-scroll-wrap" style="flex:1;overflow:auto;padding:0 16px 16px;min-height:0"></div>
   </div>
   <!-- Reading 기록 패널 -->
@@ -383,6 +386,17 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
       <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-feedback" onchange="renderHistoryReading()">
         <option value="">전체</option><option value="미작성">피드백 미작성</option><option value="완료">피드백 완료</option>
       </select>
+      <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-period" onchange="renderHistoryReading()">
+        <option value="all">전체</option>
+        <option value="today">오늘</option>
+        <option value="week">이번 주</option>
+        <option value="month">이번 달</option>
+        <option value="1m">1개월</option>
+        <option value="2m">2개월</option>
+        <option value="3m">3개월</option>
+        <option value="6m">6개월</option>
+      </select>
+      <button class="btn btn-red btn-sm" id="hrr-bulk-delete-btn" style="display:none" onclick="rrBulkDelete()">선택 삭제</button>
     </div>
     <div id="hrr-list" class="cp" style="padding:12px 16px"></div>
   </div>
@@ -22413,6 +22427,15 @@ function rrBuildFolderPath(base){
   return b+'\\'+folderKey+'\\'+yr+'\\'+mo;
 }
 
+function rrShowSavePath(){
+  var pathEl=document.getElementById('rr-save-path');
+  var basePath=(pathEl&&pathEl.value.trim())||localStorage.getItem('rr_save_path')||'C:\\Users\\gentl\\Downloads\\ReadingVideos';
+  var nameKey=(_rrStudentName&&_rrStudentNumber)?_rrStudentName+'('+_rrStudentNumber+')':(_rrStudentName||'[학생명(ID)]');
+  var now=new Date();
+  var yr=now.getFullYear();var mo=String(now.getMonth()+1).padStart(2,'0');
+  alert('📁 저장 경로 안내\n\n영상 및 스냅샷은 아래 폴더에 저장됩니다:\n\n'+basePath+'\\'+nameKey+'\\'+yr+'\\'+mo+'\\\n\n저장 경로를 바꾸려면 "📂 직접 선택" 버튼을 사용하세요.');
+}
+
 async function rrTakeSnapshot(){
   // 학습 일지 모달(rr-preview) 또는 녹화 모달(rr-video) 중 활성화된 것 사용
   var video=document.getElementById('rr-video')||document.getElementById('rr-preview');
@@ -22440,7 +22463,27 @@ async function rrTakeSnapshot(){
     canvas.toBlob(async function(blob){
       var buf=await blob.arrayBuffer();
       var saveRes=await electronAPI.saveSnapshot(filePath,buf);
-      if(saveRes&&saveRes.ok){if(typeof toast==='function')toast('📸 스냅샷 저장: '+saveRes.savedPath);}
+      if(saveRes&&saveRes.ok){
+        if(typeof toast==='function')toast('📸 스냅샷 저장됐습니다.');
+        // Firebase readingRecords에 스냅샷 경로 기록 (가장 최근 레코드에 추가)
+        if(db&&_rrStudentId){
+          try{
+            var now2=new Date();
+            var dateStr2=now2.getFullYear()+'-'+String(now2.getMonth()+1).padStart(2,'0')+'-'+String(now2.getDate()).padStart(2,'0');
+            var snap=await db.collection('readingRecords')
+              .where('studentId','==',_rrStudentId)
+              .where('recordedAt','==',dateStr2)
+              .get();
+            if(!snap.empty){
+              // 가장 최근 레코드에 스냅샷 경로 추가
+              var latestDoc=snap.docs.sort(function(a,b){return(b.data().createdAt||0)-(a.data().createdAt||0);})[0];
+              var existing=latestDoc.data().snapshotPaths||[];
+              existing.push(saveRes.savedPath);
+              await db.collection('readingRecords').doc(latestDoc.id).update({snapshotPaths:existing});
+            }
+          }catch(e){console.warn('스냅샷 경로 저장 실패:',e);}
+        }
+      }
       else{if(typeof toast==='function')toast('❌ 저장 실패: '+(saveRes&&saveRes.error||''));}
     },'image/png');
   }else{
@@ -22516,9 +22559,7 @@ function rrStopRecording(silent){
   var bp2=document.getElementById('rr-btn-pause');
   if(s)s.style.display='flex';if(e2)e2.style.display='none';if(bp2)bp2.style.display='none';if(ri)ri.style.display='none';if(t)t.style.display='none';
   if(!silent&&typeof toast==='function')toast('녹화 종료. 저장 중...');
-  // rr-result 영역에 저장 중 표시
-  var resultEl2=document.getElementById('rr-result');
-  if(resultEl2){resultEl2.style.display='block';resultEl2.style.background='#eff6ff';resultEl2.style.borderColor='#93c5fd';resultEl2.style.color='#1d4ed8';resultEl2.innerHTML='저장 중...';}
+}
 }
 
 async function rrOnRecordingStop(basePath){
@@ -22540,10 +22581,9 @@ async function rrOnRecordingStop(basePath){
       if(resultEl){
         resultEl.style.display='block';
         resultEl.style.background='#f0fdf4';resultEl.style.borderColor='#86efac';resultEl.style.color='#15803d';
-        resultEl.innerHTML='✅ 저장 완료!<br><span style="font-family:monospace;font-size:10px;word-break:break-all;color:#374151">'+savedPath+'</span><br><span style="color:#6b7280">크기: '+(blob.size/1024/1024).toFixed(1)+'MB · '+String(Math.floor(duration/60)).padStart(2,'0')+':'+String(duration%60).padStart(2,'0')+'</span>';
+        resultEl.innerHTML='✅ 저장 완료! &nbsp;<span style="color:#6b7280">크기: '+(blob.size/1024/1024).toFixed(1)+'MB · '+String(Math.floor(duration/60)).padStart(2,'0')+':'+String(duration%60).padStart(2,'0')+'</span>';
       }
-      alert('✅ Reading 녹화 저장 완료!\n\n경로: '+savedPath+'\n크기: '+(blob.size/1024/1024).toFixed(1)+'MB');
-      if(typeof toast==='function')toast('✅ Reading 녹화가 저장됐습니다!');
+      if(typeof toast==='function')toast('✅ Reading 녹화 저장됐습니다!');
     }catch(e){
       if(resultEl){resultEl.style.display='block';resultEl.style.background='#fef2f2';resultEl.style.borderColor='#fca5a5';resultEl.style.color='#dc2626';resultEl.innerHTML='❌ 저장 실패: '+e.message;}
       alert('❌ Reading 영상 저장 실패!\n\n오류: '+e.message+'\n\n저장 경로: '+folderPath);
@@ -22805,23 +22845,37 @@ async function rrShowSnapshots(recordId,videoPath,studentName,studentNumber){
   if(!electronAPI){alert('스냅샷 확인은 Electron 앱에서만 가능합니다.');return;}
   var sName=studentName||_rrStudentName||'';
   var sNum=studentNumber||_rrStudentNumber||'';
-  // 스냅샷 폴더: 영상 파일과 같은 폴더
-  var normPath=videoPath?videoPath.replace(/\//g,'\\'):'';
-  var folder=normPath?normPath.substring(0,normPath.lastIndexOf('\\')):'';
-  if(!folder){alert('영상 경로 정보가 없어 스냅샷 폴더를 찾을 수 없습니다.');return;}
   if(typeof toast==='function')toast('스냅샷 불러오는 중...');
-  var listRes=await electronAPI.listFiles(folder);
-  if(!listRes.ok){alert('폴더를 읽을 수 없습니다.\n'+folder);return;}
-  // 같은 날짜의 _snap.png 파일만 필터
-  var normVp=normPath.replace(/\\/g,'/');
-  var dateStr=normVp.match(/(\d{4}-\d{2}-\d{2})/)?normVp.match(/(\d{4}-\d{2}-\d{2})/)[1]:'';
-  var nameKey=(sName+(sNum?'('+sNum+')':'')).replace(/[\\/:*?"<>|]/g,'');
-  var snaps=listRes.files.filter(function(f){
-    return f.endsWith('_snap.png')&&(dateStr?f.indexOf(dateStr)>=0:true)&&(nameKey?f.indexOf(nameKey)>=0:true);
-  });
-  if(!snaps.length){
-    // 날짜 무관하게 _snap.png 전체 검색
-    snaps=listRes.files.filter(function(f){return f.endsWith('_snap.png');});
+  // Firebase에서 snapshotPaths 먼저 확인
+  var snapshotFiles=[];
+  var folder='';
+  if(db&&recordId){
+    try{
+      var docSnap=await db.collection('readingRecords').doc(recordId).get();
+      if(docSnap.exists){
+        var paths=docSnap.data().snapshotPaths||[];
+        if(paths.length){
+          // Firebase에 경로가 있으면 그걸 사용
+          snapshotFiles=paths.map(function(p){return{fullPath:p,name:p.split('\\').pop()};});
+        }
+      }
+    }catch(e){console.warn('Firebase snapshotPaths 조회 실패:',e);}
+  }
+  // Firebase에 없으면 폴더 스캔 fallback
+  if(!snapshotFiles.length){
+    var normPath=videoPath?videoPath.replace(/\//g,'\\'):'';
+    folder=normPath?normPath.substring(0,normPath.lastIndexOf('\\')):'';
+    if(!folder){alert('영상 경로 정보가 없어 스냅샷 폴더를 찾을 수 없습니다.');return;}
+    var listRes=await electronAPI.listFiles(folder);
+    if(!listRes.ok){alert('폴더를 읽을 수 없습니다.\n'+folder);return;}
+    var normVp=normPath.replace(/\\/g,'/');
+    var dateStr=normVp.match(/(\d{4}-\d{2}-\d{2})/)?normVp.match(/(\d{4}-\d{2}-\d{2})/)[1]:'';
+    var nameKey=(sName+(sNum?'('+sNum+')':'')).replace(/[\\/:*?"<>|]/g,'');
+    var filtered=listRes.files.filter(function(f){
+      return f.endsWith('_snap.png')&&(dateStr?f.indexOf(dateStr)>=0:true)&&(nameKey?f.indexOf(nameKey)>=0:true);
+    });
+    if(!filtered.length)filtered=listRes.files.filter(function(f){return f.endsWith('_snap.png');});
+    snapshotFiles=filtered.map(function(f){return{fullPath:folder+'\\'+f,name:f};});
   }
   // 모달 생성
   var modal=document.createElement('div');
@@ -22829,39 +22883,37 @@ async function rrShowSnapshots(recordId,videoPath,studentName,studentNumber){
   modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
   var header='<div style="width:100%;max-width:860px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
-    +'<span style="color:#fff;font-size:14px;font-weight:800">📸 스냅샷 ('+(snaps.length)+'장)</span>'
+    +'<span style="color:#fff;font-size:14px;font-weight:800">📸 스냅샷 ('+snapshotFiles.length+'장)</span>'
     +'<button onclick="document.getElementById(\'rr-snap-modal\').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:16px">×</button>'
     +'</div>';
-  if(!snaps.length){
-    modal.innerHTML=header+'<div style="color:rgba(255,255,255,.7);text-align:center;padding:40px;font-size:13px">이 날짜에 저장된 스냅샷이 없습니다.<br><span style="font-size:11px;color:rgba(255,255,255,.4)">'+folder+'</span></div></div>';
+  if(!snapshotFiles.length){
+    modal.innerHTML=header+'<div style="color:rgba(255,255,255,.7);text-align:center;padding:40px;font-size:13px">저장된 스냅샷이 없습니다.</div></div>';
     document.body.appendChild(modal);
     modal.onclick=function(e){if(e.target===modal)modal.remove();};
     return;
   }
-  var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;max-height:70vh;overflow-y:auto;padding:4px" id="rr-snap-grid">'+
-    snaps.map(function(f,i){
-      return '<div style="position:relative;cursor:pointer" onclick="rrOpenSnapFull(\''+encodeURIComponent(folder+'\\\\'+f)+'\')">'
+  var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;max-height:70vh;overflow-y:auto;padding:4px" id="rr-snap-grid">'
+    +snapshotFiles.map(function(f,i){
+      return '<div style="position:relative;cursor:pointer" onclick="rrOpenSnapFull(\''+encodeURIComponent(f.fullPath)+'\')">'
         +'<div id="rr-snap-thumb-'+i+'" style="background:#1e293b;border-radius:8px;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden">'
         +'<span style="color:rgba(255,255,255,.3);font-size:11px">로딩 중...</span>'
         +'</div>'
-        +'<div style="color:rgba(255,255,255,.6);font-size:9px;margin-top:4px;word-break:break-all">'+f+'</div>'
+        +'<div style="color:rgba(255,255,255,.6);font-size:9px;margin-top:4px;word-break:break-all">'+f.name+'</div>'
         +'</div>';
     }).join('')
   +'</div></div>';
   modal.innerHTML=header+grid;
   document.body.appendChild(modal);
   modal.onclick=function(e){if(e.target===modal)modal.remove();};
-  // 각 스냅샷 Base64로 읽어서 img 표시
-  for(var i=0;i<snaps.length;i++){
-    (function(idx,fileName){
-      var filePath=folder+'\\'+fileName;
+  for(var i=0;i<snapshotFiles.length;i++){
+    (function(idx,filePath){
       electronAPI.readVideoFile(filePath).then(function(res){
         var thumbEl=document.getElementById('rr-snap-thumb-'+idx);
         if(!thumbEl)return;
         if(!res.ok){thumbEl.innerHTML='<span style="color:#f87171;font-size:10px">읽기 실패</span>';return;}
         thumbEl.innerHTML='<img src="data:image/png;base64,'+res.base64+'" style="width:100%;height:100%;object-fit:cover;border-radius:8px">';
       });
-    })(i,snaps[i]);
+    })(i,snapshotFiles[i].fullPath);
   }
 }
 
@@ -22916,45 +22968,106 @@ async function renderHistoryReading(){
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--txt3);font-size:12px">불러오는 중...</div>';
   var studentId=document.getElementById('hrr-student').value;
   var fbFilter=document.getElementById('hrr-feedback').value;
+  var period=(document.getElementById('hrr-period')||{}).value||'all';
   try{
     var q=db.collection('readingRecords');
     if(studentId)q=q.where('studentId','==',studentId);
     if(fbFilter)q=q.where('feedbackStatus','==',fbFilter);
     var snap=await q.get();
-    var docs=snap.docs.sort(function(a,b){return (b.data().recordedAt||'').localeCompare(a.data().recordedAt||'');});
-    if(!docs.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';return;}
-    el.innerHTML=docs.map(function(doc){
-      var d=doc.data();var rid=doc.id;
-      var dur=d.duration?String(Math.floor(d.duration/60)).padStart(2,'0')+':'+String(d.duration%60).padStart(2,'0'):'--:--';
-      var fbBadge=d.feedbackStatus==='완료'
-        ?'<span style="background:#dcfce7;color:#16a34a;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">완료</span>'
-        :'<span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">미작성</span>';
-      var scores='';
-      if(d.feedbackStatus==='완료'){
-        scores='<div style="font-size:10px;color:var(--txt3);margin-top:3px">유창성 '+rrStar(d.fluencyScore)+' 발음 '+rrStar(d.pronunciationScore)+' 억양 '+rrStar(d.intonationScore)+' 끊어읽기 '+rrStar(d.phrasingScore)+'</div>';
+    var docs=snap.docs.sort(function(a,b){return(b.data().recordedAt||'').localeCompare(a.data().recordedAt||'');});
+    // 기간 필터
+    if(period&&period!=='all'){
+      var now3=new Date();
+      var cutoff=null;
+      if(period==='today'){var t=new Date(now3);t.setHours(0,0,0,0);cutoff=t;}
+      else if(period==='week'){var w=new Date(now3);w.setDate(w.getDate()-7);cutoff=w;}
+      else if(period==='month'){var m=new Date(now3);m.setDate(1);m.setHours(0,0,0,0);cutoff=m;}
+      else if(period==='1m'){var m1=new Date(now3);m1.setMonth(m1.getMonth()-1);cutoff=m1;}
+      else if(period==='2m'){var m2=new Date(now3);m2.setMonth(m2.getMonth()-2);cutoff=m2;}
+      else if(period==='3m'){var m3=new Date(now3);m3.setMonth(m3.getMonth()-3);cutoff=m3;}
+      else if(period==='6m'){var m6=new Date(now3);m6.setMonth(m6.getMonth()-6);cutoff=m6;}
+      if(cutoff){
+        var cutoffStr=cutoff.getFullYear()+'-'+String(cutoff.getMonth()+1).padStart(2,'0')+'-'+String(cutoff.getDate()).padStart(2,'0');
+        docs=docs.filter(function(doc){return(doc.data().recordedAt||'')>=cutoffStr;});
       }
-      return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface)">'
-        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
-        +'<span style="font-size:13px;font-weight:800;color:var(--navy)">'+d.studentName+'</span>'
-        +(d.studentNumber?'<span style="font-size:11px;color:var(--txt3)">('+d.studentNumber+')</span>':'')
-        +'<span style="font-size:11px;color:var(--txt3)">'+d.recordedAt+'</span>'
-        +'<span style="font-size:11px;color:var(--txt3)">'+(d.bookName||'-')+' · '+(d.unit||'-')+'</span>'
-        +'<span style="font-size:11px;color:var(--txt3);margin-left:auto">'+(d.teacherName||'-')+'</span>'
-        +'</div>'
-        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-        +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
-        +fbBadge
-        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrShowSnapshots(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">스냅샷</button>'
-        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>'
-        +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">피드백</button>'
-        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrDeleteRecordFromHistory(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">삭제</button>'
-        +'<button onclick="rrShowDeleteInfo()" style="background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;font-weight:700;flex-shrink:0" title="삭제 안내">?</button>'
-        +'</div>'
-        +scores
-        +(d.feedback?'<div style="margin-top:6px;font-size:11px;color:var(--txt2);background:var(--surface2);border-radius:6px;padding:6px 8px">💬 '+d.feedback+'</div>':'')
-        +'</div>';
-    }).join('');
+    }
+    if(!docs.length){
+      el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';
+      var bd=document.getElementById('hrr-bulk-delete-btn');if(bd)bd.style.display='none';
+      return;
+    }
+    var bd2=document.getElementById('hrr-bulk-delete-btn');if(bd2)bd2.style.display='';
+    el.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:0 2px">'
+      +'<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;color:var(--txt2)">'
+      +'<input type="checkbox" id="hrr-check-all" onchange="rrToggleSelectAll(this.checked)"> 전체선택'
+      +'</label>'
+      +'<span style="font-size:11px;color:var(--txt3)" id="hrr-selected-count"></span>'
+      +'</div>'
+      +docs.map(function(doc){
+        var d=doc.data();var rid=doc.id;
+        var dur=d.duration?String(Math.floor(d.duration/60)).padStart(2,'0')+':'+String(d.duration%60).padStart(2,'0'):'--:--';
+        var fbBadge=d.feedbackStatus==='완료'
+          ?'<span style="background:#dcfce7;color:#16a34a;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">완료</span>'
+          :'<span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">미작성</span>';
+        var scores='';
+        if(d.feedbackStatus==='완료'){
+          scores='<div style="font-size:10px;color:var(--txt3);margin-top:3px">유창성 '+rrStar(d.fluencyScore)+' 발음 '+rrStar(d.pronunciationScore)+' 억양 '+rrStar(d.intonationScore)+' 끊어읽기 '+rrStar(d.phrasingScore)+'</div>';
+        }
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface)">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
+          +'<input type="checkbox" class="hrr-row-check" data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onchange="rrUpdateSelectCount()">'
+          +'<span style="font-size:13px;font-weight:800;color:var(--navy)">'+d.studentName+'</span>'
+          +(d.studentNumber?'<span style="font-size:11px;color:var(--txt3)">('+d.studentNumber+')</span>':'')
+          +'<span style="font-size:11px;color:var(--txt3)">'+d.recordedAt+'</span>'
+          +'<span style="font-size:11px;color:var(--txt3)">'+(d.bookName||'-')+' · '+(d.unit||'-')+'</span>'
+          +'<span style="font-size:11px;color:var(--txt3);margin-left:auto">'+(d.teacherName||'-')+'</span>'
+          +'</div>'
+          +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+          +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
+          +fbBadge
+          +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrShowSnapshots(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">스냅샷</button>'
+          +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>'
+          +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">피드백</button>'
+          +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrDeleteRecordFromHistory(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">삭제</button>'
+          +'<button onclick="rrShowDeleteInfo()" style="background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;font-weight:700;flex-shrink:0" title="삭제 안내">?</button>'
+          +'</div>'
+          +scores
+          +(d.feedback?'<div style="margin-top:6px;font-size:11px;color:var(--txt2);background:var(--surface2);border-radius:6px;padding:6px 8px">💬 '+d.feedback+'</div>':'')
+          +'</div>';
+      }).join('');
   }catch(e){el.innerHTML='<div style="padding:12px;color:red;font-size:12px">오류: '+e.message+'</div>';}
+}
+
+function rrToggleSelectAll(checked){
+  document.querySelectorAll('.hrr-row-check').forEach(function(c){c.checked=checked;});
+  rrUpdateSelectCount();
+}
+
+function rrUpdateSelectCount(){
+  var n=document.querySelectorAll('.hrr-row-check:checked').length;
+  var total=document.querySelectorAll('.hrr-row-check').length;
+  var cnt=document.getElementById('hrr-selected-count');
+  if(cnt)cnt.textContent=n?n+'개 선택됨':'';
+  var allCb=document.getElementById('hrr-check-all');
+  if(allCb)allCb.checked=n>0&&n===total;
+}
+
+async function rrBulkDelete(){
+  var checked=document.querySelectorAll('.hrr-row-check:checked');
+  if(!checked.length){toast('삭제할 항목을 선택해주세요.');return;}
+  if(!confirm(checked.length+'개의 Reading 기록을 삭제하시겠습니까?\n\nFirebase 기록과 영상 파일이 함께 삭제됩니다.'))return;
+  var failed=0;
+  for(var i=0;i<checked.length;i++){
+    try{
+      var rid=checked[i].dataset.rid;
+      var vp=decodeURIComponent(checked[i].dataset.vp||'');
+      if(electronAPI&&vp)await electronAPI.deleteFile(vp);
+      await db.collection('readingRecords').doc(rid).delete();
+    }catch(e){failed++;console.warn('삭제 실패:',e);}
+  }
+  toast(failed?'⚠️ '+(checked.length-failed)+'개 삭제, '+failed+'개 실패':'🗑 '+checked.length+'개 삭제됐습니다.');
+  renderHistoryReading();
+}
 }
 
 async function rrDeleteRecordFromHistory(recordId,videoPath){
