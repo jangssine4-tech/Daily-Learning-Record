@@ -454,6 +454,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
     <button class="rev-tab"        id="btab-weekly"     onclick="switchBoardTab('weekly')"     style="font-size:13px;font-weight:700">📆 주간 할 일</button>
     <button class="rev-tab"        id="btab-focus"      onclick="switchBoardTab('focus')"      style="font-size:13px;font-weight:700">📅 이달의 할 일</button>
     <button class="rev-tab"        id="btab-area"       onclick="switchBoardTab('area')"       style="font-size:13px;font-weight:700">📂 영역별 할 일</button>
+    <button class="rev-tab"        id="btab-annual"     onclick="switchBoardTab('annual')"     style="font-size:13px;font-weight:700">🎯 올해의 중점 추진</button>
     <span style="color:var(--border);font-size:18px;padding:0 4px;align-self:center">|</span>
     <button class="rev-tab"        id="btab-crm"        onclick="switchBoardTab('crm')"        style="font-size:13px;font-weight:700">👥 상담</button>
     <button class="rev-tab"        id="btab-mk"         onclick="switchBoardTab('mk')"         style="font-size:13px;font-weight:700">📣 마케팅</button>
@@ -498,6 +499,20 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   </div>
   <!-- 영역별 할 일 패널 -->
   <div id="board-panel-area" style="display:none" class="cp"><div id="board-area-area"></div></div>
+  <!-- 올해의 중점 추진 사항 패널 -->
+  <div id="board-panel-annual" style="display:none" class="cp">
+    <div style="padding:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:15px;font-weight:800;color:var(--navy)" id="annual-year-title"></span>
+        <span style="font-size:12px;color:var(--txt3)">올해의 중점 추진 사항</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input id="annual-input" class="fi" style="flex:1;font-size:13px" placeholder="추진 사항을 입력하세요">
+        <button onclick="annualAddItem()" class="btn btn-navy btn-sm" style="white-space:nowrap;padding:8px 16px">+ 추가</button>
+      </div>
+      <div id="annual-list"></div>
+    </div>
+  </div>
   <!-- (레거시) dashboard-board-area — 일부 다른 코드에서 직접 참조하므로 숨김 유지 -->
   <div id="dashboard-board-area" style="display:none"></div>
   <div id="board-panel-crm" style="display:none" class="cp">
@@ -3468,13 +3483,13 @@ function openDbTaskModalMonthly(){
 
 function switchBoardTab(tab){
   _boardCurrentTab=tab;
-  var allTabs=['today','weekly','focus','area','crm','mk','conditions'];
+  var allTabs=['today','weekly','focus','area','annual','crm','mk','conditions'];
   allTabs.forEach(function(t){
     var btn=$('btab-'+t);
     if(btn)btn.classList.toggle('active',t===tab);
   });
   // 모든 패널 숨기기
-  var allPanels=['today','weekly','focus','area','crm','mk','conditions'];
+  var allPanels=['today','weekly','focus','area','annual','crm','mk','conditions'];
   allPanels.forEach(function(p){
     var el=$('board-panel-'+p);
     if(el)el.style.display='none';
@@ -3503,6 +3518,8 @@ function switchBoardTab(tab){
       _boardFocusNavRender();
     } else if(tab==='area'){
       _renderBoardAreaPanel();
+    } else if(tab==='annual'){
+      annualRender();
     } else if(tab==='crm'){
       _initCrmSelectors2();
       renderCrmDailyInto('board-crm-area',_getCrmDateStr2());
@@ -4591,6 +4608,77 @@ function _renderFocusSectionFiltered(type,title,color,items,isCurrentMonth){
 }
 
 // ── 영역별 패널 ──
+// ── 올해의 중점 추진 사항 ──
+var _annualItems=[];
+
+function annualRender(){
+  var yr=new Date().getFullYear();
+  var titleEl=document.getElementById('annual-year-title');
+  if(titleEl)titleEl.textContent=yr+'년';
+  var inp=document.getElementById('annual-input');
+  if(inp)inp.onkeydown=function(e){if(e.key==='Enter')annualAddItem();};
+  if(!db)return;
+  db.collection('annualGoals').where('year','==',yr).get().then(function(snap){
+    _annualItems=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+    _annualItems.sort(function(a,b){
+      var at=a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0;
+      var bt=b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0;
+      return at-bt;
+    });
+    annualRenderList();
+  }).catch(function(e){console.warn('annualRender 오류:',e);});
+}
+
+function annualRenderList(){
+  var el=document.getElementById('annual-list');
+  if(!el)return;
+  if(!_annualItems.length){
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3);font-size:13px">🎯<br><br>추진 사항을 입력해보세요.</div>';
+    return;
+  }
+  el.innerHTML=_annualItems.map(function(item,i){
+    var dateStr='';
+    if(item.createdAt&&item.createdAt.toDate){dateStr=item.createdAt.toDate().toLocaleDateString('ko-KR');}
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px">'
+      +'<span style="font-size:13px;font-weight:800;color:var(--navy);min-width:22px;padding-top:2px">'+(i+1)+'.</span>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13px;color:var(--txt1);line-height:1.6;white-space:pre-wrap">'+item.text.replace(/</g,'&lt;')+'</div>'
+      +(dateStr?'<div style="font-size:10px;color:var(--txt3);margin-top:4px">'+dateStr+'</div>':'')
+      +'</div>'
+      +'<button data-id="'+item.id+'" onclick="annualDeleteItem(this.dataset.id)" style="background:none;border:1px solid var(--border);color:var(--txt3);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;flex-shrink:0">삭제</button>'
+      +'</div>';
+  }).join('');
+}
+
+async function annualAddItem(){
+  var inp=document.getElementById('annual-input');
+  var text=(inp&&inp.value.trim())||'';
+  if(!text){if(typeof toast==='function')toast('내용을 입력해주세요.');return;}
+  if(!db)return;
+  var yr=new Date().getFullYear();
+  try{
+    var ref=await db.collection('annualGoals').add({
+      year:yr,text:text,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    _annualItems.push({id:ref.id,year:yr,text:text,createdAt:null});
+    inp.value='';
+    annualRenderList();
+    if(typeof toast==='function')toast('✅ 추진 사항이 추가됐습니다.');
+  }catch(e){if(typeof toast==='function')toast('❌ 저장 실패: '+e.message);}
+}
+
+async function annualDeleteItem(id){
+  if(!confirm('이 항목을 삭제하시겠습니까?'))return;
+  if(!db)return;
+  try{
+    await db.collection('annualGoals').doc(id).delete();
+    _annualItems=_annualItems.filter(function(x){return x.id!==id;});
+    annualRenderList();
+    if(typeof toast==='function')toast('🗑 삭제됐습니다.');
+  }catch(e){if(typeof toast==='function')toast('❌ 삭제 실패: '+e.message);}
+}
+
 function _renderBoardAreaPanel(){
   var el=$('board-area-area');if(!el)return;
   var today=todayISO();
@@ -22431,7 +22519,7 @@ function rrBuildFolderPath(base){
 
 var _rrToastTimer=null;
 function rrToast(msg){
-  // 영상 화면 안 오버레이 토스트
+  // 영상 화면 안 오버레이 토스트만 표시 (전역 toast 중복 제거)
   var ot=document.getElementById('rr-overlay-toast');
   if(ot){
     ot.textContent=msg;
@@ -22443,8 +22531,6 @@ function rrToast(msg){
       setTimeout(function(){ot.style.display='none';},300);
     },2500);
   }
-  // 기존 전역 toast도 함께 호출
-  if(typeof toast==='function')toast(msg);
 }
 
 function rrShowSavePath(){
@@ -22683,7 +22769,6 @@ async function renderReadingRecords(studentId){
         +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
         +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
         +fbBadge
-        +(d.snapshotOnly?'<span style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700">📸 스냅샷 전용</span>':'')
         +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrShowSnapshots(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">스냅샷</button>'
         +(d.snapshotOnly?'':'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>')
         +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">피드백</button>'
@@ -23077,7 +23162,6 @@ async function renderHistoryReading(){
           +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
           +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
           +fbBadge
-          +(d.snapshotOnly?'<span style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700">📸 스냅샷 전용</span>':'')
           +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrShowSnapshots(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">스냅샷</button>'
           +(d.snapshotOnly?'':'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>')
           +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">피드백</button>'
