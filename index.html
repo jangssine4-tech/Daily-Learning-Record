@@ -22454,6 +22454,11 @@ async function rrTakeSnapshot(){
 
 async function rrStartRecording(){
   if(!_rrStream){if(typeof toast==='function')toast('카메라를 먼저 선택해주세요.');return;}
+  // 학생 정보 없으면 녹화 시작 차단
+  if(!_rrStudentName||!_rrStudentId){
+    alert('❌ 학생 정보가 없습니다.\n학습 일지에서 학생을 선택한 후 녹화를 시작해주세요.');
+    return;
+  }
   var basePath='C:\\Users\\gentl\\Downloads\\ReadingVideos';
   var pathEl=document.getElementById('rr-save-path');
   if(pathEl&&pathEl.value.trim())basePath=pathEl.value.trim();
@@ -22531,11 +22536,14 @@ async function rrOnRecordingStop(basePath){
       await rrSaveMetadata(savedPath,duration,blob.size);
       if(resultEl){
         resultEl.style.display='block';
+        resultEl.style.background='#f0fdf4';resultEl.style.borderColor='#86efac';resultEl.style.color='#15803d';
         resultEl.innerHTML='✅ 저장 완료!<br><span style="font-family:monospace;font-size:10px;word-break:break-all;color:#374151">'+savedPath+'</span><br><span style="color:#6b7280">크기: '+(blob.size/1024/1024).toFixed(1)+'MB · '+String(Math.floor(duration/60)).padStart(2,'0')+':'+String(duration%60).padStart(2,'0')+'</span>';
       }
+      alert('✅ Reading 녹화 저장 완료!\n\n경로: '+savedPath+'\n크기: '+(blob.size/1024/1024).toFixed(1)+'MB');
       if(typeof toast==='function')toast('✅ Reading 녹화가 저장됐습니다!');
     }catch(e){
       if(resultEl){resultEl.style.display='block';resultEl.style.background='#fef2f2';resultEl.style.borderColor='#fca5a5';resultEl.style.color='#dc2626';resultEl.innerHTML='❌ 저장 실패: '+e.message;}
+      alert('❌ Reading 영상 저장 실패!\n\n오류: '+e.message+'\n\n저장 경로: '+folderPath);
       if(typeof toast==='function')toast('❌ 저장 실패: '+e.message);
     }
   }else{
@@ -22650,13 +22658,7 @@ async function rrPlayVideo(recordId,videoPath,studentName,studentNumber){
   if(electronAPI){
     // 경로 정규화 (/ → \)
     var normPath=videoPath.replace(/\//g,'\\');
-    // ★ 디버그: 실제 경로 확인
-    alert('[디버그] 원본경로:\n'+videoPath+'\n\n정규화경로:\n'+normPath+'\n\n학생이름: '+sName+'\n학생번호: '+sNum);
     var res=await electronAPI.fileExists(normPath);
-    // ★ 디버그2: fileExists 결과 + 폴더 내 파일 목록 확인
-    var folderForDebug=normPath.substring(0,normPath.lastIndexOf('\\'));
-    var listForDebug=electronAPI.listFiles?await electronAPI.listFiles(folderForDebug):{ok:false,files:[]};
-    alert('[디버그2] fileExists: '+JSON.stringify(res)+'\n\n폴더: '+folderForDebug+'\n\n파일목록: '+JSON.stringify(listForDebug.files||[]));
     if(!res.exists){
       // 역슬래시로도 시도
       var res2=await electronAPI.fileExists(videoPath);
