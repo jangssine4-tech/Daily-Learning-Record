@@ -1272,7 +1272,8 @@ async function isHoliday(yr,mo,d){
 async function saveStorageBucket(){
   var val=document.getElementById('settings-storage-bucket').value.trim();
   if(!val){toast('⚠️ storageBucket 값을 입력해주세요');return;}
-  var cfg=getCfg()||{};
+  var cfg=getCfg();
+  if(!cfg){toast('⚠️ Firebase 설정이 없습니다. 먼저 초기 설정을 완료해주세요.');return;}
   cfg.storageBucket=val;
   localStorage.setItem('fb_cfg',JSON.stringify(cfg));
   // Storage 재초기화
@@ -1289,7 +1290,8 @@ async function saveFbConfig(){
   localStorage.setItem('fb_cfg',JSON.stringify(cfg));initFb(cfg);
 }
 async function initFb(cfg){
-  try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
+  if(!cfg||!cfg.apiKey||!cfg.projectId){console.error('initFb: 유효하지 않은 Firebase 설정',cfg);return;}
+  if(!firebase.apps.length){firebase.initializeApp(cfg);}
   db=firebase.firestore();
   db.settings({cacheSizeBytes:50*1024*1024,merge:true});
   db.enablePersistence({synchronizeTabs:true}).catch(function(){});
