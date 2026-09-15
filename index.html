@@ -22485,7 +22485,7 @@ async function rrTakeSnapshot(){
       var saveRes=await electronAPI.saveSnapshot(filePath,buf);
       if(saveRes&&saveRes.ok){
         if(typeof toast==='function')rrToast('📸 스냅샷 저장됐습니다.');
-        // Firebase readingRecords에 스냅샷 경로 기록 (가장 최근 레코드에 추가)
+        // Firebase readingRecords에 스냅샷 경로 기록
         if(db&&_rrStudentId){
           try{
             var now2=new Date();
@@ -22495,11 +22495,29 @@ async function rrTakeSnapshot(){
               .where('recordedAt','==',dateStr2)
               .get();
             if(!snap.empty){
-              // 가장 최근 레코드에 스냅샷 경로 추가
+              // 기존 레코드에 스냅샷 경로 추가
               var latestDoc=snap.docs.sort(function(a,b){return(b.data().createdAt||0)-(a.data().createdAt||0);})[0];
               var existing=latestDoc.data().snapshotPaths||[];
               existing.push(saveRes.savedPath);
               await db.collection('readingRecords').doc(latestDoc.id).update({snapshotPaths:existing});
+            } else {
+              // 녹화 기록 없음 → 스냅샷 전용 레코드 새로 생성
+              var teacher2=(typeof currentUser!=='undefined'&&currentUser)?currentUser:{name:'알 수 없음',docId:''};
+              var levelEl2=document.getElementById('r-level');
+              var progressEl2=document.getElementById('r-progress');
+              var bookName2=levelEl2?levelEl2.value:'';
+              var unit2=progressEl2?progressEl2.value:(localStorage.getItem('rr_last_unit_'+_rrStudentId)||'');
+              await db.collection('readingRecords').add({
+                studentId:_rrStudentId,studentName:_rrStudentName,studentNumber:_rrStudentNumber,
+                recordedAt:dateStr2,bookName:bookName2,unit:unit2,
+                teacherId:teacher2.docId||teacher2.id||'',teacherName:teacher2.name||'',
+                videoPath:'',duration:0,fileSize:0,
+                snapshotPaths:[saveRes.savedPath],
+                createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+                feedbackStatus:'미작성',feedback:'',
+                fluencyScore:0,pronunciationScore:0,intonationScore:0,phrasingScore:0,
+                snapshotOnly:true
+              });
             }
           }catch(e){console.warn('스냅샷 경로 저장 실패:',e);}
         }
@@ -22665,8 +22683,9 @@ async function renderReadingRecords(studentId){
         +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
         +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
         +fbBadge
+        +(d.snapshotOnly?'<span style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700">📸 스냅샷 전용</span>':'')
         +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrShowSnapshots(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">스냅샷</button>'
-        +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>'
+        +(d.snapshotOnly?'':'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>')
         +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">피드백</button>'
         +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrDeleteRecord(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">삭제</button>'
         +'<button onclick="rrShowDeleteInfo()" style="background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;font-weight:700;flex-shrink:0" title="삭제 안내">?</button>'
@@ -23058,8 +23077,9 @@ async function renderHistoryReading(){
           +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
           +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'
           +fbBadge
+          +(d.snapshotOnly?'<span style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700">📸 스냅샷 전용</span>':'')
           +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrShowSnapshots(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">스냅샷</button>'
-          +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>'
+          +(d.snapshotOnly?'':'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>')
           +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">피드백</button>'
           +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrDeleteRecordFromHistory(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">삭제</button>'
           +'<button onclick="rrShowDeleteInfo()" style="background:var(--surface2);color:var(--txt3);border:1px solid var(--border);border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;font-weight:700;flex-shrink:0" title="삭제 안내">?</button>'
