@@ -310,10 +310,13 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   <div class="cp" id="meeting-area" style="overflow-y:auto"></div>
 </div>
 <div class="view active" id="view-schedule" style="flex-direction:column"><div style="position:sticky;top:0;z-index:50;background:var(--surface)"><div class="page-top" style="margin:0;padding:10px 16px 6px"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">월간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">신규 학생 배정</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">전달 사항</button></div><div id="sch-panel-today-header" style="background:var(--surface);border-bottom:1px solid var(--border);padding:6px 12px"><div class="toolbar" style="display:flex;align-items:center;gap:6px;margin-bottom:0"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button class="btn btn-outline btn-xs" onclick="openSchRevModal()" style="color:#16a34a;border-color:#16a34a;font-size:11px">💰 회계</button></div><div id="schedule-legend" style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0 2px;font-size:11px;color:var(--txt2);align-items:center"><span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span><span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span><span><span style="color:#d97706;font-weight:700">▲</span> 조퇴/학습 마무리 못함</span><span>📝 일지 작성</span></div></div></div><div id="sch-panel-today" style="display:flex;flex-direction:column;flex:1;min-height:0"><div style="position:sticky;top:0;z-index:10;background:var(--surface)" id="schedule-notes-award"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="assign-panel-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
-<div class="view" id="view-write"><div class="page-top"><h2>학습 일지 작성</h2></div>
+<div class="view" id="view-write">
+  <div class="page-top"><h2>학습 일지 작성</h2></div>
+  <!-- 학생 정보 고정 바 - #content 스크롤 기준 sticky -->
+  <div id="write-student-info-bar" style="position:sticky;top:0;z-index:50;background:var(--navy);color:#fff;padding:8px 16px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);display:none">학생을 선택하세요</div>
   <div style="display:flex;gap:16px;align-items:flex-start;padding:0 0 0 0;overflow-x:auto;-webkit-overflow-scrolling:touch">
   <div class="cp" style="max-width:560px;min-width:320px;flex:0 0 auto"><div class="card" style="padding:16px">
-    <div id="write-student-info" style="position:sticky;top:0;z-index:10;background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.15)">학생을 시간표에서 선택하세요</div>
+    <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
     <input type="hidden" id="r-student-id">
     <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">수행/지필 평가</div><div style="display:flex;gap:4px"><input type="date" class="fi" id="r-exam-date" style="flex:1"><select class="fi" id="r-exam-type" style="width:auto;font-size:11px;padding:6px 4px"><option value="">종류</option><option value="수행">수행</option><option value="중간">중간</option><option value="기말">기말</option><option value="모의고사">모의고사</option><option value="Tosel 정기">Tosel 정기</option><option value="Tosel Voca">Tosel Voca 올림피아드</option><option value="PFC">PFC</option></select></div></div></div>
     <div class="field"><div class="fl">태블릿 점검 교사</div><select class="fi" id="r-teacher-tablet"></select></div>
@@ -6863,6 +6866,7 @@ function startReport(studentId,makeupId,sessionTime){
   $('r-student-id').value=studentId;
   var _dispLevel=window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s);
   $('write-student-info').textContent=s.name+(s.studentNumber?' (ID:'+s.studentNumber+')':'')+' · '+_dispLevel+' · '+(s.grade||'')+(makeupId?' · 🔴 보강':'');
+  var bar=$('write-student-info-bar');if(bar){bar.textContent=$('write-student-info').textContent;bar.style.display='block';}
   $('r-date').value=_scheduleDate||todayISO();
   var lvSel=$('r-level');
   var _initLvForModal=rep?rep.level:(window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s));
@@ -18408,6 +18412,12 @@ function _registerPlanAsFocusTask(overlay,directName,directDday,directArea){
 }
 function _doRegisterFocusTask(type,name,dday,area,manager){
   var taskType=type==='monthly'?'이달의 중점':'이번 주 중점';
+  // dday 없으면 이번 달 말일로 기본 설정
+  if(!dday){
+    var now2=new Date();
+    var lastDay=new Date(now2.getFullYear(),now2.getMonth()+1,0);
+    dday=lastDay.getFullYear()+'-'+String(lastDay.getMonth()+1).padStart(2,'0')+'-'+String(lastDay.getDate()).padStart(2,'0');
+  }
   var newTask={
     id:'task_'+Date.now(),
     name:name,
@@ -18424,8 +18434,9 @@ function _doRegisterFocusTask(type,name,dday,area,manager){
   _dbTasks.push(newTask);
   db.collection('dashBoardV2').doc(newTask.id).set(newTask).then(function(){
     toast('✅ '+taskType+'으로 등록됐어요!');
-    // 중점 추진 탭 리렌더링
-    if($('board-focus-area'))_boardFocusNavRender();
+    // 이달의 할 일 탭으로 이동 후 리렌더링
+    goto('board');
+    setTimeout(function(){switchBoardTab('focus');},100);
   }).catch(function(){toast('등록 실패');});
 }
 function _parsePlanTasks(){
@@ -22455,6 +22466,16 @@ document.addEventListener('DOMContentLoaded', function(){setTimeout(function(){_
 <script>
 var _rrStudentId='',_rrStudentName='',_rrStudentNumber='';
 var _rrStream=null,_rrRecorder=null,_rrChunks=[],_rrTimerInt=null,_rrSeconds=0,_rrRecording=false;
+
+// 녹화 중 페이지 이탈/앱 종료 시 경고
+window.addEventListener('beforeunload',function(e){
+  if(_rrRecording){
+    var msg='녹화 중입니다. 저장하지 않고 나가시겠습니까?';
+    e.preventDefault();
+    e.returnValue=msg;
+    return msg;
+  }
+});
 var _rrPathDefaults={pc:'C:\\Users\\gentl\\Downloads\\ReadingVideos',external:'E:\\ReadingVideos',nas:'\\\\AcademyNAS\\ReadingVideos'};
 
 function openReadingRecordModal(studentId,studentName){
