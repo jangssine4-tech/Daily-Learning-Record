@@ -23107,12 +23107,8 @@ async function renderHistoryReading(){
   var fbFilter=document.getElementById('hrr-feedback').value;
   var period=(document.getElementById('hrr-period')||{}).value||'all';
   try{
-    var q=db.collection('readingRecords');
-    if(studentId)q=q.where('studentId','==',studentId);
-    if(fbFilter)q=q.where('feedbackStatus','==',fbFilter);
-    var snap=await q.get();
-    var docs=snap.docs.sort(function(a,b){return(b.data().recordedAt||'').localeCompare(a.data().recordedAt||'');});
-    // 기간 필터
+    // 기간 cutoff 계산
+    var cutoffStr='';
     if(period&&period!=='all'){
       var now3=new Date();
       var cutoff=null;
@@ -23124,10 +23120,17 @@ async function renderHistoryReading(){
       else if(period==='3m'){var m3=new Date(now3);m3.setMonth(m3.getMonth()-3);cutoff=m3;}
       else if(period==='6m'){var m6=new Date(now3);m6.setMonth(m6.getMonth()-6);cutoff=m6;}
       if(cutoff){
-        var cutoffStr=cutoff.getFullYear()+'-'+String(cutoff.getMonth()+1).padStart(2,'0')+'-'+String(cutoff.getDate()).padStart(2,'0');
-        docs=docs.filter(function(doc){return(doc.data().recordedAt||'')>=cutoffStr;});
+        cutoffStr=cutoff.getFullYear()+'-'+String(cutoff.getMonth()+1).padStart(2,'0')+'-'+String(cutoff.getDate()).padStart(2,'0');
       }
     }
+    // Firebase 쿼리 - 기간 필터를 서버에서 처리
+    var q=db.collection('readingRecords');
+    if(studentId)q=q.where('studentId','==',studentId);
+    if(fbFilter)q=q.where('feedbackStatus','==',fbFilter);
+    if(cutoffStr)q=q.where('recordedAt','>=',cutoffStr);
+    q=q.orderBy('recordedAt','desc').limit(200);
+    var snap=await q.get();
+    var docs=snap.docs.map(function(d){return{id:d.id,...d.data()};});
     if(!docs.length){
       el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';
       var bd=document.getElementById('hrr-bulk-delete-btn');if(bd)bd.style.display='none';
@@ -23140,8 +23143,8 @@ async function renderHistoryReading(){
       +'</label>'
       +'<span style="font-size:11px;color:var(--txt3)" id="hrr-selected-count"></span>'
       +'</div>'
-      +docs.map(function(doc){
-        var d=doc.data();var rid=doc.id;
+      +docs.map(function(d){
+        var rid=d.id;
         var dur=d.duration?String(Math.floor(d.duration/60)).padStart(2,'0')+':'+String(d.duration%60).padStart(2,'0'):'--:--';
         var fbBadge=d.feedbackStatus==='완료'
           ?'<span style="background:#dcfce7;color:#16a34a;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">완료</span>'
@@ -23172,7 +23175,50 @@ async function renderHistoryReading(){
           +(d.feedback?'<div style="margin-top:6px;font-size:11px;color:var(--txt2);background:var(--surface2);border-radius:6px;padding:6px 8px">💬 '+d.feedback+'</div>':'')
           +'</div>';
       }).join('');
-  }catch(e){el.innerHTML='<div style="padding:12px;color:red;font-size:12px">오류: '+e.message+'</div>';}
+  }catch(e){
+    // Firebase 복합 인덱스 미생성 시 orderBy 없이 재시도
+    if(e.code==='failed-precondition'||(e.message&&(e.message.indexOf('index')>=0||e.message.indexOf('Index')>=0))){
+      try{
+        var q2=db.collection('readingRecords');
+        var studentId2=document.getElementById('hrr-student').value;
+        var fbFilter2=document.getElementById('hrr-feedback').value;
+        if(studentId2)q2=q2.where('studentId','==',studentId2);
+        if(fbFilter2)q2=q2.where('feedbackStatus','==',fbFilter2);
+        if(cutoffStr)q2=q2.where('recordedAt','>=',cutoffStr);
+        q2=q2.limit(200);
+        var snap2=await q2.get();
+        var docs2=snap2.docs.map(function(d2){return{id:d2.id,...d2.data()};});
+        docs2.sort(function(a,b){return(b.recordedAt||'').localeCompare(a.recordedAt||'');});
+        if(!docs2.length){
+          el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';
+        }else{
+          el.innerHTML=docs2.map(function(d){
+            var rid=d.id;
+            var dur=d.duration?String(Math.floor(d.duration/60)).padStart(2,'0')+':'+String(d.duration%60).padStart(2,'0'):'--:--';
+            var fbBadge=d.feedbackStatus==='완료'?'<span style="background:#dcfce7;color:#16a34a;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">완료</span>':'<span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">미작성</span>';
+            return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface)">'
+              +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
+              +'<input type="checkbox" class="hrr-row-check" data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onchange="rrUpdateSelectCount()">'
+              +'<span style="font-size:13px;font-weight:800;color:var(--navy)">'+d.studentName+'</span>'
+              +(d.studentNumber?'<span style="font-size:11px;color:var(--txt3)">('+d.studentNumber+')</span>':'')
+              +'<span style="font-size:11px;color:var(--txt3)">'+d.recordedAt+'</span>'
+              +'<span style="font-size:11px;color:var(--txt3)">'+(d.bookName||'-')+' · '+(d.unit||'-')+'</span>'
+              +'<span style="font-size:11px;color:var(--txt3);margin-left:auto">'+(d.teacherName||'-')+'</span>'
+              +'</div>'
+              +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+              +'<span style="font-size:11px;color:var(--txt3)">⏱ '+dur+'</span>'+fbBadge
+              +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrShowSnapshots(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#fdf4ff;color:#7e22ce;border:1px solid #d8b4fe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">스냅샷</button>'
+              +(d.snapshotOnly?'':'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" data-sn="'+encodeURIComponent(d.studentName||'')+'" data-num="'+encodeURIComponent(d.studentNumber||'')+'" onclick="rrPlayVideo(this.dataset.rid,decodeURIComponent(this.dataset.vp),decodeURIComponent(this.dataset.sn),decodeURIComponent(this.dataset.num))" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">영상</button>')
+              +'<button data-rid="'+rid+'" onclick="rrOpenFeedback(this.dataset.rid)" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:700">피드백</button>'
+              +'<button data-rid="'+rid+'" data-vp="'+encodeURIComponent(d.videoPath||'')+'" onclick="rrDeleteRecordFromHistory(this.dataset.rid,decodeURIComponent(this.dataset.vp))" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">삭제</button>'
+              +'</div></div>';
+          }).join('');
+        }
+      }catch(e2){el.innerHTML='<div style="padding:12px;color:red;font-size:12px">오류: '+e2.message+'</div>';}
+    }else{
+      el.innerHTML='<div style="padding:12px;color:red;font-size:12px">오류: '+e.message+'</div>';
+    }
+  }
 }
 
 function rrToggleSelectAll(checked){
