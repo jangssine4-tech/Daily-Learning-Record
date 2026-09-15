@@ -2752,6 +2752,15 @@ async function initYearSelects(which){
 
 // OPTIMIZED goto - ensures populate only when needed
 async function goto(view){
+  // 학습일지(write)에서 다른 페이지로 이동 시 카메라 스트림 자동 종료
+  var currentView=document.querySelector('.view.active');
+  var currentViewId=currentView?currentView.id:'';
+  if(currentViewId==='view-write'&&view!=='write'){
+    if(typeof rrStopStream==='function')rrStopStream();
+    // sticky 바 숨기기
+    var bar=document.getElementById('write-student-info-bar');
+    if(bar)bar.style.display='none';
+  }
   // History API — 뒤로가기 버튼으로 앱 내 이전 화면으로 이동
   if(!window._gotoFromPop){
     window.history.pushState({view:view},'',window.location.pathname+'#'+view);
@@ -22656,11 +22665,32 @@ async function rrSwitchCamera(deviceId){
 }
 
 async function rrStopStream(){
+  // 녹화 중이면 강제 중단
+  if(_rrRecording){
+    _rrRecording=false;
+    clearInterval(_rrTimerInt);
+    if(_rrRecorder){try{_rrRecorder.stop();}catch(e){}}
+  }
+  // 청크 메모리 해제
+  _rrChunks=[];
+  _rrRecorder=null;
+  // 카메라 스트림 종료
   if(_rrStream){_rrStream.getTracks().forEach(async function(t){t.stop();});_rrStream=null;}
   var video=document.getElementById('rr-preview');
-  if(video)video.srcObject=null;
+  if(video){video.srcObject=null;}
   var nc=document.getElementById('rr-no-camera');
   if(nc)nc.style.display='flex';
+  // UI 초기화
+  var btnStart=document.getElementById('rr-btn-start');
+  var btnStop=document.getElementById('rr-btn-stop');
+  var btnPause=document.getElementById('rr-btn-pause');
+  var ri=document.getElementById('rr-rec-indicator');
+  var timer=document.getElementById('rr-timer');
+  if(btnStart)btnStart.style.display='flex';
+  if(btnStop)btnStop.style.display='none';
+  if(btnPause)btnPause.style.display='none';
+  if(ri)ri.style.display='none';
+  if(timer)timer.style.display='none';
 }
 
 async function rrBuildFileName(){
@@ -22856,6 +22886,7 @@ async function rrOnRecordingStop(basePath){
   var filePath=folderPath+'\\'+fileName;
   var duration=_rrSeconds;
   var blob=new Blob(_rrChunks,{type:'video/webm'});
+  _rrChunks=[]; // 메모리 즉시 해제
   var resultEl=document.getElementById('rr-result');
   if(electronAPI){
     try{
