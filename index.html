@@ -22660,7 +22660,7 @@ function rrPauseRecording(){
     clearInterval(_rrTimerInt);
     if(bp){bp.textContent='▶ 재개';bp.style.background='#16a34a';bp.style.display='flex';}
     if(ri)ri.style.opacity='0.3';
-    if(typeof toast==='function')toast('⏸ 일시정지됐습니다.');
+    rrToast('⏸ 일시정지됐습니다.');
   }else if(_rrRecorder.state==='paused'){
     _rrRecorder.resume();
     if(bp){bp.textContent='⏸ 일시정지';bp.style.background='#f59e0b';bp.style.display='flex';}
@@ -22671,7 +22671,7 @@ function rrPauseRecording(){
       var m=String(Math.floor(_rrSeconds/60)).padStart(2,'0'),s2=String(_rrSeconds%60).padStart(2,'0');
       if(t)t.textContent=m+':'+s2;
     },1000);
-    if(typeof toast==='function')toast('▶ 녹화가 재개됐습니다.');
+    rrToast('▶ 녹화가 재개됐습니다.');
   }
 }
 
@@ -22682,7 +22682,6 @@ function rrStopRecording(silent){
   var ri=document.getElementById('rr-rec-indicator');var t=document.getElementById('rr-timer');
   var bp2=document.getElementById('rr-btn-pause');
   if(s)s.style.display='flex';if(e2)e2.style.display='none';if(bp2)bp2.style.display='none';if(ri)ri.style.display='none';if(t)t.style.display='none';
-  if(!silent&&typeof toast==='function')toast('녹화 종료. 저장 중...');
 }
 
 async function rrOnRecordingStop(basePath){
@@ -23123,14 +23122,17 @@ async function renderHistoryReading(){
         cutoffStr=cutoff.getFullYear()+'-'+String(cutoff.getMonth()+1).padStart(2,'0')+'-'+String(cutoff.getDate()).padStart(2,'0');
       }
     }
-    // Firebase 쿼리 - 기간 필터를 서버에서 처리
+    // Firebase 쿼리 - where 조건 최소화, 기간 필터는 JS에서 처리 (복합 인덱스 불필요)
     var q=db.collection('readingRecords');
     if(studentId)q=q.where('studentId','==',studentId);
-    if(fbFilter)q=q.where('feedbackStatus','==',fbFilter);
-    if(cutoffStr)q=q.where('recordedAt','>=',cutoffStr);
-    q=q.orderBy('recordedAt','desc').limit(200);
+    else if(fbFilter)q=q.where('feedbackStatus','==',fbFilter);
+    q=q.orderBy('createdAt','desc').limit(300);
     var snap=await q.get();
     var docs=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+    // 기간 및 피드백 필터 JS에서 처리
+    if(cutoffStr)docs=docs.filter(function(d){return(d.recordedAt||'')>=cutoffStr;});
+    if(studentId&&fbFilter)docs=docs.filter(function(d){return d.feedbackStatus===fbFilter;});
+    else if(!studentId&&fbFilter)docs=docs.filter(function(d){return d.feedbackStatus===fbFilter;});
     if(!docs.length){
       el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';
       var bd=document.getElementById('hrr-bulk-delete-btn');if(bd)bd.style.display='none';
@@ -23188,7 +23190,11 @@ async function renderHistoryReading(){
         q2=q2.limit(200);
         var snap2=await q2.get();
         var docs2=snap2.docs.map(function(d2){return{id:d2.id,...d2.data()};});
-        docs2.sort(function(a,b){return(b.recordedAt||'').localeCompare(a.recordedAt||'');});
+        docs2.sort(function(a,b){
+          var at=a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():(a.createdAt||0);
+          var bt=b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():(b.createdAt||0);
+          return bt-at;
+        });
         if(!docs2.length){
           el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3)">📹<br><br>Reading 기록이 없습니다</div>';
         }else{
