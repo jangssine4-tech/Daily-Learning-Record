@@ -503,8 +503,9 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   <div id="board-panel-annual" style="display:none" class="cp">
     <div style="padding:16px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-        <span style="font-size:15px;font-weight:800;color:var(--navy)" id="annual-year-title"></span>
-        <span style="font-size:12px;color:var(--txt3)">올해의 중점 추진 사항</span>
+        <span style="font-size:15px;font-weight:800;color:var(--navy)">중점 추진 사항</span>
+        <select id="annual-year-sel" class="fi" style="width:auto;font-size:13px;font-weight:700;padding:4px 8px" onchange="annualChangeYear(this.value)"></select>
+        <span style="font-size:12px;color:var(--txt3)">연도별 중점 추진 사항</span>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <input id="annual-input" class="fi" style="flex:1;font-size:13px" placeholder="추진 사항을 입력하세요">
@@ -4611,13 +4612,35 @@ function _renderFocusSectionFiltered(type,title,color,items,isCurrentMonth){
 // ── 올해의 중점 추진 사항 ──
 var _annualItems=[];
 
+var _annualSelectedYear=new Date().getFullYear();
+
 function annualRender(){
-  var yr=new Date().getFullYear();
-  var titleEl=document.getElementById('annual-year-title');
-  if(titleEl)titleEl.textContent=yr+'년';
+  var curYr=new Date().getFullYear();
+  // 드롭다운 생성 (현재연도 기준 ±5년)
+  var sel=document.getElementById('annual-year-sel');
+  if(sel&&!sel.options.length){
+    for(var y=curYr+2;y>=curYr-5;y--){
+      var opt=document.createElement('option');
+      opt.value=y;opt.textContent=y+'년';
+      if(y===curYr)opt.selected=true;
+      sel.appendChild(opt);
+    }
+    _annualSelectedYear=curYr;
+  }
   var inp=document.getElementById('annual-input');
   if(inp)inp.onkeydown=function(e){if(e.key==='Enter')annualAddItem();};
+  annualLoadYear(_annualSelectedYear);
+}
+
+function annualChangeYear(yr){
+  _annualSelectedYear=parseInt(yr);
+  annualLoadYear(_annualSelectedYear);
+}
+
+function annualLoadYear(yr){
   if(!db)return;
+  var el=document.getElementById('annual-list');
+  if(el)el.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt3);font-size:12px">불러오는 중...</div>';
   db.collection('annualGoals').where('year','==',yr).get().then(function(snap){
     _annualItems=snap.docs.map(function(d){return{id:d.id,...d.data()};});
     _annualItems.sort(function(a,b){
@@ -4626,7 +4649,7 @@ function annualRender(){
       return at-bt;
     });
     annualRenderList();
-  }).catch(function(e){console.warn('annualRender 오류:',e);});
+  }).catch(function(e){console.warn('annualLoadYear 오류:',e);});
 }
 
 function annualRenderList(){
@@ -4655,7 +4678,7 @@ async function annualAddItem(){
   var text=(inp&&inp.value.trim())||'';
   if(!text){if(typeof toast==='function')toast('내용을 입력해주세요.');return;}
   if(!db)return;
-  var yr=new Date().getFullYear();
+  var yr=_annualSelectedYear||new Date().getFullYear();
   try{
     var ref=await db.collection('annualGoals').add({
       year:yr,text:text,
@@ -4664,7 +4687,7 @@ async function annualAddItem(){
     _annualItems.push({id:ref.id,year:yr,text:text,createdAt:null});
     inp.value='';
     annualRenderList();
-    if(typeof toast==='function')toast('✅ 추진 사항이 추가됐습니다.');
+    if(typeof toast==='function')toast('✅ '+yr+'년 추진 사항이 추가됐습니다.');
   }catch(e){if(typeof toast==='function')toast('❌ 저장 실패: '+e.message);}
 }
 
