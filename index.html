@@ -316,7 +316,6 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   <div id="write-student-info-bar" style="position:sticky;top:0;z-index:50;background:var(--navy);color:#fff;padding:8px 16px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);display:none">학생을 선택하세요</div>
   <div style="display:flex;gap:16px;align-items:flex-start;padding:0 0 0 0;overflow-x:auto;-webkit-overflow-scrolling:touch">
   <div class="cp" style="max-width:560px;min-width:320px;flex:0 0 auto"><div class="card" style="padding:16px">
-    <div id="write-student-info" style="background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700">학생을 시간표에서 선택하세요</div>
     <input type="hidden" id="r-student-id">
     <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">수행/지필 평가</div><div style="display:flex;gap:4px"><input type="date" class="fi" id="r-exam-date" style="flex:1"><select class="fi" id="r-exam-type" style="width:auto;font-size:11px;padding:6px 4px"><option value="">종류</option><option value="수행">수행</option><option value="중간">중간</option><option value="기말">기말</option><option value="모의고사">모의고사</option><option value="Tosel 정기">Tosel 정기</option><option value="Tosel Voca">Tosel Voca 올림피아드</option><option value="PFC">PFC</option></select></div></div></div>
     <div class="field"><div class="fl">태블릿 점검 교사</div><select class="fi" id="r-teacher-tablet"></select></div>
@@ -6865,8 +6864,8 @@ function startReport(studentId,makeupId,sessionTime){
   else{var _sTime=sessionTime||'';rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&!r.makeupId&&(r.sessionTime||'')==_sTime;});}
   $('r-student-id').value=studentId;
   var _dispLevel=window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s);
-  $('write-student-info').textContent=s.name+(s.studentNumber?' (ID:'+s.studentNumber+')':'')+' · '+_dispLevel+' · '+(s.grade||'')+(makeupId?' · 🔴 보강':'');
-  var bar=$('write-student-info-bar');if(bar){bar.textContent=$('write-student-info').textContent;bar.style.display='block';}
+  var infoText=s.name+(s.studentNumber?' (ID:'+s.studentNumber+')':'')+' · '+_dispLevel+' · '+(s.grade||'')+(makeupId?' · 🔴 보강':'');
+  var bar=$('write-student-info-bar');if(bar){bar.textContent=infoText;bar.style.display='block';}
   $('r-date').value=_scheduleDate||todayISO();
   var lvSel=$('r-level');
   var _initLvForModal=rep?rep.level:(window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s));
@@ -7049,7 +7048,7 @@ function onReportLevelChange(){
   populateProgressDropdown(newLevel,curProgress);
   var sId=$('r-student-id').value;
   var s=students.find(function(x){return x.id===sId;});
-  if(s){$('write-student-info').textContent=s.name+' · '+newLevel+' · '+(s.grade||'');}
+  if(s){var bar2=$('write-student-info-bar');if(bar2)bar2.textContent=s.name+' · '+newLevel+' · '+(s.grade||'');}
   var foundModule=getEvalModuleForLevel(newLevel);
   if(foundModule)renderEvalArea(foundModule,window._evalState||{});
   else{var area=$('eval-area');if(area)area.innerHTML='';}
@@ -15094,7 +15093,13 @@ function _dbSaveTaskModal(id){
   _dbSaveTaskModal._saving=false;
   var m=document.getElementById('db-task-modal');if(m)m.remove();
   if(_boardCurrentTab==='today')_refreshTaskList();
+  else if(_boardCurrentTab==='focus'){_boardFocusNavRender();}
+  else if(_boardCurrentTab==='weekly'){if(typeof _renderBoardWeeklyPanel==='function')_renderBoardWeeklyPanel();}
   else _renderDashBoardUI($('dashboard-board-area'));
+  // 이달의 중점 업무면 이달의 할 일 탭으로 이동
+  if(taskType==='이달의 중점'&&_boardCurrentTab!=='focus'){
+    goto('board');setTimeout(function(){switchBoardTab('focus');},100);
+  }
   // Firestore 저장은 백그라운드
   if(savedId)saveTask(savedId); else saveDashBoard();
 }
@@ -22476,6 +22481,29 @@ window.addEventListener('beforeunload',function(e){
     return msg;
   }
 });
+
+// goto() 가로채기 - 녹화 중 또는 일시정지 중 페이지 이동 시 경고
+(function(){
+  var _origGotoRR=window.goto;
+  window.goto=function(view){
+    var isRecording=_rrRecording;
+    var isPaused=_rrRecorder&&_rrRecorder.state==='paused';
+    if(isRecording||isPaused){
+      var state=isPaused?'일시정지':'녹화 중';
+      if(!confirm('⚠️ '+state+'입니다.\n저장하지 않고 이동하시겠습니까?\n\n이동하면 녹화 내용이 사라집니다.')){
+        return;
+      }
+      // 강제 종료 후 이동
+      if(isRecording||isPaused){
+        _rrRecording=false;
+        clearInterval(_rrTimerInt);
+        if(_rrRecorder){try{_rrRecorder.stop();}catch(e){}}
+        _rrChunks=[];
+      }
+    }
+    if(_origGotoRR)_origGotoRR(view);
+  };
+})();
 var _rrPathDefaults={pc:'C:\\Users\\gentl\\Downloads\\ReadingVideos',external:'E:\\ReadingVideos',nas:'\\\\AcademyNAS\\ReadingVideos'};
 
 function openReadingRecordModal(studentId,studentName){
