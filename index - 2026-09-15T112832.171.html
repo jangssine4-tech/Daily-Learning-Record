@@ -329,18 +329,18 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
           <span style="font-size:13px;font-weight:800;color:#6d28d9">📹 Reading 녹화</span>
           <button onclick="rrShowSavePath()" style="background:#ede9fe;border:1px solid #c4b5fd;color:#7c3aed;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:800;cursor:pointer;padding:0;flex-shrink:0" title="저장 경로 확인">?</button>
         </div>
-        <span style="font-size:11px;color:#7c3aed;font-weight:400">녹화 종료 시 자동으로 저장됩니다.</span>
         <div style="display:flex;align-items:center;gap:6px">
           <select id="rr-camera-sel" class="fi" style="font-size:11px;padding:4px 6px;width:auto;max-width:160px" onchange="rrSwitchCamera(this.value)"><option value="">카메라 선택</option></select>
           <button onclick="rrLoadCameras()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;cursor:pointer" title="카메라 새로고침">🔄</button>
         </div>
       </div>
-      <div style="background:#0f0f0f;border-radius:10px;overflow:hidden;position:relative;margin-bottom:10px">
+      <div style="background:#0f0f0f;border-radius:10px;overflow:hidden;position:relative;margin-bottom:6px">
         <video id="rr-preview" autoplay muted playsinline style="width:100%;max-height:240px;display:block;object-fit:cover"></video>
         <div id="rr-no-camera" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:12px;gap:6px;background:#1a1a2e"><span style="font-size:28px">📷</span><span>카메라를 선택해주세요</span></div>
         <div id="rr-rec-indicator" style="display:none;position:absolute;top:8px;left:8px;background:rgba(220,38,38,.9);color:#fff;border-radius:16px;padding:3px 8px;font-size:10px;font-weight:700;align-items:center;gap:4px"><span style="width:6px;height:6px;background:#fff;border-radius:50%;display:inline-block;animation:rrBlink 1s infinite"></span> 녹화 중</div>
         <div id="rr-timer" style="display:none;position:absolute;top:8px;right:8px;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700;font-family:monospace">00:00</div>
       </div>
+      <div style="text-align:center;font-size:11px;color:#7c3aed;font-weight:400;margin-bottom:6px">녹화 종료 시 자동으로 저장됩니다.</div>
       <div style="display:flex;gap:8px">
         <button id="rr-btn-start" onclick="rrStartRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;background:#7c3aed;">⏺ 녹화 시작</button>
         <button id="rr-btn-pause" onclick="rrPauseRecording()" style="flex:1;padding:12px;font-size:14px;font-weight:800;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;background:#f59e0b;display:none;">⏸ 일시정지</button>
@@ -383,18 +383,18 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   <div id="h-panel-reading" style="display:none">
     <div class="toolbar" style="flex-wrap:wrap;gap:6px">
       <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-student" onchange="renderHistoryReading()"><option value="">전체 학생</option></select>
-      <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-feedback" onchange="renderHistoryReading()">
-        <option value="">전체</option><option value="미작성">피드백 미작성</option><option value="완료">피드백 완료</option>
-      </select>
       <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-period" onchange="renderHistoryReading()">
         <option value="all">전체</option>
         <option value="today">오늘</option>
         <option value="week">이번 주</option>
-        <option value="month">이번 달</option>
+        <option value="month" id="hrr-period-month">이번 달</option>
         <option value="1m">1개월</option>
         <option value="2m">2개월</option>
         <option value="3m">3개월</option>
         <option value="6m">6개월</option>
+      </select>
+      <select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="hrr-feedback" onchange="renderHistoryReading()">
+        <option value="">피드백 전체</option><option value="미작성">미작성</option><option value="완료">완료</option>
       </select>
       <button class="btn btn-red btn-sm" id="hrr-bulk-delete-btn" style="display:none" onclick="rrBulkDelete()">선택 삭제</button>
     </div>
@@ -7035,9 +7035,9 @@ function renderHistory(){
   if(period==='today')list=list.filter(function(r){return r.date===todayISO();});
   else if(period==='week'){var start=new Date(now2);start.setDate(now2.getDate()-now2.getDay()+1);list=list.filter(function(r){return r.date>=start.toISOString().split('T')[0];});}
   else if(period==='month')list=list.filter(function(r){var d=new Date(r.date);return d.getMonth()+1===curMo&&d.getFullYear()===now2.getFullYear();});
-  else if(period&&period!=='all'&&!isNaN(parseInt(period))){var mo2=parseInt(period);if(mo2>curMo){$('history-scroll-wrap').innerHTML='<div class="empty"><div class="ei">⏳</div><div class="et">'+mo2+'월은 아직 진행 전입니다</div></div>';$('h-bulk-delete-btn').style.display='none';$('h-select-all-btn').style.display='none';return;}list=list.filter(function(r){var d=new Date(r.date);return d.getMonth()+1===mo2&&d.getFullYear()===now2.getFullYear();});}
-  if(!list.length){$('history-scroll-wrap').innerHTML='<div class="empty"><div class="ei">📊</div><div class="et">기록이 없습니다</div></div>';$('h-bulk-delete-btn').style.display='none';$('h-select-all-btn').style.display='none';return;}
-  $('h-bulk-delete-btn').style.display='';$('h-select-all-btn').style.display='';
+  else if(period&&period!=='all'&&!isNaN(parseInt(period))){var mo2=parseInt(period);if(mo2>curMo){$('history-scroll-wrap').innerHTML='<div class="empty"><div class="ei">⏳</div><div class="et">'+mo2+'월은 아직 진행 전입니다</div></div>';$('h-bulk-delete-btn').style.display='none';var _sa1=$('h-select-all-btn');if(_sa1)_sa1.style.display='none';return;}list=list.filter(function(r){var d=new Date(r.date);return d.getMonth()+1===mo2&&d.getFullYear()===now2.getFullYear();});}
+  if(!list.length){$('history-scroll-wrap').innerHTML='<div class="empty"><div class="ei">📊</div><div class="et">기록이 없습니다</div></div>';$('h-bulk-delete-btn').style.display='none';var _sa2=$('h-select-all-btn');if(_sa2)_sa2.style.display='none';return;}
+  $('h-bulk-delete-btn').style.display='';var _sa3=$('h-select-all-btn');if(_sa3)_sa3.style.display='';
   function hwIcon(hw){if(!hw)return'-';var s=splitHw(hw);if(s.video||s.book){var p=[];if(s.video)p.push(s.video==='미제출'?'<span style="color:#dc2626">영상 숙제 미제출</span>':'영상 숙제 제출');if(s.book)p.push(s.book==='미완료'?'<span style="color:#dc2626">교재 숙제 미완료</span>':'교재 숙제 완료');return p.join(' / ');}return hw;}
   var thead='<tr><th style="width:32px"><input type="checkbox" id="h-check-all" onclick="toggleSelectAllReports()" title="전체선택"></th>';
   ['날짜','이름','단계','진도','숙제','복습테스트','수업태도','코멘트','삭제'].forEach(function(h){thead+='<th>'+h+'</th>';});
@@ -22964,6 +22964,10 @@ function switchHistoryTab(tab){
 async function renderHistoryReading(){
   var el=document.getElementById('hrr-list');
   if(!el||!db)return;
+  // 이번달(N월) 표시 업데이트
+  var curMoRR=new Date().getMonth()+1;
+  var moOptRR=document.getElementById('hrr-period-month');
+  if(moOptRR)moOptRR.textContent='이번 달('+curMoRR+'월)';
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--txt3);font-size:12px">불러오는 중...</div>';
   var studentId=document.getElementById('hrr-student').value;
   var fbFilter=document.getElementById('hrr-feedback').value;
