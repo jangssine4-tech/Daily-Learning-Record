@@ -4487,6 +4487,7 @@ function _boardFocusNavRender(){
     var now=new Date();
     var html='<div style="max-width:720px;padding:4px;display:flex;flex-direction:column;gap:10px">';
     html+=_renderFocusPrevSection(prevStart,moStart);
+    html+=_renderFocusMonthlyTaskSection(moStart,moEnd,yr,mo);
     html+=_renderFocusAcalSection(yr,mo,moStart,moEnd,now);
     html+=_renderFocusPlanSection(moStart,moEnd);
     html+='</div>';
@@ -4513,6 +4514,52 @@ function _renderFocusPrevSection(prevStart,moStart){
   });
   h+='</div></div>';
   return h;
+}
+
+function _renderFocusMonthlyTaskSection(moStart,moEnd,yr,mo){
+  // 업무 추가 모달에서 "이달의 할 일"로 등록한 항목들
+  var items=(_dbTasks||[]).filter(function(t){
+    if(t.id&&t.id.startsWith('__'))return false;
+    if(t.planId)return false;
+    if(t.taskType!=='이달의 중점')return false;
+    // dueDate가 해당 월에 속하거나 scheduleDate가 해당 월에 속하는 것
+    var d=t.dueDate||t.scheduleDate||'';
+    return d>=moStart&&d<moEnd;
+  });
+  var done=items.filter(function(t){return t.status==='완료';}).length;
+  var h='<div style="border:1.5px solid #d8b4fe;border-radius:12px;overflow:hidden">';
+  h+='<div style="background:#fdf4ff;padding:9px 14px;display:flex;align-items:center;gap:8px">';
+  h+='<span style="font-size:13px;font-weight:800;color:#7e22ce">🎯 이달의 중점 업무</span>';
+  h+='<span style="font-size:11px;color:#a855f7">'+yr+'년 '+mo+'월</span>';
+  if(items.length)h+='<span style="font-size:11px;color:var(--txt3);margin-left:auto">'+done+'/'+items.length+' 완료</span>';
+  h+='<button class="btn btn-sm" style="background:#7e22ce;color:#fff;border:none;margin-left:'+(items.length?'4px':'auto')+'" onclick="openDbTaskModal(null,null,\'이달의 중점\')">＋ 추가</button>';
+  h+='</div>';
+  h+='<div style="padding:8px 14px;background:var(--surface)">';
+  if(!items.length){
+    h+='<div style="font-size:12px;color:var(--txt3);padding:6px 0">이달의 중점 업무가 없어요. + 추가 버튼으로 등록하세요.</div>';
+  }else{
+    items.sort(function(a,b){return(a.dueDate||a.scheduleDate||'')>(b.dueDate||b.scheduleDate||'')?1:-1;});
+    items.forEach(function(t){
+      var isDone=t.status==='완료';
+      var dStr=t.dueDate||t.scheduleDate||'';
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">';
+      h+='<input type="checkbox"'+(isDone?' checked':'')+' onchange="_toggleDbTaskStatus(\''+t.id+'\',this.checked)" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#7e22ce">';
+      h+='<span onclick="openDbTaskModal(\''+t.id+'\')" style="flex:1;font-size:12px;cursor:pointer;'+(isDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+t.name+'</span>';
+      if(dStr)h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">~'+dStr.slice(5)+'</span>';
+      if(t.area)h+='<span style="font-size:10px;background:#ede9fe;color:#7c3aed;padding:1px 5px;border-radius:4px;flex-shrink:0">'+t.area+'</span>';
+      h+='</div>';
+    });
+  }
+  h+='</div></div>';
+  return h;
+}
+
+function _toggleDbTaskStatus(id,checked){
+  var t=(_dbTasks||[]).find(function(x){return x.id===id;});
+  if(!t)return;
+  t.status=checked?'완료':'미완료';
+  saveDashBoard();
+  _boardFocusNavRender();
 }
 
 function _renderFocusAcalSection(yr,mo,moStart,moEnd,now){
