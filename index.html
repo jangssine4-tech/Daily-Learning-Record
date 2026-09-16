@@ -14953,7 +14953,7 @@ function _renderDbAreaView(){
 }
 
 // ── 업무 행 렌더링 ────────────────────────────────
-async function _dbTaskRow(t,hideAreaBadge){
+function _dbTaskRow(t,hideAreaBadge){
   var isDone=t.status==='완료';
   var pColor=_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)';
   var pShort=_DB_PRIORITY_SHORT[t.priority]||'';
@@ -15241,7 +15241,9 @@ function _dbSaveTaskModal(id){
   else _renderDashBoardUI($('dashboard-board-area'));
   // 이달의 중점 업무면 이달의 할 일 탭으로 이동
   if(taskType==='이달의 중점'&&_boardCurrentTab!=='focus'){
-    goto('board');setTimeout(function(){switchBoardTab('focus');},100);
+    var _g=window._gotoOriginal||window.goto;
+    if(_g)_g('board');
+    setTimeout(function(){switchBoardTab('focus');},150);
   }
   // Firestore 저장은 백그라운드
   if(savedId)saveTask(savedId); else saveDashBoard();
@@ -22627,31 +22629,31 @@ window.addEventListener('beforeunload',function(e){
 
 // goto() 가로채기 - 녹화 중 또는 일시정지 중 페이지 이동 시 경고
 (function(){
-  var _origGotoRR=window.goto;
-  window.goto=function(view){
-    var isRecording=_rrRecording;
-    var isPaused=_rrRecorder&&_rrRecorder.state==='paused';
-    var bootOverlay=document.getElementById('boot-overlay');
-    var isBooting=bootOverlay&&!bootOverlay.classList.contains('hidden');
-    if(!isBooting&&(isRecording||isPaused)){
-      var state=isPaused?'일시정지 중':'녹화 중';
-      // showConfirm: 확인=머물기(저장), 취소=이동
-      showConfirm('⚠️ '+state+'입니다.\n저장 버튼을 눌러 저장한 후 이동하세요.\n\n지금 이동하면 녹화 내용이 사라집니다.','머물기','이동').then(async function(stay){
-        if(stay){
-          // 머물기 - 아무것도 안 함
-          return;
-        }
-        // 이동 - 강제 종료 후 이동
-        _rrRecording=false;
-        clearInterval(_rrTimerInt);
-        if(_rrRecorder){try{_rrRecorder.stop();}catch(e){}}
-        _rrChunks=[];
-        if(_origGotoRR)_origGotoRR(view);
-      });
-      return; // 일단 이동 막음
-    }
-    if(_origGotoRR)_origGotoRR(view);
-  };
+  // defer로 goto가 정의된 후에 래핑
+  window.addEventListener('load', function(){
+    var _origGotoRR=window._gotoOriginal||window.goto;
+    if(!_origGotoRR){return;} // goto 없으면 래핑 안 함
+    window._gotoOriginal=_origGotoRR; // 원본 보존
+    window.goto=function(view){
+      var isRecording=_rrRecording;
+      var isPaused=_rrRecorder&&_rrRecorder.state==='paused';
+      var bootOverlay=document.getElementById('boot-overlay');
+      var isBooting=bootOverlay&&!bootOverlay.classList.contains('hidden');
+      if(!isBooting&&(isRecording||isPaused)){
+        var state=isPaused?'일시정지 중':'녹화 중';
+        showConfirm('⚠️ '+state+'입니다.\n저장 버튼을 눌러 저장한 후 이동하세요.\n\n지금 이동하면 녹화 내용이 사라집니다.','머물기','이동').then(async function(stay){
+          if(stay){return;}
+          _rrRecording=false;
+          clearInterval(_rrTimerInt);
+          if(_rrRecorder){try{_rrRecorder.stop();}catch(e){}}
+          _rrChunks=[];
+          if(window._gotoOriginal)window._gotoOriginal(view);
+        });
+        return;
+      }
+      if(window._gotoOriginal)window._gotoOriginal(view);
+    };
+  });
 })();
 var _rrPathDefaults={pc:'C:\\Users\\gentl\\Downloads\\ReadingVideos',external:'E:\\ReadingVideos',nas:'\\\\AcademyNAS\\ReadingVideos'};
 
