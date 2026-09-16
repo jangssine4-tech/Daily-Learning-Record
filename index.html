@@ -22640,7 +22640,13 @@ async function rrLoadCameras(){
     sel.innerHTML=cameras.length
       ?cameras.map(function(c,i){return'<option value="'+c.deviceId+'">'+(c.label||'카메라 '+(i+1))+'</option>';}).join('')
       :'<option value="">카메라를 찾을 수 없습니다</option>';
-    if(cameras.length)rrSwitchCamera(cameras[0].deviceId);
+    if(!cameras.length)return;
+    // 마지막으로 쓴 카메라 자동 선택
+    var lastId=localStorage.getItem('rr_last_camera');
+    var target=lastId&&cameras.find(function(c){return c.deviceId===lastId;});
+    var selectedId=target?lastId:cameras[0].deviceId;
+    sel.value=selectedId;
+    rrSwitchCamera(selectedId);
   }catch(e){
     var sel2=document.getElementById('rr-camera-sel');
     if(sel2)sel2.innerHTML='<option value="">카메라 권한을 허용해주세요</option>';
@@ -22649,6 +22655,7 @@ async function rrLoadCameras(){
 
 async function rrSwitchCamera(deviceId){
   if(!deviceId)return;
+  localStorage.setItem('rr_last_camera',deviceId);
   rrStopStream();
   try{
     _rrStream=await navigator.mediaDevices.getUserMedia({
