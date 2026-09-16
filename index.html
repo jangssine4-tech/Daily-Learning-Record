@@ -250,7 +250,61 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
   #today-task-col{width:100%!important;flex:1!important;max-height:50vh;overflow-y:auto}
   #btn-toggle-taskcol{display:block!important}
 }
+/* ── 커스텀 모달 (alert/confirm 대체) ── */
+.cm-overlay{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;animation:cmFadeIn .15s ease}
+.cm-box{background:var(--surface,#fff);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.18);padding:28px 28px 20px;max-width:420px;width:100%;animation:cmSlideUp .18s ease}
+.cm-icon{font-size:26px;text-align:center;margin-bottom:8px}
+.cm-msg{font-size:14px;color:var(--txt,#1e293b);line-height:1.7;white-space:pre-wrap;word-break:break-word;text-align:center;margin-bottom:20px}
+.cm-btns{display:flex;gap:10px;justify-content:center}
+.cm-btn{padding:10px 24px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;transition:opacity .15s}
+.cm-btn:hover{opacity:.85}
+.cm-btn-ok{background:var(--navy,#1e3a5f);color:#fff}
+.cm-btn-cancel{background:var(--surface2,#f1f5f9);color:var(--txt,#1e293b);border:1px solid var(--border,#e2e8f0)}
+.cm-btn-danger{background:#dc2626;color:#fff}
+@keyframes cmFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes cmSlideUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
 </style>
+<script>
+function _cmIcon(msg){
+  if(msg.includes('삭제')||msg.includes('초기화'))return '🗑️';
+  if(msg.includes('❌')||msg.includes('오류')||msg.includes('실패'))return '❌';
+  if(msg.includes('⚠️')||msg.includes('녹화')||msg.includes('이탈'))return '⚠️';
+  if(msg.includes('📁')||msg.includes('경로')||msg.includes('폴더'))return '📁';
+  if(msg.includes('✅')||msg.includes('완료'))return '✅';
+  return 'ℹ️';
+}
+function showAlert(msg,okLabel){
+  return new Promise(function(resolve){
+    var clean=msg.replace(/^[❌✅⚠️📁📌ℹ️🗑️]\s*/,'');
+    var icon=_cmIcon(msg);
+    var ov=document.createElement('div');ov.className='cm-overlay';
+    ov.innerHTML='<div class="cm-box"><div class="cm-icon">'+icon+'</div>'
+      +'<div class="cm-msg">'+clean.replace(/</g,'&lt;')+'</div>'
+      +'<div class="cm-btns"><button class="cm-btn cm-btn-ok">'+(okLabel||'확인')+'</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('.cm-btn-ok').onclick=function(){ov.remove();resolve();};
+    ov.onclick=function(e){if(e.target===ov){ov.remove();resolve();}};
+  });
+}
+function showConfirm(msg,okLabel,cancelLabel,danger){
+  return new Promise(function(resolve){
+    var clean=msg.replace(/^[❌✅⚠️📁📌ℹ️🗑️]\s*/,'');
+    var icon=_cmIcon(msg);
+    var ov=document.createElement('div');ov.className='cm-overlay';
+    var okCls=danger?'cm-btn cm-btn-danger':'cm-btn cm-btn-ok';
+    ov.innerHTML='<div class="cm-box"><div class="cm-icon">'+icon+'</div>'
+      +'<div class="cm-msg">'+clean.replace(/</g,'&lt;')+'</div>'
+      +'<div class="cm-btns">'
+      +'<button class="cm-btn cm-btn-cancel">'+(cancelLabel||'취소')+'</button>'
+      +'<button class="cm-btn '+okCls+'">'+(okLabel||'확인')+'</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('.cm-btn-ok').onclick=function(){ov.remove();resolve(true);};
+    ov.querySelector('.cm-btn-cancel').onclick=function(){ov.remove();resolve(false);};
+    ov.onclick=function(e){if(e.target===ov){ov.remove();resolve(false);}};
+  });
+}
+</script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
@@ -22646,7 +22700,7 @@ function rrShowSavePath(){
   var nameKey=(_rrStudentName&&_rrStudentNumber)?_rrStudentName+'('+_rrStudentNumber+')':(_rrStudentName||'[학생명(ID)]');
   var now=new Date();
   var yr=now.getFullYear();var mo=String(now.getMonth()+1).padStart(2,'0');
-  alert('📁 저장 경로 안내\n\n영상 및 스냅샷은 아래 폴더에 저장됩니다:\n\n'+basePath+'\\'+nameKey+'\\'+yr+'\\'+mo+'\\\n\n저장 경로를 바꾸려면 "📂 직접 선택" 버튼을 사용하세요.');
+  showAlert('📁 저장 경로 안내\n\n영상 및 스냅샷은 아래 폴더에 저장됩니다:\n\n'+basePath+'\\'+nameKey+'\\'+yr+'\\'+mo+'\\\n\n저장 경로를 바꾸려면 "📂 직접 선택" 버튼을 사용하세요.');
 }
 
 async function rrTakeSnapshot(){
@@ -23160,7 +23214,7 @@ function rrOpenSnapFull(encodedPath){
 }
 
 function rrShowDeleteInfo(){
-  alert('🗑 삭제 안내\n\n브라우저에서 [삭제] 버튼을 누르면 Firebase의 기록(날짜, 교재, 피드백 등)만 삭제됩니다.\n\n영상 파일(.webm)은 저장된 폴더에서 직접 삭제해주세요.\n\n저장 위치 예시: C:/Users/gentl/Downloads/ReadingVideos/학생이름(번호)/2026/09/\n\n※ Electron 앱에서 삭제하면 영상 파일도 자동으로 삭제됩니다.');
+  showAlert('🗑 삭제 안내\n\n브라우저에서 [삭제] 버튼을 누르면 Firebase의 기록(날짜, 교재, 피드백 등)만 삭제됩니다.\n\n영상 파일(.webm)은 저장된 폴더에서 직접 삭제해주세요.\n\n저장 위치 예시: C:/Users/gentl/Downloads/ReadingVideos/학생이름(번호)/2026/09/\n\n※ Electron 앱에서 삭제하면 영상 파일도 자동으로 삭제됩니다.');
 }
 
 
