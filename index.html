@@ -22663,11 +22663,27 @@ async function rrSwitchCamera(deviceId){
 }
 
 function rrStopStream(){
+  // 녹화 중이면 강제 중단
+  if(_rrRecording){
+    _rrRecording=false;
+    clearInterval(_rrTimerInt);
+    if(_rrRecorder){try{_rrRecorder.stop();}catch(e){}}
+    _rrChunks=[];
+    _rrRecorder=null;
+  }
+  // 카메라 스트림 종료
   if(_rrStream){_rrStream.getTracks().forEach(function(t){t.stop();});_rrStream=null;}
   var video=document.getElementById('rr-preview');
   if(video)video.srcObject=null;
   var nc=document.getElementById('rr-no-camera');
   if(nc)nc.style.display='flex';
+  // UI 초기화 - 버튼/인디케이터 상태 리셋
+  document.querySelectorAll('#rr-btn-start').forEach(function(el){el.style.display='flex';});
+  document.querySelectorAll('#rr-btn-stop').forEach(function(el){el.style.display='none';});
+  document.querySelectorAll('#rr-btn-pause').forEach(function(el){el.style.display='none';el.textContent='⏸ 일시정지';el.style.background='#f59e0b';});
+  document.querySelectorAll('#rr-rec-indicator').forEach(function(el){el.style.display='none';el.style.opacity='1';});
+  document.querySelectorAll('#rr-timer').forEach(function(el){el.style.display='none';el.textContent='00:00';});
+  document.querySelectorAll('#rr-overlay-toast').forEach(function(el){el.style.display='none';});
 }
 
 function rrBuildFileName(){
