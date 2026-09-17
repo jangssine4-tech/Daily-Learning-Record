@@ -7220,17 +7220,17 @@ async function saveReport(){
   var formTablet=($('r-comment-tablet')||{}).value||'';
   var formBook=($('r-comment-book')||{}).value||'';
   var prevComment=_splitComment(prev.comment||'');
-  var mergedTablet=formTablet||prevComment.t;
-  var mergedBook=formBook||prevComment.b;
+  // comment: 항상 폼 값 우선 (빈칸 저장 허용 — 이전 값으로 복원되지 않음)
   var mergedComment='';
-  if(mergedTablet&&mergedBook)mergedComment='[태블릿] '+mergedTablet+'\n[교재] '+mergedBook;
-  else if(mergedTablet)mergedComment=mergedTablet;
-  else if(mergedBook)mergedComment='[교재] '+mergedBook;
-  // For other fields: use form value if non-empty, else keep existing
-  function pick(formVal,prevVal){return(formVal!==undefined&&formVal!==''&&formVal!==null)?formVal:(prevVal||'');}
+  if(formTablet&&formBook)mergedComment='[태블릿] '+formTablet+'\n[교재] '+formBook;
+  else if(formTablet)mergedComment=formTablet;
+  else if(formBook)mergedComment='[교재] '+formBook;
+  // pick: formVal이 null(요소 없음)이면 prevVal 유지. ''(빈칸)은 유효한 삭제로 처리
+  function pick(formVal,prevVal){return(formVal!==null)?formVal:(prevVal||'');}
   // Merge eval items: combine, don't overwrite
   var mergedEval=Object.assign({},prev.evalItems||{},evalItems);
-  function safeVal(id){var el=$(id);return el?el.value:'';}
+  // safeVal: 요소가 없으면 null 반환(→ pick이 prev 유지). 있으면 value 반환(''도 유효한 삭제)
+  function safeVal(id){var el=$(id);return el?el.value:null;}
   function safeChecked(id){var el=$(id);return el?el.checked:false;}
   var data={
     studentId:sId,studentName:s.name,classId:s.classId||'',
