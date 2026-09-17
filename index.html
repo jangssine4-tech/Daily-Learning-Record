@@ -1186,8 +1186,8 @@ var _DB_PRIORITY_COLORS={'긴급':'#dc2626','중요':'#d97706','일반':'#16a34a
 var _DB_STATUSES=['대기','진행 중','완료','보류'];
 var _DB_STATUS_COLORS={'대기':'#6b7280','진행 중':'#2563eb','완료':'#16a34a','보류':'#d97706'};
 var _DB_STATUS_BG={'대기':'#f3f4f6','진행 중':'#eff6ff','완료':'#f0fdf4','보류':'#fffbeb'};
-var _DB_TASK_TYPES=['일반 업무','이달의 중점','이번 주 중점'];
-var _DB_TASK_TYPE_ICONS={'일반 업무':'📋','이달의 중점':'🎯','이번 주 중점':'📅'};
+var _DB_TASK_TYPES=['일반 업무','이달의 할 일','이달의 중점','이번 주 중점'];
+var _DB_TASK_TYPE_ICONS={'일반 업무':'📋','이달의 할 일':'📅','이달의 중점':'🎯','이번 주 중점':'📅'};
 var _dbTypeFilter='';
 var _promoLoaded=false;
 var currentGoalsTab='annual', currentSummaryTab='summary', currentRefTab='fees';
@@ -4589,7 +4589,7 @@ function _renderFocusAcalSection(yr,mo,moStart,moEnd,now){
   var monthlyTasks=(_dbTasks||[]).filter(function(t){
     if(t.id&&t.id.startsWith('__'))return false;
     if(t.planId)return false;
-    if(t.taskType!=='이달의 중점')return false;
+    if(t.taskType!=='이달의 중점'&&t.taskType!=='이달의 할 일')return false;
     var d=t.dueDate||t.scheduleDate||'';
     return d>=moStart&&d<moEnd;
   });
@@ -6088,7 +6088,7 @@ function renderSchedule(){
         html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'present\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
         html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'absent\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✕</span></button>';
         html+='<button class="att-btn early-btn'+(early?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'early\',\''+_mkId+'\')" title="조퇴/학습 마무리 못함"><span style="font-size:15px;font-weight:700">▲</span></button>';
-        if(done||absent||early)html+='<button class="att-btn" onclick="startReport(\''+s.id+'\',\''+_mkId+'\',\''+pTime2+'\')" title="일지 작성">📝</button>';
+        if(done||absent||early)html+='<button class="att-btn" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';startReport(\''+s.id+'\',\''+_mkId+'\',\''+pTime2+'\')" title="일지 작성">📝</button>';
 
         html+='</div>';
         // 메모 (출석 버튼 아래)
@@ -6925,6 +6925,7 @@ function startReport(studentId,makeupId,sessionTime){
   window._currentMakeupId=makeupId||'';
   window._currentSessionTime=sessionTime||'';
   renderWriteFlowPanel(studentId);
+  goto('write');
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
   var rep;
   if(makeupId){rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&r.makeupId===makeupId;});}
@@ -14178,7 +14179,7 @@ function _mfmRenderStep1(overlay){
   var thisMonItems=prepEvts.filter(function(e){return e.date>=thisMonStart&&e.date<thisMonEnd;});
 
   var overdueTasks=(_dbTasks||[]).filter(function(t){
-    return t.dueDate&&t.dueDate<today&&t.status!=='완료'&&(!t.taskType||t.taskType==='일반 업무'||t.taskType==='이달의 중점'||t.taskType==='이번 주 중점');
+    return t.dueDate&&t.dueDate<today&&t.status!=='완료'&&(!t.taskType||t.taskType==='일반 업무'||t.taskType==='이달의 할 일'||t.taskType==='이달의 중점'||t.taskType==='이번 주 중점');
   }).slice(0,8);
 
   var guides=_opGuides||[];
@@ -14892,7 +14893,7 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
     if(t.id&&t.id.startsWith('__'))return false;
     if(t.planId)return false;
     if(!t.dueDate||t.dueDate<monStr||t.dueDate>sunStr)return false;
-    return !t.taskType||t.taskType==='일반 업무'||t.taskType==='이달의 중점'||t.taskType==='이번 주 중점';
+    return !t.taskType||t.taskType==='일반 업무'||t.taskType==='이달의 할 일'||t.taskType==='이달의 중점'||t.taskType==='이번 주 중점';
   });
   weekTasks=_dbFiltered(weekTasks);
   weekTasks.sort(function(a,b){
@@ -15191,7 +15192,7 @@ function _dbSaveTaskModal(id){
   var area=(document.getElementById('dbt-area')||{}).value||'';
   var listChoice=(document.getElementById('dbt-list-hidden')||{}).value||'today';
   // listChoice → taskType 매핑 (하위 호환)
-  var taskType='일반 업무';
+  var taskType=listChoice==='monthly'?'이달의 할 일':listChoice==='weekly'?'이번 주 중점':'일반 업무';
   var dueDate=(document.getElementById('dbt-due')||{}).value||'';
   var scheduleDate=(document.getElementById('dbt-scheduledate')||{}).value||today;
   var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
@@ -15239,8 +15240,8 @@ function _dbSaveTaskModal(id){
   else if(_boardCurrentTab==='focus'){_boardFocusNavRender();}
   else if(_boardCurrentTab==='weekly'){if(typeof _renderBoardWeeklyPanel==='function')_renderBoardWeeklyPanel();}
   else _renderDashBoardUI($('dashboard-board-area'));
-  // 이달의 중점 업무면 이달의 할 일 탭으로 이동
-  if(taskType==='이달의 중점'&&_boardCurrentTab!=='focus'){
+  // 이달의 중점 업무 또는 이달의 할 일이면 이달의 할 일 탭으로 이동
+  if((taskType==='이달의 중점'||taskType==='이달의 할 일')&&_boardCurrentTab!=='focus'){
     var _g=window._gotoOriginal||window.goto;
     if(_g)_g('board');
     setTimeout(function(){switchBoardTab('focus');},150);
