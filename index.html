@@ -6933,7 +6933,7 @@ function _clearReportForm(){
   var hwSt=$('r-hw-status');if(hwSt)hwSt.value='미확인';
   var ea=$('eval-area');if(ea)ea.innerHTML='';
   var ind=$('temp-save-indicator');if(ind)ind.style.display='none';
-  window._evalState={};window._currentEvalModule='';
+  // _evalState, _currentEvalModule 은 startReport 진입 시 초기화되므로 여기서 건드리지 않음
 }
 function startReport(studentId,makeupId,sessionTime){
   if(window._reportSaving){toast('⚠️ 저장 중입니다. 잠시 후 다시 시도해주세요');return;}
@@ -6985,8 +6985,9 @@ function startReport(studentId,makeupId,sessionTime){
     if(ind)ind.style.display='none';
     if(rep){_lastLoadedReportTs=rep.updatedAt||rep.createdAt||'';if($('r-review-yn'))$('r-review-yn').value=rep.reviewYN||'';$('r-review').value=rep.reviewTest||'';$('r-review-items').value=rep.reviewTestItems||'';_setAttitudeFields(rep.attitude||'');$('r-quiz').value=rep.dailyQuiz||'';$('r-hw').value=rep.homework||'';var _hw1=splitHw(rep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw1.video;if($('r-hw-book')){$('r-hw-book').value=_hw1.book;}if($('r-hw-plan'))$('r-hw-plan').value=rep.hwPlan||'';$('r-hw-status').value=rep.hwStatus||'미확인';var _sc2=_splitComment(rep.comment||'');$('r-comment-tablet').value=_sc2.t;$('r-comment-book').value=_sc2.b;$('r-memo').value=rep.memo||'';$('r-makeup-check').checked=rep.needsMakeup||false;$('r-makeup-content').value=rep.makeupContent||'';$('r-makeup-content-wrap').style.display=rep.needsMakeup?'block':'none';if($('r-parent-contact'))$('r-parent-contact').checked=rep.parentContact||false;if($('r-exam-date'))$('r-exam-date').value=rep.examDate||'';if($('r-exam-type'))$('r-exam-type').value=rep.examType||'';if(rep.dictation){var _dm2=rep.dictation.match(/^(\d+)\/(\d+)/);if(_dm2){if($('r-dictation-correct'))$('r-dictation-correct').value=_dm2[1];if($('r-dictation-total'))$('r-dictation-total').value=_dm2[2];}$('r-dictation').value=rep.dictation;}else{if($('r-dictation-correct'))$('r-dictation-correct').value='';if($('r-dictation-total'))$('r-dictation-total').value='';$('r-dictation').value='';}}  
     else{_lastLoadedReportTs='';['r-review-yn','r-review','r-attitude-level','r-hw','r-hw-video','r-hw-book','r-dictation-correct','r-dictation-total'].forEach(function(id2){var el=$(id2);if(el)el.value='';});['r-review-items','r-quiz','r-comment-tablet','r-comment-book','r-memo','r-makeup-content'].forEach(function(id2){var el=$(id2);if(el)el.value='';});$('r-hw-status').value='미확인';$('r-attitude').style.display='none';$('r-attitude').value='';$('r-makeup-check').checked=false;$('r-makeup-content-wrap').style.display='none';if($('r-parent-contact'))$('r-parent-contact').checked=false;}
-    var levelModule=getEvalModuleForLevel(_initLvForModal);
-    if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
+    // evalModule: 저장된 rep.evalModule 우선, 없으면 레벨로 계산
+    var levelModule=(rep&&rep.evalModule)||getEvalModuleForLevel(_initLvForModal);
+    if(levelModule){window._currentEvalModule=levelModule;renderEvalArea(levelModule,rep?.evalItems||{});}
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
   }
   // Auto-set teachers AFTER goto (which rebuilds dropdowns via populateTeacherSelects)
