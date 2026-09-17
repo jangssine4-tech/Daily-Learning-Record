@@ -6977,9 +6977,10 @@ function startReport(studentId,makeupId,sessionTime){
     if(lvSel&&tempData.level){lvSel.value=tempData.level;populateProgressDropdown(tempData.level,tempData.progress||'');updateDictationDropdown(tempData.level,tempData.dictation||'');if(tempData.progress){var _ps=$('r-progress');if(_ps)_ps.value=tempData.progress;}}
     if($('r-review-yn'))$('r-review-yn').value=tempData.reviewYN||'';$('r-review').value=tempData.reviewTest||'';$('r-review-items').value=tempData.reviewTestItems||'';_setAttitudeFields(tempData.attitude||'');$('r-quiz').value=tempData.dailyQuiz||'';$('r-hw').value=tempData.homework||'';var _hw0=splitHw(tempData.homework);if($('r-hw-video'))$('r-hw-video').value=_hw0.video;if($('r-hw-book')){$('r-hw-book').value=_hw0.book;}if($('r-hw-plan'))$('r-hw-plan').value=tempData.hwPlan||'';$('r-hw-status').value=tempData.hwStatus||'미확인';var _sc0=_splitComment(tempData.comment||'');$('r-comment-tablet').value=_sc0.t;$('r-comment-book').value=_sc0.b;$('r-memo').value=tempData.memo||'';$('r-makeup-check').checked=tempData.needsMakeup||false;$('r-makeup-content').value=tempData.makeupContent||'';$('r-makeup-content-wrap').style.display=tempData.needsMakeup?'block':'none';if($('r-parent-contact'))$('r-parent-contact').checked=tempData.parentContact||false;
     if(tempData.dictation){var _dm=tempData.dictation.match(/^(\d+)\/(\d+)/);if(_dm){if($('r-dictation-correct'))$('r-dictation-correct').value=_dm[1];if($('r-dictation-total'))$('r-dictation-total').value=_dm[2];}$('r-dictation').value=tempData.dictation;}updateDictationValue();if(tempData.evalState)window._evalState=tempData.evalState;
-    // evalModule: tempData에 있으면 우선, 없으면 rep 또는 레벨로 계산
+    // evalModule: tempData에 있으면 우선, 없으면 rep 또는 레벨로 계산 (defer for onchange safety)
     var _tempEvalMod=tempData.evalModule||(rep&&rep.evalModule)||getEvalModuleForLevel(_initLvForModal);
-    if(_tempEvalMod){window._currentEvalModule=_tempEvalMod;renderEvalArea(_tempEvalMod,tempData.evalState||{});}
+    var _tempEvalState=tempData.evalState||{};
+    if(_tempEvalMod){window._currentEvalModule=_tempEvalMod;setTimeout(function(){renderEvalArea(_tempEvalMod,_tempEvalState);},0);}
     if(ind)ind.style.display='block';
     toast('📋 임시 저장 데이터를 불러왔습니다');
   }
@@ -6996,9 +6997,15 @@ function startReport(studentId,makeupId,sessionTime){
       window._evalState={};
     }
     // evalModule: rep.evalModule 우선, 없으면 레벨로 계산 — rep 유무와 무관하게 항상 렌더링
-    var levelModule=(rep&&rep.evalModule)||getEvalModuleForLevel(_initLvForModal);
-    if(levelModule){window._currentEvalModule=levelModule;renderEvalArea(levelModule,window._evalState);}
-    else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
+    // setTimeout(0)으로 defer: lvSel.innerHTML 재설정 시 발생할 수 있는 onchange 이벤트가
+    // evalArea를 비우는 걸 방지하기 위해 모든 동기 처리 이후 렌더링
+    var _evalModForRender=(rep&&rep.evalModule)||getEvalModuleForLevel(_initLvForModal);
+    var _evalStateForRender=Object.assign({},window._evalState);
+    setTimeout(function(){
+      var curMod=_evalModForRender||getEvalModuleForLevel($('r-level').value);
+      if(curMod){window._currentEvalModule=curMod;renderEvalArea(curMod,_evalStateForRender);}
+      else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
+    },0);
   }
   // Auto-set teachers AFTER goto (which rebuilds dropdowns via populateTeacherSelects)
   if(tempData&&(tempData.teacherTablet||tempData.teacher)){
@@ -7270,8 +7277,11 @@ async function saveReport(){
   }
   // 레벨 자동 업데이트 제거 - 일지 저장이 학생 레벨에 영향 없음
   window._evalState={};_lastLoadedReportTs=data.updatedAt;
-  // Clear temp data after successful DB save
-  var tempKey='tempReport_'+sId+'_'+data.date+(_mkId?'_mk'+_mkId:'');localStorage.removeItem(tempKey);
+  // Clear temp data after successful DB save (sessionTime suffix must match startReport's key format)
+  var _sstKey=_sst?'_t'+_sst.replace(':',''):'';
+  var tempKey='tempReport_'+sId+'_'+data.date+(_mkId?'_mk'+_mkId:'')+_sstKey;localStorage.removeItem(tempKey);
+  // Also remove without suffix for backward compatibility
+  var tempKeyOld='tempReport_'+sId+'_'+data.date+(_mkId?'_mk'+_mkId:'');if(tempKeyOld!==tempKey)localStorage.removeItem(tempKeyOld);
   var ind=$('temp-save-indicator');if(ind)ind.style.display='none';
   window._reportSaving=false;
   loading(false);toast('✅ 일지 저장됨 (DB 반영 완료)');
