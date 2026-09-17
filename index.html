@@ -6924,6 +6924,8 @@ function startReport(studentId,makeupId,sessionTime){
   window._currentEvalModule='';window._evalState={};window._saveImageAfter=false;_lastLoadedReportTs='';
   window._currentMakeupId=makeupId||'';
   window._currentSessionTime=sessionTime||'';
+  // ★ goto() 이전에 학생 ID를 먼저 hidden 필드에 설정 — goto 내부 렌더링이 올바른 학생을 참조하도록
+  var _rStudentEl=$('r-student-id');if(_rStudentEl)_rStudentEl.value=studentId;
   renderWriteFlowPanel(studentId);
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
   // Reading 녹화 섹션 학생 정보 먼저 동기화 (goto 전에 설정해야 녹화 패널에서 인식됨)
@@ -6932,7 +6934,8 @@ function startReport(studentId,makeupId,sessionTime){
   var rep;
   if(makeupId){rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&r.makeupId===makeupId;});}
   else{var _sTime=sessionTime||'';rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&!r.makeupId&&(r.sessionTime||'')==_sTime;});}
-  $('r-student-id').value=studentId;
+  // ★ hidden 필드 재확인 (goto 이후에도 학생 ID 보장)
+  if($('r-student-id'))$('r-student-id').value=studentId;
   var _dispLevel=window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s);
   var infoText=s.name+(s.studentNumber?' (ID:'+s.studentNumber+')':'')+' · '+_dispLevel+' · '+(s.grade||'')+(makeupId?' · 🔴 보강':'');
   var bar=$('write-student-info-bar');if(bar){bar.textContent=infoText;bar.style.display='block';}
@@ -6986,7 +6989,8 @@ function startReport(studentId,makeupId,sessionTime){
 }
 function tempSaveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
-  var tempKey='tempReport_'+sId+'_'+$('r-date').value+(window._currentMakeupId?'_mk'+window._currentMakeupId:'')+(window._currentSessionTime?'_'+window._currentSessionTime.replace(':',''):'');
+  // ★ startReport와 동일한 tempKey 형식 사용 (_t 접두사 포함)
+  var tempKey='tempReport_'+sId+'_'+$('r-date').value+(window._currentMakeupId?'_mk'+window._currentMakeupId:'')+(window._currentSessionTime?'_t'+window._currentSessionTime.replace(':',''):'');
   combineHw();
   var data={level:$('r-level').value,progress:$('r-progress').value,teacherTablet:$('r-teacher-tablet').value,teacherBook:$('r-teacher-book').value,reviewYN:$('r-review-yn').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',hwPlan:$('r-hw-plan')?.value||'',comment:_combineComment(),memo:$('r-memo').value,examDate:$('r-exam-date')?.value||'',examType:$('r-exam-type')?.value||'',needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',parentContact:$('r-parent-contact')?.checked||false,dictation:$('r-dictation').value||'',evalModule:window._currentEvalModule||'',evalState:window._evalState||{},savedAt:new Date().toISOString()};
   localStorage.setItem(tempKey,JSON.stringify(data));
@@ -7159,6 +7163,13 @@ function setEval(key,val,btn){if(!window._evalState)window._evalState={};var cur
 
 async function saveReport(){
   var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 시간표에서 선택하세요');return;}
+  // ★ 안전 검증: hidden 필드와 window 변수가 불일치하면 window 변수를 우선 사용
+  var _globalSId=window._currentReportStudentId||'';
+  if(_globalSId&&sId!==_globalSId){
+    console.warn('[saveReport] r-student-id('+sId+') vs _currentReportStudentId('+_globalSId+') 불일치 → _currentReportStudentId로 보정');
+    sId=_globalSId;
+    if($('r-student-id'))$('r-student-id').value=sId;
+  }
   var s=students.find(function(x){return x.id===sId;});if(!s){toast('⚠️ 학생 데이터를 찾을 수 없습니다');return;}
   loading(true);
   try{
