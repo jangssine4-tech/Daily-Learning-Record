@@ -7172,8 +7172,8 @@ async function saveReport(){
   else{existing=reports.find(function(r){return r.studentId===sId&&r.date===formDate&&!r.makeupId&&(r.sessionTime||'')==_sst;});}
   var prev=existing||{};
   // For comment: merge tablet/book independently
-  var formTablet=$('r-comment-tablet').value;
-  var formBook=$('r-comment-book').value;
+  var formTablet=($('r-comment-tablet')||{}).value||'';
+  var formBook=($('r-comment-book')||{}).value||'';
   var prevComment=_splitComment(prev.comment||'');
   var mergedTablet=formTablet||prevComment.t;
   var mergedBook=formBook||prevComment.b;
@@ -7185,30 +7185,32 @@ async function saveReport(){
   function pick(formVal,prevVal){return(formVal!==undefined&&formVal!==''&&formVal!==null)?formVal:(prevVal||'');}
   // Merge eval items: combine, don't overwrite
   var mergedEval=Object.assign({},prev.evalItems||{},evalItems);
+  function safeVal(id){var el=$(id);return el?el.value:'';}
+  function safeChecked(id){var el=$(id);return el?el.checked:false;}
   var data={
     studentId:sId,studentName:s.name,classId:s.classId||'',
     date:formDate,sessionTime:window._currentSessionTime||'',
-    teacher:$('r-teacher-tablet').value||'',
-    teacherTablet:$('r-teacher-tablet').value||'',
-    teacherBook:$('r-teacher-book').value||'',
-    level:pick($('r-level').value,prev.level),
-    progress:pick($('r-progress').value,prev.progress),
-    reviewYN:pick($('r-review-yn')?.value,prev.reviewYN),
-    reviewTest:pick($('r-review').value,prev.reviewTest),
-    reviewTestItems:pick($('r-review-items').value,prev.reviewTestItems),
-    attitude:pick($('r-attitude').value,prev.attitude),
-    dailyQuiz:pick($('r-quiz').value,prev.dailyQuiz),
-    homework:pick($('r-hw').value,prev.homework),
-    hwStatus:pick($('r-hw-status').value,prev.hwStatus)||'미확인',
+    teacher:safeVal('r-teacher-tablet')||'',
+    teacherTablet:safeVal('r-teacher-tablet')||'',
+    teacherBook:safeVal('r-teacher-book')||'',
+    level:pick(safeVal('r-level'),prev.level),
+    progress:pick(safeVal('r-progress'),prev.progress),
+    reviewYN:pick(safeVal('r-review-yn'),prev.reviewYN),
+    reviewTest:pick(safeVal('r-review'),prev.reviewTest),
+    reviewTestItems:pick(safeVal('r-review-items'),prev.reviewTestItems),
+    attitude:pick(safeVal('r-attitude'),prev.attitude),
+    dailyQuiz:pick(safeVal('r-quiz'),prev.dailyQuiz),
+    homework:pick(safeVal('r-hw'),prev.homework),
+    hwStatus:pick(safeVal('r-hw-status'),prev.hwStatus)||'미확인',
     comment:mergedComment,
-    memo:pick($('r-memo').value,prev.memo),
-    dictation:pick($('r-dictation')?.value,prev.dictation),
+    memo:pick(safeVal('r-memo'),prev.memo),
+    dictation:pick(safeVal('r-dictation'),prev.dictation),
     evalModule:usedEvalModule||prev.evalModule||'',
     evalItems:mergedEval,
     praise:prev.praise||[],
     absent:false,
-    examDate:$('r-exam-date')?.value||'',examType:$('r-exam-type')?.value||'',needsMakeup:$('r-makeup-check').checked||false,
-    makeupContent:pick($('r-makeup-content').value,prev.makeupContent),
+    examDate:safeVal('r-exam-date')||'',examType:safeVal('r-exam-type')||'',needsMakeup:safeChecked('r-makeup-check'),
+    makeupContent:pick(safeVal('r-makeup-content'),prev.makeupContent),
     updatedAt:new Date().toISOString()
   };
   if(_mkId)data.makeupId=_mkId;
