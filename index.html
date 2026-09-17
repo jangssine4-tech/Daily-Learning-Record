@@ -6925,8 +6925,10 @@ function startReport(studentId,makeupId,sessionTime){
   window._currentMakeupId=makeupId||'';
   window._currentSessionTime=sessionTime||'';
   renderWriteFlowPanel(studentId);
-  goto('write');
   var s=students.find(function(x){return x.id===studentId;});if(!s)return;
+  // Reading 녹화 섹션 학생 정보 먼저 동기화 (goto 전에 설정해야 녹화 패널에서 인식됨)
+  if(typeof rrInitForStudent==='function')rrInitForStudent(studentId,(s&&s.name)||'',s);
+  goto('write');
   var rep;
   if(makeupId){rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&r.makeupId===makeupId;});}
   else{var _sTime=sessionTime||'';rep=reports.find(function(r){return r.studentId===studentId&&r.date===((_scheduleDate||todayISO()))&&!r.makeupId&&(r.sessionTime||'')==_sTime;});}
@@ -6969,10 +6971,6 @@ function startReport(studentId,makeupId,sessionTime){
     if(levelModule)renderEvalArea(levelModule,rep?.evalItems||{});
     else{var ea=$('eval-area');if(ea)ea.innerHTML='';}
   }
-  goto('write');
-  // Reading 녹화 섹션 학생 정보 동기화
-  var _rrS=students.find(function(x){return x.id===studentId;});
-  if(typeof rrInitForStudent==='function')rrInitForStudent(studentId,(_rrS&&_rrS.name)||'',_rrS);
   // Auto-set teachers AFTER goto (which rebuilds dropdowns via populateTeacherSelects)
   if(tempData&&(tempData.teacherTablet||tempData.teacher)){
     if($('r-teacher-tablet'))$('r-teacher-tablet').value=tempData.teacherTablet||tempData.teacher||'';
