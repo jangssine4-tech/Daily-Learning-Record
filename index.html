@@ -2530,6 +2530,26 @@ async function syncFromFirestore(){
 }
 // ── Real-time Listeners ──
 var _rtListeners=[];
+
+// 현재 활성 뷰를 감지해 적절한 렌더 함수를 호출하는 공통 함수
+// trigger: 어떤 컬렉션이 변경됐는지 ('reports'|'students'|'makeups'|'consultations'|'memos'|'classes'|'all')
+function refreshCurrentView(trigger){
+  var cv=document.querySelector('.view.active');
+  if(!cv)return;
+  var vid=cv.id.replace('view-','');
+  // 뷰별 렌더 맵 — 각 뷰가 어떤 데이터를 사용하는지에 따라 trigger 필터링
+  var reportsViews   ={'schedule':renderScheduleThrottled,'history':renderHistory,'write':refreshWriteFormIfNeeded,'board':renderDashBoard};
+  var studentsViews  ={'schedule':renderScheduleThrottled,'students':renderStudents,'board':renderDashBoard};
+  var makeupsViews   ={'schedule':renderScheduleThrottled,'makeup':renderMakeupCalendar,'board':renderDashBoard};
+  var consultsViews  ={'consult':renderConsults,'newcon':renderNewConsults,'board':renderDashBoard};
+  var memosViews     ={'memo':renderMemoPage,'schedule':renderScheduleThrottled};
+  var classesViews   ={'schedule':renderScheduleThrottled,'students':renderStudents};
+  var map={reports:reportsViews,students:studentsViews,makeups:makeupsViews,consultations:consultsViews,memos:memosViews,classes:classesViews};
+  var viewMap=trigger==='all'?Object.assign({},reportsViews,studentsViews,makeupsViews,consultsViews,memosViews,classesViews):(map[trigger]||{});
+  var fn=viewMap[vid];
+  if(fn){try{fn();}catch(e){console.error('refreshCurrentView('+trigger+') error:',e);}}
+}
+
 function startRealtimeListeners(){
   if(!db)return;
   // Checklist realtime listener (all teachers' today status)
@@ -2541,19 +2561,13 @@ function startRealtimeListeners(){
       if(!uid)return;
       var docId='checklistDone_'+clDateStr+'_'+uid;
       var unsubCl=db.collection('config').doc(docId).onSnapshot(function(d){
-        // Update cached state for this teacher
         if(!window._clTeacherStates)window._clTeacherStates={};
         window._clTeacherStates[uid]=d.exists?d.data():null;
-        // If checklist page is open (this teacher), update UI
         var cv=document.querySelector('.view.active');
         if(cv&&cv.id==='view-checklist'){
           var myUid=currentUser&&(currentUser.docId||currentUser.id)||'';
-          if(myUid===uid){
-            _checklistState=window._clTeacherStates[uid]||{};
-            _renderChecklistUI($('checklist-area'));
-          }
+          if(myUid===uid){_checklistState=window._clTeacherStates[uid]||{};_renderChecklistUI($('checklist-area'));}
         }
-        // If dashboard is open, refresh summary
         var boardEl=$('board-cl-summary');
         if(boardEl)_loadBoardChecklistSummary();
       },function(){});
@@ -2564,27 +2578,16 @@ function startRealtimeListeners(){
   var yearStart=new Date().getFullYear()+'-01-01';
   try{
     var unsub1=db.collection('reports').where('date','>=',yearStart).onSnapshot(function(snap){
-      var newData=snap.docs.map(function(d){return{id:d.id,...d.data()};});
-      reports=newData;
-      var cv=document.querySelector('.view.active');
-      if(cv){
-        var vid=cv.id.replace('view-','');
-        if(vid==='schedule')renderScheduleThrottled();
-        else if(vid==='history')renderHistory();
-        else if(vid==='write')refreshWriteFormIfNeeded();
-      }
+      reports=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      refreshCurrentView('reports');
     },function(err){console.error('reports listener:',err);});
     _rtListeners.push(unsub1);
   }catch(e){}
   // StudentMemos listener
   try{
     var unsub2=db.collection('studentMemos').onSnapshot(function(snap){
-      var newMemos=snap.docs.map(function(d){return{id:d.id,...d.data()};});
-      var mChanged=newMemos.length!==window._studentMemos.length;
-      window._studentMemos=newMemos;
-      if(!mChanged)return;
-      var cv2=document.querySelector('.view.active');
-      if(cv2){if(cv2.id==='view-memo')renderMemoPage();if(cv2.id==='view-schedule')renderScheduleThrottled();}
+      window._studentMemos=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      refreshCurrentView('memos');
     },function(err){console.error('memos listener:',err);});
     _rtListeners.push(unsub2);
   }catch(e){}
@@ -2593,6 +2596,7 @@ function startRealtimeListeners(){
     var unsub3=db.collection('students').onSnapshot(function(snap){
       students=snap.docs.map(function(d){return{id:d.id,...d.data()};});
       _fullyPopulated=false;
+      refreshCurrentView('students');
     },function(err){});
     _rtListeners.push(unsub3);
   }catch(e){}
@@ -2600,20 +2604,15 @@ function startRealtimeListeners(){
   try{
     var unsub4=db.collection('consultations').orderBy('date','desc').onSnapshot(function(snap){
       consultations=snap.docs.map(function(d){return{id:d.id,...d.data()};});
-      var cv4=document.querySelector('.view.active');
-      if(cv4&&cv4.id==='view-consult')renderConsults();
+      refreshCurrentView('consultations');
     },function(err){});
     _rtListeners.push(unsub4);
   }catch(e){}
   // Makeups listener
   try{
     var unsub5=db.collection('makeups').onSnapshot(function(snap){
-      var newMk=snap.docs.map(function(d){return{id:d.id,...d.data()};});
-      var mkChanged=newMk.length!==makeups.length;
-      makeups=newMk;
-      if(!mkChanged)return;
-      var cv5=document.querySelector('.view.active');
-      if(cv5){if(cv5.id==='view-makeup')renderMakeupCalendar();if(cv5.id==='view-schedule')renderScheduleThrottled();}
+      makeups=snap.docs.map(function(d){return{id:d.id,...d.data()};});
+      refreshCurrentView('makeups');
     },function(err){});
     _rtListeners.push(unsub5);
   }catch(e){}
@@ -2622,6 +2621,7 @@ function startRealtimeListeners(){
     var unsub6=db.collection('classes').onSnapshot(function(snap){
       classes=snap.docs.map(function(d){return{id:d.id,...d.data()};});
       _fullyPopulated=false;
+      refreshCurrentView('classes');
     },function(err){});
     _rtListeners.push(unsub6);
   }catch(e){}
@@ -2629,7 +2629,6 @@ function startRealtimeListeners(){
   try{
     var unsub7=db.collection('users').onSnapshot(function(snap){
       users=snap.docs.map(function(d){return{id:d.id,...d.data()};});
-      // Re-merge perms from cached userPerms
       if(window._cachedPerms){Object.keys(window._cachedPerms).forEach(function(uid){var u=users.find(function(x){return x.id===uid;});if(u)u.menuPerms=window._cachedPerms[uid];});}
     },function(err){});
     _rtListeners.push(unsub7);
