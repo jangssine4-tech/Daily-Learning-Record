@@ -2900,10 +2900,7 @@ function renderWriteFlowPanel(studentId){
     quizTrend=diff>5?'📈 상승':diff<-5?'📉 하락':'➡ 유지';
   }
 
-  var html='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 '+s.name+' · 최근 4주</div>';
-
-  // Status badge
-  // 받아쓰기 저점 (70점 미만) 횟수
+  // ── 집계 추가 ──
   var dictLow=sReps.filter(function(r){
     if(r.absent||!r.dictation)return false;
     var dm=r.dictation.match(/^(\d+)\/(\d+)/);
@@ -2911,29 +2908,120 @@ function renderWriteFlowPanel(studentId){
     var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;
     return pct<70;
   }).length;
-  var risk=(absent>=2?1:0)+(hwFail>=2?1:0)+(retestCount>=2?1:0)+(attBad>=2?1:0)+(bookFail>=2?1:0)+(dictLow>=2?1:0);
-  var riskLabel=risk>=3?'🔴 관리 필요':risk>=1?'🟡 관심':'🟢 안정';
-  var riskColor=risk>=3?'#dc2626':risk>=1?'#b45309':'#16a34a';
-  var riskBg=risk>=3?'#fef2f2':risk>=1?'#fefce8':'#f0fdf4';
-  html+='<div style="background:'+riskBg+';border:1px solid '+riskColor+';border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;font-weight:700;color:'+riskColor+'">'+riskLabel+'</div>';
+  var totalClass=sReps.length;
+  var attendRate=totalClass>0?Math.round(attend/totalClass*100):100;
+  var hwTotal=sReps.filter(function(r){return!r.absent;}).length;
+  var hwOk=hwTotal-hwFail;
+  var hwRate=hwTotal>0?Math.round(hwOk/hwTotal*100):100;
+  // 받아쓰기 평균
+  var dictScores=sReps.filter(function(r){
+    if(r.absent||!r.dictation)return false;
+    var dm=r.dictation.match(/^(\d+)\/(\d+)/);
+    return dm&&parseInt(dm[2])>0;
+  }).map(function(r){
+    var dm=r.dictation.match(/^(\d+)\/(\d+)/);
+    return Math.round(parseInt(dm[1])/parseInt(dm[2])*100);
+  });
+  var dictAvg=dictScores.length?Math.round(dictScores.reduce(function(a,b){return a+b;},0)/dictScores.length):null;
+  // 대표 태도
+  var attBest='';
+  if(attGood>=2)attBest='우수 이상 '+attGood+'회';
+  else if(attBad>=2)attBest='주의 '+attBad+'회';
+  else if(attGood===1)attBest='우수 '+attGood+'회';
+  else attBest='-';
+  var attBestColor=attBad>=2?'#dc2626':attGood>=1?'#16a34a':'var(--txt)';
+  // Quiz 트렌드 문자
+  var quizTrendStr='';
+  if(quizScores.length>=2){
+    var qOld=quizScores[quizScores.length-1];var qNew=quizScores[0];
+    var qDiff=qNew-qOld;
+    quizTrendStr=qDiff>5?' ↑':qDiff<-5?' ↓':'';
+  }
+  // ── 상태 및 대표 원인 ──
+  var causes=[];
+  if(absent>=2)causes.push({t:'결석 반복',w:4});
+  else if(absent===1)causes.push({t:'결석 발생',w:2});
+  if(hwFail>=3)causes.push({t:'숙제 미완 반복',w:4});
+  else if(hwFail>=1)causes.push({t:'숙제 미완 발생',w:2});
+  if(retestCount>=2)causes.push({t:'재시험 반복',w:3});
+  else if(retestCount===1)causes.push({t:'재시험 발생',w:2});
+  if(attBad>=2)causes.push({t:'태도 관리 필요',w:3});
+  if(bookFail>=2)causes.push({t:'교재 미준비 반복',w:2});
+  else if(bookFail===1)causes.push({t:'교재 미준비 발생',w:1});
+  if(dictLow>=2)causes.push({t:'받아쓰기 저점 반복',w:2});
+  causes.sort(function(a,b){return b.w-a.w;});
+  var totalRisk=causes.reduce(function(s,c){return s+c.w;},0);
+  var riskLevel=totalRisk>=6?'red':totalRisk>=2?'yellow':'green';
+  var riskLabel=riskLevel==='red'?'🔴 집중 관리':riskLevel==='yellow'?'🟡 관심 필요':'🟢 안정적';
+  var riskColor=riskLevel==='red'?'#dc2626':riskLevel==='yellow'?'#b45309':'#16a34a';
+  var riskBg=riskLevel==='red'?'#fef2f2':riskLevel==='yellow'?'#fefce8':'#f0fdf4';
+  var mainCause=causes.length?causes[0].t:'학습 흐름 안정';
+  var subCauses=causes.slice(1,3).map(function(c){return c.t;});
+  var extraCount=causes.length>3?causes.length-3:0;
+  // ── HTML 시작 ──
+  var html='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 '+s.name+' · 최근 4주</div>';
 
-  // Stats grid
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(absent>=2?'#dc2626':'var(--navy)')+'">'+absent+'</div><div style="font-size:9px;color:var(--txt3)">결석</div></div>'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(hwFail>=2?'#dc2626':'var(--navy)')+'">'+hwFail+'</div><div style="font-size:9px;color:var(--txt3)">숙제 미완</div></div>'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(bookFail>=2?'#dc2626':'var(--navy)')+'">'+bookFail+'</div><div style="font-size:9px;color:var(--txt3)">교재 미준비</div></div>'
-    +'<div style="background:var(--surface2);border-radius:8px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(retestCount>=2?'#dc2626':'var(--navy)')+'">'+retestCount+'</div><div style="font-size:9px;color:var(--txt3)">재시험</div></div>'
-    
+  // ① 상태 배지 (이유 포함)
+  html+='<div style="background:'+riskBg+';border:1px solid '+riskColor+';border-radius:10px;padding:9px 12px;margin-bottom:10px">'
+    +'<div style="font-size:12px;font-weight:800;color:'+riskColor+'">'+riskLabel+' · '+mainCause+'</div>'
+    +(subCauses.length?'<div style="font-size:10px;color:'+riskColor+';opacity:.85;margin-top:3px">'+subCauses.join(' · ')+(extraCount?' 외 '+extraCount+'개':'')+'</div>':'')
     +'</div>';
 
-  // Attitude
-  html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px">'
-    +'<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:4px">수업 태도</div>'
-    +'<div style="font-size:11px">우수 <b>'+attGood+'회</b> · 주의 <b style="color:'+(attBad>=2?'#dc2626':'var(--txt)')+'">'+attBad+'회</b></div></div>';
+  // ② 4개 핵심 지표
+  var quizAvgStr=quizAvg!==null?(quizAvg+'점'+(quizTrendStr)):'기록없음';
+  var quizColor=quizAvg!==null&&quizAvg<70?'#dc2626':quizAvg!==null&&quizAvg>=90?'#16a34a':'var(--navy)';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">'
+    // 출석
+    +'<div style="background:var(--surface2);border-radius:10px;padding:8px 6px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">출석</div>'
+    +'<div style="font-size:18px;font-weight:800;color:'+(absent>=2?'#dc2626':absent===1?'#d97706':'#16a34a')+'">'+attendRate+'%</div>'
+    +'<div style="font-size:9px;color:var(--txt3)">결석 '+absent+'회</div>'
+    +'</div>'
+    // 숙제
+    +'<div style="background:var(--surface2);border-radius:10px;padding:8px 6px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">숙제 완료율</div>'
+    +'<div style="font-size:18px;font-weight:800;color:'+(hwFail>=3?'#dc2626':hwFail>=1?'#d97706':'#16a34a')+'">'+hwRate+'%</div>'
+    +'<div style="font-size:9px;color:var(--txt3)">미완 '+hwFail+'회</div>'
+    +'</div>'
+    // Quiz
+    +'<div style="background:var(--surface2);border-radius:10px;padding:8px 6px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">Quiz 평균</div>'
+    +'<div style="font-size:18px;font-weight:800;color:'+quizColor+'">'+quizAvgStr+'</div>'
+    +'<div style="font-size:9px;color:var(--txt3)">'+(quizScores.length?quizScores.length+'회 기록':'기록없음')+'</div>'
+    +'</div>'
+    // 태도
+    +'<div style="background:var(--surface2);border-radius:10px;padding:8px 6px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--txt3);margin-bottom:2px">수업 태도</div>'
+    +'<div style="font-size:13px;font-weight:800;color:'+attBestColor+';line-height:1.3;margin:2px 0">'+attBest+'</div>'
+    +'<div style="font-size:9px;color:var(--txt3)">주의 '+attBad+'회</div>'
+    +'</div>'
+    +'</div>';
 
-  // Recent 5 lessons
+  // ③ 보조 정보 칩
+  var chips=[];
+  chips.push('교재 미준비 '+bookFail+'회');
+  chips.push('재시험 '+retestCount+'회');
+  if(dictAvg!==null)chips.push('받아쓰기 평균 '+dictAvg+'%');
+  html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">'
+    +chips.map(function(c){return'<span style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 8px;font-size:9px;color:var(--txt2)">'+c+'</span>';}).join('')
+    +'</div>';
+
+  // ④ 최근 변화 (브리지)
+  var changes=[];
+  if(quizScores.length>=2){var qd=quizScores[0]-quizScores[quizScores.length-1];if(qd>5)changes.push('Quiz '+quizScores[quizScores.length-1]+' → '+quizScores[0]+' ↑');else if(qd<-5)changes.push('Quiz '+quizScores[quizScores.length-1]+' → '+quizScores[0]+' ↓');}
+  if(hwFail>=2)changes.push('숙제 미완 지속 ⚠️');
+  if(absent>=2)changes.push('결석 반복 ⚠️');
+  if(changes.length){
+    html+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:8px">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--txt2);margin-bottom:3px">📈 최근 변화</div>'
+      +'<div style="font-size:10px;color:var(--txt)">'+changes.join('　/　')+'</div>'
+      +'</div>';
+  }
+
+  // ⑤ 최근 수업 흐름 (날짜별 근거)
   if(sReps.length){
-    html+='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">최근 수업 흐름</div>'
+    html+='<div style="font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px;padding-top:4px;border-top:1px solid var(--border)">날짜별 수업 기록 ↓</div>'
+      +'<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px">최근 수업 흐름</div>'
       +'<div style="display:grid;grid-template-columns:30px 44px 44px 52px 28px 40px 52px;gap:2px;font-size:9px;font-weight:700;color:var(--txt3);padding-bottom:3px;border-bottom:2px solid var(--border);margin-bottom:3px;text-align:center"><span>날짜</span><span>교재 숙제</span><span>영상 숙제</span><span>태도</span><span>Quiz</span><span>플랜 체크</span><span>받아 쓰기</span></div>';
     sReps.slice(0,8).forEach(function(r){
       var testLabel=r.absent?'-':(r.reviewTest||'-');
