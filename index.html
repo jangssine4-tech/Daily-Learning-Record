@@ -292,11 +292,14 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
     var icon=_cmIcon(msg);
     var ov=document.createElement('div');ov.className='cm-overlay';
     var okCls=danger?'cm-btn cm-btn-danger':'cm-btn cm-btn-ok';
+    // okLabel/cancelLabel이 문자열이 아닌 경우(true/false 등) 기본값 사용
+    var okText=(typeof okLabel==='string'&&okLabel)?okLabel:'확인';
+    var cancelText=(typeof cancelLabel==='string'&&cancelLabel)?cancelLabel:'취소';
     ov.innerHTML='<div class="cm-box"><div class="cm-icon">'+icon+'</div>'
       +'<div class="cm-msg">'+clean.replace(/</g,'&lt;')+'</div>'
       +'<div class="cm-btns">'
-      +'<button class="cm-btn cm-btn-cancel">'+(cancelLabel||'취소')+'</button>'
-      +'<button class="cm-btn '+okCls+'">'+(okLabel||'확인')+'</button>'
+      +'<button class="cm-btn cm-btn-cancel">'+cancelText+'</button>'
+      +'<button class="cm-btn '+okCls+'">'+okText+'</button>'
       +'</div></div>';
     document.body.appendChild(ov);
     ov.querySelector('.cm-btn-ok').onclick=async function(){ov.remove();resolve(true);};
@@ -7101,7 +7104,7 @@ function onReportDateChange(){
     populateProgressDropdown($('r-level').value,existingRep.progress||'',newDate);
     if($('r-review-yn'))$('r-review-yn').value=existingRep.reviewYN||'';if($('r-review'))$('r-review').value=existingRep.reviewTest||'';if($('r-review-items'))$('r-review-items').value=existingRep.reviewTestItems||'';
     _setAttitudeFields(existingRep.attitude||'');if($('r-quiz'))$('r-quiz').value=existingRep.dailyQuiz||'';
-    if($('r-hw'))$('r-hw').value=existingRep.homework||'';var _hw2=splitHw(existingRep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw2.video;if($('r-hw-book'))$('r-hw-book').value=_hw2.book;if($('r-hw-status'))$('r-hw-status').value=existingRep.hwStatus||'미확인';
+    if($('r-hw'))$('r-hw').value=existingRep.homework||'';var _hw2=splitHw(existingRep.homework);if($('r-hw-video'))$('r-hw-video').value=_hw2.video;if($('r-hw-book'))$('r-hw-book').value=_hw2.book;if($('r-hw-status'))$('r-hw-status').value=existingRep.hwStatus||'미확인';if($('r-hw-plan'))$('r-hw-plan').value=existingRep.hwPlan||'';
     var _sc3=_splitComment(existingRep.comment||'');$('r-comment-tablet').value=_sc3.t;$('r-comment-book').value=_sc3.b;$('r-memo').value=existingRep.memo||'';
     return;
   }
@@ -7246,6 +7249,7 @@ async function saveReport(){
     dailyQuiz:pick(safeVal('r-quiz'),prev.dailyQuiz),
     homework:pick(safeVal('r-hw'),prev.homework),
     hwStatus:pick(safeVal('r-hw-status'),prev.hwStatus)||'미확인',
+    hwPlan:pick(safeVal('r-hw-plan'),prev.hwPlan),
     comment:mergedComment,
     memo:pick(safeVal('r-memo'),prev.memo),
     dictation:pick(safeVal('r-dictation'),prev.dictation),
