@@ -3937,19 +3937,12 @@ function _buildTimeline(){
     } else {
       secItems.forEach(function(entry){
         var h=entry.h; var item=entry.item;
-        var displayH=h===24?'00':String(h).padStart(2,'0');
-        var dispMin=item.item&&item.item.task&&item.item.task.startMinute?String(item.item.task.startMinute).padStart(2,'0'):'00';
-        var timeLabel=displayH+':'+dispMin;
         var isPastHour=isTodayDate&&h<curH;
         var isCurrent=isTodayDate&&h===curH;
         var rowBg=isCurrent?'#e9e9eb':(isPastDate||isPastHour)?'var(--surface2)':secBg;
         var borderLeft=isCurrent?'3px solid var(--navy)':'3px solid transparent';
         var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+h+')" ondrop="tlDrop(event,'+h+')" ondragleave="tlDragLeave(event)"':'';
         html+='<div class="tl-row" data-hour="'+h+'" '+dndAttrs+' style="min-height:44px;border-bottom:1px solid var(--border);background:'+rowBg+';border-left:'+borderLeft+';transition:background .15s;padding:6px 8px 6px 10px">';
-        html+='<div style="margin-bottom:4px">';
-        html+='<span style="font-size:11px;font-weight:700;color:'+(isCurrent?'var(--navy)':(isPastDate||isPastHour)?'var(--txt3)':'var(--txt2)')+'">'+timeLabel+'</span>';
-        if(isCurrent)html+='<span style="font-size:9px;color:var(--navy);font-weight:600;margin-left:4px">지금</span>';
-        html+='</div>';
         html+='<div class="tl-slot" style="display:flex;flex-direction:column;gap:4px">';
         html+=_tlTaskCard(item,isPastDate);
         html+='</div></div>';
@@ -4002,8 +3995,14 @@ function _tlTaskCard(item,isPastDate){
   }
 
   if(isPlan)r+='<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#1d4ed8;flex-shrink:0;font-weight:700">📋</span>';
-  // 업무명 (타임라인 행 헤더에 이미 시간이 표시되므로 카드 내 시간 생략)
-  r+='<span style="flex:1;font-size:12px;font-weight:500;'+lineThrough+'">'+t.name+'</span>';
+  // 업무명 + 시작 시간 (체크박스 오른쪽)
+  var timeLabel='';
+  if(t.startHour!==undefined&&t.startHour!==null){
+    var th=t.startHour===24?0:t.startHour;
+    var tm=t.startMinute?String(t.startMinute).padStart(2,'0'):'00';
+    timeLabel='<span style="font-size:11px;font-weight:600;color:var(--txt3);margin-right:4px;flex-shrink:0">'+String(th).padStart(2,'0')+':'+tm+'</span>';
+  }
+  r+='<span style="flex:1;font-size:12px;font-weight:500;display:flex;align-items:center;gap:0;'+lineThrough+'">'+timeLabel+t.name+'</span>';
   if(t.estDuration)r+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+t.estDuration+'</span>';
 
   // 플랜 업무 세부 내용 드롭다운 버튼
