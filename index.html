@@ -3836,6 +3836,15 @@ function tlCalSelect(dateStr){
 }
 
 // ── 타임라인 빌더 ──────────────────────────────────────────────
+// 시간 → 시간대 구간 변환 (startHour 숫자 기준)
+function _hourToTimeSection(h){
+  var n=parseInt(h);
+  if(n>=6&&n<12)return '오전';
+  if(n>=12&&n<18)return '오후';
+  if(n>=18&&n<21)return '저녁';
+  return '밤'; // 21~24(=0) + 0~5
+}
+
 function _buildTimeline(){
   var selDate=_tlSelectedDate();
   var today=todayISO();
@@ -3844,6 +3853,15 @@ function _buildTimeline(){
   var isTodayDate=selDate===today;
   var now=new Date();
   var curH=now.getHours();
+
+  // 4개 구간 정의 (표시 순서)
+  var SECTIONS=[
+    {key:'오전',label:'☀️ 오전',sub:'06~12시',hours:[6,7,8,9,10,11],bg:'#fffbeb',border:'#fde68a',headerBg:'#fef3c7',textColor:'#92400e'},
+    {key:'오후',label:'🌤 오후',sub:'12~18시',hours:[12,13,14,15,16,17],bg:'#f0fdf4',border:'#86efac',headerBg:'#dcfce7',textColor:'#166534'},
+    {key:'저녁',label:'🌆 저녁',sub:'18~21시',hours:[18,19,20],bg:'#eff6ff',border:'#93c5fd',headerBg:'#dbeafe',textColor:'#1e40af'},
+    {key:'밤',label:'🌙 밤',sub:'21~24시',hours:[21,22,23,24],bg:'#faf5ff',border:'#d8b4fe',headerBg:'#ede9fe',textColor:'#6b21a8'}
+  ];
+
   var HOURS=[];
   for(var h=1;h<=24;h++)HOURS.push(h);
 
@@ -3883,24 +3901,55 @@ function _buildTimeline(){
   html+='<button onclick="_toggleTaskCol()" id="btn-toggle-taskcol" style="display:none;background:#1e40af;border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;margin-left:auto">📋 오늘의 업무</button>';
   html+='</div>';
 
-  HOURS.forEach(function(h){
-    var displayH=h===24?'00':String(h).padStart(2,'0');
-    var timeLabel=displayH+':00';
-    var isPastHour=isTodayDate&&h<curH;
-    var isCurrent=isTodayDate&&h===curH;
-    var items=slotMap[h]||[];
-    var rowBg=isCurrent?'#eff6ff':(isPastDate||isPastHour)?'var(--surface2)':'var(--surface)';
-    var borderLeft=isCurrent?'4px solid var(--blue)':'4px solid transparent';
-    var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+h+')" ondrop="tlDrop(event,'+h+')" ondragleave="tlDragLeave(event)"':'';
+  // 4개 구간 렌더링
+  SECTIONS.forEach(function(sec){
+    var secItems=[];
+    sec.hours.forEach(function(h){
+      (slotMap[h]||[]).forEach(function(item){
+        secItems.push({h:h,item:item});
+      });
+    });
+    // 현재 구간에 현재 시간이 포함되는지
+    var isCurrentSection=isTodayDate&&sec.hours.indexOf(curH)!==-1;
+    var isPastSection=isTodayDate&&sec.hours[sec.hours.length-1]<curH;
 
-    html+='<div class="tl-row" data-hour="'+h+'" '+dndAttrs+' style="min-height:48px;border-bottom:1px solid var(--border);background:'+rowBg+';border-left:'+borderLeft+';transition:background .15s;padding:6px 8px 6px 10px">';
-    html+='<div style="margin-bottom:'+(items.length?'4px':'0')+'">';
-    html+='<span style="font-size:11px;font-weight:700;color:'+(isCurrent?'var(--blue)':(isPastDate||isPastHour)?'var(--txt3)':'var(--txt2)')+'">'+timeLabel+'</span>';
-    if(isCurrent)html+='<span style="font-size:9px;color:var(--blue);font-weight:600;margin-left:4px">지금</span>';
+    html+='<div style="border-bottom:2px solid '+sec.border+';margin-bottom:0">';
+    // 구간 헤더
+    html+='<div style="background:'+sec.headerBg+';padding:7px 12px;display:flex;align-items:center;gap:8px;border-left:4px solid '+sec.border+'">';
+    html+='<span style="font-size:13px;font-weight:800;color:'+sec.textColor+'">'+sec.label+'</span>';
+    html+='<span style="font-size:10px;color:'+sec.textColor+';opacity:0.7">'+sec.sub+'</span>';
+    if(isCurrentSection)html+='<span style="font-size:9px;background:var(--blue);color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">지금</span>';
     html+='</div>';
-    html+='<div class="tl-slot" style="display:flex;flex-direction:column;gap:4px">';
-    items.forEach(function(item){html+=_tlTaskCard(item,isPastDate);});
-    html+='</div></div>';
+
+    // 구간 내 시간대별 행
+    if(secItems.length===0){
+      // 빈 구간 — 드롭 가능 영역
+      var firstH=sec.hours[0];
+      var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+firstH+')" ondrop="tlDrop(event,'+firstH+')" ondragleave="tlDragLeave(event)"':'';
+      html+='<div class="tl-row" data-hour="'+firstH+'" '+dndAttrs+' style="min-height:44px;background:'+(isPastSection||isPastDate?'var(--surface2)':sec.bg)+';padding:8px 12px;display:flex;align-items:center">';
+      html+='<span style="font-size:11px;color:var(--txt3)">—</span>';
+      html+='</div>';
+    } else {
+      secItems.forEach(function(entry){
+        var h=entry.h; var item=entry.item;
+        var displayH=h===24?'00':String(h).padStart(2,'0');
+        var timeLabel=displayH+':00';
+        var isPastHour=isTodayDate&&h<curH;
+        var isCurrent=isTodayDate&&h===curH;
+        var rowBg=isCurrent?'#eff6ff':(isPastDate||isPastHour)?'var(--surface2)':sec.bg;
+        var borderLeft=isCurrent?'4px solid var(--blue)':'4px solid '+sec.border;
+        var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+h+')" ondrop="tlDrop(event,'+h+')" ondragleave="tlDragLeave(event)"':'';
+        html+='<div class="tl-row" data-hour="'+h+'" '+dndAttrs+' style="min-height:44px;border-bottom:1px solid '+sec.border+';background:'+rowBg+';border-left:'+borderLeft+';transition:background .15s;padding:6px 8px 6px 10px">';
+        html+='<div style="margin-bottom:4px">';
+        html+='<span style="font-size:11px;font-weight:700;color:'+(isCurrent?'var(--blue)':(isPastDate||isPastHour)?'var(--txt3)':sec.textColor)+'">'+timeLabel+'</span>';
+        if(isCurrent)html+='<span style="font-size:9px;color:var(--blue);font-weight:600;margin-left:4px">지금</span>';
+        html+='</div>';
+        html+='<div class="tl-slot" style="display:flex;flex-direction:column;gap:4px">';
+        html+=_tlTaskCard(item,isPastDate);
+        html+='</div></div>';
+      });
+    }
+    html+='</div>';
   });
 
   html+='</div>';
@@ -13778,6 +13827,10 @@ function _savePlanTaskModal(planId,taskIdx){
     var ptmParts=ptmStartHourRaw.split(':');
     var ptmHH=parseInt(ptmParts[0]);
     ptmStartHour=(ptmHH===0)?24:ptmHH;
+    // 시작 시간이 설정됐고 시간대가 '미배치'이면 자동 배정
+    if((timeSlot==='미배치'||!timeSlot)&&ptmStartHour!==undefined){
+      timeSlot=_hourToTimeSection(ptmStartHour);
+    }
   }
   plan.tasks[taskIdx].name=name;
   plan.tasks[taskIdx].date=date;
@@ -13955,10 +14008,10 @@ function deleteFocusTask(type,id){
   _renderDashBoardUI($('dashboard-board-area'));
 }
 // ── 오늘 할 일: 오른쪽 업무 목록 ────────────────────────────
-var _TODAY_TIME_SLOTS=['오전','오후','수업 후','미배치'];
-var _TODAY_TIME_SLOT_ICONS={'오전':'☀️','오후':'🌤','수업 후':'🌙','미배치':'📥'};
-var _TODAY_TIME_SLOT_COLORS={'오전':'#fef9c3','오후':'#ecfdf5','수업 후':'#eff6ff','미배치':'#f8fafc'};
-var _TODAY_TIME_SLOT_BORDER={'오전':'#fde68a','오후':'#86efac','수업 후':'#93c5fd','미배치':'#e2e8f0'};
+var _TODAY_TIME_SLOTS=['오전','오후','저녁','밤','미배치'];
+var _TODAY_TIME_SLOT_ICONS={'오전':'☀️','오후':'🌤','저녁':'🌆','밤':'🌙','미배치':'📥'};
+var _TODAY_TIME_SLOT_COLORS={'오전':'#fef9c3','오후':'#dcfce7','저녁':'#dbeafe','밤':'#ede9fe','미배치':'#f8fafc'};
+var _TODAY_TIME_SLOT_BORDER={'오전':'#fde68a','오후':'#86efac','저녁':'#93c5fd','밤':'#d8b4fe','미배치':'#e2e8f0'};
 var _TODAY_DURATION_OPTIONS=['5분','10분','15분','20분','30분','40분','60분','90분','120분'];
 var _TODAY_FOCUS_OPTIONS=['집중 업무','일반 업무','짧은 업무'];
 var _TODAY_FOCUS_COLORS={'집중 업무':'#7c3aed','일반 업무':'#2563eb','짧은 업무':'#6b7280'};
@@ -15315,7 +15368,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
 
   // ── 실행 시간대 + 시작 시간 ──
   var rTime=document.createElement('div');rTime.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
-  var TIME_SLOTS=['미정','오전','오후','수업 전','수업 후'];
+  var TIME_SLOTS=['미정','오전','오후','저녁','밤'];
   var slotSel=mkSel('dbt-timeslot',TIME_SLOTS.map(function(s){return{v:s,l:s};}),
     t?t.timeSlot||'미정':'미정');
   var curHourVal=t&&t.startHour!==undefined&&t.startHour!==null
@@ -15389,6 +15442,10 @@ function _dbSaveTaskModal(id){
     var parts=startHourRaw.split(':');
     var hh=parseInt(parts[0]);var mm=parseInt(parts[1]||0);
     startHour=(hh===0&&mm===0)?24:hh;
+    // 시작 시간이 설정됐고 시간대가 '미정'이면 자동 배정
+    if(timeSlot==='미정'&&startHour!==undefined){
+      timeSlot=_hourToTimeSection(startHour);
+    }
   }
   // 하위 호환: priority 필드도 유지
   var priority=importance==='높음'?'중요':(urgency==='긴급'?'긴급':'일반');
