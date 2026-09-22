@@ -3854,12 +3854,12 @@ function _buildTimeline(){
   var now=new Date();
   var curH=now.getHours();
 
-  // 4개 구간 정의 (표시 순서) — 색 없이 회색 계열 통일
+  // 4개 구간 정의 (표시 순서) — 시간대별 파스텔 컬러 테마
   var SECTIONS=[
-    {key:'오전',label:'오전',sub:'06~12시',hours:[6,7,8,9,10,11]},
-    {key:'오후',label:'오후',sub:'12~18시',hours:[12,13,14,15,16,17]},
-    {key:'저녁',label:'저녁',sub:'18~21시',hours:[18,19,20]},
-    {key:'밤',label:'밤',sub:'21~24시',hours:[21,22,23,24]}
+    {key:'오전',label:'오전',sub:'06~12시',hours:[6,7,8,9,10,11],bg:'#fffbeb',hdrBg:'#fef3c7',accentColor:'#f59e0b',txtColor:'#92400e'},
+    {key:'오후',label:'오후',sub:'12~18시',hours:[12,13,14,15,16,17],bg:'#eff6ff',hdrBg:'#dbeafe',accentColor:'#3b82f6',txtColor:'#1e40af'},
+    {key:'저녁',label:'저녁',sub:'18~21시',hours:[18,19,20],bg:'#f5f3ff',hdrBg:'#ede9fe',accentColor:'#8b5cf6',txtColor:'#5b21b6'},
+    {key:'밤',label:'밤',sub:'21~24시',hours:[21,22,23,24],bg:'#eef2ff',hdrBg:'#e0e7ff',accentColor:'#4f46e5',txtColor:'#3730a3'}
   ];
 
   var HOURS=[];
@@ -3913,17 +3913,19 @@ function _buildTimeline(){
     var isCurrentSection=isTodayDate&&sec.hours.indexOf(curH)!==-1;
     var isPastSection=isTodayDate&&sec.hours[sec.hours.length-1]<curH;
 
-    var secBg=isCurrentSection?'#f4f4f5':'var(--surface)';
-    var headerTextColor=isCurrentSection?'var(--txt)':'var(--txt3)';
-    var headerFontWeight=isCurrentSection?'700':'600';
-    var borderColor='var(--border)';
+    var secBg=isPastSection?'var(--surface2)':(sec.bg||'var(--surface)');
+    var hdrBg=isPastSection?'var(--surface3)':(isCurrentSection?(sec.hdrBg||'#e9e9eb'):(sec.hdrBg||'var(--surface2)'));
+    var accentColor=isPastSection?'var(--txt3)':(sec.accentColor||'var(--navy)');
+    var headerTextColor=isPastSection?'var(--txt3)':(sec.txtColor||'var(--txt)');
+    var headerFontWeight=isCurrentSection?'800':'700';
 
     html+='<div style="border-bottom:1px solid var(--border);margin-bottom:0">';
-    // 구간 헤더
-    html+='<div style="background:'+(isCurrentSection?'#e9e9eb':'var(--surface2)')+';padding:6px 12px;display:flex;align-items:center;gap:8px">';
+    // 구간 헤더 — 왼쪽 4px 컬러 바 + 파스텔 배경
+    html+='<div style="background:'+hdrBg+';padding:7px 12px 7px 10px;display:flex;align-items:center;gap:8px;border-left:4px solid '+(isPastSection?'var(--border)':accentColor)+(isCurrentSection?';box-shadow:0 1px 3px rgba(0,0,0,.06)':'')+'">';
     html+='<span style="font-size:12px;font-weight:'+headerFontWeight+';color:'+headerTextColor+'">'+sec.label+'</span>';
-    html+='<span style="font-size:10px;color:var(--txt3)">'+sec.sub+'</span>';
-    if(isCurrentSection)html+='<span style="font-size:9px;background:var(--navy);color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">지금</span>';
+    html+='<span style="font-size:10px;color:'+(isPastSection?'var(--txt3)':accentColor)+';opacity:'+(isPastSection?'0.6':'0.8')+'">'+sec.sub+'</span>';
+    if(isCurrentSection)html+='<span style="font-size:9px;background:'+accentColor+';color:#fff;padding:1px 6px;border-radius:10px;font-weight:700;margin-left:2px">지금</span>';
+    if(isPastSection)html+='<span style="font-size:9px;color:var(--txt3);margin-left:2px">완료</span>';
     html+='</div>';
 
     // 구간 내 시간대별 행
@@ -3931,7 +3933,7 @@ function _buildTimeline(){
       // 빈 구간 — 드롭 가능 영역
       var firstH=sec.hours[0];
       var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+firstH+')" ondrop="tlDrop(event,'+firstH+')" ondragleave="tlDragLeave(event)"':'';
-      html+='<div class="tl-row" data-hour="'+firstH+'" '+dndAttrs+' style="min-height:40px;background:'+(isPastSection||isPastDate?'var(--surface2)':secBg)+';padding:8px 12px;display:flex;align-items:center">';
+      html+='<div class="tl-row" data-hour="'+firstH+'" '+dndAttrs+' style="min-height:40px;background:'+(isPastSection||isPastDate?'var(--surface2)':secBg)+';padding:8px 12px;display:flex;align-items:center;border-left:4px solid transparent">';
       html+='<span style="font-size:11px;color:var(--txt3)">—</span>';
       html+='</div>';
     } else {
@@ -3939,8 +3941,8 @@ function _buildTimeline(){
         var h=entry.h; var item=entry.item;
         var isPastHour=isTodayDate&&h<curH;
         var isCurrent=isTodayDate&&h===curH;
-        var rowBg=isCurrent?'#e9e9eb':(isPastDate||isPastHour)?'var(--surface2)':secBg;
-        var borderLeft=isCurrent?'3px solid var(--navy)':'3px solid transparent';
+        var rowBg=isCurrent?(sec.hdrBg||'#e9e9eb'):(isPastDate||isPastHour)?'var(--surface2)':secBg;
+        var borderLeft=isCurrent?('4px solid '+(sec.accentColor||'var(--navy)')):'4px solid transparent';
         var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+h+')" ondrop="tlDrop(event,'+h+')" ondragleave="tlDragLeave(event)"':'';
         html+='<div class="tl-row" data-hour="'+h+'" '+dndAttrs+' style="min-height:44px;border-bottom:1px solid var(--border);background:'+rowBg+';border-left:'+borderLeft+';transition:background .15s;padding:6px 8px 6px 10px">';
         html+='<div class="tl-slot" style="display:flex;flex-direction:column;gap:4px">';
