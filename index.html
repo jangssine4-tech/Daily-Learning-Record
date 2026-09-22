@@ -7417,6 +7417,7 @@ function renderHistory(){
   var sId=$('h-student').value;var period=$('h-period').value;var today2=new Date(),curMo=today2.getMonth()+1;
   var moOpt=$('h-period-month');if(moOpt)moOpt.textContent=curMo+'월 (이번 달)';
   var list=[...reports];if(sId)list=list.filter(function(r){return r.studentId===sId;});
+  list.sort(function(a,b){return b.date>a.date?1:b.date<a.date?-1:0;});
   var now2=new Date();
   if(period==='today')list=list.filter(function(r){return r.date===todayISO();});
   else if(period==='week'){var start=new Date(now2);start.setDate(now2.getDate()-now2.getDay()+1);list=list.filter(function(r){return r.date>=start.toISOString().split('T')[0];});}
@@ -7779,7 +7780,8 @@ function renderStudents(){
     var startOfMonth=sYr+'-'+String(sMo).padStart(2,'0')+'-01';
     list=list.filter(function(s){
       if(s.enrollDate&&s.enrollDate>endOfMonth)return false;
-      if(['퇴원','휴원'].includes(s.status)&&s.quitDate&&s.quitDate<startOfMonth)return false;
+      if(s.status==='퇴원'&&s.quitDate&&s.quitDate<startOfMonth)return false;
+      if(s.status==='휴원'&&s.quitDate&&s.quitDate<startOfMonth)return true;
       return true;
     });
   }
