@@ -3854,12 +3854,12 @@ function _buildTimeline(){
   var now=new Date();
   var curH=now.getHours();
 
-  // 4개 구간 정의 (표시 순서)
+  // 4개 구간 정의 (표시 순서) — 색 없이 회색 계열 통일
   var SECTIONS=[
-    {key:'오전',label:'☀️ 오전',sub:'06~12시',hours:[6,7,8,9,10,11],bg:'#fffbeb',border:'#fde68a',headerBg:'#fef3c7',textColor:'#92400e'},
-    {key:'오후',label:'🌤 오후',sub:'12~18시',hours:[12,13,14,15,16,17],bg:'#f0fdf4',border:'#86efac',headerBg:'#dcfce7',textColor:'#166534'},
-    {key:'저녁',label:'🌆 저녁',sub:'18~21시',hours:[18,19,20],bg:'#eff6ff',border:'#93c5fd',headerBg:'#dbeafe',textColor:'#1e40af'},
-    {key:'밤',label:'🌙 밤',sub:'21~24시',hours:[21,22,23,24],bg:'#faf5ff',border:'#d8b4fe',headerBg:'#ede9fe',textColor:'#6b21a8'}
+    {key:'오전',label:'오전',sub:'06~12시',hours:[6,7,8,9,10,11]},
+    {key:'오후',label:'오후',sub:'12~18시',hours:[12,13,14,15,16,17]},
+    {key:'저녁',label:'저녁',sub:'18~21시',hours:[18,19,20]},
+    {key:'밤',label:'밤',sub:'21~24시',hours:[21,22,23,24]}
   ];
 
   var HOURS=[];
@@ -3913,12 +3913,17 @@ function _buildTimeline(){
     var isCurrentSection=isTodayDate&&sec.hours.indexOf(curH)!==-1;
     var isPastSection=isTodayDate&&sec.hours[sec.hours.length-1]<curH;
 
-    html+='<div style="border-bottom:2px solid '+sec.border+';margin-bottom:0">';
+    var secBg=isCurrentSection?'#f4f4f5':'var(--surface)';
+    var headerTextColor=isCurrentSection?'var(--txt)':'var(--txt3)';
+    var headerFontWeight=isCurrentSection?'700':'600';
+    var borderColor='var(--border)';
+
+    html+='<div style="border-bottom:1px solid var(--border);margin-bottom:0">';
     // 구간 헤더
-    html+='<div style="background:'+sec.headerBg+';padding:7px 12px;display:flex;align-items:center;gap:8px;border-left:4px solid '+sec.border+'">';
-    html+='<span style="font-size:13px;font-weight:800;color:'+sec.textColor+'">'+sec.label+'</span>';
-    html+='<span style="font-size:10px;color:'+sec.textColor+';opacity:0.7">'+sec.sub+'</span>';
-    if(isCurrentSection)html+='<span style="font-size:9px;background:var(--blue);color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">지금</span>';
+    html+='<div style="background:'+(isCurrentSection?'#e9e9eb':'var(--surface2)')+';padding:6px 12px;display:flex;align-items:center;gap:8px">';
+    html+='<span style="font-size:12px;font-weight:'+headerFontWeight+';color:'+headerTextColor+'">'+sec.label+'</span>';
+    html+='<span style="font-size:10px;color:var(--txt3)">'+sec.sub+'</span>';
+    if(isCurrentSection)html+='<span style="font-size:9px;background:var(--navy);color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">지금</span>';
     html+='</div>';
 
     // 구간 내 시간대별 행
@@ -3926,23 +3931,24 @@ function _buildTimeline(){
       // 빈 구간 — 드롭 가능 영역
       var firstH=sec.hours[0];
       var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+firstH+')" ondrop="tlDrop(event,'+firstH+')" ondragleave="tlDragLeave(event)"':'';
-      html+='<div class="tl-row" data-hour="'+firstH+'" '+dndAttrs+' style="min-height:44px;background:'+(isPastSection||isPastDate?'var(--surface2)':sec.bg)+';padding:8px 12px;display:flex;align-items:center">';
+      html+='<div class="tl-row" data-hour="'+firstH+'" '+dndAttrs+' style="min-height:40px;background:'+(isPastSection||isPastDate?'var(--surface2)':secBg)+';padding:8px 12px;display:flex;align-items:center">';
       html+='<span style="font-size:11px;color:var(--txt3)">—</span>';
       html+='</div>';
     } else {
       secItems.forEach(function(entry){
         var h=entry.h; var item=entry.item;
         var displayH=h===24?'00':String(h).padStart(2,'0');
-        var timeLabel=displayH+':00';
+        var dispMin=item.item&&item.item.task&&item.item.task.startMinute?String(item.item.task.startMinute).padStart(2,'0'):'00';
+        var timeLabel=displayH+':'+dispMin;
         var isPastHour=isTodayDate&&h<curH;
         var isCurrent=isTodayDate&&h===curH;
-        var rowBg=isCurrent?'#eff6ff':(isPastDate||isPastHour)?'var(--surface2)':sec.bg;
-        var borderLeft=isCurrent?'4px solid var(--blue)':'4px solid '+sec.border;
+        var rowBg=isCurrent?'#e9e9eb':(isPastDate||isPastHour)?'var(--surface2)':secBg;
+        var borderLeft=isCurrent?'3px solid var(--navy)':'3px solid transparent';
         var dndAttrs=(!isPastDate)?'ondragover="tlDragOver(event,'+h+')" ondrop="tlDrop(event,'+h+')" ondragleave="tlDragLeave(event)"':'';
-        html+='<div class="tl-row" data-hour="'+h+'" '+dndAttrs+' style="min-height:44px;border-bottom:1px solid '+sec.border+';background:'+rowBg+';border-left:'+borderLeft+';transition:background .15s;padding:6px 8px 6px 10px">';
+        html+='<div class="tl-row" data-hour="'+h+'" '+dndAttrs+' style="min-height:44px;border-bottom:1px solid var(--border);background:'+rowBg+';border-left:'+borderLeft+';transition:background .15s;padding:6px 8px 6px 10px">';
         html+='<div style="margin-bottom:4px">';
-        html+='<span style="font-size:11px;font-weight:700;color:'+(isCurrent?'var(--blue)':(isPastDate||isPastHour)?'var(--txt3)':sec.textColor)+'">'+timeLabel+'</span>';
-        if(isCurrent)html+='<span style="font-size:9px;color:var(--blue);font-weight:600;margin-left:4px">지금</span>';
+        html+='<span style="font-size:11px;font-weight:700;color:'+(isCurrent?'var(--navy)':(isPastDate||isPastHour)?'var(--txt3)':'var(--txt2)')+'">'+timeLabel+'</span>';
+        if(isCurrent)html+='<span style="font-size:9px;color:var(--navy);font-weight:600;margin-left:4px">지금</span>';
         html+='</div>';
         html+='<div class="tl-slot" style="display:flex;flex-direction:column;gap:4px">';
         html+=_tlTaskCard(item,isPastDate);
@@ -13718,7 +13724,7 @@ function openPlanTaskModal(planId,taskIdx){
 
   // 타임라인 시작 시간 (직접 입력)
   var pCurHourVal=t.startHour!==undefined&&t.startHour!==null
-    ?(t.startHour===24?'00':String(t.startHour).padStart(2,'0'))+':00'
+    ?(t.startHour===24?'00':String(t.startHour).padStart(2,'0'))+':'+(t.startMinute?String(t.startMinute).padStart(2,'0'):'00')
     :'';
   var pStartHourInp=document.createElement('input');
   pStartHourInp.className='fi';pStartHourInp.id='ptm-starthour';
@@ -13822,11 +13828,12 @@ function _savePlanTaskModal(planId,taskIdx){
   var focusType=(document.getElementById('ptm-focus')||{}).value||'';
   if(!name.trim()){toast('업무명을 입력하세요');return;}
   var ptmStartHourRaw=(document.getElementById('ptm-starthour')||{}).value||'';
-  var ptmStartHour=undefined;
+  var ptmStartHour=undefined;var ptmStartMinute=0;
   if(ptmStartHourRaw){
     var ptmParts=ptmStartHourRaw.split(':');
-    var ptmHH=parseInt(ptmParts[0]);
-    ptmStartHour=(ptmHH===0)?24:ptmHH;
+    var ptmHH=parseInt(ptmParts[0]);var ptmMM=parseInt(ptmParts[1]||0);
+    ptmStartHour=(ptmHH===0&&ptmMM===0)?24:ptmHH;
+    ptmStartMinute=ptmMM;
     // 시작 시간이 설정됐고 시간대가 '미배치'이면 자동 배정
     if((timeSlot==='미배치'||!timeSlot)&&ptmStartHour!==undefined){
       timeSlot=_hourToTimeSection(ptmStartHour);
@@ -13838,6 +13845,7 @@ function _savePlanTaskModal(planId,taskIdx){
   plan.tasks[taskIdx].manager=manager;
   plan.tasks[taskIdx].memo=memo;
   plan.tasks[taskIdx].startHour=ptmStartHour;
+  plan.tasks[taskIdx].startMinute=ptmStartMinute;
   if(date===today){
     plan.tasks[taskIdx].timeSlot=timeSlot;
     plan.tasks[taskIdx].estDuration=estDuration;
@@ -15372,7 +15380,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var slotSel=mkSel('dbt-timeslot',TIME_SLOTS.map(function(s){return{v:s,l:s};}),
     t?t.timeSlot||'미정':'미정');
   var curHourVal=t&&t.startHour!==undefined&&t.startHour!==null
-    ?(t.startHour===24?'00':String(t.startHour).padStart(2,'0'))+':00':'';
+    ?(t.startHour===24?'00':String(t.startHour).padStart(2,'0'))+':'+(t.startMinute?String(t.startMinute).padStart(2,'0'):'00'):'';
   var startHourInp=document.createElement('input');
   startHourInp.className='fi';startHourInp.id='dbt-starthour';
   startHourInp.type='time';startHourInp.style.fontSize='12px';startHourInp.value=curHourVal;
@@ -15437,11 +15445,12 @@ function _dbSaveTaskModal(id){
   var estDuration=(document.getElementById('dbt-duration')||{}).value||'';
   var memo=(document.getElementById('dbt-memo')||{}).value||'';
   var startHourRaw=(document.getElementById('dbt-starthour')||{}).value||'';
-  var startHour=undefined;
+  var startHour=undefined;var startMinute=0;
   if(startHourRaw){
     var parts=startHourRaw.split(':');
     var hh=parseInt(parts[0]);var mm=parseInt(parts[1]||0);
     startHour=(hh===0&&mm===0)?24:hh;
+    startMinute=mm;
     // 시작 시간이 설정됐고 시간대가 '미정'이면 자동 배정
     if(timeSlot==='미정'&&startHour!==undefined){
       timeSlot=_hourToTimeSection(startHour);
@@ -15459,7 +15468,7 @@ function _dbSaveTaskModal(id){
       t.scheduleDate=scheduleDate;
       t.parentTask=parentTask;
       t.importance=importance;t.urgency=urgency;t.priority=priority;
-      t.timeSlot=timeSlot;t.estDuration=estDuration;t.startHour=startHour;t.memo=memo;
+      t.timeSlot=timeSlot;t.estDuration=estDuration;t.startHour=startHour;t.startMinute=startMinute;t.memo=memo;
     }
   }else{
     var newTask={
@@ -15467,7 +15476,7 @@ function _dbSaveTaskModal(id){
       dueDate:dueDate||scheduleDate,scheduleDate:scheduleDate,
       parentTask:parentTask,status:'대기',cycle:'반복없음',memo:memo,createdAt:today,
       importance:importance,urgency:urgency,priority:priority,
-      timeSlot:timeSlot,estDuration:estDuration,startHour:startHour
+      timeSlot:timeSlot,estDuration:estDuration,startHour:startHour,startMinute:startMinute
     };
     _dbTasks.push(newTask);
   }
