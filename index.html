@@ -13167,6 +13167,7 @@ function openPayrollModal(userId,yr,mo){
     +'<button class="btn btn-outline" style="flex:1" onclick="savePayrollImage(\''+userId+'\','+yr+','+mo+',this.closest(\'.mo\'))">📷 이미지 저장</button>'
     +'</div>'
     +'<div style="height:6px"></div>'
+    +(wasSaved||workDays.length?'<button class="btn btn-red btn-block" onclick="clearPayrollMonth(\''+userId+'\','+yr+','+mo+',this.closest(\'.mo\'))">🗑 이 달 근무기록 삭제 (잘못 입력된 경우)</button><div style="height:6px"></div>':'')
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
   document.body.appendChild(overlay);
 }
@@ -13198,6 +13199,18 @@ async function savePayroll(userId,yr,mo,overlay){
   if(idx>=0){users[idx][key]=workDays;users[idx][key+'_saved']=true;}
   if(overlay)overlay.remove();
   renderStaffArea();saveCacheDebounced();toast('✅ 근무시간 저장됨');
+}
+async function clearPayrollMonth(userId,yr,mo,overlay){
+  var u=users.find(function(x){return x.id===userId;});if(!u)return;
+  var _cm=await showConfirm(yr+'년 '+mo+'월 근무기록을 삭제합니다.\n(잘못 입력됐거나 해당 월에 근무하지 않은 경우 사용)\n선생님이 이 달을 기준으로 강사 페이지에서 삭제 처리되어 있었다면, 이제 이 달에도 표시되지 않습니다.\n삭제하시겠습니까?',null,null,true);
+  if(!_cm)return;
+  loading(true);
+  var key='workDays_'+yr+'_'+mo;
+  var update={};update[key]=firebase.firestore.FieldValue.delete();update[key+'_saved']=firebase.firestore.FieldValue.delete();
+  await db.collection('users').doc(userId).update(update);
+  delete u[key];delete u[key+'_saved'];
+  if(overlay)overlay.remove();
+  renderStaffArea();loading(false);saveCacheDebounced();toast('🗑 '+yr+'년 '+mo+'월 근무기록 삭제됨');
 }
 function savePayrollImage(userId,yr,mo,overlay){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
