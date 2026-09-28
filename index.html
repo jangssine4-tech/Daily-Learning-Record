@@ -19477,16 +19477,19 @@ function getCrmThreshold(id){
   return null;
 }
 // ══ GOALS ══
-function renderGoalsView(){var yr=parseInt(($('goals-year')||{}).value)||new Date().getFullYear();renderRevGoals(yr);}
+function renderGoalsView(){var yr=parseInt(($('goals-year')||{}).value)||new Date().getFullYear();var moEl=$('goals-month');var mo=moEl&&moEl.value?parseInt(moEl.value):null;renderRevGoals(yr,mo);}
 
 
-function renderRevGoals(yr){
+function renderRevGoals(yr,moSel){
   var el=$('goals-annual-area');if(!el)return;
   var now=new Date();
   var curYr=now.getFullYear(),curMo=now.getMonth()+1;
-  var elapsedMo=yr===curYr?curMo:12;
+  // refMo: 진단/현황 카드가 기준으로 삼는 월. 선택하지 않으면 기존과 동일하게
+  // (올해면 실제 이번 달, 과거 연도면 12월)로 동작한다.
+  var refMo=moSel||(yr===curYr?curMo:12);
+  var isRealNow=(yr===curYr&&refMo===curMo);
+  var elapsedMo=refMo;
   var elapsedPct=Math.round(elapsedMo/12*100);
-  var active=students.filter(function(s){return['재원','신규'].includes(s.status||'재원');});
   var gt=(_goalTargets&&_goalTargets[yr])||{};
   var targetRev=parseInt(gt.targetRev)||0;
   var avgFee=parseInt(gt.avgFee)||0;         // 1인 월평균 교육비
@@ -19516,23 +19519,36 @@ function renderRevGoals(yr){
     // 해당 월 기준 재원(재원+신규)/휴원 인원 스냅샷
     var activeCnt=students.filter(function(s){var st=getStudentStatusAtMonth(s,yr,mo);return st==='재원'||st==='신규';}).length;
     var holdCnt=students.filter(function(s){return getStudentStatusAtMonth(s,yr,mo)==='휴원';}).length;
-    return{mo:mo,totalRev:totalRev,hasData:revs.length>0,newStu:newStu,outStu:outStu,activeCnt:activeCnt,holdCnt:holdCnt};
+    return{mo:mo,totalRev:totalRev,hasData:revs.length>0,newStu:newStu,outStu:outStu,activeCnt:activeCnt,holdCnt:holdCnt,net:newStu-outStu};
   });
+  // 재원 인원 과거월 보정: statusHistory가 기록되지 않은 과거 월은 현재 상태값으로 대체되어
+  // 항상 같은 숫자로 표시되는 문제가 있어, 현재 월을 기준점 삼아 신규·퇴원 순증감을 거꾸로 적용해
+  // 과거 재원 인원을 근사 재구성한다. (휴원은 대응하는 증감 데이터가 없어 보정하지 않음)
+  if(yr===curYr){
+    for(var _bi=curMo-2;_bi>=0;_bi--){
+      monthData[_bi].activeCnt=monthData[_bi+1].activeCnt-monthData[_bi+1].net;
+    }
+  }
   var yearRev=monthData.reduce(function(s,d){return s+d.totalRev;},0);
+  // refActiveCnt: 카드·진단 메시지가 표시할 "재원생 수" — 기준월이 실제 오늘이면 현재 값을,
+  // 과거 기준월이면 월별 실적 표와 동일한(재구성/보정된) 스냅샷 값을 사용해 숫자를 일치시킨다.
+  var refActiveCnt=isRealNow?students.filter(function(s){return['재원','신규'].includes(s.status||'재원');}).length:((monthData[refMo-1]||{}).activeCnt||0);
 
   // ── 역산 계산 ──
   var needAvgStu=0,needMonthlyRev=0,needNewPerMo=0,needConsult=0,needInquiry=0,projYearEnd=0;
   if(targetRev>0&&avgFee>0){
     needMonthlyRev=Math.round(targetRev/12);
     needAvgStu=Math.ceil(needMonthlyRev/avgFee);
-    var gap=Math.max(0,needAvgStu-active.length);
-    var churnPerMo=Math.ceil(active.length*(churnRate/100));
+    var gap=Math.max(0,needAvgStu-refActiveCnt);
+    var churnPerMo=Math.ceil(refActiveCnt*(churnRate/100));
     needNewPerMo=gap+churnPerMo;
     if(convReg>0)needConsult=Math.ceil(needNewPerMo/(convReg/100));
     if(convInq>0&&convReg>0)needInquiry=Math.ceil(needConsult/(convInq/100));
   }
-  // 연말 예상 매출 (현재 추세 × 12/경과월)
-  if(elapsedMo>0)projYearEnd=Math.round(yearRev/elapsedMo*12);
+  // 연말 예상 매출 (기준월까지의 추세 × 12/경과월) — 기준월을 과거로 선택하면
+  // 그 이후 달의 매출은 아직 없던 셈 치고, 기준월까지의 실적만으로 추세를 계산한다.
+  var revThroughRef=monthData.slice(0,elapsedMo).reduce(function(s,d){return s+d.totalRev;},0);
+  if(elapsedMo>0)projYearEnd=Math.round(revThroughRef/elapsedMo*12);
 
   // ── 색상/배지 헬퍼 ──
   function getColor(pct,elapsed,hasT){if(!hasT)return'var(--txt3)';if(pct>=100)return'#16a34a';if(pct>=elapsed)return'#d97706';return'#dc2626';}
@@ -19562,6 +19578,9 @@ function renderRevGoals(yr){
     +'<select class="fi" style="width:90px" id="goals-year" onchange="renderRevGoals(parseInt(this.value))">'
     +[yr-1,yr,yr+1].map(function(y){return'<option value="'+y+'"'+(y===yr?' selected':'')+'>'+y+'년</option>';}).join('')
     +'</select>'
+    +'<select class="fi" style="width:80px" id="goals-month" onchange="renderRevGoals('+yr+',parseInt(this.value))">'
+    +Array.from({length:(yr===curYr?curMo:12)},function(_,i){var m=i+1;return'<option value="'+m+'"'+(m===refMo?' selected':'')+'>'+m+'월</option>';}).join('')
+    +'</select>'
     +'<div style="font-size:16px;font-weight:800;color:var(--navy)">성장 목표 관리</div>'
     +'</div>'
     +'<button class="btn btn-outline btn-sm" onclick="_toggleGoalSettings('+yr+')" id="goal-settings-btn">⚙️ 목표 설정</button>'
@@ -19581,15 +19600,16 @@ function renderRevGoals(yr){
     +'</div>';
 
   // ── 핵심 카드 3개 ──
-  // ── 2단계: 이번 달 데이터 집계 ──
-  var moStr=curMo+'월';
-  var moNewStu=students.filter(function(s){var d=new Date(s.startDate||s.createdAt||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;}).length;
-  var moOutStu=students.filter(function(s){if(s.status!=='퇴원')return false;var d=new Date(s.endDate||s.updatedAt||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;}).length;
+  // ── 2단계: 기준월(refMo) 데이터 집계 — 월 선택 드롭다운으로 과거 월을 골라도
+  // 이 카드들과 아래 진단 메시지가 해당 월 기준으로 다시 계산된다 ──
+  var moStr=(yr!==curYr?yr+'년 ':'')+refMo+'월'+(isRealNow?'':' (기준)');
+  var moNewStu=students.filter(function(s){var d=new Date(s.startDate||s.createdAt||'');return d.getFullYear()===yr&&d.getMonth()+1===refMo;}).length;
+  var moOutStu=students.filter(function(s){if(s.status!=='퇴원')return false;var d=new Date(s.endDate||s.updatedAt||'');return d.getFullYear()===yr&&d.getMonth()+1===refMo;}).length;
   var moNet=moNewStu-moOutStu;
-  var moInquiry=(newConsults||[]).filter(function(nc){var d=new Date(nc.inquiryDate||nc.date||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;}).length;
-  var moConsult=(newConsults||[]).filter(function(nc){var d=new Date(nc.date||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo&&['상담 완료','체험 예정','체험 완료','등록 완료'].includes(nc.ncStatus);}).length;
-  var moReg=(newConsults||[]).filter(function(nc){var d=new Date(nc.date||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo&&nc.ncStatus==='등록 완료';}).length;
-  var moTasks=(_dbTasks||[]).filter(function(t){if(t.id&&t.id.startsWith('__'))return false;var d=new Date(t.dueDate||t.createdAt||'');return d.getFullYear()===curYr&&d.getMonth()+1===curMo;});
+  var moInquiry=(newConsults||[]).filter(function(nc){var d=new Date(nc.inquiryDate||nc.date||'');return d.getFullYear()===yr&&d.getMonth()+1===refMo;}).length;
+  var moConsult=(newConsults||[]).filter(function(nc){var d=new Date(nc.date||'');return d.getFullYear()===yr&&d.getMonth()+1===refMo&&['상담 완료','체험 예정','체험 완료','등록 완료'].includes(nc.ncStatus);}).length;
+  var moReg=(newConsults||[]).filter(function(nc){var d=new Date(nc.date||'');return d.getFullYear()===yr&&d.getMonth()+1===refMo&&nc.ncStatus==='등록 완료';}).length;
+  var moTasks=(_dbTasks||[]).filter(function(t){if(t.id&&t.id.startsWith('__'))return false;var d=new Date(t.dueDate||t.createdAt||'');return d.getFullYear()===yr&&d.getMonth()+1===refMo;});
   var moTaskDone=moTasks.filter(function(t){return t.status==='완료';}).length;
   var moTaskPct=moTasks.length>0?Math.round(moTaskDone/moTasks.length*100):null;
 
@@ -19606,10 +19626,10 @@ function renderRevGoals(yr){
     // 2. 재원생
     +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
     +'<div style="font-size:13px;color:var(--txt3);margin-bottom:4px">현재 재원생</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--navy)">'+active.length+'명</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--navy)">'+refActiveCnt+'명</div>'
     +'<div style="font-size:13px;color:var(--txt2);margin-top:4px">필요 평균 <b>'+(needAvgStu||'-')+'</b>명</div>'
-    +'<div style="font-size:13px;color:var(--txt2)">차이 <b style="color:'+(needAvgStu&&active.length>=needAvgStu?'#16a34a':'#dc2626')+'">'+(needAvgStu?((active.length-needAvgStu>=0?'+':'')+(active.length-needAvgStu)+'명'):'-')+'</b></div>'
-    +(needAvgStu>0?bar(Math.round(active.length/needAvgStu*100),'#2563eb'):'')
+    +'<div style="font-size:13px;color:var(--txt2)">차이 <b style="color:'+(needAvgStu&&refActiveCnt>=needAvgStu?'#16a34a':'#dc2626')+'">'+(needAvgStu?((refActiveCnt-needAvgStu>=0?'+':'')+(refActiveCnt-needAvgStu)+'명'):'-')+'</b></div>'
+    +(needAvgStu>0?bar(Math.round(refActiveCnt/needAvgStu*100),'#2563eb'):'')
     +'</div>'
     // 3. 연말 예상
     +'<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:14px">'
@@ -19662,7 +19682,7 @@ function renderRevGoals(yr){
       ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">월 신규 필요</div><div style="font-size:16px;font-weight:800;color:#d97706">'+(needNewPerMo?needNewPerMo+'명':'-')+'</div><div style="font-size:12px;color:var(--txt3)">(퇴원 보전 포함)</div></div>'
       ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">필요 상담 수/월</div><div style="font-size:16px;font-weight:800;color:#2563eb">'+(convReg>0?needConsult+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convReg>0?'전환율 '+convReg+'%':'전환율 미입력')+'</div></div>'
       ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">필요 문의 수/월</div><div style="font-size:16px;font-weight:800;color:#7c3aed">'+(convInq>0?needInquiry+'건':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(convInq>0?'전환율 '+convInq+'%':'전환율 미입력')+'</div></div>'
-      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">예상 월 퇴원</div><div style="font-size:16px;font-weight:800;color:#dc2626">'+(churnRate>0?Math.ceil(active.length*(churnRate/100))+'명':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(churnRate>0?churnRate+'% 기준':'퇴원율 미입력')+'</div></div>'
+      ,'<div style="background:#fff;border-radius:10px;padding:10px;text-align:center"><div style="font-size:13px;color:var(--txt3)">예상 월 퇴원</div><div style="font-size:16px;font-weight:800;color:#dc2626">'+(churnRate>0?Math.ceil(refActiveCnt*(churnRate/100))+'명':'-')+'</div><div style="font-size:9px;color:var(--txt3)">'+(churnRate>0?churnRate+'% 기준':'퇴원율 미입력')+'</div></div>'
       ].join('')
       +'</div>'
       +'</div>';
@@ -19677,7 +19697,7 @@ function renderRevGoals(yr){
   var cumRev=0,monthRows='';
   monthData.forEach(function(d){
     var isFuture=yr===curYr&&d.mo>curMo;
-    var isThisMo=yr===curYr&&d.mo===curMo;
+    var isThisMo=d.mo===refMo; // 선택한 기준월 행을 하이라이트
     if(isFuture){
       monthRows+='<tr style="opacity:.3"><td style="text-align:center">'+d.mo+'월</td>'
         +'<td style="text-align:right">'+(moTgt?moTgt.toLocaleString()+'원':'-')+'</td>'
@@ -19706,15 +19726,15 @@ function renderRevGoals(yr){
     +'<div style="overflow-x:auto"><table class="rev-tbl" style="font-size:12px;width:100%">'
     +'<thead><tr style="background:var(--navy);color:#fff">'
     +'<th style="text-align:center;padding:8px">월</th>'
-    +'<th style="text-align:right;padding:8px">월 목표</th>'
-    +'<th style="text-align:right;padding:8px">실매출</th>'
+    +'<th style="text-align:center;padding:8px">월 목표</th>'
+    +'<th style="text-align:center;padding:8px">실매출</th>'
     +'<th style="text-align:center;padding:8px">달성률</th>'
     +'<th style="text-align:center;padding:8px">재원</th>'
     +'<th style="text-align:center;padding:8px">휴원</th>'
     +'<th style="text-align:center;padding:8px">신규</th>'
     +'<th style="text-align:center;padding:8px">퇴원</th>'
     +'<th style="text-align:center;padding:8px">순증</th>'
-    +'<th style="text-align:right;padding:8px">누적</th>'
+    +'<th style="text-align:center;padding:8px">누적</th>'
     +'</tr></thead>'
     +'<tbody>'+monthRows+'</tbody>'
     +'</table></div>';
@@ -19734,9 +19754,9 @@ function renderRevGoals(yr){
   }
   // 2. 재원생 진단
   if(needAvgStu>0){
-    var stuGap=needAvgStu-active.length;
+    var stuGap=needAvgStu-refActiveCnt;
     if(stuGap<=0){
-      diagMsgs.push({type:'good',msg:'재원생 '+active.length+'명으로 목표('+needAvgStu+'명) 달성 중입니다 ✅'});
+      diagMsgs.push({type:'good',msg:'재원생 '+refActiveCnt+'명으로 목표('+needAvgStu+'명) 달성 중입니다 ✅'});
     } else {
       var moLeft2=12-elapsedMo;
       var needNetPerMo=moLeft2>0?Math.ceil(stuGap/moLeft2):stuGap;
@@ -19746,34 +19766,34 @@ function renderRevGoals(yr){
   // 3. 이번 달 학생 변동 진단
   if(moNewStu>0||moOutStu>0){
     if(moNet>0){
-      diagMsgs.push({type:'good',msg:curMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순증 +'+moNet+'명'});
+      diagMsgs.push({type:'good',msg:refMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순증 +'+moNet+'명'});
     } else if(moNet===0){
-      diagMsgs.push({type:'info',msg:curMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순증 없음, 유지 관리 필요'});
+      diagMsgs.push({type:'info',msg:refMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순증 없음, 유지 관리 필요'});
     } else {
-      diagMsgs.push({type:'bad',msg:curMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순감 '+moNet+'명, 퇴원 관리 필요'});
+      diagMsgs.push({type:'bad',msg:refMo+'월 신규 '+moNewStu+'명, 퇴원 '+moOutStu+'명 — 순감 '+moNet+'명, 퇴원 관리 필요'});
     }
   }
   // 4. 문의·상담 진단
   if(needInquiry>0){
     if(moInquiry>=needInquiry){
-      diagMsgs.push({type:'good',msg:curMo+'월 문의 목표 '+needInquiry+'건 중 현재 '+moInquiry+'건 달성 ✅'});
+      diagMsgs.push({type:'good',msg:refMo+'월 문의 목표 '+needInquiry+'건 중 현재 '+moInquiry+'건 달성 ✅'});
     } else {
-      diagMsgs.push({type:'warn',msg:curMo+'월 문의 목표 '+needInquiry+'건 중 현재 '+moInquiry+'건 — 홍보 활동 점검 필요'});
+      diagMsgs.push({type:'warn',msg:refMo+'월 문의 목표 '+needInquiry+'건 중 현재 '+moInquiry+'건 — 홍보 활동 점검 필요'});
     }
   }
   if(needConsult>0){
     if(moConsult>=needConsult){
-      diagMsgs.push({type:'good',msg:curMo+'월 상담 목표 '+needConsult+'건 중 현재 '+moConsult+'건 달성 ✅'});
+      diagMsgs.push({type:'good',msg:refMo+'월 상담 목표 '+needConsult+'건 중 현재 '+moConsult+'건 달성 ✅'});
     } else {
-      diagMsgs.push({type:'warn',msg:curMo+'월 상담 목표 '+needConsult+'건 중 현재 '+moConsult+'건 — 상담 유도 필요'});
+      diagMsgs.push({type:'warn',msg:refMo+'월 상담 목표 '+needConsult+'건 중 현재 '+moConsult+'건 — 상담 유도 필요'});
     }
   }
   // 5. 할 일 완료율 진단
   if(moTaskPct!==null&&moTasks.length>=3){
     if(moTaskPct<50){
-      diagMsgs.push({type:'bad',msg:curMo+'월 할 일 완료율 '+moTaskPct+'% — 업무 실행력 점검 필요'});
+      diagMsgs.push({type:'bad',msg:refMo+'월 할 일 완료율 '+moTaskPct+'% — 업무 실행력 점검 필요'});
     } else if(moTaskPct<80){
-      diagMsgs.push({type:'info',msg:curMo+'월 할 일 완료율 '+moTaskPct+'% — '+moTaskDone+'건/'+moTasks.length+'건 완료'});
+      diagMsgs.push({type:'info',msg:refMo+'월 할 일 완료율 '+moTaskPct+'% — '+moTaskDone+'건/'+moTasks.length+'건 완료'});
     }
   }
 
