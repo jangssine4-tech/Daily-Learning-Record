@@ -6263,15 +6263,31 @@ async function markAttendance(studentId, action, makeupId){
   var isEarly=action==='early';
   var isPresent=action==='present';
 
-  function removeAutoMakeup(){
-    var mk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated;});
-    if(mk){db.collection('makeups').doc(mk.id).delete();makeups=makeups.filter(function(m){return m.id!==mk.id;});}
+  async function removeAutoMakeup(){
+    var mk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated&&m.makeupStatus==='pending';});
+    if(!mk){
+      // Fallback: the local array may not be caught up yet (e.g. rapid clicks), so double-check against the DB.
+      try{
+        var snap=await db.collection('makeups')
+          .where('studentId','==',studentId)
+          .where('absentDate','==',todayStr).get();
+        var found=snap.docs.find(function(d){var v=d.data();return v.autoCreated&&v.makeupStatus==='pending';});
+        if(found) mk={id:found.id};
+      }catch(e){console.warn(e);}
+    }
+    if(mk){
+      await db.collection('makeups').doc(mk.id).delete();
+      makeups=makeups.filter(function(m){return m.id!==mk.id;});
+      renderMakeupCalendar();
+    }
   }
-  function createAutoMakeup(){
+  async function createAutoMakeup(){
     var hasMk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr;});
     if(!hasMk){
       var mkData={studentId:studentId,studentName:s.name,absentDate:todayStr,absentReason:isEarly?'조퇴':'',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupNote:'',autoCreated:true,createdAt:new Date().toISOString()};
-      db.collection('makeups').add(mkData).then(async function(ref){makeups.push({id:ref.id,...mkData});renderMakeupCalendar();});
+      var ref=await db.collection('makeups').add(mkData);
+      if(!makeups.find(function(m){return m.id===ref.id;})) makeups.push({id:ref.id,...mkData});
+      renderMakeupCalendar();
     }
   }
 
@@ -6280,7 +6296,7 @@ async function markAttendance(studentId, action, makeupId){
     if(sameState){
       await db.collection('reports').doc(existing.id).delete();
       reports=reports.filter(function(r){return r.id!==existing.id;});
-      if(existing.absent||existing.earlyLeave) removeAutoMakeup();
+      if(existing.absent||existing.earlyLeave) await removeAutoMakeup();
       toast('↩ '+s.name+' 상태 취소');
     } else {
       var wasAbsentOrEarly=existing.absent||existing.earlyLeave;
@@ -6288,9 +6304,9 @@ async function markAttendance(studentId, action, makeupId){
       await db.collection('reports').doc(existing.id).update(update);
       var idx=reports.findIndex(function(r){return r.id===existing.id;});
       if(idx>=0) reports[idx]={...reports[idx],...update};
-      if(isAbsent){ createAutoMakeup(); showAbsentNotifyModal(s); }
-      else if(isEarly){ createAutoMakeup(); }
-      else if(isPresent&&wasAbsentOrEarly){ removeAutoMakeup(); }
+      if(isAbsent){ await createAutoMakeup(); showAbsentNotifyModal(s); }
+      else if(isEarly){ await createAutoMakeup(); }
+      else if(isPresent&&wasAbsentOrEarly){ await removeAutoMakeup(); }
       if(isAbsent) toast('❌ '+s.name+' 결석 (보강 계획표 등록)');
       else if(isEarly) toast('⚠️ '+s.name+' 조퇴 (보강 계획표 등록)');
       else toast('✅ '+s.name+' 출석');
@@ -6305,7 +6321,7 @@ async function markAttendance(studentId, action, makeupId){
     if(window._currentSessionTime)data.sessionTime=window._currentSessionTime;
     var newR=await db.collection('reports').add(data);
     reports.push({id:newR.id,...data});
-    if(isAbsent||isEarly) createAutoMakeup();
+    if(isAbsent||isEarly) await createAutoMakeup();
     if(isAbsent){ toast('❌ '+s.name+' 결석 (보강 계획표 등록)'); showAbsentNotifyModal(s); }
     else if(isEarly) toast('⚠️ '+s.name+' 조퇴 (보강 계획표 등록)');
     else toast('✅ '+s.name+' 출석');
