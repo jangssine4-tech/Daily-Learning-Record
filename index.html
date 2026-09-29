@@ -13586,7 +13586,10 @@ function saveDashBoard(){
   toSave.forEach(function(t){
     batch.set(db.collection('dashBoardV2').doc(t.id),t);
   });
-  batch.commit().catch(function(e){console.error('saveDashBoard batch 오류:',e);});
+  batch.commit().catch(function(e){
+    console.error('saveDashBoard batch 오류:',e);
+    toast('❌ 업무 저장 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
+  });
 }
 
 // 특정 task 하나만 저장 (편집/상태변경 시 사용 — 더 효율적)
@@ -13594,13 +13597,19 @@ function saveTask(id){
   if(!_dbTasks)return;
   var t=_dbTasks.find(function(x){return x.id===id;});
   if(!t||!t.id||t.id.startsWith('__'))return;
-  db.collection('dashBoardV2').doc(t.id).set(t).catch(function(e){console.error('saveTask 오류:',e);});
+  db.collection('dashBoardV2').doc(t.id).set(t).catch(function(e){
+    console.error('saveTask 오류:',e);
+    toast('❌ "'+(t.name||'업무')+'" 저장 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
+  });
 }
 
 // task 삭제
 function deleteTask(id){
   if(!id||id.startsWith('__'))return;
-  db.collection('dashBoardV2').doc(id).delete().catch(function(e){console.error('deleteTask 오류:',e);});
+  db.collection('dashBoardV2').doc(id).delete().catch(function(e){
+    console.error('deleteTask 오류:',e);
+    toast('❌ 삭제 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
+  });
 }
 function renderDashBoard(){
   // board 뷰 진입 시 오늘 탭으로 초기화
