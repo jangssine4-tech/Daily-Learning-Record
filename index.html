@@ -873,17 +873,6 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   </div>
 </div><div id="ref-panel-tuitiontable" style="display:none" class="cp"><div id="tuition-table-area"></div></div><div id="ref-panel-curriculum" style="display:none" class="cp"><input class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="max-width:280px;font-size:12px;padding:6px 10px;margin-bottom:12px"><div id="ref-curriculum-area"></div></div><div id="ref-panel-eval" style="display:none" class="cp"><div id="eval-modules-area"></div></div><div id="ref-panel-classes" style="display:none" class="cp"><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openClassModal()">+ 모듈 추가</button></div><div id="class-list-ref"></div></div><div id="ref-panel-guides" style="display:none" class="cp"><div id="ref-guides-area"></div></div></div>
 <div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
-<div class="view" id="view-personal">
-  <div class="page-top"><h2>🧭 마이</h2><p>학원 업무와 분리된 개인 목표·버킷리스트를 관리합니다 (원장 전용)</p></div>
-  <div class="cp">
-    <div id="personal-active-area" style="margin-bottom:16px"></div>
-    <div class="toolbar" style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:14px;font-weight:800;color:var(--navy)">🪣 버킷리스트</span>
-      <button class="btn btn-navy btn-sm" style="margin-left:auto" onclick="openPersonalModal()">+ 항목 추가</button>
-    </div>
-    <div id="personal-list-area"></div>
-  </div>
-</div>
 <div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 채널 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div class="field"><div class="fl">카카오 채널 보강 예약 링크</div><input class="fi" id="kakao-booking-url" placeholder="https://pf.kakao.com/xxxxx 또는 예약 링크"></div><div class="field" style="margin-top:10px"><div class="fl">결석 알림 메시지 템플릿</div><textarea class="fi" id="kakao-absent-msg" rows="6" style="font-size:12px;line-height:1.6" placeholder="메시지를 입력하세요. {이름}, {날짜}, {링크}를 사용할 수 있습니다."></textarea><div style="font-size:10px;color:var(--txt3);margin-top:4px">사용 가능 변수: <b>{이름}</b> = 학생 이름, <b>{날짜}</b> = 오늘 날짜, <b>{링크}</b> = 보강 예약 링크</div></div><div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-green btn-sm" onclick="saveKakaoConfig()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="$('kakao-absent-msg').value='안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';toast('기본 메시지 복원됨')">기본값 복원</button></div></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><div class="field" style="margin-bottom:10px"><div class="fl">Storage Bucket</div><div style="display:flex;gap:6px"><input class="fi" id="settings-storage-bucket" placeholder="daily-report-5a26e.appspot.com" style="flex:1;font-size:12px"><button class="btn btn-green btn-sm" onclick="saveStorageBucket()">저장</button></div><div style="font-size:10px;color:var(--txt3);margin-top:4px">교사 자료실 파일 업로드에 필요해요</div></div><button class="btn btn-outline btn-sm" onclick="if(await showConfirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
 <!-- MODALS -->
 <div id="modal-student" style="display:none" class="mo" onclick="if(event.target===this)closeM('student')"><div class="ms"><div class="mh"></div><div class="mt" id="s-modal-title">학생 등록</div>
@@ -1180,26 +1169,10 @@ var _dbView='today';
 var _dbAreaFilter='';
 var _dbStatusFilter='';
 var _dbPriorityFilter='';
-var _DB_AREAS=['수업 관리','학생 관리','학부모 소통','홍보','교무','회계','인사','일반','개인'];
+var _DB_AREAS=['수업 관리','학생 관리','학부모 소통','홍보','교무','회계','인사','일반'];
 var _DB_CYCLES=['반복없음','매일','매주','매월','매년'];
 var _dbEditId=null;
-var _DB_AREA_ICONS={'수업 관리':'📚','학생 관리':'👨‍🎓','학부모 소통':'👨‍👩‍👧','홍보':'📣','교무':'📋','회계':'💰','인사':'🧑‍💼','일반':'📝','개인':'🧍'};
-// 관리자만 '개인' 영역을 볼 수 있음 (교사 계정에는 아예 노출되지 않음)
-function _visibleDbAreas(){
-  if(currentUser&&currentUser.role==='admin')return _DB_AREAS;
-  return _DB_AREAS.filter(function(a){return a!=='개인';});
-}
-// 오늘/주간 화면에서 학원 업무만 볼지, 개인 업무까지 포함할지 (기본값: 학원 업무만)
-var _dbShowPersonal=false;
-function _dbVisibleTasks(){
-  var src=_dbTasks||[];
-  if(_dbShowPersonal)return src;
-  return src.filter(function(t){return t.area!=='개인';});
-}
-function _toggleDbShowPersonal(checked){
-  _dbShowPersonal=checked;
-  if(_boardCurrentTab==='today')_renderBoardTodayPanel();
-}
+var _DB_AREA_ICONS={'수업 관리':'📚','학생 관리':'👨‍🎓','학부모 소통':'👨‍👩‍👧','홍보':'📣','교무':'📋','회계':'💰','인사':'🧑‍💼','일반':'📝'};
 var _DB_PRIORITIES=['긴급','중요','일반'];
 var _DB_PRIORITY_SHORT={'긴급':'🔴','중요':'🟡','일반':'🟢'};
 var _DB_PRIORITY_COLORS={'긴급':'#dc2626','중요':'#d97706','일반':'#16a34a'};
@@ -1420,8 +1393,6 @@ async function login(){
 // OPTIMIZED BOOT - breaks work into yielding steps
 // ═══════════════════════════════════════════════════
 var _menuStruct=[
-{sec:'개인',items:[
-  {id:'personal',label:'마이 (버킷리스트)',svg:'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'}]},
 {sec:'계획 관리',items:[
   {id:'goals',label:'성장 목표 관리',svg:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',subs:[{id:'goals_annual',label:'연간 목표'}]},
   {id:'acal',label:'연간 학사일정',svg:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'},
@@ -2908,10 +2879,6 @@ function goto(view){
     if(!currentUser||currentUser.role!=='admin'){toast('관리자만 접근할 수 있어요');return;}
     try{renderUsers();}catch(e){var ea=$('users-list');if(ea)ea.innerHTML='<div style="padding:20px;color:red">오류:'+e.message+'</div>';}
   }
-  else if(view==='personal'){
-    if(!currentUser||currentUser.role!=='admin'){toast('관리자만 접근할 수 있어요');return;}
-    renderPersonalPage();
-  }
   else if(view==='settings'){loadPeriods().then(async function(){try{renderPeriodSettings();}catch(e){var ep=$('period-settings');if(ep)ep.innerHTML='<div style="color:red">오류:'+e.message+'</div>';}});try{loadKakaoConfigUI();}catch(e){} try{var _cfg=getCfg();var _sb=document.getElementById('settings-storage-bucket');if(_sb&&_cfg&&_cfg.storageBucket)_sb.value=_cfg.storageBucket;}catch(e){}}
   else if(view==='board'){renderDashBoard();}
   else if(view==='dashboard'){goto('board');setTimeout(function(){switchBoardTab('focus');},100);}
@@ -3952,7 +3919,7 @@ function _buildTimeline(){
   var HOURS=[];
   for(var h=1;h<=24;h++)HOURS.push(h);
 
-  var timedTasks=_dbVisibleTasks().filter(function(t){
+  var timedTasks=(_dbTasks||[]).filter(function(t){
     return t.dueDate===selDate&&_isOnTimeline(t.startHour);
   });
   var planTimedTasks=getPlanTasksForDate(selDate).filter(function(t){
@@ -3962,8 +3929,8 @@ function _buildTimeline(){
   HOURS.forEach(function(h){slotMap[h]=[];});
   timedTasks.forEach(function(t){var h=parseInt(t.startHour);if(slotMap[h]!==undefined)slotMap[h].push({type:'db',task:t});});
   planTimedTasks.forEach(function(t){var h=parseInt(t.startHour);if(slotMap[h]!==undefined)slotMap[h].push({type:'plan',task:t});});
-  // 루틴 슬롯 병합 (반복 요일 필터 적용, 개인 루틴은 토글이 꺼져있으면 제외)
-  var routines=_getRoutines().filter(function(r){return _dbShowPersonal||!r.personal;});
+  // 루틴 슬롯 병합 (반복 요일 필터 적용)
+  var routines=_getRoutines();
   var selDOW=['일','월','화','수','목','금','토'][new Date(selDate).getDay()];
   routines.forEach(function(r){
     if(r.days&&r.days.length>0&&!r.days.includes(selDOW))return;
@@ -3985,11 +3952,6 @@ function _buildTimeline(){
     html+='<button onclick="tlCalSelect(\''+today+'\')" style="background:var(--mint);border:none;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;cursor:pointer">오늘</button>';
   }
   html+='<button onclick="openRoutineModal()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer">🔁 루틴</button>';
-  if(currentUser&&currentUser.role==='admin'){
-    html+='<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#fff;background:rgba(255,255,255,.12);border-radius:6px;padding:4px 8px;cursor:pointer;white-space:nowrap">'
-      +'<input type="checkbox" onchange="_toggleDbShowPersonal(this.checked)"'+(_dbShowPersonal?' checked':'')+' style="width:12px;height:12px;cursor:pointer">'
-      +(_dbShowPersonal?'개인 포함':'학원 업무만')+'</label>';
-  }
   html+='<button onclick="_toggleTaskCol()" id="btn-toggle-taskcol" style="display:none;background:#1e40af;border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;margin-left:auto">오늘의 업무</button>';
   html+='</div>';
 
@@ -4496,7 +4458,6 @@ function openRoutineModal(){
         h+='<span style="flex:1;font-size:12px;color:var(--txt)">'+r.name+'</span>';
         h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+daysLabel+'</span>';
         if(r.duration)h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0;margin-left:4px">·'+r.duration+'분</span>';
-        if(r.personal)h+='<span style="font-size:9px;font-weight:700;color:#6b7280;background:var(--surface2);border-radius:4px;padding:1px 4px;flex-shrink:0">🧍개인</span>';
         h+='<button onclick="deleteRoutine('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;padding:0 2px;line-height:1">×</button>';
         h+='</div>';
       });
@@ -4546,13 +4507,6 @@ function openRoutineModal(){
     });
     h+='</div>';
     h+='</div>';
-
-    // ④ 개인 루틴 여부 (관리자만 노출 — 체크 시 학원 업무 화면에서 기본적으로 숨겨짐)
-    if(currentUser&&currentUser.role==='admin'){
-      h+='<label style="display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:11px;color:var(--txt2);cursor:pointer">'
-        +'<input type="checkbox" id="routine-personal" style="width:14px;height:14px;cursor:pointer">'
-        +'🧍 개인 루틴으로 등록 (평소 학원 업무 화면에서는 숨겨짐)</label>';
-    }
 
     h+='<button onclick="addRoutine()" class="btn btn-navy btn-sm" style="width:100%">루틴 추가</button>';
     h+='</div>'; // form 끝
@@ -4618,9 +4572,8 @@ function addRoutine(){
   var duration=parseInt((document.getElementById('routine-duration')||{}).value||'30')||30;
   var selectedDays=[];
   document.querySelectorAll('[data-day]').forEach(function(b){if(b.dataset.on==='1')selectedDays.push(b.dataset.day);});
-  var isPersonal=!!(document.getElementById('routine-personal')||{}).checked;
   var routines=_getRoutines();
-  routines.push({id:'r_'+Date.now(),name:name,hour:hour,min:min,duration:duration,days:selectedDays,personal:isPersonal});
+  routines.push({id:'r_'+Date.now(),name:name,hour:hour,min:min,duration:duration,days:selectedDays});
   _saveRoutines(routines);
   if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
 }
@@ -4928,158 +4881,6 @@ async function annualDeleteItem(id){
     annualRenderList();
     if(typeof toast==='function')toast('🗑 삭제됐습니다.');
   }catch(e){if(typeof toast==='function')toast('❌ 삭제 실패: '+e.message);}
-}
-
-// ══════════════ 🧭 마이 (개인 버킷리스트) — 원장 전용 ══════════════
-var _personalItems=null; // null=미로드
-var _PERSONAL_AREAS=['업무','자기개발','건강','자녀교육','가족','여행','취미','기타'];
-var _PERSONAL_IMPORTANCE=['매우 높음','높음','보통','낮음'];
-var _PERSONAL_STATUS=['대기','진행','완료'];
-
-function renderPersonalPage(){
-  if(_personalItems!==null){renderPersonalActive();renderPersonalList();return;}
-  var el=$('personal-list-area');if(el)el.innerHTML='<div style="text-align:center;padding:30px;color:var(--txt3);font-size:12px">불러오는 중...</div>';
-  db.collection('personalBucket').get().then(async function(snap){
-    _personalItems=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
-    renderPersonalActive();
-    renderPersonalList();
-  }).catch(function(e){
-    console.error('personalBucket 로드 오류:',e);
-    if(el)el.innerHTML='<div style="padding:20px;color:red">불러오기 실패: '+e.message+'</div>';
-  });
-}
-
-// 상단: 현재 추진 중(active===true)인 항목만 진행률과 함께 요약
-function renderPersonalActive(){
-  var el=$('personal-active-area');if(!el)return;
-  var active=(_personalItems||[]).filter(function(x){return x.active;});
-  if(!active.length){el.innerHTML='';return;}
-  var h='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px">🎯 현재 추진 중</div>';
-  h+='<div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden">';
-  active.forEach(function(it,i){
-    var pct=Math.max(0,Math.min(100,parseInt(it.progress)||0));
-    var bc=pct>=100?'#16a34a':pct>=50?'#d97706':'#3b82f6';
-    h+='<div style="padding:10px 14px;'+(i>0?'border-top:1px solid var(--border)':'')+'cursor:pointer" onclick="openPersonalModal(\''+it.id+'\')">';
-    h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">';
-    h+='<span style="font-size:9px;font-weight:700;background:var(--surface2);color:var(--txt2);padding:1px 6px;border-radius:10px">'+(it.area||'-')+'</span>';
-    h+='<span style="flex:1;font-size:13px;font-weight:600;color:var(--txt)">'+(it.title||'')+'</span>';
-    h+='<span style="font-size:11px;font-weight:700;color:'+bc+'">'+pct+'%</span>';
-    h+='</div>';
-    h+='<div style="background:var(--surface2);border-radius:3px;height:5px;margin-bottom:4px"><div style="background:'+bc+';width:'+pct+'%;height:5px;border-radius:3px"></div></div>';
-    if(it.nextAction)h+='<div style="font-size:11px;color:var(--txt3)">다음 행동: '+it.nextAction+'</div>';
-    h+='</div>';
-  });
-  h+='</div>';
-  el.innerHTML=h;
-}
-
-// 하단: 버킷리스트 전체 (분야별 그룹, 중요도순 정렬)
-function renderPersonalList(){
-  var el=$('personal-list-area');if(!el)return;
-  var items=(_personalItems||[]).slice();
-  if(!items.length){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt3);font-size:13px">🪣<br><br>하고 싶은 것을 자유롭게 등록해보세요.</div>';
-    return;
-  }
-  var impOrder={'매우 높음':0,'높음':1,'보통':2,'낮음':3};
-  items.sort(function(a,b){
-    var ai=impOrder[a.importance];ai=ai===undefined?2:ai;
-    var bi=impOrder[b.importance];bi=bi===undefined?2:bi;
-    return ai-bi;
-  });
-  var statusColor={'대기':'#6b7280','진행':'#2563eb','완료':'#16a34a'};
-  var h='<div style="margin-top:10px;border:1px solid var(--border);border-radius:12px;overflow:hidden">';
-  items.forEach(function(it,i){
-    var sc=statusColor[it.status]||'#6b7280';
-    h+='<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;'+(i>0?'border-top:1px solid var(--border)':'')+'">';
-    h+='<span style="font-size:9px;font-weight:700;background:var(--surface2);color:var(--txt2);padding:1px 6px;border-radius:10px;flex-shrink:0">'+(it.area||'-')+'</span>';
-    h+='<span style="font-size:10px;font-weight:700;color:'+sc+';flex-shrink:0">'+(it.status||'대기')+'</span>';
-    h+='<span onclick="openPersonalModal(\''+it.id+'\')" style="flex:1;font-size:12px;cursor:pointer;color:var(--txt)">'+(it.title||'')
-      +(it.detail?'<span style="color:var(--txt3);font-weight:400"> — '+it.detail+'</span>':'')+'</span>';
-    if(it.active)h+='<span style="font-size:9px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:1px 6px;border-radius:10px;flex-shrink:0">추진중</span>';
-    if(it.targetPeriod)h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+it.targetPeriod+'</span>';
-    h+='<button onclick="deletePersonalItem(\''+it.id+'\')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0">×</button>';
-    h+='</div>';
-  });
-  h+='</div>';
-  el.innerHTML=h;
-}
-
-function openPersonalModal(id){
-  var it=id?(_personalItems||[]).find(function(x){return x.id===id;}):null;
-  var old=$('personal-modal');if(old)old.remove();
-  var modal=document.createElement('div');
-  modal.id='personal-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2500;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.onclick=function(e){if(e.target===modal)modal.remove();};
-  var mkOpts=function(arr,val){return arr.map(function(a){return '<option value="'+a+'"'+(val===a?' selected':'')+'>'+a+'</option>';}).join('');};
-  var box=document.createElement('div');
-  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto';
-  box.innerHTML=
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-      +'<div style="font-size:15px;font-weight:800;color:var(--navy)">'+(id?'✏️ 항목 편집':'🪣 버킷리스트 추가')+'</div>'
-      +'<button onclick="$(\'personal-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>'
-    +'</div>'
-    +'<div class="field" style="margin-bottom:10px"><div class="fl">항목 *</div><input class="fi" id="pb-title" value="'+(it?(it.title||'').replace(/"/g,'&quot;'):'')+'" placeholder="예: TOEIC 만점 받기" style="font-size:13px"></div>'
-    +'<div class="field" style="margin-bottom:10px"><div class="fl">세부계획 / 의미</div><textarea class="fi" id="pb-detail" rows="2" style="font-size:12px">'+(it?(it.detail||''):'')+'</textarea></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
-      +'<div class="field"><div class="fl">분야</div><select class="fi" id="pb-area">'+mkOpts(_PERSONAL_AREAS,it?it.area:_PERSONAL_AREAS[0])+'</select></div>'
-      +'<div class="field"><div class="fl">중요도</div><select class="fi" id="pb-importance">'+mkOpts(_PERSONAL_IMPORTANCE,it?it.importance:'보통')+'</select></div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
-      +'<div class="field"><div class="fl">상태</div><select class="fi" id="pb-status">'+mkOpts(_PERSONAL_STATUS,it?it.status:'대기')+'</select></div>'
-      +'<div class="field"><div class="fl">목표시기</div><input class="fi" id="pb-period" value="'+(it?(it.targetPeriod||''):'')+'" placeholder="예: 중기, 지속, 2026" style="font-size:12px"></div>'
-    +'</div>'
-    +'<label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:var(--txt2);cursor:pointer">'
-      +'<input type="checkbox" id="pb-active" style="width:14px;height:14px;cursor:pointer"'+(it&&it.active?' checked':'')+'> 🎯 현재 추진 중 (상단 요약에 진행률과 함께 표시)</label>'
-    +'<div class="field" style="margin-bottom:10px"><div class="fl">진행률 (%)</div><input type="number" class="fi" id="pb-progress" min="0" max="100" value="'+(it?(it.progress||0):0)+'" style="font-size:12px"></div>'
-    +'<div class="field" style="margin-bottom:16px"><div class="fl">다음 행동</div><input class="fi" id="pb-next" value="'+(it?(it.nextAction||''):'')+'" placeholder="예: 매일 읽기/듣기 30~40분" style="font-size:12px"></div>'
-    +'<button onclick="savePersonalItem('+(id?"'"+id+"'":'null')+')" class="btn btn-navy btn-sm" style="width:100%">저장</button>';
-  modal.appendChild(box);
-  document.body.appendChild(modal);
-}
-
-async function savePersonalItem(id){
-  var title=($('pb-title')||{}).value||'';
-  if(!title.trim()){toast('항목을 입력하세요');return;}
-  var data={
-    title:title,
-    detail:($('pb-detail')||{}).value||'',
-    area:($('pb-area')||{}).value||'기타',
-    importance:($('pb-importance')||{}).value||'보통',
-    status:($('pb-status')||{}).value||'대기',
-    targetPeriod:($('pb-period')||{}).value||'',
-    active:!!($('pb-active')||{}).checked,
-    progress:parseInt(($('pb-progress')||{}).value)||0,
-    nextAction:($('pb-next')||{}).value||'',
-    updatedAt:new Date().toISOString()
-  };
-  try{
-    if(id){
-      await db.collection('personalBucket').doc(id).set(data,{merge:true});
-      var idx=_personalItems.findIndex(function(x){return x.id===id;});
-      if(idx>=0)_personalItems[idx]=Object.assign({id:id},data);
-    }else{
-      data.createdAt=new Date().toISOString();
-      var ref=await db.collection('personalBucket').add(data);
-      _personalItems.push(Object.assign({id:ref.id},data));
-    }
-    var m=$('personal-modal');if(m)m.remove();
-    renderPersonalActive();
-    renderPersonalList();
-    toast('✅ 저장됐습니다');
-  }catch(e){toast('❌ 저장 실패: '+e.message);}
-}
-
-async function deletePersonalItem(id){
-  var _cm=await showConfirm('이 항목을 삭제하시겠습니까?',true);if(!_cm)return;
-  try{
-    await db.collection('personalBucket').doc(id).delete();
-    _personalItems=(_personalItems||[]).filter(function(x){return x.id!==id;});
-    renderPersonalActive();
-    renderPersonalList();
-    toast('🗑 삭제됐습니다');
-  }catch(e){toast('❌ 삭제 실패: '+e.message);}
 }
 
 function _renderBoardAreaPanel(){
@@ -13748,10 +13549,6 @@ function loadDashBoard(forceReload){
     // 중복 ID 방어 — 같은 ID가 여러 번 있으면 첫 번째만 유지
     var seenIds={};
     colTasks=colTasks.filter(function(t){if(seenIds[t.id])return false;seenIds[t.id]=true;return true;});
-    // '개인' 영역 업무는 관리자(원장) 계정에만 로드 — 교사 계정에는 아예 내려가지 않음
-    if(!(currentUser&&currentUser.role==='admin')){
-      colTasks=colTasks.filter(function(t){return t.area!=='개인';});
-    }
     var configTasks=configDoc.exists?(configDoc.data().tasks||[]):[];
     // config 배열에만 있는 task → 컬렉션으로 마이그레이션
     var colIds=new Set(colTasks.map(function(t){return t.id;}));
@@ -14537,11 +14334,11 @@ function _renderTodayTaskSection(){
   var today=todayISO();
   function addDays(dateStr,n){var d=new Date(dateStr);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 
-  var todayItems=_dbVisibleTasks().filter(function(t){
+  var todayItems=(_dbTasks||[]).filter(function(t){
     return (t.scheduleDate||t.dueDate)===today&&!(t.id&&t.id.startsWith('__'))&&!t.planId&&t.status!=='완료';
   });
   var planTodayTasks=getPlanTasksForDate(today).filter(function(t){return t.done!==true;});
-  var overdueItems=_dbVisibleTasks().filter(function(t){
+  var overdueItems=(_dbTasks||[]).filter(function(t){
     return !(t.id&&t.id.startsWith('__'))&&!t.planId&&t.dueDate&&t.dueDate<today&&t.status!=='완료';
   });
   var planOverdue=getPlanTasksForRange('2000-01-01',addDays(today,-1)).filter(function(t){
@@ -14916,7 +14713,7 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
 
 // ── 영역별 뷰 ────────────────────────────────────
 function _renderDbAreaView(){
-  var areas=_dbAreaFilter?[_dbAreaFilter]:_visibleDbAreas();
+  var areas=_dbAreaFilter?[_dbAreaFilter]:_DB_AREAS;
   var allTasks=_dbFiltered((_dbTasks||[]).filter(function(t){return !t.id||!t.id.startsWith('__');}));
   var html='';
   areas.forEach(function(area){
@@ -15088,7 +14885,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var mw=document.createElement('div');mw.style.marginBottom='10px';mw.appendChild(mkLbl('메모'));mw.appendChild(memoTa);box.appendChild(mw);
 
   // ── 업무 영역 ──
-  var areaSel=mkSel('dbt-area',_visibleDbAreas().map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
+  var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
   var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
 
   // ── 예상 소요시간 ──
