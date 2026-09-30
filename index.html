@@ -4416,13 +4416,54 @@ function _toggleTaskCol(){
   col.style.display=col.style.display==='none'?'flex':'none';
 }
 
-// ── 루틴 관리 ────────────────────────────────────────────────
-var _ROUTINES_KEY='tl_routines_v1';
+// ── 루틴 관리 (Firestore 저장 — 기기/브라우저 간 공유, localStorage 유실 방지) ──
+var _ROUTINES_KEY='tl_routines_v1'; // 구버전 localStorage 키 — 1회 마이그레이션 용도로만 사용
+var _routinesCache=null; // null=미로드, 배열=로드 완료
+var _routinesLoading=false;
 function _getRoutines(){
-  try{return JSON.parse(localStorage.getItem(_ROUTINES_KEY)||'[]');}catch(e){return[];}
+  if(_routinesCache===null){
+    _ensureRoutinesLoaded();
+    return [];
+  }
+  return _routinesCache;
 }
-function _saveRoutines(arr){
-  try{localStorage.setItem(_ROUTINES_KEY,JSON.stringify(arr));}catch(e){}
+function _ensureRoutinesLoaded(){
+  if(_routinesCache!==null||_routinesLoading)return;
+  _routinesLoading=true;
+  db.collection('routines').get().then(async function(snap){
+    var arr=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+    if(arr.length===0){
+      // 구버전(localStorage 전용 시절)에 등록된 루틴이 이 브라우저에 남아있으면 1회 마이그레이션
+      var old=[];
+      try{old=JSON.parse(localStorage.getItem(_ROUTINES_KEY)||'[]');}catch(e){old=[];}
+      if(old.length>0){
+        try{
+          var batch=db.batch();
+          old.forEach(function(r){
+            var id=r.id||('r_'+Date.now()+'_'+Math.random().toString(36).slice(2));
+            batch.set(db.collection('routines').doc(id),{name:r.name,hour:r.hour,min:r.min||0,duration:r.duration||30,days:r.days||[]});
+          });
+          await batch.commit();
+          var snap2=await db.collection('routines').get();
+          arr=snap2.docs.map(function(d){return Object.assign({id:d.id},d.data());});
+          console.log('루틴 '+old.length+'건을 localStorage에서 Firestore로 마이그레이션 완료');
+        }catch(e){console.error('루틴 마이그레이션 오류:',e);}
+      }
+    }
+    _routinesCache=arr;
+    _routinesLoading=false;
+    _refreshRoutineUI();
+  }).catch(function(e){
+    console.error('루틴 로드 오류:',e);
+    _routinesCache=[];
+    _routinesLoading=false;
+    toast('❌ 루틴 불러오기 실패 — 인터넷 연결을 확인해주세요',4000);
+  });
+}
+function _refreshRoutineUI(){
+  var l=document.getElementById('today-timeline-col');
+  if(l){l.innerHTML=_buildTimeline();if(typeof _initTimelineDnD==='function')_initTimelineDnD();}
+  if(window._routineModal&&window._routineRenderBox){window._routineModal.innerHTML=window._routineRenderBox();}
 }
 
 function openRoutineModal(){
@@ -4572,17 +4613,31 @@ function addRoutine(){
   var duration=parseInt((document.getElementById('routine-duration')||{}).value||'30')||30;
   var selectedDays=[];
   document.querySelectorAll('[data-day]').forEach(function(b){if(b.dataset.on==='1')selectedDays.push(b.dataset.day);});
-  var routines=_getRoutines();
-  routines.push({id:'r_'+Date.now(),name:name,hour:hour,min:min,duration:duration,days:selectedDays});
-  _saveRoutines(routines);
+  var id='r_'+Date.now();
+  var newRoutine={id:id,name:name,hour:hour,min:min,duration:duration,days:selectedDays};
+  // 낙관적 UI 갱신 (저장 실패 시 아래에서 롤백)
+  _routinesCache=(_routinesCache||[]).concat([newRoutine]);
   if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
+  db.collection('routines').doc(id).set({name:name,hour:hour,min:min,duration:duration,days:selectedDays}).catch(function(e){
+    console.error('addRoutine 오류:',e);
+    toast('❌ "'+name+'" 루틴 저장 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
+    _routinesCache=(_routinesCache||[]).filter(function(r){return r.id!==id;});
+    if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
+  });
 }
 
 function deleteRoutine(idx){
   var routines=_getRoutines();
-  routines.splice(idx,1);
-  _saveRoutines(routines);
+  var r=routines[idx];if(!r)return;
+  // 낙관적 UI 갱신 (삭제 실패 시 아래에서 복구)
+  _routinesCache=routines.filter(function(x,i){return i!==idx;});
   if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
+  db.collection('routines').doc(r.id).delete().catch(function(e){
+    console.error('deleteRoutine 오류:',e);
+    toast('❌ "'+(r.name||'루틴')+'" 삭제 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
+    _routinesCache=_getRoutines().concat([r]);
+    if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
+  });
 }
 
 // ── 주간 할 일 드롭다운 ──
