@@ -13111,7 +13111,7 @@ function openPayrollModal(userId,yr,mo){
     rows+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);'+bg+'">'
       +'<span style="font-size:12px;font-weight:600;min-width:22px;color:var(--navy)">'+dowName2+'</span>'
       +'<span style="font-size:12px;min-width:70px">'+mo+'월 '+d2+'일</span>'
-      +'<input type="number" class="fi payroll-hrs" data-day="'+d2+'" data-type="'+(dtype)+'" value="'+hrs+'" step="0.5" min="0" max="24" style="width:60px;font-size:12px;padding:4px 6px;text-align:center">'
+      +'<input type="number" class="fi payroll-hrs" data-day="'+d2+'" data-type="'+(dtype)+'" data-staffday="'+(isStaffDay?'1':'0')+'" data-default-hrs="'+(isStaffDay?(staffHours[dowName2]||0):0)+'" value="'+hrs+'" step="0.5" min="0" max="24" style="width:60px;font-size:12px;padding:4px 6px;text-align:center">'
       +'<span style="font-size:11px;color:var(--txt3)">h</span>'
       +'<button class="btn btn-xs '+(dtype==='holiday'?'btn-navy':'btn-outline')+'" style="font-size:9px;padding:2px 5px" onclick="setPayrollDayType(this,\'holiday\')">공휴일</button>'
       +'<button class="btn btn-xs '+(dtype==='absent'?'btn-red':'btn-outline')+'" style="font-size:9px;padding:2px 5px" onclick="setPayrollDayType(this,\'absent\')">결근</button>'
@@ -13143,14 +13143,18 @@ function setPayrollDayType(btn,type){
   var curType=inp.dataset.type;
   var newType=curType===type?'normal':type;
   inp.dataset.type=newType;
+  // 공휴일/결근으로 바꾸면 수업 시수 0, 다시 정상으로 돌리면 세팅된 시수로 복원
+  var defaultHrs=parseFloat(inp.dataset.defaultHrs)||0;
+  inp.value=(newType==='holiday'||newType==='absent')?0:defaultHrs;
   // Update button styles
   var btns=row.querySelectorAll('button');
   btns.forEach(function(b){
-    if(b.textContent==='공휴일')b.className='btn btn-xs '+(newType==='holiday'?'btn-navy':'btn-outline')+' '+'font-size:9px;padding:2px 5px';
+    if(b.textContent==='공휴일')b.className='btn btn-xs '+(newType==='holiday'?'btn-navy':'btn-outline');
     if(b.textContent==='결근')b.className='btn btn-xs '+(newType==='absent'?'btn-red':'btn-outline');
   });
-  var bgMap={holiday:'#eff6ff',absent:'#fef2f2',normal:''};
-  // Keep staff day tint for normal
+  var isStaffDay=inp.dataset.staffday==='1';
+  var bgMap={holiday:'#eff6ff',absent:'#fef2f2',normal:(isStaffDay?'#f0fdf4':'')};
+  // 정상으로 돌아오면 근무 요일 연초록 배경도 함께 복원
   row.style.background=bgMap[newType]||'';
 }
 async function savePayroll(userId,yr,mo,overlay){
