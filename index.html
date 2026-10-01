@@ -12784,8 +12784,7 @@ function renderStaffArea(){
     if(u.role!=='teacher')return false;
     if(u.startDate&&u.startDate.slice(0,7)>yrMoStr)return false;
     if(u.endDate&&u.endDate.slice(0,7)<yrMoStr)return false;
-    if(!u.staffDeleted)return true;
-    var wd=u['workDays_'+yr+'_'+mo]||[];return wd.length>0;
+    return true;
   });
   var payrollHTML=teacherList.length?teacherList.map(function(u,idx){
     var hourlyRate=getHourlyRate(u,yr,mo);
@@ -12824,7 +12823,7 @@ function renderStaffArea(){
       +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
       +'<button class="btn btn-xs '+(juhuEnabled?'btn-green':'btn-outline')+'" onclick="toggleJuhu(\''+u.id+'\','+!juhuEnabled+')" title="주휴수당: 주 15시간 이상 근무 시 지급">'+(juhuEnabled?'✅ 주휴수당 ON':'주휴수당 OFF')+'</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">✏️ 편집</button>'
-      +'<button class="btn btn-red btn-xs" onclick="deleteStaffUser(\''+u.id+'\',\''+u.name+'\')">🗑 삭제</button></div></div>';
+      +'<button class="btn btn-red btn-xs" onclick="deleteStaffUser(\''+u.id+'\',\''+u.name+'\','+yr+','+mo+')">🗑 퇴사 처리</button></div></div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt3)">등록된 교사가 없습니다.</div>';
   // Freelancer ledger
   var freelancerHTML='<table class="rev-tbl" style="font-size:12px"><thead><tr><th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">주민번호</th><th style="text-align:center">주소</th><th style="text-align:center">용역비</th><th style="text-align:center">사업소득세(3%)</th><th style="text-align:center">주민세</th><th style="text-align:center">차감수령액</th><th style="text-align:center">지급날짜</th></tr></thead><tbody>';
@@ -12843,7 +12842,7 @@ function renderStaffArea(){
   });
   freelancerHTML+='<tr style="background:var(--surface2);font-weight:700"><td colspan="4" style="text-align:center">합계</td><td style="text-align:center;color:var(--red)">'+totalFee.toLocaleString()+'</td><td style="text-align:center">'+totalBizTax.toLocaleString()+'</td><td style="text-align:center">'+totalResTax.toLocaleString()+'</td><td style="text-align:center;color:var(--navy)">'+totalNet.toLocaleString()+'</td><td></td></tr></tbody></table>';
   el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h4 style="margin:0">💰 '+moStr+' 급여 명세서</h4><div style="display:flex;align-items:center;gap:6px"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 강사 등록</button><button onclick="showStaffGuide()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:22px;height:22px;font-size:12px;font-weight:800;cursor:pointer;color:var(--txt2)">?</button></div></div>'
-    +'<div class="expense-section">'+payrollHTML+'</div>'
+    +'<div class="expense-section">'+payrollHTML+_renderDeletedStaffList()+'</div>'
     +'<div class="expense-section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h4 style="margin:0">📋 '+moStr+' 프리랜서 용역 대장</h4><button class="btn btn-outline btn-sm" onclick="saveFreelancerImage()">📷 이미지 저장</button></div><div style="overflow-x:auto">'+freelancerHTML+'</div></div>';
 }
 function saveFreelancerImage(){
@@ -12857,8 +12856,7 @@ function saveFreelancerImage(){
     if(u.role!=='teacher')return false;
     if(u.startDate&&u.startDate.slice(0,7)>yrMoStr)return false;
     if(u.endDate&&u.endDate.slice(0,7)<yrMoStr)return false;
-    if(!u.staffDeleted)return true;
-    var wd=u['workDays_'+yr+'_'+mo]||[];return wd.length>0;
+    return true;
   });
   var rows='';var totalFee=0,totalBiz=0,totalRes=0,totalNet=0;
   teacherList.forEach(function(u,idx){
@@ -12935,11 +12933,38 @@ async function _captureFreelancer(card,container,allMo,allViews,moStr){
     });
   },400);
 }
-async function deleteStaffUser(userId,name){
-  var _cm=await showConfirm(name+' 강사를 강사 페이지에서 삭제합니다.\n관리자 페이지에는 영향이 없습니다.\n(해당 월에 근무 데이터가 있으면 그 월에는 계속 표시됩니다)\n삭제하시겠습니까?',null,null,true);if(!_cm)return;
-  loading(true);await db.collection('users').doc(userId).update({staffDeleted:true,staffDeletedAt:new Date().toISOString()});
-  var u=users.find(function(x){return x.id===userId;});if(u)u.staffDeleted=true;
-  renderStaffArea();loading(false);toast('🗑 '+name+' 강사 페이지에서 삭제됨');
+async function deleteStaffUser(userId,name,yr,mo){
+  var _cm=await showConfirm(name+' 선생님을 퇴사 처리합니다.\n지금 보고 있는 '+yr+'년 '+mo+'월까지는 계속 표시되고, '+mo+'월 다음 달부터 강사 페이지에서 보이지 않습니다.\n관리자 페이지에는 영향이 없습니다.\n(나중에 "퇴사한 강사 보기"에서 되돌릴 수 있어요)\n퇴사 처리하시겠습니까?',null,null,true);if(!_cm)return;
+  loading(true);
+  var endDate=yr+'-'+String(mo).padStart(2,'0')+'-'+String(new Date(yr,mo,0).getDate()).padStart(2,'0');
+  await db.collection('users').doc(userId).update({staffDeleted:true,staffDeletedAt:new Date().toISOString(),endDate:endDate});
+  var u=users.find(function(x){return x.id===userId;});if(u){u.staffDeleted=true;u.endDate=endDate;}
+  renderStaffArea();loading(false);toast('🗑 '+name+' 선생님 '+mo+'월까지 근무로 처리, 다음 달부터 강사 페이지에서 숨겨집니다');
+}
+async function restoreStaffUser(userId,name){
+  var _cm=await showConfirm(name+' 선생님을 다시 재직 중으로 되돌릴까요?\n퇴사 처리로 설정됐던 퇴사일이 지워집니다.',null,null,true);if(!_cm)return;
+  loading(true);
+  await db.collection('users').doc(userId).update({staffDeleted:false,endDate:firebase.firestore.FieldValue.delete()});
+  var u=users.find(function(x){return x.id===userId;});if(u){u.staffDeleted=false;delete u.endDate;}
+  renderStaffArea();loading(false);toast('↩️ '+name+' 선생님이 재직 중으로 복구됐습니다');
+}
+function _renderDeletedStaffList(){
+  var deleted=users.filter(function(u){return u.role==='teacher'&&u.staffDeleted;});
+  if(!deleted.length)return '';
+  return '<div style="margin-top:14px"><button class="btn btn-outline btn-sm" onclick="_toggleDeletedStaffList()">🗂 퇴사한 강사 보기 ('+deleted.length+')</button>'
+    +'<div id="deleted-staff-list" style="display:none;margin-top:8px">'
+    +deleted.map(function(u){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">'
+        +'<span style="font-size:13px;font-weight:700;flex:1">'+u.name+'</span>'
+        +(u.endDate?'<span style="font-size:11px;color:var(--txt3)">퇴사일: '+u.endDate+'</span>':'')
+        +'<button class="btn btn-outline btn-xs" onclick="restoreStaffUser(\''+u.id+'\',\''+u.name+'\')">↩️ 복구</button>'
+        +'</div>';
+    }).join('')
+    +'</div></div>';
+}
+function _toggleDeletedStaffList(){
+  var el=document.getElementById('deleted-staff-list');if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
 }
 function toggleStaffDay(userId,day,el){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
