@@ -4792,13 +4792,15 @@ function _renderFocusAcalSection(yr,mo,moStart,moEnd,now){
     combined.forEach(function(item){
       if(item._type==='acal'){
         var e=item._data;
+        var isAcalDone=!!e.completed;
         var diff=Math.round((new Date(e.date)-now)/(1000*60*60*24));
         var dday=diff>0?'<span style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px">D-'+diff+'</span>':diff===0?'<span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:1px 5px;border-radius:4px">오늘</span>':'<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:1px 5px;border-radius:4px">완료</span>';
         var catCol=catColors[e.cat]||'#94a3b8';
         h+='<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)">';
+        h+='<input type="checkbox"'+(isAcalDone?' checked':'')+' data-evtid="'+e.id+'" onchange="_toggleAcalMonthlyDone(this.dataset.evtid,this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:#1d4ed8;flex-shrink:0">';
         h+='<span style="font-size:11px;font-weight:600;color:var(--txt3);flex-shrink:0">'+e.date.slice(5)+'</span>';
         if(e.cat)h+='<span style="font-size:9px;font-weight:700;background:'+catCol+';color:#fff;padding:2px 6px;border-radius:10px;flex-shrink:0">'+e.cat+'</span>';
-        h+='<span style="font-size:12px;flex:1;color:var(--txt)">'+e.title+'</span>';
+        h+='<span style="font-size:12px;flex:1;'+(isAcalDone?'text-decoration:line-through;color:var(--txt3)':'color:var(--txt)')+'">'+e.title+'</span>';
         h+=dday;
         h+='</div>';
       }else{
@@ -4825,6 +4827,22 @@ function rrToggleMonthlyTask(id,checked){
   t.status=checked?'완료':'미완료';
   saveDashBoard();
   _boardFocusNavRender();
+}
+
+// ── 이달의 업무 박스: 학사일정 항목 완료 체크 ──
+function _toggleAcalMonthlyDone(id,checked){
+  if(!_academicCalendar||!_academicCalendar.events)return;
+  var idx=_academicCalendar.events.findIndex(function(e){return e.id===id;});
+  if(idx<0)return;
+  _academicCalendar.events[idx].completed=checked;
+  _academicCalendar.events[idx].completedAt=checked?new Date().toISOString():null;
+  saveAcademicCalendar();
+  _boardFocusNavRender();
+  // 연간 학사일정 화면도 열려있으면 함께 갱신
+  var acalMain=$('acal-main-area');
+  if(acalMain&&typeof _renderAcademicCalendarUI==='function')_renderAcademicCalendarUI(acalMain);
+  var calEl=$('dashboard-calendar-area');
+  if(calEl&&typeof _renderAcademicCalendarUI==='function')_renderAcademicCalendarUI(calEl);
 }
 
 function _renderFocusPlanSection(moStart,moEnd){
@@ -12824,7 +12842,7 @@ function renderStaffArea(){
     freelancerHTML+='<tr><td style="text-align:center">'+(idx+1)+'</td><td style="text-align:center;font-weight:600">'+u.name+'</td><td style="text-align:center;font-size:11px">'+ssn+'</td><td style="text-align:center;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(u.address||'-')+'</td><td style="text-align:center">'+fee.toLocaleString()+'</td><td style="text-align:center">'+bizTax.toLocaleString()+'</td><td style="text-align:center">'+resTax.toLocaleString()+'</td><td style="text-align:center;font-weight:700">'+net2.toLocaleString()+'</td><td style="text-align:center">'+payDateStr+'</td></tr>';
   });
   freelancerHTML+='<tr style="background:var(--surface2);font-weight:700"><td colspan="4" style="text-align:center">합계</td><td style="text-align:center;color:var(--red)">'+totalFee.toLocaleString()+'</td><td style="text-align:center">'+totalBizTax.toLocaleString()+'</td><td style="text-align:center">'+totalResTax.toLocaleString()+'</td><td style="text-align:center;color:var(--navy)">'+totalNet.toLocaleString()+'</td><td></td></tr></tbody></table>';
-  el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h4 style="margin:0">💰 '+moStr+' 급여 명세서</h4><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 강사 등록</button> <button onclick="showStaffGuide()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:22px;height:22px;font-size:12px;font-weight:800;cursor:pointer;color:var(--txt2)">?</button></div>'
+  el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h4 style="margin:0">💰 '+moStr+' 급여 명세서</h4><div style="display:flex;align-items:center;gap:6px"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 강사 등록</button><button onclick="showStaffGuide()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:22px;height:22px;font-size:12px;font-weight:800;cursor:pointer;color:var(--txt2)">?</button></div></div>'
     +'<div class="expense-section">'+payrollHTML+'</div>'
     +'<div class="expense-section"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h4 style="margin:0">📋 '+moStr+' 프리랜서 용역 대장</h4><button class="btn btn-outline btn-sm" onclick="saveFreelancerImage()">📷 이미지 저장</button></div><div style="overflow-x:auto">'+freelancerHTML+'</div></div>';
 }
@@ -12930,6 +12948,7 @@ function toggleStaffDay(userId,day,el){
   if(idx>=0)staffDays.splice(idx,1);else staffDays.push(day);
   u.staffDays=staffDays;
   db.collection('users').doc(userId).update({staffDays:staffDays});
+  _syncStaffScheduleToPayroll(userId);
   renderStaffArea();saveCacheDebounced();
 }
 function saveStaffDayHours(userId,day,val){
@@ -12938,7 +12957,47 @@ function saveStaffDayHours(userId,day,val){
   h[day]=parseFloat(val)||0;
   u.staffHoursPerDay=h;
   db.collection('users').doc(userId).update({staffHoursPerDay:h});
+  _syncStaffScheduleToPayroll(userId);
   saveCacheDebounced();
+}
+// 수업 요일/시수를 바꾸면, 이미 저장된 "근무 시간표"(워크데이)에도 반영 —
+// 단, 이미 지난 날짜(근무 완료된 날)나 공휴일/결근으로 따로 표시해둔 날, 메모가 적힌 날은 건드리지 않음
+function _syncStaffScheduleToPayroll(userId){
+  var u=users.find(function(x){return x.id===userId;});if(!u)return;
+  var yr=parseInt($('rev-year')?.value)||new Date().getFullYear();
+  var mo=parseInt($('rev-month')?.value)||new Date().getMonth()+1;
+  var key='workDays_'+yr+'_'+mo;
+  var workDays=u[key];
+  if(!workDays||!workDays.length)return; // 아직 저장 전이면 모달 열 때 최신 요일/시수로 자동 채워지므로 손댈 것 없음
+  var staffDays=u.staffDays||[];
+  var staffHours=u.staffHoursPerDay||{};
+  var dayNames=['일','월','화','수','목','금','토'];
+  var today=new Date();today.setHours(0,0,0,0);
+  var changed=false;
+  var daysInMo=new Date(yr,mo,0).getDate();
+  for(var d=1;d<=daysInMo;d++){
+    var dt=new Date(yr,mo-1,d);
+    if(dt<today)continue; // 이미 지난 날은 그대로 둠
+    var dowName=dayNames[dt.getDay()];
+    if(dowName==='일')continue;
+    var entry=workDays.find(function(w){return w.day===d;});
+    if(entry&&(entry.type==='holiday'||entry.type==='absent'||(entry.memo&&entry.memo.trim())))continue; // 수동으로 표시해둔 날은 유지
+    var shouldWork=staffDays.includes(dowName);
+    var newHours=shouldWork?(staffHours[dowName]||0):0;
+    if(entry){
+      if(entry.hours!==newHours){entry.hours=newHours;changed=true;}
+    }else{
+      workDays.push({day:d,hours:newHours,type:'normal'});changed=true;
+    }
+  }
+  if(changed){
+    u[key]=workDays;
+    var update={};update[key]=workDays;
+    db.collection('users').doc(userId).update(update).catch(function(e){
+      console.error('_syncStaffScheduleToPayroll 오류:',e);
+      toast('⚠️ 근무 시간표 자동 반영 실패 — 인터넷 연결을 확인해주세요',4000);
+    });
+  }
 }
 async function toggleJuhu(userId,enabled){
   var idx=users.findIndex(function(u){return u.id===userId;});
