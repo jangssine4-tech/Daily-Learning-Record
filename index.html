@@ -1179,8 +1179,8 @@ var _DB_PRIORITY_COLORS={'긴급':'#dc2626','중요':'#d97706','일반':'#16a34a
 var _DB_STATUSES=['대기','진행 중','완료','보류'];
 var _DB_STATUS_COLORS={'대기':'#6b7280','진행 중':'#2563eb','완료':'#16a34a','보류':'#d97706'};
 var _DB_STATUS_BG={'대기':'#f3f4f6','진행 중':'#eff6ff','완료':'#f0fdf4','보류':'#fffbeb'};
-var _DB_TASK_TYPES=['일반 업무','이달의 할 일','이달의 중점','이번 주 중점'];
-var _DB_TASK_TYPE_ICONS={'일반 업무':'📋','이달의 할 일':'📅','이달의 중점':'🎯','이번 주 중점':'📅'};
+var _DB_TASK_TYPES=['일반 업무','이달의 할 일'];
+var _DB_TASK_TYPE_ICONS={'일반 업무':'📋','이달의 할 일':'📅'};
 var _dbTypeFilter='';
 var _promoLoaded=false;
 var currentGoalsTab='annual', currentSummaryTab='summary', currentRefTab='fees';
@@ -4771,7 +4771,7 @@ function _renderFocusAcalSection(yr,mo,moStart,moEnd,now){
   var monthlyTasks=(_dbTasks||[]).filter(function(t){
     if(t.id&&t.id.startsWith('__'))return false;
     if(t.planId)return false;
-    if(t.taskType!=='이달의 중점'&&t.taskType!=='이달의 할 일')return false;
+    if(t.taskType!=='이달의 할 일')return false;
     var d=t.dueDate||t.scheduleDate||'';
     return d>=moStart&&d<moEnd;
   });
@@ -5104,16 +5104,7 @@ function renderDashMonthly(){
       var isCompleted=e.completed;
       var catCol=catColors[e.cat]||'#94a3b8';
       var catBadge=e.cat?'<span style="font-size:9px;font-weight:700;background:'+catCol+';color:#fff;padding:2px 0;border-radius:20px;flex-shrink:0;min-width:52px;text-align:center;display:inline-block">'+e.cat+'</span>':'';
-      var linkedTask=(_dbTasks||[]).find(function(t){return t.acalId===e.id&&t.taskType==='이달의 중점';});
-      var alreadyLinked=!!linkedTask;
-      var linkBtn;
-      if(isCompleted){
-        linkBtn='<span style="font-size:9px;color:#16a34a;flex-shrink:0">✅ 완료</span>';
-      }else if(alreadyLinked){
-        linkBtn='<button data-tid="'+linkedTask.id+'" onclick="event.stopPropagation();_unlinkFocusTask(this.dataset.tid)" style="font-size:9px;padding:1px 6px;border-radius:4px;background:#f0fdf4;color:#16a34a;border:1px solid #16a34a;cursor:pointer;flex-shrink:0">✅ 등록됨</button>';
-      }else{
-        linkBtn='<button data-acid="'+e.id+'" onclick="event.stopPropagation();var _ev=(_academicCalendar.events||[]).find(function(x){return x.id===this.dataset.acid;}.bind(this));if(_ev)_acalCreateFocusTask(_ev);" style="font-size:9px;padding:1px 6px;border-radius:4px;background:#7c3aed;color:#fff;border:none;cursor:pointer;flex-shrink:0">+ 중점업무</button>';
-      }
+      var linkBtn=isCompleted?'<span style="font-size:9px;color:#16a34a;flex-shrink:0">✅ 완료</span>':'';
       calHTML+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">'
         +'<span style="font-size:11px;font-weight:600;color:var(--txt2);flex-shrink:0">'+(isCompleted?'✅':e.date.slice(5))+'</span>'
         +catBadge
@@ -13727,7 +13718,21 @@ function loadDashBoard(forceReload){
     } else {
       _dbTasks=colTasks;
     }
+    _migrateOldFocusTaskTypes();
   }).catch(function(e){console.error('loadDashBoard 오류:',e);_dbTasks=_dbTasks||[];});
+}
+// '이달의 중점'/'이번 주 중점' 기능 제거에 따른 1회성 정리 —
+// 예전에 저장된 해당 타입 업무를 모두 '일반 업무'로 되돌린다 (dashBoardV2 컬렉션 기준)
+var _focusTaskTypesMigrated=false;
+function _migrateOldFocusTaskTypes(){
+  if(_focusTaskTypesMigrated)return;
+  _focusTaskTypesMigrated=true;
+  (_dbTasks||[]).forEach(function(t){
+    if(t.taskType==='이달의 중점'||t.taskType==='이번 주 중점'){
+      t.taskType='일반 업무';
+      if(t.id&&!t.id.startsWith('__'))db.collection('dashBoardV2').doc(t.id).update({taskType:'일반 업무'}).catch(function(){});
+    }
+  });
 }
 function saveDashBoard(){
   // _dbTasks 미로드 상태면 저장 금지 — 빈 배열 덮어쓰기 방지
@@ -14192,17 +14197,6 @@ function _dbGeneralTasks(tasks){
     return !t.taskType||t.taskType==='일반 업무';
   });
 }
-function _dbFocusTasks(type){
-  // taskType 기반 중점 추진사항 목록
-  var key=type==='monthly'?'이달의 중점':'이번 주 중점';
-  return (_dbTasks||[]).filter(function(t){
-    return t.taskType===key&&!(t.id&&t.id.startsWith('__'));
-  });
-}
-
-// ── 중점 추진사항 (dashBoardV2 통합) ──────────────
-// focusTasks Firestore는 더 이상 사용하지 않음
-// taskType 필드로 dashBoardV2에서 관리
 function loadFocusTasks(){
   // dashBoardV2 로드와 통합 — 별도 로드 불필요
   return Promise.resolve();
@@ -14214,11 +14208,6 @@ function toggleFocusTask(type,id){
     saveTask(id);
     _renderDashBoardUI($('dashboard-board-area'));
   }
-}
-function deleteFocusTask(type,id){
-  _dbTasks=(_dbTasks||[]).filter(function(x){return x.id!==id;});
-  deleteTask(id);
-  _renderDashBoardUI($('dashboard-board-area'));
 }
 // ── 오늘 할 일: 오른쪽 업무 목록 ────────────────────────────
 var _TODAY_TIME_SLOTS=['오전','오후','저녁','밤','미배치'];
@@ -14616,7 +14605,6 @@ function todayDragDrop(e,tgtId){
   _todayDragSrcId=null;
 }
 
-var _focusDragSrcId=null;
 function _toggleSubTask(taskId,subIdx,checked,type){
   var t=(_dbTasks||[]).find(function(x){return x.id===taskId;});
   if(!t)return;
@@ -14661,81 +14649,6 @@ async function _markAcalComplete(acalId){
   saveAcademicCalendar();
   var calEl=$('dashboard-calendar-area');
   if(calEl)_renderAcademicCalendarUI(calEl);
-}
-
-async function _acalCreateFocusTask(acalEvt){
-  // 이미 등록된 경우 해지
-  var existing=(_dbTasks||[]).find(function(t){return t.acalId===acalEvt.id&&t.taskType==='이달의 중점';});
-  if(existing){_unlinkFocusTask(existing.id);return;}
-  // 학사일정 항목으로부터 이달의 중점 업무 생성
-  var now=new Date();
-  var yr=now.getFullYear();
-  var mo=now.getMonth()+1;
-  var dueDate=acalEvt.endDate||acalEvt.date||(yr+'-'+String(mo).padStart(2,'0')+'-28');
-  var newTask={
-    name:acalEvt.title,
-    taskType:'이달의 중점',
-    area:acalEvt.cat||'학원 운영',
-    status:'진행 중',
-    dueDate:dueDate,
-    acalId:acalEvt.id,
-    subTasks:[],
-    progress:0,
-    createdAt:new Date().toISOString()
-  };
-  db.collection('dashBoardV2').add(newTask).then(async function(ref){
-    newTask.id=ref.id;
-    if(!_dbTasks)_dbTasks=[];
-    _dbTasks.push(newTask);
-    toast('✅ 이달의 중점 업무로 등록됐어요');
-    var boardEl=$('dashboard-board-area');
-    if(boardEl)_renderDashBoardUI(boardEl);
-    renderDashMonthly();
-  }).catch(function(e){
-    console.error('중점 업무 등록 오류',e);
-  });
-}
-async function _unlinkFocusTask(taskId){
-  var _cm=await showConfirm('이달의 중점 업무 등록을 해제할까요?',true);if(!_cm)return;
-  db.collection('dashBoardV2').doc(taskId).delete().then(async function(){
-    _dbTasks=(_dbTasks||[]).filter(function(t){return t.id!==taskId;});
-    toast('중점 업무 등록이 해제됐어요');
-    var boardEl=$('dashboard-board-area');
-    if(boardEl)_renderDashBoardUI(boardEl);
-    renderDashMonthly();
-  }).catch(function(e){toast('해제 실패: '+e.message);});
-}
-function focusDragStart(e,id){
-  _focusDragSrcId=id;
-  e.dataTransfer.effectAllowed='move';
-  setTimeout(function(){if(e.target)e.target.style.opacity='0.4';},0);
-}
-function focusDragEnd(e){if(e.target)e.target.style.opacity='1';}
-function focusDragDrop(e,type,tgtId){
-  e.preventDefault();
-  if(e.target&&e.target.closest)e.target.closest('[draggable]').style.opacity='1';
-  if(!_focusDragSrcId||_focusDragSrcId===tgtId)return;
-  _focusDragReorder(type,_focusDragSrcId,tgtId);
-  _focusDragSrcId=null;
-}
-function _focusDragReorder(type,srcId,tgtId){
-  // dashBoardV2 tasks 배열에서 해당 type의 항목 순서 변경
-  var key=type==='monthly'?'이달의 중점':'이번 주 중점';
-  var all=_dbTasks||[];
-  var focusItems=all.filter(function(t){return t.taskType===key&&!(t.id&&t.id.startsWith('__'));});
-  var others=all.filter(function(t){return !(t.taskType===key&&!(t.id&&t.id.startsWith('__')));});
-  var srcIdx=focusItems.findIndex(function(t){return t.id===srcId;});
-  var tgtIdx=focusItems.findIndex(function(t){return t.id===tgtId;});
-  if(srcIdx<0||tgtIdx<0)return;
-  var moved=focusItems.splice(srcIdx,1)[0];
-  focusItems.splice(tgtIdx,0,moved);
-  _dbTasks=others.concat(focusItems);
-  // 순서 변경된 focus items만 저장
-  focusItems.forEach(function(t,i){
-    t._order=i;
-    saveTask(t.id);
-  });
-  _renderDashBoardUI($('dashboard-board-area'));
 }
 
 // ── 오늘 뷰 (상담 알림·마케팅 루틴 제거) ──────────
@@ -14831,7 +14744,7 @@ function _renderDbWeekViewForRange(monStr,sunStr,now){
     if(t.id&&t.id.startsWith('__'))return false;
     if(t.planId)return false;
     if(!t.dueDate||t.dueDate<monStr||t.dueDate>sunStr)return false;
-    return !t.taskType||t.taskType==='일반 업무'||t.taskType==='이달의 할 일'||t.taskType==='이달의 중점'||t.taskType==='이번 주 중점';
+    return !t.taskType||t.taskType==='일반 업무'||t.taskType==='이달의 할 일';
   });
   weekTasks=_dbFiltered(weekTasks);
   weekTasks.sort(function(a,b){
@@ -14897,8 +14810,6 @@ function _dbTaskRow(t,hideAreaBadge){
   var pColor=_DB_PRIORITY_COLORS[t.priority]||'var(--txt3)';
   var pShort=_DB_PRIORITY_SHORT[t.priority]||'';
   var typeIcon='';
-  if(t.taskType==='이달의 중점')typeIcon='<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:4px;background:#dbeafe;color:#1d4ed8;flex-shrink:0">🎯</span>';
-  else if(t.taskType==='이번 주 중점')typeIcon='<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:4px;background:#ede9fe;color:#6d28d9;flex-shrink:0">📅</span>';
   var areaBadge=(!hideAreaBadge&&t.area)?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--txt2);border:1px solid var(--border);flex-shrink:0;white-space:nowrap">'+t.area+'</span>':'';
   var statusOpts=_DB_STATUSES.map(function(s){
     return '<option value="'+s+'"'+(t.status===s?' selected':'')+'>'+s+'</option>';
@@ -15086,24 +14997,6 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   // 실행 예정일 변경 시 타임라인 힌트 표시
   schInp.addEventListener('change',function(){});
 
-  // 상위 업무
-  var ptSel=document.createElement('select');ptSel.className='fi';ptSel.id='dbt-parent-task';ptSel.style.fontSize='12px';
-  var ptNone=document.createElement('option');ptNone.value='';ptNone.textContent='없음';ptSel.appendChild(ptNone);
-  var parentCandidates=(_dbTasks||[]).filter(function(x){
-    return x.id!==id&&(x.taskType==='이달의 중점'||x.taskType==='이번 주 중점');
-  });
-  if(parentCandidates.length===0){
-    var noOpt=document.createElement('option');noOpt.value='';noOpt.textContent='(등록된 중점 업무 없음)';noOpt.disabled=true;ptSel.appendChild(noOpt);
-  }else{
-    parentCandidates.forEach(function(x){
-      var op=document.createElement('option');op.value=x.id;
-      var typeLabel=x.taskType==='이달의 중점'?'[이달] ':'[주간] ';
-      op.textContent=typeLabel+x.name.substring(0,28);
-      if(t&&t.parentTask===x.id)op.selected=true;ptSel.appendChild(op);
-    });
-  }
-  var ptw=document.createElement('div');ptw.style.marginBottom='16px';ptw.appendChild(mkLbl('상위 업무'));ptw.appendChild(ptSel);box.appendChild(ptw);
-
   // 버튼
   var br=document.createElement('div');br.style.cssText='display:flex;gap:8px';
   if(id){
@@ -15130,7 +15023,7 @@ function _dbSaveTaskModal(id){
   var area=(document.getElementById('dbt-area')||{}).value||'';
   var listChoice=(document.getElementById('dbt-list-hidden')||{}).value||'today';
   // listChoice → taskType 매핑 (하위 호환)
-  var taskType=listChoice==='monthly'?'이달의 할 일':listChoice==='weekly'?'이번 주 중점':'일반 업무';
+  var taskType=listChoice==='monthly'?'이달의 할 일':'일반 업무';
   var dueDate=(document.getElementById('dbt-due')||{}).value||'';
   var scheduleDate=(document.getElementById('dbt-scheduledate')||{}).value||today;
   var parentTask=(document.getElementById('dbt-parent-task')||{}).value||'';
@@ -15183,8 +15076,8 @@ function _dbSaveTaskModal(id){
   else if(_boardCurrentTab==='focus'){_boardFocusNavRender();}
   else if(_boardCurrentTab==='weekly'){if(typeof _renderBoardWeeklyPanel==='function')_renderBoardWeeklyPanel();}
   else _renderDashBoardUI($('dashboard-board-area'));
-  // 이달의 중점 업무 또는 이달의 할 일이면 이달의 할 일 탭으로 이동
-  if((taskType==='이달의 중점'||taskType==='이달의 할 일')&&_boardCurrentTab!=='focus'){
+  // 이달의 할 일이면 이달의 할 일 탭으로 이동
+  if(taskType==='이달의 할 일'&&_boardCurrentTab!=='focus'){
     var _g=window._gotoOriginal||window.goto;
     if(_g)_g('board');
     setTimeout(function(){switchBoardTab('focus');},150);
@@ -18443,7 +18336,6 @@ function _openNewPlanModalInner(editPlan){
       +'</div>'
     )
     +'<button class="btn btn-navy btn-block" id="plan-save-btn">'+(isEdit?'저장':'등록')+'</button>'
-    +'<button class="btn btn-outline btn-block" style="border-color:#10b981;color:#065f46;background:#f0fdf4" onclick="_registerPlanAsFocusTask(this.closest(\'.mo\'))">중점 추진으로도 등록</button>'
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
     +'</div>';
   document.body.appendChild(overlay);
@@ -18494,45 +18386,6 @@ function _recalcPlanTaskDates(planId){
   }).catch(function(){toast('재계산 실패');});
 }
 
-function _registerPlanAsFocusTask(overlay,directName,directDday,directArea){
-  var name=directName||($('plan-name')||{}).value||'';
-  if(!name.trim()){toast('플랜명을 입력해 주세요');return;}
-  var dday=directDday||($('plan-dday')||{}).value||todayISO();
-  var area=directArea||($('plan-area')||{}).value||'';
-  var manager=($('plan-manager')||{}).value||'';
-  // 중간 팝업 없이 바로 이달의 중점으로 등록
-  _doRegisterFocusTask('monthly',name,dday,area,manager);
-  if(overlay)overlay.remove();
-}
-function _doRegisterFocusTask(type,name,dday,area,manager){
-  var taskType=type==='monthly'?'이달의 중점':'이번 주 중점';
-  // dday 없으면 이번 달 말일로 기본 설정
-  if(!dday){
-    var now2=new Date();
-    var lastDay=new Date(now2.getFullYear(),now2.getMonth()+1,0);
-    dday=lastDay.getFullYear()+'-'+String(lastDay.getMonth()+1).padStart(2,'0')+'-'+String(lastDay.getDate()).padStart(2,'0');
-  }
-  var newTask={
-    id:'task_'+Date.now(),
-    name:name,
-    area:area,
-    taskType:taskType,
-    priority:'높음',
-    dueDate:dday,
-    status:'대기',
-    cycle:'반복없음',
-    memo:'',
-    createdAt:todayISO()
-  };
-  if(!_dbTasks)_dbTasks=[];
-  _dbTasks.push(newTask);
-  db.collection('dashBoardV2').doc(newTask.id).set(newTask).then(async function(){
-    toast('✅ '+taskType+'으로 등록됐어요!');
-    // 이달의 할 일 탭으로 이동 후 리렌더링
-    goto('board');
-    setTimeout(function(){switchBoardTab('focus');},100);
-  }).catch(function(){toast('등록 실패');});
-}
 function _parsePlanTasks(){
   var text=($('plan-paste')||{}).value||'';
   var ddayEl=$('plan-dday');
@@ -18670,24 +18523,6 @@ function _savePlan(overlay,editId){
         renderPlansList();
         renderPlanDetail(newPlan.id);
       },200);
-      // 중점 추진 등록 여부 묻기
-      setTimeout(function(){
-        var ov2=document.createElement('div');
-        ov2.className='mo';ov2.style.display='flex';
-        ov2.innerHTML='<div class="ms" style="max-width:340px;text-align:center">'
-          +'<div class="mh"></div>'
-          +'<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:6px">🎯 중점 추진에도 등록할까요?</div>'
-          +'<div style="font-size:12px;color:var(--txt2);margin-bottom:16px;line-height:1.6">플랜 <b>'+name+'</b>을<br>중점 추진 탭에 바로 등록할 수 있어요.</div>'
-          +'<div style="display:flex;gap:8px">'
-          +'<button class="btn btn-navy" style="flex:1" id="plan-to-focus-yes">등록</button>'
-          +'<button class="btn btn-outline" style="flex:1" onclick="this.closest(\'.mo\').remove()">건너뛰기</button>'
-          +'</div></div>';
-        document.body.appendChild(ov2);
-        document.getElementById('plan-to-focus-yes').onclick=async function(){
-          ov2.remove();
-          _registerPlanAsFocusTask(null,name,dday,area);
-        };
-      },300);
 
     }).catch(function(e){console.error('플랜 저장 실패:',e);toast('저장 실패: '+e.message);});
   }
@@ -18828,19 +18663,12 @@ function openAcalDetail(evtId){
     +'<button class="btn btn-navy" style="flex:1" id="acal-detail-plan-btn">플랜 연결</button>'
     +'</div>'
     +'<div style="height:8px"></div>'
-    +'<button class="btn btn-outline btn-block" style="border-color:#10b981;color:#065f46;background:#f0fdf4" id="acal-detail-focus-btn">중점 추진으로 등록</button>'
-    +'<div style="height:8px"></div>'
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
     +'</div>';
   document.body.appendChild(overlay);
   document.getElementById('acal-detail-edit-btn').onclick=async function(){
     overlay.remove();
     openAcalAddModal(evtId);
-  };
-  document.getElementById('acal-detail-focus-btn').onclick=async function(){
-    overlay.remove();
-    // 이름, 날짜, 영역을 학사일정에서 가져와 중점 등록
-    _registerPlanAsFocusTask(null,e.title,e.date,e.area||'');
   };
   document.getElementById('acal-detail-plan-btn').onclick=async function(){
     var _evtId=evtId;
@@ -18966,24 +18794,6 @@ async function renderCrmConditions(){
   el.innerHTML='<div style="padding:12px;color:var(--txt3);font-size:12px">⏳ 로딩 중...</div>';
   loadCrmConditions().then(async function(){_renderCrmConditionsUI(el);});
 }
-async function migrateTaskTypes(){
-  var _cm=await showConfirm('이달의 중점, 이번 주 중점 업무를 모두 일반 업무로 변환합니다. 계속하시겠습니까?');if(!_cm)return;
-  var tasks=(_dbTasks||[]).filter(function(t){
-    return t.taskType==='이달의 중점'||t.taskType==='이번 주 중점';
-  });
-  if(!tasks.length){showAlert('변환할 업무가 없습니다.');return;}
-  var count=0;
-  for(var i=0;i<tasks.length;i++){
-    try{
-      await db.collection('tasks').doc(tasks[i].id).update({taskType:'일반 업무'});
-      tasks[i].taskType='일반 업무';
-      count++;
-    }catch(e){console.error(e);}
-  }
-  showAlert(count+'개 업무가 일반 업무로 변환됐습니다.');
-  loadDashBoard(true);
-}
-
 function _renderCrmConditionsUI(el){
   var cats=[
     {key:'urgent',label:'🔴 긴급',color:'#dc2626',bg:'#fef2f2'},
@@ -18992,11 +18802,7 @@ function _renderCrmConditionsUI(el){
   ];
   var html='<div style="max-width:700px;padding:14px">'
     +'<div style="font-size:12px;color:var(--txt3);margin-bottom:16px;padding:10px 12px;background:var(--surface2);border-radius:8px">💡 횟수·일수·점수를 수정하면 오늘의 업무 자동 분류에 즉시 반영됩니다. ✏️ 표시 항목만 수정 가능합니다.</div>'
-    +'<div style="margin-bottom:16px;padding:12px;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px">'
-    +'<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px">🔄 업무 유형 일괄 변환</div>'
-    +'<div style="font-size:11px;color:#78350f;margin-bottom:8px">이달의 중점, 이번 주 중점 업무를 모두 일반 업무로 변환합니다. 한 번만 실행하면 돼요.</div>'
-    +'<button onclick="migrateTaskTypes()" style="padding:8px 16px;background:#f59e0b;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">일반 업무로 변환하기</button>'
-    +'</div>';
+    +'';
   cats.forEach(function(cat){
     var items=(_crmConditions[cat.key]||[]);
     html+='<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:800;color:'+cat.color+';margin-bottom:10px;padding:8px 12px;background:'+cat.bg+';border-radius:8px">'+cat.label+'</div>';
