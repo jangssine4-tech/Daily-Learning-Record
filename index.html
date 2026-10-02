@@ -12774,10 +12774,18 @@ function _migrateLegacyStaffDeleted(){
   var prevMo=now.getMonth();var prevYr=now.getFullYear();// getMonth()는 0-base라 그대로 쓰면 "이번 달의 1일 - 1일" = 전월 말일
   if(prevMo===0){prevMo=12;prevYr--;}
   var prevMonthEnd=prevYr+'-'+String(prevMo).padStart(2,'0')+'-'+String(new Date(prevYr,prevMo,0).getDate()).padStart(2,'0');
+  var todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   users.forEach(function(u){
+    // 아직 입사 전(시작일이 미래)인 강사는 "예전에 퇴사 처리된" 대상이 될 수 없으므로 건너뜀 —
+    // 그렇지 않으면 staffDeleted 플래그가 잘못 남아있는 경우 아직 근무를 시작하지도 않은 강사가
+    // 이번 보정으로 퇴사일이 생겨버려 영원히 안 보이게 되는 문제가 생김.
+    if(u.startDate&&u.startDate>todayStr)return;
     if(u.role==='teacher'&&u.staffDeleted&&!u.endDate){
       u.endDate=prevMonthEnd;
-      db.collection('users').doc(u.id).update({endDate:prevMonthEnd}).catch(function(){});
+      u.staffDeleted=false;
+      // staffDeleted도 함께 꺼서, 이후 관리자가 퇴사일을 지워 되돌리더라도
+      // 다음 세션에서 이 보정이 다시 실행되어 퇴사일이 재생성되는 일이 없도록 함
+      db.collection('users').doc(u.id).update({endDate:prevMonthEnd,staffDeleted:false}).catch(function(){});
     }
   });
 }
@@ -12832,8 +12840,16 @@ function renderStaffArea(){
       +'<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openPayrollModal(\''+u.id+'\','+yr+','+mo+')">📝 근무 시간표</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
       +'<button class="btn btn-xs '+(juhuEnabled?'btn-green':'btn-outline')+'" onclick="toggleJuhu(\''+u.id+'\','+!juhuEnabled+')" title="주휴수당: 주 15시간 이상 근무 시 지급">'+(juhuEnabled?'✅ 주휴수당 ON':'주휴수당 OFF')+'</button>'
-      +'<button class="btn btn-xs" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a" onclick="deleteStaffUser(\''+u.id+'\',\''+u.name+'\','+yr+','+mo+')">🚪 퇴사 처리</button>'
-      +'<button class="btn btn-red btn-xs" onclick="deleteStaffUserPermanently(\''+u.id+'\',\''+u.name+'\')">🗑 삭제</button></div></div>';
+      +(u.endDate?'<button class="btn btn-outline btn-xs" style="border-color:#16a34a;color:#16a34a" onclick="undoStaffDelete(\''+u.id+'\',\''+u.name+'\')">↩️ 퇴사 처리 취소</button>':'<button class="btn btn-xs" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a" onclick="deleteStaffUser(\''+u.id+'\',\''+u.name+'\','+yr+','+mo+')">🚪 퇴사 처리</button>')
+      +'<button class="btn btn-red btn-xs" onclick="deleteStaffUserPermanently(\''+u.id+'\',\''+u.name+'\')">🗑 삭제</button>'
+      +'<div style="position:relative;display:inline-flex">'
+      +'<button type="button" onclick="_toggleStaffDeleteGuide(this)" style="width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--txt2);font-size:11px;font-weight:800;cursor:pointer;line-height:1;flex-shrink:0">?</button>'
+      +'<div class="staff-delete-guide" style="display:none;position:absolute;bottom:26px;right:0;z-index:300;width:240px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.15);text-align:left">'
+      +'<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:4px">🚪 퇴사 처리</div>'
+      +'<div style="font-size:11px;color:var(--txt2);line-height:1.5;margin-bottom:8px">지금 보고 있는 달까지는 계속 보이고, 다음 달부터 강사 페이지에서 자동으로 숨겨져요. 근무 기록·시급 설정은 그대로 보존돼요. 잘못 눌렀다면 바로 그 자리에 생기는 "↩️ 퇴사 처리 취소" 버튼으로 되돌릴 수 있어요.</div>'
+      +'<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:4px">🗑 삭제</div>'
+      +'<div style="font-size:11px;color:var(--txt2);line-height:1.5">완전 삭제예요. 근무 시간표, 시급 설정 등 그동안의 모든 기록이 함께 영구적으로 사라지고 되돌릴 수 없어요. 단순 퇴사가 아니라 잘못 등록했거나 중복 등록된 경우에만 사용하세요.</div>'
+      +'</div></div></div></div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt3)">등록된 교사가 없습니다.</div>';
   // Freelancer ledger
   var freelancerHTML='<table class="rev-tbl" style="font-size:12px"><thead><tr><th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">주민번호</th><th style="text-align:center">주소</th><th style="text-align:center">용역비</th><th style="text-align:center">사업소득세(3%)</th><th style="text-align:center">주민세</th><th style="text-align:center">차감수령액</th><th style="text-align:center">지급날짜</th></tr></thead><tbody>';
@@ -12946,12 +12962,32 @@ async function _captureFreelancer(card,container,allMo,allViews,moStr){
 // 퇴사 처리 — 퇴사일을 "지금 보고 있는 달의 말일"로 설정. 그 달까지는 계속 표시, 다음 달부터 숨겨짐.
 // 잘못 눌렀거나 날짜를 바꿔야 하면 "편집" 모달의 퇴사일 필드에서 직접 수정/삭제하면 된다.
 async function deleteStaffUser(userId,name,yr,mo){
-  var _cm=await showConfirm(name+' 선생님을 퇴사 처리합니다.\n지금 보고 있는 '+yr+'년 '+mo+'월까지는 계속 표시되고, 다음 달부터 강사 페이지에서 보이지 않습니다.\n관리자 페이지에는 영향이 없습니다.\n(날짜가 잘못됐거나 취소하려면 "편집"에서 퇴사일을 직접 수정/삭제하면 됩니다)\n퇴사 처리하시겠습니까?',null,null,true);if(!_cm)return;
+  var _cm=await showConfirm(name+' 선생님을 퇴사 처리합니다.\n지금 보고 있는 '+yr+'년 '+mo+'월까지는 계속 표시되고, 다음 달부터 강사 페이지에서 보이지 않습니다.\n관리자 페이지에는 영향이 없습니다.\n(잘못 눌렀다면 카드에 생기는 "↩️ 퇴사 처리 취소" 버튼으로 바로 되돌릴 수 있어요)\n퇴사 처리하시겠습니까?',null,null,true);if(!_cm)return;
   loading(true);
   var endDate=yr+'-'+String(mo).padStart(2,'0')+'-'+String(new Date(yr,mo,0).getDate()).padStart(2,'0');
-  await db.collection('users').doc(userId).update({endDate:endDate});
-  var u=users.find(function(x){return x.id===userId;});if(u)u.endDate=endDate;
-  renderStaffArea();loading(false);toast('🚪 '+name+' 선생님 '+mo+'월까지 근무로 처리, 다음 달부터 강사 페이지에서 숨겨집니다');
+  try{
+    await db.collection('users').doc(userId).update({endDate:endDate});
+    var u=users.find(function(x){return x.id===userId;});if(u)u.endDate=endDate;
+    renderStaffArea();loading(false);toast('🚪 '+name+' 선생님 '+mo+'월까지 근무로 처리, 다음 달부터 강사 페이지에서 숨겨집니다');
+  }catch(e){
+    loading(false);
+    console.error('deleteStaffUser 오류:',e);
+    toast('❌ 퇴사 처리 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
+  }
+}
+// 퇴사 처리를 잘못 눌렀을 때 바로 되돌리는 기능 — 퇴사일을 지워서 원래 상태로 복원
+async function undoStaffDelete(userId,name){
+  var _cm=await showConfirm(name+' 선생님의 퇴사 처리를 취소할까요?\n퇴사일이 지워지고, 다시 모든 달에 정상적으로 표시됩니다.',null,null,true);if(!_cm)return;
+  loading(true);
+  try{
+    await db.collection('users').doc(userId).update({endDate:null,staffDeleted:false});
+    var u=users.find(function(x){return x.id===userId;});if(u){u.endDate=null;u.staffDeleted=false;}
+    renderStaffArea();loading(false);toast('↩️ '+name+' 선생님 퇴사 처리가 취소됐어요');
+  }catch(e){
+    loading(false);
+    console.error('undoStaffDelete 오류:',e);
+    toast('❌ 취소 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
+  }
 }
 // 완전 삭제 — 잘못 등록한 중복/오입력 강사용. 되돌릴 수 없으며, 그동안 저장된 근무기록/시급 설정도 함께 사라짐.
 async function deleteStaffUserPermanently(userId,name){
@@ -18158,6 +18194,23 @@ function _toggleGptGuide(btn){
 }
 
 function _togglePlanPasteGuide(btn){
+  var box=btn.nextElementSibling;
+  if(!box)return;
+  var isOpen=box.style.display!=='none';
+  box.style.display=isOpen?'none':'';
+  if(!isOpen){
+    setTimeout(function(){
+      document.addEventListener('click',function _close(e){
+        if(!box.contains(e.target)&&e.target!==btn){
+          box.style.display='none';
+          document.removeEventListener('click',_close);
+        }
+      });
+    },10);
+  }
+}
+
+function _toggleStaffDeleteGuide(btn){
   var box=btn.nextElementSibling;
   if(!box)return;
   var isOpen=box.style.display!=='none';
