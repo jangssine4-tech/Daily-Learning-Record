@@ -23565,14 +23565,16 @@ document.addEventListener('DOMContentLoaded',function(){
    컬렉션: diagTests / diagResults / diagConfig(main)
    ═══════════════════════════════════════════════════ */
 var DG={tests:[],results:[],cfg:null,loaded:false,tab:'score',testId:'',wrong:{},rid:'',
-  form:{prospectId:'',name:'',grade:'예비중1',school:'',date:'',consent:false},setTestId:'',viewRid:'',filter:''};
+  form:{prospectId:'',name:'',grade:'예비중1',school:'',date:'',consent:false},setTestId:'',viewRid:'',filter:'',half:{}};
+var DG_GRADES=['예비중1','중1','중2','중3'];
+var DG_GUIDE={'VIEW 진단평가 Standard':'대상: 중1(내신 상위권) ~ 중3 · 40문항(객관식 32, 서술형 8) · 권장 시험시간 40분','VIEW 진단평가 Basic':'대상: 예비 중등생 / 중1(내신 중하위권) · 25문항(객관식 20, 서술형 5) · 권장 시험시간 30분'};
 
 (function(){var st=document.createElement('style');st.textContent='@media print{#print-area.dg-print{padding:0 !important}}';document.head.appendChild(st);})();
 var DG_AREA_COLOR={li:'#3b82f6',vo:'#8b5cf6',gr:'#f59e0b',rd:'#00b894'};
 var DG_DEF_CFG={
   academyName:'잉글리시아이위드멘토링 영수학원',phone:'',
   footer:'본 결과는 진단평가 시점의 성취 수준을 나타내며, 꾸준한 학습으로 충분히 성장할 수 있습니다.',
-  logo:'',retentionMonths:12,
+  logo:'',retentionMonths:12,partialCredit:true,
   tpl:{
     li:{s:'듣기 영역에서 안정적인 이해력을 보였습니다.',w:'듣기는 매일 짧은 음원을 반복해서 듣는 습관으로 빠르게 키울 수 있는 부분입니다.'},
     vo:{s:'어휘 영역에서 탄탄한 기본기를 갖추고 있습니다.',w:'어휘는 꾸준한 암기와 복습 루틴으로 가장 눈에 띄게 성장할 수 있는 부분입니다.'},
@@ -23616,11 +23618,35 @@ var DG_SEED_Q=[
  [38,'rd',3,'mc','2','글의 세부 내용 파악하기'],[39,'rd',3,'short','(A) However (B) In addition','글의 흐름 파악하기'],[40,'rd',3,'mc','3','글의 세부 내용 파악하기']
 ];
 
+
+var DG_BASIC_Q=[
+ [1,'li',1,'mc','1','정보를 듣고, 일치하는 그림 찾기'],[2,'li',1,'mc','3','세부 정보 파악하기 (한 일 / 할 일)'],[3,'li',1,'mc','3','도표 정보 파악하기'],
+ [4,'li',2,'mc','4','어색한 대화 찾기'],[5,'li',2,'mc','4','내용 일치·불일치 찾기'],[6,'li',2,'mc','3','마지막 말에 적절하게 응답하기'],
+ [7,'vo',1,'short','(1) trust (2) give (3) month','기본 어휘의 의미 파악하기',3],[8,'vo',1,'mc','2','기본 어휘의 유의어/반의어 파악하기'],[9,'vo',1,'mc','5','중1 필수 어휘의 의미 파악하기'],[10,'vo',1,'mc','4','중1 필수 숙어의 의미 파악하기'],
+ [11,'vo',2,'mc','4','중2 필수 어휘의 의미 파악하기'],[12,'vo',2,'mc','1','중2 필수 어휘의 의미 파악하기'],[13,'vo',2,'mc','3','중2 필수 숙어의 의미 파악하기'],
+ [14,'gr',1,'mc','5','2형식 문장 구조 파악하기, 품사 파악하기'],[15,'gr',1,'short','(1) were (2) studied (3) told','동사의 과거형 변화 파악하기',3],
+ [16,'gr',1,'short','(1) He doesn\'t go to school by bus. (2) Does he go to school by bus?','일반동사의 문장 형태 파악하기',2],
+ [17,'gr',1,'mc','3','중1 수준의 기본 문법 파악하기 (전치사, 명사, 관사, 일반동사, 소유대명사)'],
+ [18,'gr',2,'mc','4','5형식 문장 구조 파악하기'],[19,'gr',2,'short','It is dangerous to swim in the river.','to부정사의 문장 구조 파악하기'],
+ [20,'rd',1,'mc','2','글의 주제 찾기'],[21,'rd',1,'mc','4','글의 흐름 파악하기'],[22,'rd',1,'mc','5','글의 세부 내용 파악하기'],
+ [23,'rd',2,'mc','3','글의 요지 및 어휘의 의미 파악하기'],[24,'rd',2,'mc','5','글의 세부 내용 파악하기'],[25,'rd',2,'short','winter, cold, hot','글의 요지 파악하기',3]
+];
+
 function dgEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function dgToday(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function dgAddMonths(iso,n){var d=new Date(iso||dgToday());d.setMonth(d.getMonth()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function dgTest(id){return DG.tests.find(function(t){return t.id===id;});}
 function dgPct(g,m){return m?Math.round(g/m*100):0;}
+function dgFmt(n){n=Math.round(Number(n)*10)/10;return String(n);}
+function dgParts(q){
+  if(q.parts)return q.parts;
+  if(q.type!=='short')return 1;
+  var a=String(q.answer||''),m=a.match(/\((\d|[A-Za-z])\)/g);
+  if(m&&m.length>=2)return m.length;
+  if(a.indexOf(',')>=0&&a.indexOf('.')<0)return a.split(',').length;
+  return 1;
+}
+function dgShort(t){return String((t&&t.name)||'').replace(/^VIEW\s*진단평가\s*/,'')||'';}
 
 /* ── 로딩 ── */
 async function dgLoad(){
@@ -23666,20 +23692,21 @@ function dgTab(t){
 /* ── 계산 ── */
 function dgBandOf(t,total){
   var bs=(t.bands&&t.bands.length)?t.bands:DG_SEED_BANDS;
-  return bs.find(function(b){return total>=b.min&&total<=b.max;})||bs[bs.length-1];
+  var tt=Math.floor(total+1e-9);return bs.find(function(b){return tt>=b.min&&tt<=b.max;})||bs[bs.length-1];
 }
-function dgCompute(t,wrongMap){
-  var byArea={},byLevel={1:{got:0,max:0},2:{got:0,max:0},3:{got:0,max:0}},total=0,max=0,wrong=[];
+function dgCompute(t,wrongMap,halfMap){
+  halfMap=halfMap||{};
+  var byArea={},byLevel={1:{got:0,max:0},2:{got:0,max:0},3:{got:0,max:0}},total=0,max=0,wrong=[],half=[];
   t.areas.forEach(function(a){byArea[a.id]={got:0,max:0};});
   t.questions.forEach(function(q){
-    var p=Number(q.points)||1,ok=!wrongMap[q.no];
-    max+=p;if(ok)total+=p;else wrong.push(q.no);
-    if(byArea[q.area]){byArea[q.area].max+=p;if(ok)byArea[q.area].got+=p;}
-    if(byLevel[q.level]){byLevel[q.level].max+=p;if(ok)byLevel[q.level].got+=p;}
+    var p=Number(q.points)||1,earn=wrongMap[q.no]?0:(halfMap[q.no]?p*0.5:p);
+    max+=p;total+=earn;if(wrongMap[q.no])wrong.push(q.no);else if(halfMap[q.no])half.push(q.no);
+    if(byArea[q.area]){byArea[q.area].max+=p;byArea[q.area].got+=earn;}
+    if(byLevel[q.level]){byLevel[q.level].max+=p;byLevel[q.level].got+=earn;}
   });
   Object.keys(byArea).forEach(function(k){byArea[k].pct=dgPct(byArea[k].got,byArea[k].max);});
   Object.keys(byLevel).forEach(function(k){byLevel[k].pct=dgPct(byLevel[k].got,byLevel[k].max);});
-  return {total:total,max:max,byArea:byArea,byLevel:byLevel,wrong:wrong};
+  return {total:total,max:max,byArea:byArea,byLevel:byLevel,wrong:wrong,half:half};
 }
 
 /* ── ① 채점 탭 ── */
@@ -23687,8 +23714,8 @@ function dgRenderScore(){
   var el=$('dg-p-score');if(!el)return;
   if(!DG.tests.length){
     el.innerHTML='<div class="card" style="padding:20px;text-align:center"><div style="font-size:14px;font-weight:700;margin-bottom:6px">등록된 시험지가 없어요</div>'
-      +'<div style="font-size:12px;color:var(--txt2);margin-bottom:12px;line-height:1.6">VIEW 진단평가 Standard(40문항) 정답표가 미리 준비되어 있어요.<br>버튼 한 번으로 등록할 수 있어요.</div>'
-      +'<button class="btn btn-green" onclick="dgSeed()">VIEW 진단평가 Standard 등록</button></div>';
+      +'<div style="font-size:12px;color:var(--txt2);margin-bottom:12px;line-height:1.6">VIEW 진단평가 Standard(40문항) 정답표가 미리 준비되어 있어요.<br>버튼 한 번으로 등록할 수 있어요. (Basic 25문항도 있어요)</div>'
+      +dgSeedButtons()+'</div>';
     return;
   }
   var t=dgTest(DG.testId)||DG.tests[0];DG.testId=t.id;
@@ -23700,62 +23727,72 @@ function dgRenderScore(){
     var qs=t.questions.filter(function(q){return q.area===a.id;});
     return '<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:700;margin-bottom:5px;color:'+(DG_AREA_COLOR[a.id]||'var(--navy)')+'">'+dgEsc(a.name)+' <span id="dg-ar-'+a.id+'" style="color:var(--txt2);font-weight:600"></span></div>'
       +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px">'
-      +qs.map(function(q){return '<button type="button" id="dg-q-'+q.no+'" onclick="dgToggleQ('+q.no+')" title="'+dgEsc(q.intent||'')+'" style="padding:7px 0;border-radius:8px;border:1.5px solid var(--border2);font-weight:700;font-size:13px;line-height:1.1">'+q.no+'<div style="font-size:9px;font-weight:600;opacity:.7;margin-top:2px">L'+q.level+(q.type==='short'?' · 주관식':'')+'</div></button>';}).join('')
+      +qs.map(function(q){return '<button type="button" id="dg-q-'+q.no+'" onclick="dgToggleQ('+q.no+')" title="'+dgEsc(q.intent||'')+'" style="padding:7px 0;border-radius:8px;border:1.5px solid var(--border2);font-weight:700;font-size:13px;line-height:1.1">'+q.no+'<div style="font-size:9px;font-weight:600;opacity:.7;margin-top:2px">L'+q.level+(q.type==='short'?' · 주관식'+(dgParts(q)>1?'×'+dgParts(q):''):'')+'</div></button>';}).join('')
       +'</div></div>';
   }).join('');
   var editing=DG.rid?'<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:10px">✏️ 저장된 결과를 수정하는 중이에요. <a href="#" onclick="dgResetForm();return false" style="color:#92400e;font-weight:700">새로 채점하기</a></div>':'';
   el.innerHTML=editing
    +'<div class="card" style="padding:14px">'
    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">'
-   +'<div class="field"><div class="fl">시험지</div><select class="fi" id="dg-s-test" onchange="DG.testId=this.value;DG.wrong={};dgRenderScore()">'+DG.tests.map(function(x){return '<option value="'+x.id+'"'+(x.id===t.id?' selected':'')+'>'+dgEsc(x.name)+'</option>';}).join('')+'</select></div>'
+   +'<div class="field"><div class="fl">시험지</div><select class="fi" id="dg-s-test" onchange="DG.testId=this.value;DG.wrong={};DG.half={};dgRenderScore()">'+DG.tests.map(function(x){return '<option value="'+x.id+'"'+(x.id===t.id?' selected':'')+'>'+dgEsc(x.name)+'</option>';}).join('')+'</select></div>'
    +'<div class="field"><div class="fl">신규 상담에서 선택</div><select class="fi" id="dg-s-pros" onchange="dgPickProspect(this.value)">'+proOpts+'</select></div>'
    +'<div class="field"><div class="fl">이름</div><input class="fi" id="dg-s-name" value="'+dgEsc(f.name)+'" oninput="DG.form.name=this.value" placeholder="학생 이름"></div>'
-   +'<div class="field"><div class="fl">학년</div><input class="fi" id="dg-s-grade" list="dg-grades" value="'+dgEsc(f.grade)+'" oninput="DG.form.grade=this.value"><datalist id="dg-grades"><option>예비중1</option><option>예비중2</option><option>예비중3</option><option>초5</option><option>초6</option><option>중1</option><option>중2</option><option>중3</option></datalist></div>'
+   +'<div class="field"><div class="fl">학년</div><select class="fi" id="dg-s-grade" onchange="DG.form.grade=this.value">'+dgGradeOpts(f.grade)+'</select></div>'
    +'<div class="field"><div class="fl">학교</div><input class="fi" id="dg-s-school" value="'+dgEsc(f.school)+'" oninput="DG.form.school=this.value" placeholder="○○초등학교"></div>'
    +'<div class="field"><div class="fl">응시일</div><input class="fi" type="date" id="dg-s-date" value="'+dgEsc(f.date)+'" onchange="DG.form.date=this.value"></div>'
    +'</div>'
+   +'<div style="font-size:11px;color:var(--txt2);margin-top:6px">'+dgEsc(t.guide||DG_GUIDE[t.name]||'')+'</div>'
+   +(dgSeedButtons()?'<div style="margin-top:6px;font-size:11px;color:var(--txt3)">다른 시험지가 필요하면 <b>시험지</b> 탭에서 등록해요.</div>':'')
    +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-top:8px;line-height:1.5"><input type="checkbox" id="dg-s-consent" '+(f.consent?'checked':'')+' onchange="DG.form.consent=this.checked" style="margin-top:2px"><span>학부모(보호자)에게 <b>진단평가 결과의 수집·이용</b> 동의를 받았어요. <span style="color:var(--txt3)">(미동의 시 저장되지 않아요)</span></span></label>'
    +'</div>'
-   +'<div class="card" style="padding:14px"><div style="font-size:12px;color:var(--txt2);margin-bottom:10px;line-height:1.5">시험지를 보면서 <b style="color:#dc2626">틀린 문항 번호만</b> 눌러 주세요. 모두 정답으로 시작해요. (주관식은 모든 답란이 맞아야 1점)</div>'
+   +'<div class="card" style="padding:14px"><div style="font-size:12px;color:var(--txt2);margin-bottom:10px;line-height:1.5">시험지를 보면서 <b style="color:#dc2626">틀린 문항 번호만</b> 눌러 주세요. 모두 정답으로 시작해요.'+(DG.cfg.partialCredit!==false?'<br>답란이 여러 개인 서술형(<b>주관식 ×2·×3</b>)은 한 번 더 누르면 <b style="color:#b45309">부분점수(0.5점)</b>가 돼요. (VIEW 가이드: 2개 중 1개 / 3개 중 2개 정답)':'<br>답란이 여러 개인 서술형은 모두 맞아야 1점이에요.')+'</div>'
    +grid
-   +'<div style="display:flex;gap:6px;margin-top:6px"><button class="btn btn-outline btn-sm" onclick="DG.wrong={};dgPaintAll()">전체 정답으로 초기화</button></div></div>'
+   +'<div style="display:flex;gap:6px;margin-top:6px"><button class="btn btn-outline btn-sm" onclick="DG.wrong={};DG.half={};dgPaintAll()">전체 정답으로 초기화</button></div></div>'
    +'<div class="card" style="padding:14px;position:sticky;bottom:0;z-index:5;box-shadow:0 -4px 14px rgba(15,23,42,.08)"><div id="dg-live" style="font-size:13px;margin-bottom:8px"></div>'
    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-green" onclick="dgSaveResult(true)">저장하고 리포트 보기</button><button class="btn btn-outline" onclick="dgSaveResult(false)">임시 저장</button></div></div>';
   dgPaintAll();
 }
+function dgGradeOpts(cur){var g=DG_GRADES.slice();if(cur&&g.indexOf(cur)<0)g.push(cur);return g.map(function(x){return '<option'+(x===cur?' selected':'')+'>'+dgEsc(x)+'</option>';}).join('');}
 function dgPickProspect(id){
   DG.form.prospectId=id;
   var n=(newConsults||[]).find(function(x){return x.id===id;});
   if(n){DG.form.name=n.prospectName||n.studentName||'';DG.form.school=n.school||'';if(n.grade)DG.form.grade=n.grade;}
   dgRenderScore();
 }
-function dgToggleQ(no){if(DG.wrong[no])delete DG.wrong[no];else DG.wrong[no]=true;dgPaintQ(no);dgLive();}
+function dgToggleQ(no){
+  var t=dgTest(DG.testId),q=t&&t.questions.find(function(x){return x.no===no;});
+  var multi=q&&dgParts(q)>=2&&DG.cfg.partialCredit!==false;
+  if(!DG.wrong[no]&&!DG.half[no]){DG.wrong[no]=true;}
+  else if(DG.wrong[no]){delete DG.wrong[no];if(multi)DG.half[no]=true;}
+  else{delete DG.half[no];}
+  dgPaintQ(no);dgLive();
+}
 function dgPaintQ(no){
-  var b=$('dg-q-'+no);if(!b)return;var w=!!DG.wrong[no];
-  b.style.background=w?'#fee2e2':'#ecfdf5';b.style.color=w?'#b91c1c':'#047857';b.style.borderColor=w?'#ef4444':'#6ee7b7';
+  var b=$('dg-q-'+no);if(!b)return;var w=!!DG.wrong[no],h=!!DG.half[no];
+  b.style.background=w?'#fee2e2':(h?'#fef3c7':'#ecfdf5');b.style.color=w?'#b91c1c':(h?'#b45309':'#047857');b.style.borderColor=w?'#ef4444':(h?'#f59e0b':'#6ee7b7');
 }
 function dgPaintAll(){var t=dgTest(DG.testId);if(!t)return;t.questions.forEach(function(q){dgPaintQ(q.no);});dgLive();}
 function dgLive(){
   var t=dgTest(DG.testId);if(!t)return;
-  var s=dgCompute(t,DG.wrong),b=dgBandOf(t,s.total),el=$('dg-live');if(!el)return;
-  el.innerHTML='<b style="font-size:18px;color:var(--navy)">'+s.total+' / '+s.max+'점</b> <span class="badge bg-blue" style="margin-left:4px">'+dgEsc(b.label)+'</span> <span style="color:var(--txt2);margin-left:6px;font-size:12px">틀린 문항 '+s.wrong.length+'개</span>';
-  t.areas.forEach(function(a){var x=$('dg-ar-'+a.id);if(x)x.textContent=s.byArea[a.id].got+'/'+s.byArea[a.id].max;});
+  var s=dgCompute(t,DG.wrong,DG.half),b=dgBandOf(t,s.total),el=$('dg-live');if(!el)return;
+  el.innerHTML='<b style="font-size:18px;color:var(--navy)">'+dgFmt(s.total)+' / '+dgFmt(s.max)+'점</b> <span class="badge bg-blue" style="margin-left:4px">'+dgEsc(b.label)+'</span> <span style="color:var(--txt2);margin-left:6px;font-size:12px">틀린 문항 '+s.wrong.length+'개'+(s.half.length?' · 부분점수 '+s.half.length+'개':'')+'</span>';
+  t.areas.forEach(function(a){var x=$('dg-ar-'+a.id);if(x)x.textContent=dgFmt(s.byArea[a.id].got)+'/'+dgFmt(s.byArea[a.id].max);});
 }
-function dgResetForm(){DG.rid='';DG.wrong={};DG.form={prospectId:'',name:'',grade:DG.form.grade||'예비중1',school:'',date:dgToday(),consent:false};dgRenderScore();}
+function dgResetForm(){DG.rid='';DG.wrong={};DG.half={};DG.form={prospectId:'',name:'',grade:DG.form.grade||'예비중1',school:'',date:dgToday(),consent:false};dgRenderScore();}
 
 async function dgSaveResult(showReport){
   var t=dgTest(DG.testId);if(!t)return;
   var f=DG.form;
   if(!f.name.trim()){toast('⚠️ 학생 이름을 입력해 주세요');return;}
   if(!f.consent){toast('⚠️ 보호자 동의 확인에 체크해 주세요');return;}
-  var s=dgCompute(t,DG.wrong),b=dgBandOf(t,s.total);
+  var s=dgCompute(t,DG.wrong,DG.half),b=dgBandOf(t,s.total);
   var old=DG.rid?DG.results.find(function(x){return x.id===DG.rid;}):null;
   var now=new Date().toISOString();
   var data={
     testId:t.id,testName:t.name,testDate:f.date||dgToday(),examiner:(currentUser&&currentUser.name)||'',
     prospectId:f.prospectId||'',studentId:(old&&old.studentId)||'',
     nameSnapshot:f.name.trim(),grade:(f.grade||'').trim(),school:(f.school||'').trim(),
-    wrong:s.wrong,scores:{total:s.total,max:s.max,byArea:s.byArea,byLevel:s.byLevel},band:b.id,
+    wrong:s.wrong,half:s.half,scores:{total:s.total,max:s.max,byArea:s.byArea,byLevel:s.byLevel},band:b.id,
     comment:{manual:(old&&old.comment&&old.comment.manual)||''},
     consent:{given:true,date:(old&&old.consent&&old.consent.date)||dgToday()},
     retentionUntil:dgAddMonths(f.date||dgToday(),Number(DG.cfg.retentionMonths)||12),
@@ -23783,7 +23820,7 @@ function dgRenderResults(){
   var rows=list.map(function(r){
     var t=dgTest(r.testId),b=t?dgBandOf(t,r.scores.total):null,exp=r.retentionUntil&&r.retentionUntil<today;
     return '<tr><td style="font-size:11px">'+dgEsc(r.testDate||'')+'</td><td><b>'+dgEsc(r.nameSnapshot)+'</b><div style="font-size:10px;color:var(--txt3)">'+dgEsc(r.grade||'')+(r.school?' · '+dgEsc(r.school):'')+'</div></td>'
-     +'<td><b>'+r.scores.total+'</b>/'+r.scores.max+'</td><td style="font-size:11px">'+dgEsc(b?b.label:'')+'</td>'
+     +'<td><b>'+dgFmt(r.scores.total)+'</b>/'+dgFmt(r.scores.max)+'</td><td style="font-size:11px"><span style="color:var(--txt3)">'+dgEsc(dgShort(t))+'</span> '+dgEsc(b?b.label:'')+'</td>'
      +'<td>'+(r.status==='confirmed'?'<span class="badge bg-green">확정</span>':'<span class="badge bg-gray">임시</span>')+(exp?' <span class="badge bg-red">보존기한 경과</span>':'')+'</td>'
      +'<td style="white-space:nowrap"><button class="btn btn-green btn-xs" onclick="dgOpenReport(\''+r.id+'\')">리포트</button> <button class="btn btn-outline btn-xs" onclick="dgEditResult(\''+r.id+'\')">수정</button> <button class="btn btn-outline btn-xs" style="color:#dc2626" onclick="dgDeleteResult(\''+r.id+'\')">삭제</button></td></tr>';
   }).join('');
@@ -23795,7 +23832,7 @@ function dgRenderResults(){
 }
 function dgEditResult(id){
   var r=DG.results.find(function(x){return x.id===id;});if(!r)return;
-  DG.rid=id;DG.testId=r.testId;DG.wrong={};(r.wrong||[]).forEach(function(n){DG.wrong[n]=true;});
+  DG.rid=id;DG.testId=r.testId;DG.wrong={};DG.half={};(r.wrong||[]).forEach(function(n){DG.wrong[n]=true;});(r.half||[]).forEach(function(n){DG.half[n]=true;});
   DG.form={prospectId:r.prospectId||'',name:r.nameSnapshot||'',grade:r.grade||'',school:r.school||'',date:r.testDate||dgToday(),consent:!!(r.consent&&r.consent.given)};
   dgTab('score');
 }
@@ -23828,7 +23865,7 @@ function dgComments(r,t){
   if(!strong.length){var top=areas.slice().sort(function(x,y){return y.pct-x.pct;})[0];if(top&&top.pct>=60)strong=[top];}
   var weak=areas.slice().sort(function(x,y){return x.pct-y.pct;}).filter(function(a){return a.pct<=60&&strong.indexOf(a)<0;}).slice(0,2);
   var tpl=function(a,k){var x=(cfg.tpl||{})[a.id];return x&&x[k]?x[k]:(k==='s'?a.name+' 영역에서 좋은 성취를 보였습니다.':a.name+' 영역은 꾸준한 학습으로 충분히 키워 갈 수 있는 부분입니다.');};
-  var wrongSet={};(r.wrong||[]).forEach(function(n){wrongSet[n]=true;});
+  var wrongSet={};(r.wrong||[]).concat(r.half||[]).forEach(function(n){wrongSet[n]=true;});
   var strongTxt=strong.map(function(a){return tpl(a,'s');}).join(' ');
   var weakTxt=weak.map(function(a){
     var intents=[];t.questions.forEach(function(q){if(q.area===a.id&&wrongSet[q.no]&&q.intent&&intents.indexOf(q.intent)<0)intents.push(q.intent);});
@@ -23861,28 +23898,28 @@ function dgBar(label,pct,color,avgPct){
 function dgReportHTML(r){
   var t=dgTest(r.testId);if(!t)return '<div style="padding:20px">시험지 정보를 찾을 수 없어요.</div>';
   var cfg=DG.cfg,cm=dgComments(r,t),av=dgAverage(r),avg=av.avg;
-  var wrongSet={};(r.wrong||[]).forEach(function(n){wrongSet[n]=true;});
+  var wrongSet={};(r.wrong||[]).concat(r.half||[]).forEach(function(n){wrongSet[n]=true;});var halfSet={};(r.half||[]).forEach(function(n){halfSet[n]=true;});
   var pct=dgPct(r.scores.total,r.scores.max);
   var areaRows=t.areas.map(function(a){var s=r.scores.byArea[a.id];
     return '<tr><td style="border:none;border-bottom:1px solid #e2e8f0;padding:4px 6px;font-weight:700;text-align:left;background:none">'+dgEsc(a.name)+'</td>'
-     +'<td style="border:none;border-bottom:1px solid #e2e8f0;padding:4px 6px;text-align:center;background:none">'+s.got+' / '+s.max+'</td>'
+     +'<td style="border:none;border-bottom:1px solid #e2e8f0;padding:4px 6px;text-align:center;background:none">'+dgFmt(s.got)+' / '+dgFmt(s.max)+'</td>'
      +'<td style="border:none;border-bottom:1px solid #e2e8f0;padding:4px 6px;text-align:center;background:none;font-weight:700">'+s.pct+'%</td>'
      +(avg?'<td style="border:none;border-bottom:1px solid #e2e8f0;padding:4px 6px;text-align:center;background:none;color:#475569">'+avg[a.id]+'%</td>':'')+'</tr>';}).join('');
   var th=function(x){return '<th style="border:none;border-bottom:2px solid #0b2c5c;padding:4px 6px;font-size:11px;background:none;text-align:center">'+x+'</th>';};
   var levelBars=[1,2,3].map(function(l){var s=r.scores.byLevel[l];return s.max?dgBar('Level '+l,s.pct,['#60a5fa','#3b82f6','#1e40af'][l-1]):'';}).join('');
   var wrongAll=t.questions.filter(function(q){return wrongSet[q.no];});var wrongQs=wrongAll.slice(0,14);
   var wrongHTML=wrongQs.length?'<div style="columns:2;column-gap:14px;font-size:10px;line-height:1.55;color:#334155">'+wrongQs.map(function(q){
-    return '<div style="break-inside:avoid"><b>'+q.no+'번</b> <span style="color:#64748b">'+dgEsc((t.areas.find(function(a){return a.id===q.area;})||{}).name||'')+' L'+q.level+'</span> '+dgEsc(q.intent||'')+'</div>';}).join('')+'</div>'+(wrongAll.length>14?'<div style="font-size:10px;color:#64748b;margin-top:3px">외 '+(wrongAll.length-14)+'문항은 상담 시 함께 살펴보세요.</div>':'')
+    return '<div style="break-inside:avoid"><b>'+q.no+'번</b> <span style="color:#64748b">'+dgEsc((t.areas.find(function(a){return a.id===q.area;})||{}).name||'')+' L'+q.level+'</span> '+dgEsc(q.intent||'')+(halfSet[q.no]?' <span style="color:#b45309">(부분점수)</span>':'')+'</div>';}).join('')+'</div>'+(wrongAll.length>14?'<div style="font-size:10px;color:#64748b;margin-top:3px">외 '+(wrongAll.length-14)+'문항은 상담 시 함께 살펴보세요.</div>':'')
     :'<div style="font-size:11px;color:#047857;font-weight:700">모든 문항을 정확하게 해결했어요! 👏</div>';
   var logo=cfg.logo?'<img src="'+cfg.logo+'" style="max-height:46px;max-width:150px;object-fit:contain">':'<div style="font-weight:800;font-size:14px;color:#0b2c5c">'+dgEsc(cfg.academyName||'')+'</div>';
   var box='border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;margin-top:8px;page-break-inside:avoid;';
   var h='<div class="dgp" style="font-family:-apple-system,BlinkMacSystemFont,\'Apple SD Gothic Neo\',\'Noto Sans KR\',sans-serif;color:#1e293b;font-size:12px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:3px solid #0b2c5c;padding-bottom:8px"><div style="min-width:120px">'+logo+'</div>'
-   +'<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#0b2c5c;letter-spacing:-.5px;white-space:nowrap">예비 중등 진단평가 결과 리포트</div><div style="font-size:11px;color:#64748b">'+dgEsc(r.testName||t.name)+'</div></div>'
+   +'<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#0b2c5c;letter-spacing:-.5px;white-space:nowrap">'+((r.grade||'').indexOf('예비')===0?'예비 중등 ':'영어 ')+'진단평가 결과 리포트</div><div style="font-size:11px;color:#64748b">'+dgEsc(r.testName||t.name)+'</div></div>'
    +'<div style="min-width:120px;text-align:right;font-size:10px;color:#64748b">응시일 '+dgEsc(r.testDate||'')+'</div></div>'
    +'<div style="display:flex;gap:6px;margin-top:10px;font-size:12px">'
-   +[['이름',r.nameSnapshot],['학년',r.grade],['학교',r.school],['시험',t.gradeTarget||'']].map(function(x){return '<div style="flex:1;background:#f1f5f9;border-radius:8px;padding:6px 10px"><span style="color:#64748b;font-size:10px">'+x[0]+'</span><div style="font-weight:700">'+dgEsc(x[1]||'-')+'</div></div>';}).join('')+'</div>'
-   +'<div style="'+box+'display:flex;align-items:center;gap:14px"><div style="text-align:center;min-width:110px"><div style="font-size:11px;color:#64748b">종합 점수</div><div style="font-size:30px;font-weight:800;color:#0b2c5c;line-height:1.1">'+r.scores.total+'<span style="font-size:15px;color:#64748b"> / '+r.scores.max+'</span></div></div>'
+   +[['이름',r.nameSnapshot],['학년',r.grade],['학교',r.school],['시험',dgShort(t)||t.gradeTarget||'']].map(function(x){return '<div style="flex:1;background:#f1f5f9;border-radius:8px;padding:6px 10px"><span style="color:#64748b;font-size:10px">'+x[0]+'</span><div style="font-weight:700">'+dgEsc(x[1]||'-')+'</div></div>';}).join('')+'</div>'
+   +'<div style="'+box+'display:flex;align-items:center;gap:14px"><div style="text-align:center;min-width:110px"><div style="font-size:11px;color:#64748b">종합 점수</div><div style="font-size:30px;font-weight:800;color:#0b2c5c;line-height:1.1">'+dgFmt(r.scores.total)+'<span style="font-size:15px;color:#64748b"> / '+dgFmt(r.scores.max)+'</span></div></div>'
    +'<div style="flex:1"><div style="display:inline-block;background:#00b894;color:#fff;font-weight:700;border-radius:999px;padding:2px 12px;font-size:12px">'+dgEsc(cm.band.label)+'</div>'
    +'<div style="height:12px;background:#e2e8f0;border-radius:6px;margin-top:8px"><div style="width:'+pct+'%;height:100%;background:#00b894;border-radius:6px"></div></div>'
    +(avg?'<div style="font-size:10px;color:#64748b;margin-top:4px">응시자 평균 '+av.total+'점 (n='+av.n+')</div>':'')+'</div></div>'
@@ -23936,27 +23973,44 @@ function dgPrintReport(){
 }
 
 /* ── ③ 시험지 탭 ── */
-async function dgSeed(){
-  var data={
-    name:'VIEW 진단평가 Standard',gradeTarget:'예비중1',publisher:'비상교육 VIEW',totalScore:40,
-    scoring:'1문항 1점 (복수 답란 문항은 전체 정답일 때 1점)',
+function dgSeedDef(kind){
+  var bs=JSON.parse(JSON.stringify(DG_SEED_BANDS));
+  if(kind==='basic'){
+    bs=bs.slice(0,3);bs[2].min=21;bs[2].max=25;
+    return {name:'VIEW 진단평가 Basic',gradeTarget:'예비중1~중1',publisher:'비상교육 VIEW',totalScore:25,guide:DG_GUIDE['VIEW 진단평가 Basic'],
+      scoring:'1문항 1점 (복수 답란 서술형은 부분점수 0.5점 가능)',
+      areas:[{id:'li',name:'Listening'},{id:'vo',name:'Vocabulary'},{id:'gr',name:'Grammar'},{id:'rd',name:'Reading'}],
+      bands:bs,questions:DG_BASIC_Q.map(function(x){return {no:x[0],area:x[1],level:x[2],type:x[3],answer:x[4],points:1,intent:x[5],parts:x[6]||1};}),
+      source:'answer-key-pdf',verified:true,createdAt:new Date().toISOString()};
+  }
+  return {name:'VIEW 진단평가 Standard',gradeTarget:'중1~중3',publisher:'비상교육 VIEW',totalScore:40,guide:DG_GUIDE['VIEW 진단평가 Standard'],
+    scoring:'1문항 1점 (복수 답란 서술형은 부분점수 0.5점 가능)',
     areas:[{id:'li',name:'Listening'},{id:'vo',name:'Vocabulary'},{id:'gr',name:'Grammar'},{id:'rd',name:'Reading'}],
-    bands:JSON.parse(JSON.stringify(DG_SEED_BANDS)),
-    questions:DG_SEED_Q.map(function(x){return {no:x[0],area:x[1],level:x[2],type:x[3],answer:x[4],points:1,intent:x[5]};}),
-    source:'answer-key-pdf',verified:true,createdAt:new Date().toISOString()
-  };
+    bands:bs,questions:DG_SEED_Q.map(function(x){var q={no:x[0],area:x[1],level:x[2],type:x[3],answer:x[4],points:1,intent:x[5]};q.parts=dgParts(q);return q;}),
+    source:'answer-key-pdf',verified:true,createdAt:new Date().toISOString()};
+}
+async function dgSeed(kind){
+  kind=kind||'standard';
+  var data=dgSeedDef(kind);
   if(DG.tests.some(function(t){return t.name===data.name;})){toast('이미 등록되어 있어요');return;}
   loading(true);
-  try{var ref=await db.collection('diagTests').add(data);await dgLoad();DG.testId=ref.id;DG.setTestId=ref.id;toast('✅ VIEW 진단평가 Standard를 등록했어요');}
+  try{var ref=await db.collection('diagTests').add(data);await dgLoad();DG.testId=ref.id;DG.setTestId=ref.id;toast('✅ '+data.name+'를 등록했어요');}
   catch(e){toast('❌ 등록 실패 — '+(e&&e.message?e.message:e),5000);}
   loading(false);dgTab(DG.tab);
+}
+function dgSeedButtons(){
+  var out='';
+  [['standard','VIEW 진단평가 Standard'],['basic','VIEW 진단평가 Basic']].forEach(function(x){
+    if(!DG.tests.some(function(t){return t.name===x[1];}))out+='<button class="btn btn-green btn-sm" style="margin:2px" onclick="dgSeed(\''+x[0]+'\')">'+x[1]+' 등록</button>';
+  });
+  return out;
 }
 function dgRenderTests(){
   var el=$('dg-p-test');if(!el)return;
   var t=dgTest(DG.setTestId);
   var head='<div class="card" style="padding:12px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
    +(DG.tests.length?'<select class="fi" style="max-width:260px" onchange="DG.setTestId=this.value;dgRenderTests()">'+DG.tests.map(function(x){return '<option value="'+x.id+'"'+(t&&x.id===t.id?' selected':'')+'>'+dgEsc(x.name)+'</option>';}).join('')+'</select>':'<span style="font-size:12px;color:var(--txt2)">등록된 시험지 없음</span>')
-   +(DG.tests.some(function(x){return x.name==='VIEW 진단평가 Standard';})?'':'<button class="btn btn-green btn-sm" onclick="dgSeed()">VIEW 진단평가 Standard 등록</button>')
+   +dgSeedButtons()
    +'</div></div>';
   if(!t){el.innerHTML=head;return;}
   var areaOpts=function(sel){return t.areas.map(function(a){return '<option value="'+a.id+'"'+(a.id===sel?' selected':'')+'>'+dgEsc(a.name)+'</option>';}).join('');};
@@ -23966,16 +24020,17 @@ function dgRenderTests(){
      +'<td><select class="fi" id="dgq-l-'+i+'" style="font-size:11px;padding:3px;width:54px">'+[1,2,3].map(function(l){return '<option'+(q.level===l?' selected':'')+'>'+l+'</option>';}).join('')+'</select></td>'
      +'<td><input class="fi" id="dgq-ans-'+i+'" value="'+dgEsc(q.answer)+'" style="font-size:11px;padding:3px;min-width:90px"></td>'
      +'<td><input class="fi" id="dgq-p-'+i+'" type="number" step="0.5" min="0" value="'+(q.points||1)+'" style="font-size:11px;padding:3px;width:50px"></td>'
+     +'<td><input class="fi" id="dgq-parts-'+i+'" type="number" min="1" max="6" value="'+dgParts(q)+'" style="font-size:11px;padding:3px;width:46px"></td>'
      +'<td><input class="fi" id="dgq-i-'+i+'" value="'+dgEsc(q.intent||'')+'" style="font-size:11px;padding:3px;min-width:180px"></td></tr>';}).join('');
   el.innerHTML=head+'<div class="card" style="padding:12px"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><div class="field" style="flex:1;min-width:180px"><div class="fl">시험지 이름</div><input class="fi" id="dgt-name" value="'+dgEsc(t.name)+'"></div>'
    +'<div class="field" style="width:130px"><div class="fl">대상 학년</div><input class="fi" id="dgt-grade" value="'+dgEsc(t.gradeTarget||'')+'"></div></div>'
    +'<div style="font-size:11px;color:var(--txt2);margin-bottom:6px">정답은 원본 정답표와 한 번 대조해 보세요. 채점은 정답이 아니라 “틀린 문항 선택”으로 하므로 정답 열은 확인용이에요.</div>'
-   +'<div style="overflow-x:auto;max-height:55vh;overflow-y:auto"><table class="tbl" style="width:100%"><thead><tr><th>번호</th><th>영역</th><th>Level</th><th>정답</th><th>배점</th><th>출제 의도</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+   +'<div style="overflow-x:auto;max-height:55vh;overflow-y:auto"><table class="tbl" style="width:100%"><thead><tr><th>번호</th><th>영역</th><th>Level</th><th>정답</th><th>배점</th><th>답란 수</th><th>출제 의도</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
    +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-green" onclick="dgSaveTest()">저장</button><button class="btn btn-outline" style="color:#dc2626" onclick="dgDeleteTest()">시험지 삭제</button></div></div>';
 }
 async function dgSaveTest(){
   var t=dgTest(DG.setTestId);if(!t)return;
-  var qs=t.questions.map(function(q,i){return Object.assign({},q,{area:$('dgq-a-'+i).value,level:Number($('dgq-l-'+i).value),answer:$('dgq-ans-'+i).value,points:Number($('dgq-p-'+i).value)||1,intent:$('dgq-i-'+i).value});});
+  var qs=t.questions.map(function(q,i){return Object.assign({},q,{area:$('dgq-a-'+i).value,level:Number($('dgq-l-'+i).value),answer:$('dgq-ans-'+i).value,points:Number($('dgq-p-'+i).value)||1,parts:Math.max(1,Number($('dgq-parts-'+i).value)||1),intent:$('dgq-i-'+i).value});});
   var max=qs.reduce(function(s,q){return s+q.points;},0);
   var upd={name:($('dgt-name').value||t.name).trim(),gradeTarget:$('dgt-grade').value.trim(),questions:qs,totalScore:max,updatedAt:new Date().toISOString()};
   loading(true);
@@ -24000,6 +24055,7 @@ function dgRenderSettings(){
    +'<div class="field"><div class="fl">학원명</div><input class="fi" id="dgc-name" value="'+dgEsc(c.academyName)+'"></div>'
    +'<div class="field"><div class="fl">연락처</div><input class="fi" id="dgc-phone" value="'+dgEsc(c.phone)+'" placeholder="031-000-0000"></div>'
    +'<div class="field"><div class="fl">결과 보존 기간(개월)</div><input class="fi" id="dgc-ret" type="number" min="1" max="60" value="'+dgEsc(c.retentionMonths)+'"></div></div>'
+   +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;margin:6px 0"><input type="checkbox" id="dgc-partial" '+(c.partialCredit!==false?'checked':'')+' style="margin-top:2px"><span>답란이 여러 개인 서술형은 <b>부분점수(0.5점)</b> 허용 <span style="color:var(--txt3)">(VIEW 가이드 기준: 2개 중 1개 / 3개 중 2개 맞으면 0.5점)</span></span></label>'
    +'<div class="field"><div class="fl">리포트 하단 안내 문구</div><input class="fi" id="dgc-footer" value="'+dgEsc(c.footer)+'"></div>'
    +'<div style="display:flex;align-items:center;gap:10px;margin-top:6px"><div>'+(c.logo?'<img id="dgc-logo-prev" src="'+c.logo+'" style="max-height:46px;max-width:150px;border:1px solid var(--border);border-radius:6px;padding:3px">':'<span style="font-size:11px;color:var(--txt3)">로고 없음 (학원명으로 대체)</span>')+'</div>'
    +'<label class="btn btn-outline btn-sm" style="cursor:pointer">로고 선택<input type="file" accept="image/*" style="display:none" onchange="dgLogoPick(this)"></label>'+(c.logo?'<button class="btn btn-outline btn-xs" onclick="dgLogoClear()">로고 삭제</button>':'')+'</div>'
@@ -24034,7 +24090,7 @@ async function dgSaveCfg(patch){
   loading(false);
 }
 async function dgSaveInfo(){
-  await dgSaveCfg({academyName:$('dgc-name').value.trim(),phone:$('dgc-phone').value.trim(),footer:$('dgc-footer').value.trim(),retentionMonths:Number($('dgc-ret').value)||12});
+  await dgSaveCfg({academyName:$('dgc-name').value.trim(),phone:$('dgc-phone').value.trim(),footer:$('dgc-footer').value.trim(),retentionMonths:Number($('dgc-ret').value)||12,partialCredit:$('dgc-partial').checked});
   dgRenderSettings();
 }
 async function dgSaveTpl(){
