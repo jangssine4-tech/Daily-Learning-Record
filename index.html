@@ -23646,6 +23646,7 @@ function dgParts(q){
   if(a.indexOf(',')>=0&&a.indexOf('.')<0)return a.split(',').length;
   return 1;
 }
+function dgScore100(total,max){return max?Math.round(total/max*100):0;}
 function dgShort(t){return String((t&&t.name)||'').replace(/^VIEW\s*진단평가\s*/,'')||'';}
 
 /* ── 로딩 ── */
@@ -23776,7 +23777,7 @@ function dgPaintAll(){var t=dgTest(DG.testId);if(!t)return;t.questions.forEach(f
 function dgLive(){
   var t=dgTest(DG.testId);if(!t)return;
   var s=dgCompute(t,DG.wrong,DG.half),b=dgBandOf(t,s.total),el=$('dg-live');if(!el)return;
-  el.innerHTML='<b style="font-size:18px;color:var(--navy)">'+dgFmt(s.total)+' / '+dgFmt(s.max)+'점</b> <span class="badge bg-blue" style="margin-left:4px">'+dgEsc(b.label)+'</span> <span style="color:var(--txt2);margin-left:6px;font-size:12px">틀린 문항 '+s.wrong.length+'개'+(s.half.length?' · 부분점수 '+s.half.length+'개':'')+'</span>';
+  el.innerHTML='<b style="font-size:18px;color:var(--navy)">'+dgScore100(s.total,s.max)+'점</b> <span style="font-size:12px;color:var(--txt2)">(원점수 '+dgFmt(s.total)+' / '+dgFmt(s.max)+')</span> <span class="badge bg-blue" style="margin-left:4px">'+dgEsc(b.label)+'</span> <span style="color:var(--txt2);margin-left:6px;font-size:12px">틀린 문항 '+s.wrong.length+'개'+(s.half.length?' · 부분점수 '+s.half.length+'개':'')+'</span>';
   t.areas.forEach(function(a){var x=$('dg-ar-'+a.id);if(x)x.textContent=dgFmt(s.byArea[a.id].got)+'/'+dgFmt(s.byArea[a.id].max);});
 }
 function dgResetForm(){DG.rid='';DG.wrong={};DG.half={};DG.form={prospectId:'',name:'',grade:DG.form.grade||'예비중1',school:'',date:dgToday(),consent:false};dgRenderScore();}
@@ -23833,7 +23834,7 @@ function dgRenderResults(){
   var rows=list.map(function(r){
     var t=dgTest(r.testId),b=t?dgBandOf(t,r.scores.total):null,exp=r.retentionUntil&&r.retentionUntil<today;
     return '<tr><td style="font-size:11px">'+dgEsc(r.testDate||'')+'</td><td><b>'+dgEsc(r.nameSnapshot)+'</b><div style="font-size:10px;color:var(--txt3)">'+dgEsc(r.grade||'')+(r.school?' · '+dgEsc(r.school):'')+'</div></td>'
-     +'<td><b>'+dgFmt(r.scores.total)+'</b>/'+dgFmt(r.scores.max)+'</td><td style="font-size:11px"><span style="color:var(--txt3)">'+dgEsc(dgShort(t))+'</span> '+dgEsc(b?b.label:'')+'</td>'
+     +'<td><b>'+dgScore100(r.scores.total,r.scores.max)+'점</b><div style="font-size:10px;color:var(--txt3)">원점수 '+dgFmt(r.scores.total)+'/'+dgFmt(r.scores.max)+'</div></td><td style="font-size:11px"><span style="color:var(--txt3)">'+dgEsc(dgShort(t))+'</span> '+dgEsc(b?b.label:'')+'</td>'
      +'<td>'+(r.status==='confirmed'?'<span class="badge bg-green">확정</span>':'<span class="badge bg-gray">임시</span>')+(exp?' <span class="badge bg-red">보존기한 경과</span>':'')+'</td>'
      +'<td style="white-space:nowrap"><button class="btn btn-green btn-xs" onclick="dgOpenReport(\''+r.id+'\')">리포트</button> <button class="btn btn-outline btn-xs" onclick="dgEditResult(\''+r.id+'\')">수정</button> <button class="btn btn-outline btn-xs" style="color:#dc2626" onclick="dgDeleteResult(\''+r.id+'\')">삭제</button></td></tr>';
   }).join('');
@@ -23932,10 +23933,10 @@ function dgReportHTML(r){
    +'<div style="min-width:120px;text-align:right;font-size:10px;color:#64748b">응시일 '+dgEsc(r.testDate||'')+'</div></div>'
    +'<div style="display:flex;gap:6px;margin-top:10px;font-size:12px">'
    +[['이름',r.nameSnapshot],['학년',r.grade],['학교',r.school],['시험',dgShort(t)||t.gradeTarget||'']].map(function(x){return '<div style="flex:1;background:#f1f5f9;border-radius:8px;padding:6px 10px"><span style="color:#64748b;font-size:10px">'+x[0]+'</span><div style="font-weight:700">'+dgEsc(x[1]||'-')+'</div></div>';}).join('')+'</div>'
-   +'<div style="'+box+'display:flex;align-items:center;gap:14px"><div style="text-align:center;min-width:110px"><div style="font-size:11px;color:#64748b">종합 점수</div><div style="font-size:30px;font-weight:800;color:#0b2c5c;line-height:1.1">'+dgFmt(r.scores.total)+'<span style="font-size:15px;color:#64748b"> / '+dgFmt(r.scores.max)+'</span></div></div>'
+   +'<div style="'+box+'display:flex;align-items:center;gap:14px"><div style="text-align:center;min-width:110px"><div style="font-size:11px;color:#64748b">종합 점수</div><div style="font-size:30px;font-weight:800;color:#0b2c5c;line-height:1.1">'+dgScore100(r.scores.total,r.scores.max)+'<span style="font-size:15px;color:#64748b"> / 100</span></div><div style="font-size:10px;color:#64748b;margin-top:2px">원점수 '+dgFmt(r.scores.total)+' / '+dgFmt(r.scores.max)+'</div></div>'
    +'<div style="flex:1"><div style="display:inline-block;background:#00b894;color:#fff;font-weight:700;border-radius:999px;padding:2px 12px;font-size:12px">'+dgEsc(cm.band.label)+'</div>'
    +'<div style="height:12px;background:#e2e8f0;border-radius:6px;margin-top:8px"><div style="width:'+pct+'%;height:100%;background:#00b894;border-radius:6px"></div></div>'
-   +(avg?'<div style="font-size:10px;color:#64748b;margin-top:4px">응시자 평균 '+av.total+'점 (n='+av.n+')</div>':'')+'</div></div>'
+   +(avg?'<div style="font-size:10px;color:#64748b;margin-top:4px">응시자 평균 '+dgScore100(av.total,r.scores.max)+'점 (n='+av.n+')</div>':'')+'</div></div>'
    +'<div style="display:flex;gap:12px;margin-top:10px;align-items:center"><div style="flex:1;min-width:0">'+dgRadar(t,r,avg)+(avg?'<div style="text-align:center;font-size:9px;color:#64748b">점선: 응시자 평균</div>':'')+'</div>'
    +'<div style="flex:1;min-width:0"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+th('영역')+th('득점')+th('정답률')+(avg?th('평균'):'')+'</tr></thead><tbody>'+areaRows+'</tbody></table>'
    +'<div style="font-size:11px;font-weight:700;margin:10px 0 2px">난이도별 정답률</div>'+levelBars+'</div></div>'
