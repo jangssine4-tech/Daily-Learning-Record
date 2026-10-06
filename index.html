@@ -23660,6 +23660,7 @@ async function dgLoad(){
     DG.cfg=Object.assign({},DG_DEF_CFG,saved);
     DG.cfg.tpl=Object.assign({},DG_DEF_CFG.tpl,saved.tpl||{});
     DG.loaded=true;
+    if(DG.rid&&!DG.results.some(function(x){return x.id===DG.rid;}))DG.rid='';
   }catch(e){
     console.error('dgLoad',e);
     toast('❌ 진단평가 데이터 로딩 실패 — '+(e&&e.message?e.message:e),5000);
@@ -23800,13 +23801,25 @@ async function dgSaveResult(showReport){
   };
   loading(true);
   try{
-    var id=DG.rid;
-    if(id){await db.collection('diagResults').doc(id).update(data);}
-    else{data.createdAt=now;data.createdBy=(currentUser&&currentUser.name)||'';var ref=await db.collection('diagResults').add(data);id=ref.id;}
+    var id=DG.rid,saved=false;
+    if(id){
+      try{await db.collection('diagResults').doc(id).update(data);saved=true;}
+      catch(e){
+        // 수정 중이던 기록이 이미 삭제된 경우 → 오류 대신 새 기록으로 저장
+        if(e&&(e.code==='not-found'||/No document to update/i.test(e.message||'')))id='';
+        else throw e;
+      }
+    }
+    if(!saved){data.createdAt=now;data.createdBy=(currentUser&&currentUser.name)||'';var ref=await db.collection('diagResults').add(data);id=ref.id;}
     await dgLoad();loading(false);
-    DG.rid=id;
     toast(showReport?'✅ 저장했어요':'💾 임시 저장했어요');
-    if(showReport){dgOpenReport(id);}
+    if(showReport){
+      // 다음 학생은 새 기록으로 채점 (이전 결과를 덮어쓰지 않도록 수정 상태 해제)
+      DG.rid='';DG.wrong={};DG.half={};
+      DG.form={prospectId:'',name:'',grade:f.grade,school:'',date:dgToday(),consent:false};
+      dgRenderScore();
+      dgOpenReport(id);
+    }else{DG.rid=id;dgRenderScore();}
   }catch(e){loading(false);console.error(e);toast('❌ 저장 실패 — '+(e&&e.message?e.message:e),5000);}
 }
 
