@@ -893,7 +893,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
     </div>
   </div>
 </div><div id="ref-panel-tuitiontable" style="display:none" class="cp"><div id="tuition-table-area"></div></div><div id="ref-panel-curriculum" style="display:none" class="cp"><input class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="max-width:280px;font-size:12px;padding:6px 10px;margin-bottom:12px"><div id="ref-curriculum-area"></div></div><div id="ref-panel-eval" style="display:none" class="cp"><div id="eval-modules-area"></div></div><div id="ref-panel-classes" style="display:none" class="cp"><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openClassModal()">+ 모듈 추가</button></div><div id="class-list-ref"></div></div><div id="ref-panel-guides" style="display:none" class="cp"><div id="ref-guides-area"></div></div></div>
-<div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
+<div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button><span id="users-tabs" style="margin-left:10px"></span></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
 <div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 채널 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div class="field"><div class="fl">카카오 채널 보강 예약 링크</div><input class="fi" id="kakao-booking-url" placeholder="https://pf.kakao.com/xxxxx 또는 예약 링크"></div><div class="field" style="margin-top:10px"><div class="fl">학부모 보강 선택 페이지 주소 (makeup.html)</div><input class="fi" id="kakao-makeup-url" placeholder="비워두면 이 앱과 같은 폴더의 makeup.html 사용"></div><div class="field" style="margin-top:10px"><div class="fl">결석 알림 메시지 템플릿</div><textarea class="fi" id="kakao-absent-msg" rows="6" style="font-size:12px;line-height:1.6" placeholder="메시지를 입력하세요. {이름}, {날짜}, {링크}를 사용할 수 있습니다."></textarea><div style="font-size:10px;color:var(--txt3);margin-top:4px">사용 가능 변수: <b>{이름}</b> = 학생 이름, <b>{날짜}</b> = 오늘 날짜, <b>{링크}</b> = 보강 예약 링크</div></div><div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-green btn-sm" onclick="saveKakaoConfig()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="$('kakao-absent-msg').value='안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n아래 링크에서 가능하신 보강 시간을 선택해 주시면 바로 확정됩니다.\n\n👉 {링크}\n\n감사합니다~^^';toast('기본 메시지 복원됨')">기본값 복원</button></div></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><div class="field" style="margin-bottom:10px"><div class="fl">Storage Bucket</div><div style="display:flex;gap:6px"><input class="fi" id="settings-storage-bucket" placeholder="daily-report-5a26e.appspot.com" style="flex:1;font-size:12px"><button class="btn btn-green btn-sm" onclick="saveStorageBucket()">저장</button></div><div style="font-size:10px;color:var(--txt3);margin-top:4px">교사 자료실 파일 업로드에 필요해요</div></div><button class="btn btn-outline btn-sm" onclick="if(await showConfirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
 <!-- MODALS -->
 <div id="modal-student" style="display:none" class="mo" onclick="if(event.target===this)closeM('student')"><div class="ms"><div class="mh"></div><div class="mt" id="s-modal-title">학생 등록</div>
@@ -10896,7 +10896,7 @@ function calcMonthExpTotal(yr,mo){
   // Auto 인건비+세금 (전월분) - same check as renderRevExpense (autoFromLedger)
   if(!list.some(function(e2){return e2.category==='인건비'&&e2.autoFromLedger;})){
     tl.forEach(function(u2){
-      var wd=u2['workDays_'+pyr+'_'+pmo]||[];var th=wd.reduce(function(s2,d2){return s2+(parseFloat(d2.hours)||0);},0);
+      var wd=_wdEff(u2,pyr,pmo);var th=wd.reduce(function(s2,d2){return s2+(parseFloat(d2.hours)||0);},0);
       var fee=Math.round(th*(u2.hourlyRate||15000));var bt=Math.round(fee*0.03);var rt=Math.round(bt*0.1);var nt=fee-bt-rt;
       if(nt>0)list.push({category:'인건비',amount:nt,autoFromLedger:true});
       if(bt>0)list.push({category:'세금-원천 소득세',amount:bt,autoFromLedger:true});
@@ -12987,7 +12987,7 @@ function renderStaffArea(){
   var payrollHTML=teacherList.length?teacherList.map(function(u,idx){
     var isDupeName=_nameCount[u.name]>1;
     var hourlyRate=getHourlyRate(u,yr,mo);
-    var workDays=u['workDays_'+yr+'_'+mo]||[];
+    var workDays=_wdEff(u,yr,mo);
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
     var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
     var juhuEnabled=u.juhuEnabled||false;
@@ -13021,24 +13021,17 @@ function renderStaffArea(){
       +'<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openPayrollModal(\''+u.id+'\','+yr+','+mo+')">📝 근무 시간표</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
       +'<button class="btn btn-xs '+(juhuEnabled?'btn-green':'btn-outline')+'" onclick="toggleJuhu(\''+u.id+'\','+!juhuEnabled+')" title="주휴수당: 주 15시간 이상 근무 시 지급">'+(juhuEnabled?'✅ 주휴수당 ON':'주휴수당 OFF')+'</button>'
-      +'<button class="btn btn-xs" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a" onclick="deleteStaffUser(\''+u.id+'\',\''+u.name+'\','+yr+','+mo+')">🚪 퇴사 처리</button>'
-      +(u.endDate?'<button class="btn btn-outline btn-xs" style="border-color:#16a34a;color:#16a34a" onclick="undoStaffDelete(\''+u.id+'\',\''+u.name+'\')">↩️ 퇴사 처리 취소</button>':'')
-      +'<button class="btn btn-red btn-xs" onclick="deleteStaffUserPermanently(\''+u.id+'\',\''+u.name+'\')">🗑 삭제</button>'
-      +'<div style="position:relative;display:inline-flex">'
-      +'<button type="button" onclick="_toggleStaffDeleteGuide(this)" style="width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--txt2);font-size:11px;font-weight:800;cursor:pointer;line-height:1;flex-shrink:0">?</button>'
-      +'<div class="staff-delete-guide" style="display:none;position:absolute;bottom:26px;right:0;z-index:300;width:240px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.15);text-align:left">'
-      +'<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:4px">🚪 퇴사 처리</div>'
-      +'<div style="font-size:11px;color:var(--txt2);line-height:1.5;margin-bottom:8px">지금 보고 있는 달까지는 계속 보이고, 다음 달부터 강사 페이지에서 자동으로 숨겨져요. 근무 기록·시급 설정은 그대로 보존돼요. 잘못 눌렀다면 바로 그 자리에 생기는 "↩️ 퇴사 처리 취소" 버튼으로 되돌릴 수 있어요.</div>'
-      +'<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:4px">🗑 삭제</div>'
-      +'<div style="font-size:11px;color:var(--txt2);line-height:1.5">완전 삭제예요. 근무 시간표, 시급 설정 등 그동안의 모든 기록이 함께 영구적으로 사라지고 되돌릴 수 없어요. 단순 퇴사가 아니라 잘못 등록했거나 중복 등록된 경우에만 사용하세요.</div>'
-      +'</div></div></div></div>';
+      +'</div>'
+      +(u.endDate?'<div style="margin-top:6px;font-size:11px;color:#92400e">🚪 퇴사일 '+u.endDate+' — 이후 근무는 0시간으로 처리돼요</div>':'')
+      +'<div style="margin-top:6px;font-size:10px;color:var(--txt3)">퇴사·삭제는 관리자 페이지에서 해 주세요</div>'
+      +'</div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt3)">등록된 교사가 없습니다.</div>';
   // Freelancer ledger
   var freelancerHTML='<table class="rev-tbl" style="font-size:12px"><thead><tr><th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">주민번호</th><th style="text-align:center">주소</th><th style="text-align:center">용역비</th><th style="text-align:center">사업소득세(3%)</th><th style="text-align:center">주민세</th><th style="text-align:center">차감수령액</th><th style="text-align:center">지급날짜</th></tr></thead><tbody>';
   var totalFee=0,totalBizTax=0,totalResTax=0,totalNet=0;
   teacherList.forEach(function(u,idx){
     var hourlyRate=getHourlyRate(u,yr,mo);
-    var workDays=u['workDays_'+yr+'_'+mo]||[];
+    var workDays=_wdEff(u,yr,mo);
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
     var fee=Math.round(totalHours*hourlyRate);
     var bizTax=Math.round(fee*0.03);
@@ -13068,7 +13061,7 @@ function saveFreelancerImage(){
   });
   var rows='';var totalFee=0,totalBiz=0,totalRes=0,totalNet=0;
   teacherList.forEach(function(u,idx){
-    var workDays=u['workDays_'+yr+'_'+mo]||[];
+    var workDays=_wdEff(u,yr,mo);
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
     var hourlyRate=getHourlyRate(u,yr,mo);
     var juhuEnabled=u.juhuEnabled||false;
@@ -13226,7 +13219,7 @@ function _syncStaffScheduleToPayroll(userId){
     if(dowName==='일')continue;
     var entry=workDays.find(function(w){return w.day===d;});
     if(entry&&(entry.type==='holiday'||entry.type==='absent'||(entry.memo&&entry.memo.trim())))continue; // 수동으로 표시해둔 날은 유지
-    var shouldWork=staffDays.includes(dowName);
+    var shouldWork=staffDays.includes(dowName)&&!_afterEnd(u,yr,mo,d);
     var newHours=shouldWork?(staffHours[dowName]||0):0;
     if(entry){
       if(entry.hours!==newHours){entry.hours=newHours;changed=true;}
@@ -13333,7 +13326,7 @@ function openPayrollModal(userId,yr,mo){
     for(var d=1;d<=daysInMo;d++){
       var dt=new Date(yr,mo-1,d);var dow=dt.getDay();
       var dowName=dayNames[dow];
-      if(staffDays.includes(dowName)){
+      if(staffDays.includes(dowName)&&!_afterEnd(u,yr,mo,d)){
         workDays.push({day:d,hours:staffHours[dowName]||0,type:'normal'});
       }
     }
@@ -13347,7 +13340,8 @@ function openPayrollModal(userId,yr,mo){
     var dowName2=dayNames[dow2];
     var isStaffDay=staffDays.includes(dowName2);
     var existing=workDays.find(function(w){return w.day===d2;});
-    var hrs=existing?existing.hours:(isStaffDay?(staffHours[dowName2]||0):0);
+    var _post=_afterEnd(u,yr,mo,d2);
+    var hrs=_post?0:(existing?existing.hours:(isStaffDay?(staffHours[dowName2]||0):0));
     var dtype=existing?existing.type:'normal';
     var bg=isStaffDay?'background:#f0fdf4':'';
     if(dtype==='holiday')bg='background:#eff6ff';
@@ -13355,7 +13349,7 @@ function openPayrollModal(userId,yr,mo){
     rows+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);'+bg+'">'
       +'<span style="font-size:12px;font-weight:600;min-width:22px;color:var(--navy)">'+dowName2+'</span>'
       +'<span style="font-size:12px;min-width:70px">'+mo+'월 '+d2+'일</span>'
-      +'<input type="number" class="fi payroll-hrs" data-day="'+d2+'" data-type="'+(dtype)+'" data-staffday="'+(isStaffDay?'1':'0')+'" data-default-hrs="'+(isStaffDay?(staffHours[dowName2]||0):0)+'" value="'+hrs+'" step="0.5" min="0" max="24" style="width:60px;font-size:12px;padding:4px 6px;text-align:center">'
+      +(_post?'<span style="font-size:10px;color:#b91c1c;font-weight:700">퇴사 후</span>':'')+'<input type="number" class="fi payroll-hrs" '+(_post?'readonly ':'')+'data-day="'+d2+'" data-type="'+(dtype)+'" data-staffday="'+(isStaffDay?'1':'0')+'" data-default-hrs="'+(isStaffDay?(staffHours[dowName2]||0):0)+'" value="'+hrs+'" step="0.5" min="0" max="24" style="width:60px;font-size:12px;padding:4px 6px;text-align:center">'
       +'<span style="font-size:11px;color:var(--txt3)">h</span>'
       +'<button class="btn btn-xs '+(dtype==='holiday'?'btn-navy':'btn-outline')+'" style="font-size:9px;padding:2px 5px" onclick="setPayrollDayType(this,\'holiday\')">공휴일</button>'
       +'<button class="btn btn-xs '+(dtype==='absent'?'btn-red':'btn-outline')+'" style="font-size:9px;padding:2px 5px" onclick="setPayrollDayType(this,\'absent\')">결근</button>'
@@ -13544,7 +13538,7 @@ function renderRevExpense(yr,mo){
   var hasAutoSalary=list.some(function(e2){return e2.category==='인건비'&&e2.autoFromLedger;});
   if(!hasAutoSalary&&teacherList.length){
     teacherList.forEach(function(u){
-      var workDays=u['workDays_'+prevYrS+'_'+prevMoS]||[];
+      var workDays=_wdEff(u,prevYrS,prevMoS);
       var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
       var fee=Math.round(totalHours*(u.hourlyRate||15000));
       var bizTax=Math.round(fee*0.03);var resTax=Math.round(bizTax*0.1);
@@ -13561,7 +13555,7 @@ function renderRevExpense(yr,mo){
   var hasAutoTax=list.some(function(e2){return e2.category==='세금-원천 소득세'&&e2.autoFromLedger;});
   if(!hasAutoTax&&teacherList.length){
     teacherList.forEach(function(u){
-      var workDays=u['workDays_'+prevYrS+'_'+prevMoS]||[];
+      var workDays=_wdEff(u,prevYrS,prevMoS);
       var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
       var fee=Math.round(totalHours*(u.hourlyRate||15000));
       var bizTax=Math.round(fee*0.03);var resTax=Math.round(bizTax*0.1);
@@ -21646,7 +21640,7 @@ function renderChecklistOverview(){
   });
 }
 async function renderUsers(){
-  try{var tb=$('users-tbody');if(!tb)return;var activeUsers=users.filter(function(u){return!u.adminDeleted;});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">등록된 교사 없음</div></div></td></tr>';return;}var isCurrentAdmin=currentUser&&currentUser.role==='admin';tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong>'+_retiredBadge(u)+(u.engName?' <span style="font-size:11px;color:var(--blue)">('+u.engName+')</span>':'')+'</td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>':'<span style="font-size:11px;color:var(--txt3)">-</span>'))+'</td><td>'+(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button>':'<span style="font-size:11px;color:var(--txt3)">-</span>')+'</td></tr>';}).join('')+_hiddenUsersRow();}catch(e){console.error('renderUsers 오류:',e);var _ea=document.getElementById('users-list');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
+  try{var tb=$('users-tbody');if(!tb)return;var _allU=users.filter(function(u){return!u.adminDeleted;});var _nRet=_allU.filter(_isRetiredNow).length;_renderUsersTabs(_allU.length-_nRet,_nRet);var activeUsers=_allU.filter(function(u){return _usersTab==='retired'?_isRetiredNow(u):!_isRetiredNow(u);});if(!activeUsers.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">👤</div><div class="et">'+(_usersTab==='retired'?'퇴사한 선생님 없음':'등록된 교사 없음')+'</div></div></td></tr>';return;}var isCurrentAdmin=currentUser&&currentUser.role==='admin';tb.innerHTML=activeUsers.map(function(u){var isAdmin=u.role==='admin';return'<tr><td><strong>'+u.name+'</strong>'+_retiredBadge(u)+(u.engName?' <span style="font-size:11px;color:var(--blue)">('+u.engName+')</span>':'')+'</td><td style="font-size:12px;color:var(--txt3)">'+u.loginId+'</td><td><span class="badge '+(isAdmin?'bg-red':'bg-blue')+'">'+(isAdmin?'관리자':'교사')+'</span></td><td style="font-size:11px;color:var(--txt3)">'+(u.createdAt||'').split('T')[0]+'</td><td>'+(isAdmin?'<span class="badge bg-gray">전체</span>':(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openMenuPermModal(\''+u.id+'\')">✏️</button>':'<span style="font-size:11px;color:var(--txt3)">-</span>'))+'</td><td>'+(isCurrentAdmin?'<button class="btn btn-outline btn-xs" onclick="openUserModal(\''+u.id+'\')">편집</button>'+(isAdmin?'':(_usersTab==='retired'?' <button class="btn btn-outline btn-xs" style="border-color:#16a34a;color:#16a34a" onclick="reinstateUser(\''+u.id+'\')">재직 복귀</button> <button class="btn btn-outline btn-xs" style="border-color:#dc2626;color:#dc2626" onclick="purgeAdminUser(\''+u.id+'\')">삭제</button>':' <button class="btn btn-outline btn-xs" style="border-color:#d97706;color:#92400e" onclick="retireUserNow(\''+u.id+'\')">퇴사</button>')):'<span style="font-size:11px;color:var(--txt3)">-</span>')+'</td></tr>';}).join('')+(_usersTab==='retired'?_hiddenUsersRow():'');}catch(e){console.error('renderUsers 오류:',e);var _ea=document.getElementById('users-list');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
 }
 async function openUserModal(id){if(!currentUser||currentUser.role!=='admin'){toast('관리자만 접근할 수 있어요');return;}var u=id?users.find(function(x){return x.id===id;}):null;$('u-id-key').value=id||'';$('u-name').value=u?u.name||'':'';$('u-engname').value=u?u.engName||'':'';$('u-role').value=u?u.role||'teacher':'teacher';$('u-id').value=u?u.loginId||'':'';$('u-pw').value='';$('u-phone').value=u?u.phone||'':'';if(u&&u.ssn){try{$('u-ssn').value=atob(u.ssn);}catch(e){$('u-ssn').value='';}}else{$('u-ssn').value='';}$('u-ssn').type='password';$('u-address').value=u?u.address||'':'';$('u-startdate').value=u?u.startDate||'':'';$('u-enddate').value=u?u.endDate||'':'';$('u-del-wrap').style.display=id?'block':'none';$('modal-user').style.display='flex';}
 async function saveUser(){
@@ -24317,14 +24311,83 @@ async function dgLogoClear(){await dgSaveCfg({logo:''});dgRenderSettings();}
 /* ── 관리자 > 교사 계정 보조 (퇴사 배지 / 숨겨진 계정 복구) ── */
 function _retiredBadge(u){
   var t=dgToday();
+  if(u.endDate&&u.endDate>=t)return ' <span class="badge bg-gray" style="font-size:10px">퇴사 예정 '+dgEsc(u.endDate)+'</span>';
   if(u.endDate&&u.endDate<t)return ' <span class="badge bg-gray" style="font-size:10px">퇴사 '+dgEsc(u.endDate)+'</span>';
   return '';
 }
 function _hiddenUsersRow(){
   var hid=(users||[]).filter(function(u){return u.adminDeleted;});
   if(!hid.length)return '';
-  return '<tr><td colspan="6" style="background:#fffbeb;font-size:12px;padding:10px"><b>🗑 관리자 페이지에서 숨겨진 계정 '+hid.length+'개</b> <span style="color:var(--txt3)">(퇴사 처리와는 별개예요. 아래 [복구]로 다시 표시할 수 있어요)</span><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'
-   +hid.map(function(u){return '<span style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:4px 8px">'+dgEsc(u.name||'')+' <span style="color:var(--txt3)">'+dgEsc(u.loginId||'')+'</span> <button class="btn btn-outline btn-xs" onclick="restoreAdminUser(\''+u.id+'\')">복구</button></span>';}).join('')+'</div></td></tr>';
+  return '<tr><td colspan="6" style="background:#fffbeb;font-size:12px;padding:10px"><b>🗑 관리자 페이지에서 숨겨진 계정 '+hid.length+'개</b> <span style="color:var(--txt3)">(퇴사 처리와는 별개예요. [복구]로 다시 표시하거나 [완전 삭제]로 영구 삭제할 수 있어요)</span><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'
+   +hid.map(function(u){return '<span style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:4px 8px">'+dgEsc(u.name||'')+' <span style="color:var(--txt3)">'+dgEsc(u.loginId||'')+'</span> <button class="btn btn-outline btn-xs" onclick="restoreAdminUser(\''+u.id+'\')">복구</button> <button class="btn btn-outline btn-xs" style="border-color:#dc2626;color:#dc2626" onclick="purgeAdminUser(\''+u.id+'\')">완전 삭제</button></span>';}).join('')+'</div></td></tr>';
+}
+var _usersTab='active';
+function _isRetiredNow(u){return !!u.endDate;}
+function _pad2(n){return String(n).padStart(2,'0');}
+// 퇴사일 다음 날부터는 근무 안 한 것으로 취급(0시간) — 저장된 값은 건드리지 않고 계산·표시할 때만 반영
+function _afterEnd(u,yr,mo,d){return !!(u&&u.endDate&&(yr+'-'+_pad2(mo)+'-'+_pad2(d))>u.endDate);}
+function _wdEff(u,yr,mo){
+  var arr=(u&&u['workDays_'+yr+'_'+mo])||[];
+  if(!u||!u.endDate)return arr;
+  return arr.map(function(w){return _afterEnd(u,yr,mo,w.day)?Object.assign({},w,{hours:0}):w;});
+}
+function _renderUsersTabs(nA,nR){
+  var el=document.getElementById('users-tabs');if(!el)return;
+  function b(k,l,n){var on=_usersTab===k;return '<button class="btn btn-sm '+(on?'btn-green':'btn-outline')+'" style="margin-right:4px" onclick="setUsersTab(\''+k+'\')">'+l+' '+n+'</button>';}
+  el.innerHTML=b('active','재직',nA)+b('retired','퇴사',nR);
+}
+function setUsersTab(k){_usersTab=k;renderUsers();}
+function retireUserNow(id){
+  var u=(users||[]).find(function(x){return x.id===id;});if(!u)return;
+  var n=new Date();var def=n.getFullYear()+'-'+_pad2(n.getMonth()+1)+'-'+_pad2(new Date(n.getFullYear(),n.getMonth()+1,0).getDate());
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:var(--surface,#fff);border-radius:14px;padding:18px;max-width:340px;width:100%">'
+   +'<div style="font-weight:800;font-size:15px;margin-bottom:8px">🚪 '+dgEsc(u.name||'')+' 선생님 퇴사 처리</div>'
+   +'<div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:10px">퇴사일을 정해 주세요. 눌러도 재직 명단에서는 바로 빠지지만, 급여(회계 &gt; 강사)에는 <b>퇴사일이 속한 달까지</b> 계속 보이고, 퇴사일 다음 날부터는 근무시간이 0으로 처리돼요.</div>'
+   +'<input type="date" id="retire-date" class="fi" value="'+def+'" style="width:100%;margin-bottom:12px">'
+   +'<div style="display:flex;gap:8px"><button class="btn btn-outline btn-block" id="retire-cancel">취소</button><button class="btn btn-green btn-block" id="retire-ok">퇴사 처리</button></div></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#retire-cancel').onclick=function(){ov.remove();};
+  ov.querySelector('#retire-ok').onclick=async function(){
+    var d=ov.querySelector('#retire-date').value;
+    if(!d){toast('퇴사일을 선택해 주세요');return;}
+    if(u.startDate&&d<u.startDate){toast('퇴사일이 입사일보다 빠를 수 없어요');return;}
+    ov.remove();loading(true);
+    try{await db.collection('users').doc(id).update({endDate:d,updatedAt:new Date().toISOString()});u.endDate=d;renderUsers();
+      try{if(typeof renderStaffArea==='function')renderStaffArea();}catch(e){}
+      saveCacheDebounced();toast('🚪 퇴사 탭으로 이동했어요 (퇴사일 '+d+')');}
+    catch(e){toast('❌ 실패 — '+(e&&e.message?e.message:e),5000);}
+    loading(false);
+  };
+}
+async function reinstateUser(id){
+  var u=(users||[]).find(function(x){return x.id===id;});if(!u)return;
+  var ok=await showConfirm((u.name||'')+' 선생님을 재직으로 되돌릴까요?\n퇴사일이 지워져요.');if(!ok)return;
+  loading(true);
+  try{await db.collection('users').doc(id).update({endDate:null,updatedAt:new Date().toISOString()});u.endDate=null;renderUsers();saveCacheDebounced();toast('↩️ 재직으로 복귀했어요');}
+  catch(e){toast('❌ 실패 — '+(e&&e.message?e.message:e),5000);}
+  loading(false);
+}
+async function purgeAdminUser(id){
+  if(!currentUser||currentUser.role!=='admin'){toast('관리자만 할 수 있어요');return;}
+  var u=(users||[]).find(function(x){return x.id===id;});if(!u)return;
+  if(currentUser.docId&&currentUser.docId===id){toast('지금 로그인한 계정은 삭제할 수 없어요');return;}
+  if(u.role==='admin'&&(users||[]).filter(function(x){return x.role==='admin'&&x.id!==id;}).length===0){toast('마지막 관리자 계정은 삭제할 수 없어요');return;}
+  if(!u.adminDeleted&&!_isRetiredNow(u)){toast('재직 중인 계정은 먼저 퇴사 처리해 주세요');return;}
+  var same=(users||[]).filter(function(x){return x.id!==id&&String(x.loginId||'').trim().toLowerCase()===String(u.loginId||'').trim().toLowerCase();});
+  var ok=await showConfirm('⚠️ '+(u.name||'')+' ('+(u.loginId||'')+') 계정을 완전히 삭제합니다.\n'
+    +(same.length?'같은 아이디를 쓰는 다른 계정('+same.map(function(x){return x.name;}).join(', ')+')은 그대로 남아요.\n':'')
+    +'이 선생님의 근무 시간표·시급 설정이 함께 사라지고 되돌릴 수 없어요.\n이미 작성된 보고서 등의 기록은 이름이 남아 있어 그대로 보여요.\n\n정말 영구 삭제할까요?',null,null,true);
+  if(!ok)return;
+  loading(true);
+  try{
+    await db.collection('users').doc(id).delete();
+    try{await db.collection('userPerms').doc(id).delete();}catch(e){}
+    users=users.filter(function(x){return x.id!==id;});
+    renderUsers();saveCacheDebounced();toast('🗑 완전히 삭제됐어요');
+  }catch(e){toast('❌ 삭제 실패 — '+(e&&e.message?e.message:e),5000);}
+  loading(false);
 }
 async function restoreAdminUser(id){
   var u=(users||[]).find(function(x){return x.id===id;});if(!u)return;
