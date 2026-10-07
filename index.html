@@ -204,6 +204,16 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .makeup-chip .mk-hint{font-size:9px;margin-left:2px;flex-shrink:0;pointer-events:none;font-weight:700;letter-spacing:-.3px}
 .makeup-chip .mk-hint-plan{color:#d97706}
 .makeup-chip .mk-hint-done{color:#16a34a}
+.makeup-chip .mk-hint-parent{color:#0f766e}
+.makeup-chip .mk-hint-wait{color:#9ca3af}
+.makeup-chip.parent-new{box-shadow:0 0 0 2px #14b8a6}
+.mk-sum-chip{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 9px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--txt2);white-space:nowrap}
+.mk-sum-chip.full{background:#dcfce7;border-color:#86efac;color:#166534}
+.mk-sum-chip.part{background:#fefce8;border-color:#f59e0b;color:#92400e}
+.mk-sum-chip.none{background:#fef2f2;border-color:#fca5a5;color:#b91c1c}
+.sch-pbadge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;cursor:pointer;border:1px solid transparent}
+.sch-pbadge.new{background:#ccfbf1;border-color:#14b8a6;color:#0f766e}
+.sch-pbadge.wait{background:var(--surface2);border-color:var(--border2);color:var(--txt3)}
 .makeup-chip .mk-hint-scheduled{color:#2563eb}
 .makeup-chip .mk-hint-time{color:#4f83cc;font-weight:600}
 .mk-today-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:0 2px}
@@ -366,7 +376,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   </div>
   <div class="cp" id="meeting-area" style="overflow-y:auto"></div>
 </div>
-<div class="view active" id="view-schedule" style="flex-direction:column"><div style="position:sticky;top:0;z-index:50;background:var(--surface)"><div class="page-top" style="margin:0;padding:10px 16px 6px"><h2 id="schedule-day-title">오늘의 시간표</h2></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">월간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">신규 학생 배정</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">전달 사항</button></div><div id="sch-panel-today-header" style="background:var(--surface);border-bottom:1px solid var(--border);padding:6px 12px"><div class="toolbar" style="display:flex;align-items:center;gap:6px;margin-bottom:0"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button id="sch-rev-btn" class="btn btn-outline btn-xs" onclick="openSchRevModal()" style="color:#16a34a;border-color:#16a34a;font-size:11px">회계</button><span style="font-size:11px;color:var(--txt2);display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:28px"><span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span><span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span><span><span style="color:#d97706;font-weight:700">▲</span> 조퇴/학습 마무리 못함</span><span>📝 일지 작성</span></span></div><div id="schedule-legend" style="display:none"></div></div></div><div id="sch-panel-today" style="display:flex;flex-direction:column;flex:1;min-height:0"><div style="position:sticky;top:0;z-index:10;background:var(--surface)" id="schedule-notes-award"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="assign-panel-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
+<div class="view active" id="view-schedule" style="flex-direction:column"><div style="position:sticky;top:0;z-index:50;background:var(--surface)"><div class="page-top" style="margin:0;padding:10px 16px 6px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h2 id="schedule-day-title" style="margin:0">오늘의 시간표</h2><span id="sch-parent-badges" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span></div></div><div style="background:var(--surface2);border-bottom:2px solid var(--border);display:flex;overflow-x:auto;padding:4px 0;gap:2px;flex-shrink:0"><button class="rev-tab active" id="schtab-today" onclick="switchSchTab('today')">오늘의 시간표</button><button class="rev-tab" id="schtab-weekly" onclick="switchSchTab('weekly')">월간 시간표</button><button class="rev-tab" id="schtab-capacity" onclick="switchSchTab('capacity')">신규 학생 배정</button><button class="rev-tab" id="schtab-notes" onclick="switchSchTab('notes')">전달 사항</button></div><div id="sch-panel-today-header" style="background:var(--surface);border-bottom:1px solid var(--border);padding:6px 12px"><div class="toolbar" style="display:flex;align-items:center;gap:6px;margin-bottom:0"><input type="date" id="schedule-date-pick" class="fi" style="width:auto;font-size:12px;padding:5px 10px;border-radius:20px;cursor:pointer" onchange="onScheduleDateChange(this.value)"><button class="btn btn-outline btn-xs" onclick="resetScheduleToday()">오늘</button><button id="sch-rev-btn" class="btn btn-outline btn-xs" onclick="openSchRevModal()" style="color:#16a34a;border-color:#16a34a;font-size:11px">회계</button><span style="font-size:11px;color:var(--txt2);display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:28px"><span><span style="color:#16a34a;font-weight:700">✔</span> 등원</span><span><span style="color:#dc2626;font-weight:700">✕</span> 결석</span><span><span style="color:#d97706;font-weight:700">▲</span> 조퇴/학습 마무리 못함</span><span>📝 일지 작성</span></span></div><div id="schedule-legend" style="display:none"></div></div></div><div id="sch-panel-today" style="display:flex;flex-direction:column;flex:1;min-height:0"><div style="position:sticky;top:0;z-index:10;background:var(--surface)" id="schedule-notes-award"></div><div class="cp" id="schedule-list"></div></div><div id="sch-panel-weekly" style="display:none"><div class="cp" id="weekly-timetable-area"></div></div><div id="sch-panel-capacity" style="display:none"><div class="cp" id="assign-panel-area"></div></div><div id="sch-panel-notes" style="display:none"><div class="cp" id="schedule-notes-area"></div></div></div>
 <div class="view" id="view-write">
   <div class="page-top"><h2>학습 일지 작성</h2></div>
   <!-- 학생 정보 고정 바 - #content 스크롤 기준 sticky -->
@@ -476,7 +486,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
 </div>
 <div class="view" id="view-classes"><div class="page-top"><h2>모듈 관리</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openClassModal()">+ 모듈 추가</button></div><div class="cp"><div id="class-list"></div></div></div>
 <div class="view" id="view-portfolio"><div class="page-top"><h2>학생별 포트폴리오</h2></div><div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="pf-student" onchange="renderPortfolio()"><option value="">학생 선택</option></select></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto"><button class="rev-tab active" id="pftab-newcon" onclick="switchPfTab('newcon')">입회 상담</button><button class="rev-tab" id="pftab-form" onclick="switchPfTab('form')">상담 신청서</button><button class="rev-tab" id="pftab-style" onclick="switchPfTab('style')">학습 성향</button><button class="rev-tab" id="pftab-lsreport" onclick="switchPfTab('lsreport')">학습 성향 리포트</button><button class="rev-tab" id="pftab-report" onclick="switchPfTab('report')">학습 리포트</button><button class="rev-tab" id="pftab-consult" onclick="switchPfTab('consult')">상담 기록</button><button class="rev-tab" id="pftab-ai" onclick="switchPfTab('ai')">AI 카드</button></div><div class="cp"><div id="pf-panel-newcon"><div id="pf-newcon-area"></div></div><div id="pf-panel-form" style="display:none"><div id="pf-form-area"></div></div><div id="pf-panel-style" style="display:none"><div id="pf-style-area"></div></div><div id="pf-panel-lsreport" style="display:none"><div id="pf-lsreport-area"></div></div><div id="pf-panel-report" style="display:none"><div id="pf-report-area"></div></div><div id="pf-panel-consult" style="display:none"><div id="pf-consult-area"></div></div><div id="pf-panel-ai" style="display:none"><div id="pf-ai-area"></div></div></div></div>
-<div class="view" id="view-makeup"><div class="page-top"><h2>보강 계획표</h2></div><div class="toolbar" style="flex-wrap:wrap;gap:6px"><button class="btn btn-outline btn-sm" onclick="prevMakeupMonth()">◀</button><span id="makeup-month-nav" style="font-size:13px;font-weight:700;min-width:80px;text-align:center"></span><button class="btn btn-outline btn-sm" onclick="nextMakeupMonth()">▶</button><div style="display:flex;align-items:center;gap:6px;margin-left:4px;flex-wrap:wrap"><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--txt3)"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--surface2);border:1px solid var(--border2)"></span>미정</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#92400e"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#fefce8;border:1px solid #f59e0b"></span>예정</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#166534"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#dcfce7;border:1px solid #86efac"></span>완료</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#1d4ed8"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#eff6ff;border:1.5px dashed #93c5fd"></span>보강일(예정)</span></div><button class="btn btn-green btn-sm" style="margin-left:auto" onclick="openMakeupUnifiedNew(todayISO())">+ 보강 추가</button></div><div class="cp" style="overflow-x:auto;padding:10px 12px"><div id="makeup-calendar"></div></div></div>
+<div class="view" id="view-makeup"><div class="page-top"><h2>보강 계획표</h2></div><div class="toolbar" style="flex-wrap:wrap;gap:6px"><button class="btn btn-outline btn-sm" onclick="prevMakeupMonth()">◀</button><span id="makeup-month-nav" style="font-size:13px;font-weight:700;min-width:80px;text-align:center"></span><button class="btn btn-outline btn-sm" onclick="nextMakeupMonth()">▶</button><div style="display:flex;align-items:center;gap:6px;margin-left:4px;flex-wrap:wrap"><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--txt3)"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--surface2);border:1px solid var(--border2)"></span>미정</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#92400e"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#fefce8;border:1px solid #f59e0b"></span>예정</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#166534"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#dcfce7;border:1px solid #86efac"></span>완료</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#1d4ed8"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#eff6ff;border:1.5px dashed #93c5fd"></span>보강일(예정)</span></div><button class="btn btn-green btn-sm" style="margin-left:auto" onclick="openMakeupUnifiedNew(todayISO())">+ 보강 추가</button></div><div class="cp" style="overflow-x:auto;padding:10px 12px"><div id="makeup-summary"></div><div id="makeup-calendar"></div></div></div>
 <div class="view" id="view-newcon"><div class="page-top"><h2>신규 상담</h2></div>
 <div id="consult-panel-history" class="cp">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -881,7 +891,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   </div>
 </div><div id="ref-panel-tuitiontable" style="display:none" class="cp"><div id="tuition-table-area"></div></div><div id="ref-panel-curriculum" style="display:none" class="cp"><input class="fi" id="ref-cur-search" placeholder="🔍 단계 검색" oninput="renderRefCurriculum()" style="max-width:280px;font-size:12px;padding:6px 10px;margin-bottom:12px"><div id="ref-curriculum-area"></div></div><div id="ref-panel-eval" style="display:none" class="cp"><div id="eval-modules-area"></div></div><div id="ref-panel-classes" style="display:none" class="cp"><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openClassModal()">+ 모듈 추가</button></div><div id="class-list-ref"></div></div><div id="ref-panel-guides" style="display:none" class="cp"><div id="ref-guides-area"></div></div></div>
 <div class="view" id="view-admin"><div class="page-top"><h2>관리자 페이지</h2></div><div class="toolbar"><button class="btn btn-green btn-sm" onclick="openUserModal()">+ 교사 계정 추가</button></div><div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th>이름</th><th>아이디</th><th>역할</th><th>등록일</th><th>메뉴 권한</th><th>관리</th></tr></thead><tbody id="users-tbody"></tbody></table></div></div></div></div>
-<div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 채널 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div class="field"><div class="fl">카카오 채널 보강 예약 링크</div><input class="fi" id="kakao-booking-url" placeholder="https://pf.kakao.com/xxxxx 또는 예약 링크"></div><div class="field" style="margin-top:10px"><div class="fl">결석 알림 메시지 템플릿</div><textarea class="fi" id="kakao-absent-msg" rows="6" style="font-size:12px;line-height:1.6" placeholder="메시지를 입력하세요. {이름}, {날짜}, {링크}를 사용할 수 있습니다."></textarea><div style="font-size:10px;color:var(--txt3);margin-top:4px">사용 가능 변수: <b>{이름}</b> = 학생 이름, <b>{날짜}</b> = 오늘 날짜, <b>{링크}</b> = 보강 예약 링크</div></div><div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-green btn-sm" onclick="saveKakaoConfig()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="$('kakao-absent-msg').value='안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';toast('기본 메시지 복원됨')">기본값 복원</button></div></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><div class="field" style="margin-bottom:10px"><div class="fl">Storage Bucket</div><div style="display:flex;gap:6px"><input class="fi" id="settings-storage-bucket" placeholder="daily-report-5a26e.appspot.com" style="flex:1;font-size:12px"><button class="btn btn-green btn-sm" onclick="saveStorageBucket()">저장</button></div><div style="font-size:10px;color:var(--txt3);margin-top:4px">교사 자료실 파일 업로드에 필요해요</div></div><button class="btn btn-outline btn-sm" onclick="if(await showConfirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
+<div class="view" id="view-settings"><div class="page-top"><h2>설정</h2></div><div class="cp"><div class="sec">교시 시간 설정</div><div class="card" style="padding:15px;margin-bottom:14px" id="period-settings"></div><div class="sec">카카오 채널 설정</div><div class="card" style="padding:15px;margin-bottom:14px"><div class="field"><div class="fl">카카오 채널 보강 예약 링크</div><input class="fi" id="kakao-booking-url" placeholder="https://pf.kakao.com/xxxxx 또는 예약 링크"></div><div class="field" style="margin-top:10px"><div class="fl">학부모 보강 선택 페이지 주소 (makeup.html)</div><input class="fi" id="kakao-makeup-url" placeholder="비워두면 이 앱과 같은 폴더의 makeup.html 사용"></div><div class="field" style="margin-top:10px"><div class="fl">결석 알림 메시지 템플릿</div><textarea class="fi" id="kakao-absent-msg" rows="6" style="font-size:12px;line-height:1.6" placeholder="메시지를 입력하세요. {이름}, {날짜}, {링크}를 사용할 수 있습니다."></textarea><div style="font-size:10px;color:var(--txt3);margin-top:4px">사용 가능 변수: <b>{이름}</b> = 학생 이름, <b>{날짜}</b> = 오늘 날짜, <b>{링크}</b> = 보강 예약 링크</div></div><div style="display:flex;gap:6px;margin-top:10px"><button class="btn btn-green btn-sm" onclick="saveKakaoConfig()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="$('kakao-absent-msg').value='안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n아래 링크에서 가능하신 보강 시간을 선택해 주시면 바로 확정됩니다.\n\n👉 {링크}\n\n감사합니다~^^';toast('기본 메시지 복원됨')">기본값 복원</button></div></div><div class="sec">Firebase</div><div class="card" style="padding:15px;margin-bottom:14px"><div style="font-size:13px;margin-bottom:8px">상태: <span class="badge bg-green">● 연결됨</span></div><div class="field" style="margin-bottom:10px"><div class="fl">Storage Bucket</div><div style="display:flex;gap:6px"><input class="fi" id="settings-storage-bucket" placeholder="daily-report-5a26e.appspot.com" style="flex:1;font-size:12px"><button class="btn btn-green btn-sm" onclick="saveStorageBucket()">저장</button></div><div style="font-size:10px;color:var(--txt3);margin-top:4px">교사 자료실 파일 업로드에 필요해요</div></div><button class="btn btn-outline btn-sm" onclick="if(await showConfirm('설정 초기화?')){localStorage.removeItem('fb_cfg');location.reload()}">설정 초기화</button><button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="localStorage.removeItem('academy_cache');toast('✅ 캐시 삭제됨')">캐시 삭제</button></div><div style="text-align:center;font-size:11px;color:var(--txt3);margin-top:20px">잉글리시아이 v4.1 · 성능 최적화</div></div></div>
 <!-- MODALS -->
 <div id="modal-student" style="display:none" class="mo" onclick="if(event.target===this)closeM('student')"><div class="ms"><div class="mh"></div><div class="mt" id="s-modal-title">학생 등록</div>
 <input type="hidden" id="s-id"><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">👤 기본 정보</div><div class="r2"><div class="field"><div class="fl">이름 *</div><input class="fi" id="s-name" placeholder="홍길동"></div><div class="field"><div class="fl">ID</div><input class="fi" id="s-number" type="number" placeholder="1" min="1"></div></div><div class="r2"><div class="field"><div class="fl">등록일</div><input type="date" class="fi" id="s-enroll-date"></div><div class="field"><div class="fl">수업 시작일</div><input type="date" class="fi" id="s-class-start-date"><div id="s-class-start-hint" style="font-size:10px;color:var(--txt3);margin-top:3px">비워두면 등록일을 기준으로 계산합니다</div></div></div><div class="r2"><div class="field"><div class="fl">재원 상태</div><select class="fi" id="s-status" onchange="onStudentStatusChange()"><option value="재원">재원생</option><option value="신규">신규</option><option value="휴원">휴원</option><option value="퇴원">퇴원</option></select><div id="s-status-month-hint" style="font-size:10px;color:var(--txt3);margin-top:3px"></div></div><div class="field"><div class="fl">유입 경로</div><select class="fi" id="s-inflow"><option value="">선택</option><option value="소개">소개</option><option value="블로그">블로그</option><option value="당근">당근</option><option value="오프라인">오프라인</option></select></div></div><div id="s-quit-reason-row" style="display:none" class="r2"><div class="field"><div class="fl">휴/퇴원 사유</div><select class="fi" id="s-quit-reason"><option value="">사유 선택</option><option value="이사">이사</option><option value="타학원 이동">타학원 이동</option><option value="학습량 부담">학습량 부담</option><option value="비용 문제">비용 문제</option><option value="기타">기타</option></select></div><div class="field"><div class="fl">휴/퇴원일</div><input type="date" class="fi" id="s-quit-date"></div></div><div class="r2"><div class="field"><div class="fl">학년</div><select class="fi" id="s-grade"><option value="">선택</option><option>초1</option><option>초2</option><option>초3</option><option>초4</option><option>초5</option><option>초6</option><option>중1</option><option>중2</option><option>중3</option><option>고1</option><option>고2</option><option>고3</option></select></div><div class="field"><div class="fl">상담 주기</div><select class="fi" id="s-consult-cycle"><option value="">선택</option><option value="2주">2주</option><option value="1개월">1개월</option><option value="2개월">2개월</option><option value="3개월">3개월</option></select></div></div><div class="r2"><div class="field"><div class="fl">모듈</div><select class="fi" id="s-class" onchange="onSClassChange()"><option value="">모듈 미배정</option></select></div><div class="field"><div class="fl">할인</div><select class="fi" id="s-discount"><option value="">없음</option><option value="형제할인">형제 할인</option><option value="수학할인">수학 할인</option><option value="장기수강할인">장기수강 할인</option><option value="장학할인">장학 할인</option></select></div></div><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">📞 연락처</div><div class="r2"><div class="field"><div class="fl">학부모 연락처</div><input class="fi" id="s-phone-mom" placeholder="010-0000-0000" type="tel"></div><div class="field"><div class="fl">학교</div><input class="fi" id="s-school" placeholder="군포초등학교"></div></div><div class="field"><div class="fl">메시지 수신 동의</div><select class="fi" id="s-msg-consent"><option value="동의">동의</option><option value="미동의">미동의</option></select></div><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">📚 수업 정보</div><div class="r2"><div class="field"><div class="fl">📚 본수업 단계 *</div><select class="fi" id="s-level" onchange="document.getElementById('s-custom-level').style.display=this.value==='직접입력'?'block':'none';onSLevelChange()"><option value="">선택</option><optgroup label="Phonics"><option>Hello Phonics 1</option><option>Hello Phonics 2</option><option>Phonics1A</option><option>Phonics1B</option><option>Phonics 2A</option><option>Phonics 2B</option><option>Phonics 3A</option><option>Phonics 3B</option><option>Master Phonics 1</option><option>Master Phonics 2</option></optgroup><optgroup label="Basic"><option>Joy 1A</option><option>Joy 1B</option><option>Joy 1C</option><option>Joy 2A</option><option>Joy 2B</option><option>Joy 2C</option><option>Wise 1A</option><option>Wise 1B</option><option>Wise 1C</option><option>Wise 2A</option><option>Wise 2B</option><option>Wise 2C</option><option>Pride 1A</option><option>Pride 1B</option><option>Pride 1C</option><option>Pride 2A</option><option>Pride 2B</option><option>Pride 2C</option></optgroup><optgroup label="Grammar"><option>Grammar Plus 1</option><option>Grammar Plus 2</option><option>Grammar Plus 3</option><option>Grammar Plus 4</option><option>Grammar Plus 5</option><option>Grammar Plus 6</option><option>First Grammar 1</option><option>First Grammar 2</option><option>First Grammar 3</option></optgroup><optgroup label="Prime"><option>Prime 1A</option><option>Prime 1B</option><option>Prime 2A</option><option>Prime 2B</option><option>Prime 3A</option><option>Prime 3B</option><option>Prime 4A</option><option>Prime 4B</option></optgroup><optgroup label="Advanced"><option>Advanced 1A</option><option>Advanced 1B</option><option>Advanced 2A</option><option>Advanced 2B</option><option>Advanced 3A</option><option>Advanced 3B</option><option>Advanced 4A</option><option>Advanced 4B</option></optgroup><optgroup label="Elite"><option>Elite 1-1</option><option>Elite 1-2</option><option>Elite 1-3</option><option>Elite 2-1</option><option>Elite 2-2</option><option>Elite 2-3</option><option>Elite 3-1</option><option>Elite 3-2</option><option>Elite 3-3</option></optgroup><optgroup label="중고등"><option>내신콘서트</option><option>Reader's Bank 1</option><option>Reader's Bank 2</option><option>Reader's Bank 3</option><option>Reader's Bank 4</option><option>Reader's Bank 5</option><option>천일문 입문</option><option>천일문 기본</option><option>천일문 실력</option><option>빠바 구문</option><option>빠바 유형</option></optgroup><option value="직접입력">직접 입력</option></select><input class="fi" id="s-custom-level" placeholder="직접 입력" style="display:none;margin-top:6px"></div><div class="field"><div class="fl">⭐ 특강 단계</div><select class="fi" id="s-special-level"><option value="">본수업 단계와 동일</option><optgroup label="Phonics"><option>Hello Phonics 1</option><option>Hello Phonics 2</option><option>Phonics1A</option><option>Phonics1B</option><option>Phonics 2A</option><option>Phonics 2B</option><option>Phonics 3A</option><option>Phonics 3B</option><option>Master Phonics 1</option><option>Master Phonics 2</option></optgroup><optgroup label="Basic"><option>Joy 1A</option><option>Joy 1B</option><option>Joy 1C</option><option>Joy 2A</option><option>Joy 2B</option><option>Joy 2C</option><option>Wise 1A</option><option>Wise 1B</option><option>Wise 1C</option><option>Wise 2A</option><option>Wise 2B</option><option>Wise 2C</option><option>Pride 1A</option><option>Pride 1B</option><option>Pride 1C</option><option>Pride 2A</option><option>Pride 2B</option><option>Pride 2C</option></optgroup><optgroup label="Grammar"><option>Grammar Plus 1</option><option>Grammar Plus 2</option><option>Grammar Plus 3</option><option>Grammar Plus 4</option><option>Grammar Plus 5</option><option>Grammar Plus 6</option><option>First Grammar 1</option><option>First Grammar 2</option><option>First Grammar 3</option></optgroup><optgroup label="Prime"><option>Prime 1A</option><option>Prime 1B</option><option>Prime 2A</option><option>Prime 2B</option><option>Prime 3A</option><option>Prime 3B</option><option>Prime 4A</option><option>Prime 4B</option></optgroup><optgroup label="Advanced"><option>Advanced 1A</option><option>Advanced 1B</option><option>Advanced 2A</option><option>Advanced 2B</option><option>Advanced 3A</option><option>Advanced 3B</option><option>Advanced 4A</option><option>Advanced 4B</option></optgroup><optgroup label="Elite"><option>Elite 1-1</option><option>Elite 1-2</option><option>Elite 1-3</option><option>Elite 2-1</option><option>Elite 2-2</option><option>Elite 2-3</option><option>Elite 3-1</option><option>Elite 3-2</option><option>Elite 3-3</option></optgroup><optgroup label="중고등"><option>내신콘서트</option><option>Reader's Bank 1</option><option>Reader's Bank 2</option><option>Reader's Bank 3</option><option>Reader's Bank 4</option><option>Reader's Bank 5</option><option>천일문 입문</option><option>천일문 기본</option><option>천일문 실력</option><option>빠바 구문</option><option>빠바 유형</option></optgroup></select></div></div><div class="field"><div class="fl">수업 요일 및 시수</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px"><div style="background:var(--surface2);border-radius:10px;padding:10px;overflow:hidden;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">📚 본수업</div><div id="s-days" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px"><div class="day-pill" data-day="월" onclick="toggleDay(this)">월</div><div class="day-pill" data-day="화" onclick="toggleDay(this)">화</div><div class="day-pill" data-day="수" onclick="toggleDay(this)">수</div><div class="day-pill" data-day="목" onclick="toggleDay(this)">목</div><div class="day-pill" data-day="금" onclick="toggleDay(this)">금</div></div><div id="s-periods-area"></div><div id="s-weekly-hours-display" style="font-size:11px;color:var(--mint);margin-top:4px;font-weight:600"></div></div><div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:10px;overflow:hidden;min-width:0"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:#92400e">⭐</span><select id="s-extra-class-type" class="fi" style="font-size:12px;font-weight:700;color:#92400e;background:transparent;border:none;padding:0;cursor:pointer;width:70px"><option value="special">특강</option><option value="main">본수업</option></select><button type="button" onclick="clearSpecialDays()" style="margin-left:auto;font-size:11px;color:#92400e;background:none;border:1px solid #f59e0b;border-radius:4px;padding:3px 10px;cursor:pointer;white-space:nowrap">초기화</button></div><div id="s-special-days" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px"><div class="day-pill" data-day="월" onclick="toggleSpecialDay(this)">월</div><div class="day-pill" data-day="화" onclick="toggleSpecialDay(this)">화</div><div class="day-pill" data-day="수" onclick="toggleSpecialDay(this)">수</div><div class="day-pill" data-day="목" onclick="toggleSpecialDay(this)">목</div><div class="day-pill" data-day="금" onclick="toggleSpecialDay(this)">금</div></div><div id="s-special-periods-area"></div><div id="s-special-hours-display" style="font-size:11px;color:#92400e;margin-top:4px;font-weight:600"></div></div></div></div><div style="margin:14px 0 8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;font-weight:700;color:var(--navy)">👨‍👩‍👧 기타</div><div class="field"><div class="fl">형제 정보</div><div id="siblings-area"></div><button class="btn btn-outline btn-xs" onclick="addSibling()" style="margin-top:6px">+ 형제 추가</button></div><div class="field"><div class="fl">메모</div><textarea class="fi" id="s-memo" rows="2" placeholder="특이사항 등"></textarea></div><div style="height:10px"></div><button class="btn btn-green btn-block" onclick="saveStudent()">저장</button><div style="height:6px"></div><div id="s-del-wrap" style="display:none"><button class="btn btn-red btn-block" onclick="deleteStudent()">학생 삭제</button><div style="height:6px"></div></div><button class="btn btn-outline btn-block" onclick="closeM('student')">취소</button>
@@ -5968,6 +5978,7 @@ function fmt12h(t){
 
 function renderSchedule(){
   try{
+  try{updateParentBadges();}catch(e){}
   var schedList=$('schedule-list');
   var targetDate=_scheduleDate?new Date(_scheduleDate+'T12:00:00'):new Date();
   var dow=targetDate.getDay();var dayName=DAY_MAP[dow];
@@ -6321,17 +6332,23 @@ async function markAttendance(studentId, action, makeupId){
 
 window._kakaoConfig={};
 async function saveKakaoConfig(){
-  var data={bookingUrl:$('kakao-booking-url')?.value.trim()||'',absentMsg:$('kakao-absent-msg')?.value||'',updatedAt:new Date().toISOString()};
+  var data={bookingUrl:$('kakao-booking-url')?.value.trim()||'',makeupPageUrl:$('kakao-makeup-url')?.value.trim()||'',absentMsg:$('kakao-absent-msg')?.value||'',updatedAt:new Date().toISOString()};
   await db.collection('config').doc('kakao').set(data);
   window._kakaoConfig=data;toast('✅ 저장됨');
 }
-function showAbsentNotifyModal(s){
+async function showAbsentNotifyModal(s){
   var kc=window._kakaoConfig||{};
   var bookingUrl=kc.bookingUrl||'';
+  window._absentNotifyMkId=null;
+  try{
+    var _absDay=_scheduleDate||todayISO();
+    var _mk=makeups.find(function(m){return m.studentId===s.id&&m.absentDate===_absDay;});
+    if(_mk){bookingUrl=await ensureParentLink(_mk);window._absentNotifyMkId=_mk.id;}
+  }catch(e){console.warn('parent link',e);}
   var parentPhone=s.phoneMom||'';
   var today=new Date();
   var dateStr=today.getFullYear()+'년 '+String(today.getMonth()+1).padStart(2,'0')+'월 '+String(today.getDate()).padStart(2,'0')+'일';
-  var template=kc.absentMsg||'안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';
+  var template=kc.absentMsg||'안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n아래 링크에서 가능하신 보강 시간을 선택해 주시면 바로 확정됩니다.\n\n👉 {링크}\n\n감사합니다~^^';
   var msg=template.replace(/\{이름\}/g,s.name).replace(/\{날짜\}/g,dateStr).replace(/\{링크\}/g,bookingUrl||'(링크 미설정)');
   var overlay=document.createElement('div');overlay.className='mo';overlay.style.display='flex';
   overlay.onclick=async function(e){if(e.target===overlay)overlay.remove();};
@@ -6354,7 +6371,8 @@ function showAbsentNotifyModal(s){
 }
 function copyAbsentMsg(){
   var ta=document.getElementById('absent-notify-msg');
-  if(ta){navigator.clipboard.writeText(ta.value);toast('📋 메시지가 복사되었습니다. 카카오톡에 붙여넣기 하세요!');}
+  if(ta){navigator.clipboard.writeText(ta.value);toast('📋 메시지가 복사되었습니다. 카카오톡에 붙여넣기 하세요!');
+    if(window._absentNotifyMkId)markParentLinkSent(window._absentNotifyMkId);}
 }
 
 // ══ PORTFOLIO (학생별 포트폴리오) ══
@@ -8364,6 +8382,110 @@ async function deleteClass(){var id=$('cls-id').value;if(!id)return;var _cm=awai
 // ══ MAKEUP ══
 function prevMakeupMonth(){makeupViewMonth--;if(makeupViewMonth<0){makeupViewMonth=11;makeupViewYear--;}renderMakeupCalendar();}
 function nextMakeupMonth(){makeupViewMonth++;if(makeupViewMonth>11){makeupViewMonth=0;makeupViewYear++;}renderMakeupCalendar();}
+// ══════════════════════════════════════════
+// 학부모 보강 링크 · 표시 · 학생별 현황
+// ══════════════════════════════════════════
+var _mkSumOpen=false,_mkSumScope='month';
+function _mkParentHint(m){
+  if(m.parentStatus==='confirmed'){
+    var unseen=m.parentSeen===false;
+    return{cls:unseen?' parent-new':'',html:'<span class="mk-hint mk-hint-parent" title="학부모가 직접 선택·확정">👪'+(unseen?'NEW':'')+'</span>'};
+  }
+  if(m.parentStatus==='waiting'&&m.makeupStatus==='pending'){
+    return{cls:'',html:'<span class="mk-hint mk-hint-wait" title="링크 발송 · 학부모 응답 대기">⏳</span>'};
+  }
+  return{cls:'',html:''};
+}
+function updateParentBadges(){
+  var el=document.getElementById('sch-parent-badges');if(!el)return;
+  var nNew=0,nWait=0;
+  (makeups||[]).forEach(function(m){
+    if(m.parentStatus==='confirmed'&&m.parentSeen===false)nNew++;
+    else if(m.parentStatus==='waiting'&&m.makeupStatus==='pending')nWait++;
+  });
+  var h='';
+  if(nNew)h+='<span class="sch-pbadge new" onclick="goto(\'makeup\')" title="학부모가 선택해서 자동 확정된 보강 (확인 전)">👪 학부모 확정 '+nNew+'건</span>';
+  if(nWait)h+='<span class="sch-pbadge wait" onclick="goto(\'makeup\')" title="링크를 보냈지만 아직 선택하지 않은 학부모">⏳ 응답 대기 '+nWait+'건</span>';
+  el.innerHTML=h;
+}
+function _mkBaseLinkUrl(){
+  var kc=window._kakaoConfig||{};
+  if(kc.makeupPageUrl)return kc.makeupPageUrl.trim();
+  return location.origin+location.pathname.replace(/[^\/]*$/,'')+'makeup.html';
+}
+function _mkRandToken(){var a=new Uint8Array(16);crypto.getRandomValues(a);return Array.prototype.map.call(a,function(b){return b.toString(16).padStart(2,'0');}).join('');}
+async function ensureParentLink(m){
+  if(!m.parentToken){
+    var tok=_mkRandToken();
+    await db.collection('makeups').doc(m.id).update({parentToken:tok,parentTokenAt:new Date().toISOString()});
+    m.parentToken=tok;
+  }
+  var base=_mkBaseLinkUrl();
+  return base+(base.indexOf('?')>=0?'&':'?')+'m='+encodeURIComponent(m.id)+'&t='+encodeURIComponent(m.parentToken);
+}
+async function markParentLinkSent(id){
+  var m=makeups.find(function(x){return x.id===id;});if(!m)return;
+  if(m.parentStatus==='confirmed')return;
+  var up={parentStatus:'waiting',parentSentAt:new Date().toISOString()};
+  Object.assign(m,up);
+  try{await db.collection('makeups').doc(id).update(up);}catch(e){console.warn(e);}
+  updateParentBadges();renderMakeupCalendar();
+}
+async function copyParentLinkFromModal(){
+  var id=($('mk-id')||{}).value;var m=makeups.find(function(x){return x.id===id;});if(!m)return;
+  try{
+    var link=await ensureParentLink(m);
+    await navigator.clipboard.writeText(link);
+    await markParentLinkSent(id);
+    toast('🔗 학부모 링크 복사됨 (응답 대기로 표시)');
+  }catch(e){console.warn(e);toast('⚠️ 링크 생성 실패');}
+}
+async function markParentSeen(id){
+  var m=makeups.find(function(x){return x.id===id;});
+  if(!m||m.parentStatus!=='confirmed'||m.parentSeen!==false)return;
+  m.parentSeen=true;
+  try{await db.collection('makeups').doc(id).update({parentSeen:true});}catch(e){console.warn(e);}
+  updateParentBadges();
+}
+function toggleMkSummary(){_mkSumOpen=!_mkSumOpen;renderMakeupSummary();}
+function setMkSumScope(sc,ev){if(ev)ev.stopPropagation();_mkSumScope=sc;renderMakeupSummary();}
+function renderMakeupSummary(){
+  var box=document.getElementById('makeup-summary');if(!box)return;
+  var yr=makeupViewYear,mo=makeupViewMonth;
+  var list=(makeups||[]).filter(function(m){
+    if(_mkSumScope==='all')return true;
+    if(!m.absentDate)return false;
+    var d=new Date(m.absentDate);return d.getFullYear()===yr&&d.getMonth()===mo;
+  });
+  var by={};
+  list.forEach(function(m){
+    var k=m.studentId||m.studentName;if(!k)return;
+    var o=by[k]||(by[k]={name:m.studentName||'-',need:0,done:0});
+    o.need++;if(m.makeupStatus==='done')o.done++;
+  });
+  var rows=Object.keys(by).map(function(k){return by[k];});
+  rows.sort(function(a,b){return (b.need-b.done)-(a.need-a.done)||a.name.localeCompare(b.name,'ko');});
+  var remain=rows.reduce(function(t,r){return t+(r.need-r.done);},0);
+  var pending=rows.filter(function(r){return r.need>r.done;}).length;
+  var scopeLbl=_mkSumScope==='all'?'전체':(mo+1)+'월';
+  var btn=function(sc,l){var on=_mkSumScope===sc;return '<button onclick="setMkSumScope(\''+sc+'\',event)" style="font-size:10px;padding:1px 8px;border-radius:10px;cursor:pointer;border:1px solid var(--border2);background:'+(on?'var(--navy)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt3)')+'">'+l+'</button>';};
+  var h='<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">'
+    +'<div onclick="toggleMkSummary()" style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer">'
+    +'<span style="font-size:11px;font-weight:700;color:var(--txt2)">📊 학생별 보강 현황 ('+scopeLbl+' · '+rows.length+'명 · 남은 보강 '+remain+'회)</span>'
+    +'<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">'+btn('month','이번 달 결석')+btn('all','전체')+'<span style="font-size:10px;color:var(--txt3);margin-left:4px">'+(_mkSumOpen?'▲':'▼')+'</span></span></div>';
+  if(_mkSumOpen){
+    h+='<div style="padding:2px 12px 10px;border-top:1px solid var(--border)"><div style="font-size:10px;color:var(--txt3);margin:6px 0">이름(보강한 횟수/보강해야 하는 횟수) · 결석한 날 기준 · 남은 횟수 많은 순</div><div style="display:flex;flex-wrap:wrap;gap:5px">';
+    if(!rows.length)h+='<span style="font-size:11px;color:var(--txt3)">해당 학생 없음</span>';
+    rows.forEach(function(r){
+      var cls=r.done>=r.need?'full':(r.done>0?'part':'none');
+      h+='<span class="mk-sum-chip '+cls+'"><b>'+r.name+'</b>('+r.done+'/'+r.need+')</span>';
+    });
+    h+='</div></div>';
+  }
+  h+='</div>';
+  box.innerHTML=h;
+}
+
 function renderMakeupCalendar(){
   var yr=makeupViewYear,mo=makeupViewMonth;$('makeup-month-nav').textContent=yr+'년 '+(mo+1)+'월';if($('makeup-month-label'))$('makeup-month-label').textContent=yr+'년 '+(mo+1)+'월';
   var firstDay=new Date(yr,mo,1).getDay();var lastDate=new Date(yr,mo+1,0).getDate();var todayStr=todayISO();
@@ -8426,7 +8548,8 @@ function renderMakeupCalendar(){
             var hint='';
             if(isDone&&m.makeupDate){hint='<span class="mk-hint mk-hint-done">✓'+fmtDate(m.makeupDate)+'</span>';}
             else if(isScheduled){hint='<span class="mk-hint mk-hint-plan">→'+fmtDate(m.makeupDate)+'</span>';}
-            var chip='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+hint+'</div>';
+            var _ph=_mkParentHint(m);
+            var chip='<div class="makeup-chip '+cls3+_ph.cls+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+hint+_ph.html+'</div>';
             if(isPending)pendingChips+=chip; else scheduledChips+=chip;
           } else {
             // 보강일 칸
@@ -8434,7 +8557,8 @@ function renderMakeupCalendar(){
             var cls3=isDone2?'done scheduled':'scheduled';
             var timeHint=m.makeupTime?'<span class="mk-hint mk-hint-time">'+fmt12h(m.makeupTime)+'</span>':'';
             var absentHint=m.absentDate?'<span class="mk-hint mk-hint-scheduled">↑'+fmtDate(m.absentDate)+'</span>':'';
-            var chip='<div class="makeup-chip '+cls3+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+timeHint+absentHint+'</div>';
+            var _ph2=_mkParentHint(m);
+            var chip='<div class="makeup-chip '+cls3+_ph2.cls+'" onclick="event.stopPropagation();openMakeupUnified(\''+m.id+'\')">'+m.studentName+timeHint+absentHint+_ph2.html+'</div>';
             scheduledChips+=chip;
           }
         });
@@ -8449,6 +8573,7 @@ function renderMakeupCalendar(){
   }
   html+='</div>';
   $('makeup-calendar').innerHTML=html;
+  try{renderMakeupSummary();updateParentBadges();}catch(e){console.warn('makeup summary',e);}
   $('makeup-calendar').onclick=async function(e){
     var chip=e.target.closest('.makeup-chip');
     if(chip&&chip.style.pointerEvents==='none')return; // 범례 칩 무시
@@ -8528,6 +8653,7 @@ function _openMakeupModal(){
 
     // ── 하단 버튼 ──
     +'<div style="height:16px"></div>'
+    +'<button class="btn btn-outline btn-sm btn-block" id="mk-plink-btn" onclick="copyParentLinkFromModal()" style="display:none;margin-bottom:8px">🔗 학부모 보강 선택 링크 복사</button>'
     +'<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-red btn-sm" id="mk-del-btn" onclick="deleteMakeupEntry()" style="flex:0 0 auto">삭제</button><button class="btn btn-outline btn-sm" onclick="closeM(\'makeup\')" style="flex:1">취소</button><button class="btn btn-green btn-sm" id="mk-save-btn" onclick="saveMakeupUnified()" style="flex:2">보강 대기 등록</button></div>'
     +'</div>';
   document.body.appendChild(overlay);
@@ -8579,13 +8705,13 @@ function _mkUpdateNotifyMsg(){
   var makeupPeriodSel=$('mk-period');
   var makeupPeriodTxt=makeupPeriodSel&&makeupPeriodSel.value?makeupPeriodSel.options[makeupPeriodSel.selectedIndex].text:'';
   var makeupDateStr=makeupDateVal?makeupDateVal.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1년 $2월 $3일'):'';
-  var template=kc.absentMsg||'안녕하세요, 어머니~^^\n{날짜} {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';
+  var template=kc.absentMsg||'안녕하세요, 어머니~^^\n{날짜} {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n아래 링크에서 가능하신 보강 시간을 선택해 주시면 바로 확정됩니다.\n\n👉 {링크}\n\n감사합니다~^^';
   var msg=template.replace(/\{이름\}/g,sName).replace(/\{날짜\}/g,absentDateStr).replace(/\{링크\}/g,bookingUrl||'(링크 미설정)');
   // 보강 일정이 잡혀 있으면 메시지에 자동 추가
   if(makeupDateStr){
     var scheduleInfo='\n\n📅 보강 일정: '+makeupDateStr+(makeupPeriodTxt?' '+makeupPeriodTxt:'');
     // 링크 안내 문구 앞에 보강 일정 삽입
-    msg=msg.replace('가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉','보강 일정이 아래와 같이 확정되었습니다.'+scheduleInfo+'\n\n문의 사항이 있으시면 편하게 연락 주세요~^^\n\n👉');
+    msg=msg.replace('아래 링크에서 가능하신 보강 시간을 선택해 주시면 바로 확정됩니다.\n\n👉','보강 일정이 아래와 같이 확정되었습니다.'+scheduleInfo+'\n\n문의 사항이 있으시면 편하게 연락 주세요~^^\n\n👉');
   }
   var ta=$('mk-notify-msg');if(ta)ta.value=msg;
 }
@@ -8634,6 +8760,8 @@ function openMakeupUnified(id){
   _mkOnAbsentRangeChange();
   var memo=$('mk-result-memo');if(memo)memo.value=m.makeupResult&&m.makeupResult!==''?(m.makeupResultMemo||''):'';
   var delBtn=$('mk-del-btn');if(delBtn)delBtn.style.display='';
+  var plb=$('mk-plink-btn');if(plb)plb.style.display=(m.makeupStatus==='pending')?'':'none';
+  markParentSeen(id);
 }
 
 // 새 보강 등록 (날짜 칸 클릭)
@@ -12231,7 +12359,8 @@ function loadKakaoConfigUI(){
   db.collection('config').doc('kakao').get().then(async function(doc){
     var d=doc.exists?doc.data():{};
     if($('kakao-booking-url'))$('kakao-booking-url').value=d.bookingUrl||'';
-    if($('kakao-absent-msg'))$('kakao-absent-msg').value=d.absentMsg||'안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n가능하신 날짜와 시간을 아래 링크에 남겨주시면 일정 조율 후 안내 드리겠습니다.\n\n👉 {링크}\n\n감사합니다~^^';
+    if($('kakao-makeup-url'))$('kakao-makeup-url').value=d.makeupPageUrl||'';
+    if($('kakao-absent-msg'))$('kakao-absent-msg').value=d.absentMsg||'안녕하세요, 어머니~^^\n오늘({날짜}) {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n아래 링크에서 가능하신 보강 시간을 선택해 주시면 바로 확정됩니다.\n\n👉 {링크}\n\n감사합니다~^^';
     window._kakaoConfig=d;
   }).catch(function(){});
   }catch(e){console.error('loadKakaoConfigUI 오류:',e);}

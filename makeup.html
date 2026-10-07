@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>보강 일정 선택</title>
+<style>
+:root{--navy:#1e3a5f;--bg:#f5f7fa;--card:#fff;--line:#e2e8f0;--txt:#1f2937;--sub:#6b7280;--accent:#2563eb;--ok:#16a34a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;line-height:1.5}
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px 40px}
+.brand{font-size:12px;color:var(--sub);text-align:center;margin-bottom:6px}
+h1{font-size:20px;color:var(--navy);text-align:center;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.who{font-size:15px}.who b{color:var(--navy)}
+.day{font-size:13px;font-weight:700;color:var(--navy);margin:14px 0 6px}
+.slots{display:flex;flex-wrap:wrap;gap:8px}
+.slot{flex:1 1 calc(50% - 8px);min-width:130px;padding:12px 8px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font-size:15px;font-weight:600;color:var(--txt);cursor:pointer}
+.slot.on{border-color:var(--accent);background:#eff6ff;color:var(--accent)}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--navy);color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:14px}
+.btn:disabled{opacity:.4;cursor:default}
+.msg{text-align:center;padding:28px 12px}
+.msg .big{font-size:40px;margin-bottom:6px}
+.msg .t{font-size:17px;font-weight:700;color:var(--navy)}
+.msg .s{font-size:14px;color:var(--sub);margin-top:6px}
+.err{color:#b91c1c;font-size:13px;text-align:center;margin-top:10px;min-height:18px}
+.note{font-size:12px;color:var(--sub);text-align:center;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">잉글리시아이위드멘토링 영수학원</div>
+  <h1>보강 일정 선택</h1>
+  <div id="root"><div class="card msg"><div class="s">불러오는 중…</div></div></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+<script>
+// ▼▼ 앱 설정 화면의 Firebase 설정값(apiKey 등)과 같은 값을 넣으세요. 공개되어도 되는 값입니다. ▼▼
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBaxcYn-PwBDTVoD4knE2awpwSrt0PscnE",
+  authDomain: "daily-report-5a26e.firebaseapp.com",
+  projectId: "daily-report-5a26e"
+};
+// ▲▲ ----------------------------------------------------------------- ▲▲
+var REGION = 'asia-northeast3';
+
+var root = document.getElementById('root');
+var qs = new URLSearchParams(location.search);
+var MID = qs.get('m'), TOKEN = qs.get('t');
+var DAY = ['일','월','화','수','목','금','토'];
+var selected = null;
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function fmtDate(d){var p=d.split('-');return parseInt(p[1])+'월 '+parseInt(p[2])+'일 ('+DAY[new Date(d+'T12:00:00').getDay()]+')';}
+function fmtTime(t){var h=parseInt(t.slice(0,2)),m=t.slice(3);var ap=h<12?'오전':'오후';var h12=h%12||12;return ap+' '+h12+':'+m;}
+function range(t,e){e=e||t;var a=fmtTime(t),b=fmtTime(e);return a+' ~ '+(a.slice(0,2)===b.slice(0,2)?b.slice(3):b);}
+function endOf(t){var m=parseInt(t.slice(0,2))*60+parseInt(t.slice(3))+60;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+
+function show(big,title,sub){root.innerHTML='<div class="card msg"><div class="big">'+big+'</div><div class="t">'+esc(title)+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+'</div>';}
+
+function render(o){
+  if(o.state==='done'){return show('✅','이미 보강이 완료되었습니다','');}
+  if(o.state==='confirmed'){
+    return show('📅','보강 일정이 확정되어 있습니다',
+      '<b>'+esc(o.studentName)+'</b> 학생<br>'+fmtDate(o.date)+' '+(o.time?range(o.time,endOf(o.time)):'')+'<br><br>변경이 필요하시면 학원으로 연락 주세요.');
+  }
+  var cands=o.candidates||[];
+  if(!cands.length){
+    return show('🙏','선택 가능한 시간이 없습니다','현재 정원이 모두 차 있어요.<br>학원에서 따로 연락드려 일정을 잡겠습니다.');
+  }
+  var byDate={};cands.forEach(function(c){(byDate[c.date]=byDate[c.date]||[]).push(c);});
+  var h='<div class="card who"><b>'+esc(o.studentName)+'</b> 학생'+(o.absentDate?' · '+fmtDate(o.absentDate)+' 결석':'')+'<br><span style="font-size:13px;color:var(--sub)">아래에서 보강 가능한 시간을 하나 선택해 주세요. 제출하면 바로 확정됩니다.</span></div><div class="card">';
+  Object.keys(byDate).sort().forEach(function(d){
+    h+='<div class="day">'+fmtDate(d)+'</div><div class="slots">';
+    byDate[d].forEach(function(c){h+='<button class="slot" data-d="'+c.date+'" data-t="'+c.time+'">'+range(c.time,c.end)+'</button>';});
+    h+='</div>';
+  });
+  h+='<button class="btn" id="go" disabled>이 시간으로 확정하기</button><div class="err" id="err"></div></div><div class="note">1시간 수업 기준 · 확정 후 변경은 학원으로 연락 주세요.</div>';
+  root.innerHTML=h;
+  root.querySelectorAll('.slot').forEach(function(b){b.onclick=function(){
+    root.querySelectorAll('.slot').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');selected={d:b.dataset.d,t:b.dataset.t};
+    var go=document.getElementById('go');go.disabled=false;go.textContent=fmtDate(selected.d)+' '+fmtTime(selected.t)+' 확정하기';
+  };});
+  document.getElementById('go').onclick=submit;
+  if(window._notice){document.getElementById('err').textContent=window._notice;window._notice='';}
+}
+
+var fnGet,fnConfirm;
+function load(){
+  fnGet({makeupId:MID,token:TOKEN}).then(function(r){window._last=r.data;render(r.data);})
+  .catch(function(e){show('⚠️','링크를 확인할 수 없습니다','링크가 잘못되었거나 만료되었습니다.<br>학원으로 문의해 주세요.');});
+}
+function submit(){
+  if(!selected)return;
+  var go=document.getElementById('go'),err=document.getElementById('err');
+  go.disabled=true;go.textContent='확정 중…';err.textContent='';
+  fnConfirm({makeupId:MID,token:TOKEN,date:selected.d,time:selected.t}).then(function(r){
+    var d=r.data;
+    if(d.ok){show('🎉','보강이 확정되었습니다','<b>'+esc(window._last.studentName)+'</b> 학생<br>'+fmtDate(d.date)+' '+range(d.time,endOf(d.time))+'<br><br>그 시간에 뵙겠습니다. 감사합니다!');}
+    else{selected=null;window._notice='방금 다른 학생이 먼저 선택한 시간입니다. 다른 시간을 선택해 주세요.';load();}
+  }).catch(function(){go.disabled=false;go.textContent='다시 시도';err.textContent='처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';});
+}
+
+if(!MID||!TOKEN){show('⚠️','잘못된 링크입니다','학원에서 받은 링크를 그대로 열어 주세요.');}
+else{
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    var fns=firebase.app().functions(REGION);
+    fnGet=fns.httpsCallable('getMakeupOffer');fnConfirm=fns.httpsCallable('confirmMakeupSlot');
+    load();
+  }catch(e){show('⚠️','설정 오류','Firebase 설정이 필요합니다.');}
+}
+</script>
+</body>
+</html>
