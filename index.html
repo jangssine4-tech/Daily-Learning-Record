@@ -1400,10 +1400,17 @@ async function login(){
   }
   try{
     var snap=await db.collection('users').where('loginId','==',id).get();
-    if(snap.empty){toast('❌ 아이디/비밀번호 오류');$('login-screen').style.display='flex';hideBootOverlay();return;}
-    var u=snap.docs[0].data();
-    if(u.password!==pw){toast('❌ 아이디/비밀번호 오류');$('login-screen').style.display='flex';hideBootOverlay();return;}
-    currentUser={...u,docId:snap.docs[0].id};
+    var cand=snap.docs;
+    if(!cand.length){ // 저장된 아이디의 공백·대소문자 차이 보정
+      var allU=await db.collection('users').get();
+      cand=allU.docs.filter(function(d){return String(d.data().loginId||'').trim().toLowerCase()===id.toLowerCase();});
+    }
+    if(!cand.length){toast('❌ 아이디를 찾을 수 없어요 ('+id+')');$('login-screen').style.display='flex';hideBootOverlay();return;}
+    // 같은 아이디 계정이 여러 개여도 비밀번호가 맞는 계정으로 로그인
+    var hit=cand.find(function(d){return d.data().password===pw;})||cand.find(function(d){return String(d.data().password||'').trim()===pw.trim();});
+    if(!hit){toast('❌ 비밀번호가 맞지 않아요'+(cand.length>1?' (같은 아이디 계정이 '+cand.length+'개 있어요 — 관리자 페이지에서 중복 계정을 정리해 주세요)':''));$('login-screen').style.display='flex';hideBootOverlay();return;}
+    var u=hit.data();
+    currentUser={...u,docId:hit.id};
     bootProgress(20, '데이터 로딩...');
     await yield_();
     await bootApp();
