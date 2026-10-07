@@ -6,20 +6,44 @@
 <meta name="robots" content="noindex,nofollow">
 <title>보강 일정 선택</title>
 <style>
-:root{--navy:#1e3a5f;--bg:#f5f7fa;--card:#fff;--line:#e2e8f0;--txt:#1f2937;--sub:#6b7280;--accent:#2563eb;--ok:#16a34a}
-*{box-sizing:border-box}
+:root{--navy:#1e3a5f;--bg:#f5f7fa;--card:#fff;--line:#e2e8f0;--txt:#1f2937;--sub:#6b7280;--accent:#2563eb;--ok:#16a34a;--red:#dc2626}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;line-height:1.5}
-.wrap{max-width:480px;margin:0 auto;padding:20px 16px 40px}
-.brand{font-size:12px;color:var(--sub);text-align:center;margin-bottom:6px}
+.wrap{max-width:480px;margin:0 auto;padding:22px 16px 40px}
+.logo{display:flex;justify-content:center;align-items:center;min-height:8px;margin-bottom:8px}
+.logo img{max-height:64px;max-width:70%;object-fit:contain}
+.logo .t{font-size:13px;font-weight:700;color:var(--navy)}
 h1{font-size:20px;color:var(--navy);text-align:center;margin:0 0 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
 .who{font-size:15px}.who b{color:var(--navy)}
-.day{font-size:13px;font-weight:700;color:var(--navy);margin:14px 0 6px}
-.slots{display:flex;flex-wrap:wrap;gap:8px}
-.slot{flex:1 1 calc(50% - 8px);min-width:130px;padding:12px 8px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font-size:15px;font-weight:600;color:var(--txt);cursor:pointer}
+.sub{font-size:13px;color:var(--sub)}
+.cur{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:14px;color:var(--accent);font-weight:600}
+/* 달력 */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-head b{font-size:16px;color:var(--navy)}
+.nav{width:36px;height:36px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:16px;color:var(--navy);cursor:pointer}
+.nav:disabled{opacity:.3;cursor:default}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{font-size:11px;font-weight:700;text-align:center;color:var(--sub);padding:4px 0}
+.dow.sat{color:#2563eb}.dow.sun{color:var(--red)}
+.d{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:15px;color:#c0c6d0;border:1.5px solid transparent;background:transparent;padding:0;font-family:inherit}
+.d.sat{color:#b8c6ee}.d.sun{color:#f0b4b4}
+.d.ok{color:var(--navy);font-weight:700;background:#f0f5ff;border-color:#c7d7f5;cursor:pointer}
+.d.ok.sat{color:#2563eb}
+.d.ok.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.d.today{box-shadow:inset 0 0 0 1.5px #94a3b8}
+.d.cur{background:#dcfce7;border-color:#86efac;color:#166534;font-weight:700}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--sub);margin-top:10px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+/* 시간 */
+.tt{font-size:14px;font-weight:700;color:var(--navy);margin:16px 0 8px}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.slot{padding:13px 6px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font-size:15px;font-weight:600;color:var(--txt);cursor:pointer;font-family:inherit}
 .slot.on{border-color:var(--accent);background:#eff6ff;color:var(--accent)}
-.btn{display:block;width:100%;padding:14px;border:0;border-radius:12px;background:var(--navy);color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:14px}
+.hint{font-size:13px;color:var(--sub);text-align:center;padding:14px 0 2px}
+.btn{display:block;width:100%;padding:15px;border:0;border-radius:12px;background:var(--navy);color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:16px;font-family:inherit}
 .btn:disabled{opacity:.4;cursor:default}
+.btn.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--navy);margin-top:10px}
 .msg{text-align:center;padding:28px 12px}
 .msg .big{font-size:40px;margin-bottom:6px}
 .msg .t{font-size:17px;font-weight:700;color:var(--navy)}
@@ -30,7 +54,7 @@ h1{font-size:20px;color:var(--navy);text-align:center;margin:0 0 16px}
 </head>
 <body>
 <div class="wrap">
-  <div class="brand">잉글리시아이위드멘토링 영수학원</div>
+  <div class="logo" id="logo"></div>
   <h1>보강 일정 선택</h1>
   <div id="root"><div class="card msg"><div class="s">불러오는 중…</div></div></div>
 </div>
@@ -38,81 +62,142 @@ h1{font-size:20px;color:var(--navy);text-align:center;margin:0 0 16px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 <script>
-// ▼▼ 앱 설정 화면의 Firebase 설정값(apiKey 등)과 같은 값을 넣으세요. 공개되어도 되는 값입니다. ▼▼
 var FIREBASE_CONFIG = {
   apiKey: "AIzaSyBaxcYn-PwBDTVoD4knE2awpwSrt0PscnE",
   authDomain: "daily-report-5a26e.firebaseapp.com",
   projectId: "daily-report-5a26e"
 };
-// ▲▲ ----------------------------------------------------------------- ▲▲
 var REGION = 'asia-northeast3';
+var BRAND = '잉글리시아이위드멘토링 영수학원';
 
 var root = document.getElementById('root');
 var qs = new URLSearchParams(location.search);
 var MID = qs.get('m'), TOKEN = qs.get('t');
 var DAY = ['일','월','화','수','목','금','토'];
-var selected = null;
+var S = {offer:null, byDate:{}, months:[], mi:0, date:'', time:'', changing:false};
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function pad(n){return String(n).padStart(2,'0');}
 function fmtDate(d){var p=d.split('-');return parseInt(p[1])+'월 '+parseInt(p[2])+'일 ('+DAY[new Date(d+'T12:00:00').getDay()]+')';}
-function fmtTime(t){var h=parseInt(t.slice(0,2)),m=t.slice(3);var ap=h<12?'오전':'오후';var h12=h%12||12;return ap+' '+h12+':'+m;}
-function range(t,e){e=e||t;var a=fmtTime(t),b=fmtTime(e);return a+' ~ '+(a.slice(0,2)===b.slice(0,2)?b.slice(3):b);}
-function endOf(t){var m=parseInt(t.slice(0,2))*60+parseInt(t.slice(3))+60;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function fmtTime(t){var h=parseInt(t.slice(0,2)),m=t.slice(3);return (h<12?'오전':'오후')+' '+(h%12||12)+':'+m;}
+function range(t,e){var a=fmtTime(t);if(!e)return a;var b=fmtTime(e);var same=a.slice(0,2)===b.slice(0,2)||(parseInt(e.slice(0,2))===12&&parseInt(t.slice(0,2))<12);return a+' ~ '+(same?b.slice(3):b);}
+function shortDate(d){var p=d.split('-');return parseInt(p[1])+'/'+parseInt(p[2])+'('+DAY[new Date(d+'T12:00:00').getDay()]+')';}
+function endOf(t,d){var m=parseInt(t.slice(0,2))*60+parseInt(t.slice(3))+d;return pad(Math.floor(m/60))+':'+pad(m%60);}
+function durOf(date){return new Date(date+'T12:00:00').getDay()===6?30:60;} // 현재 일정 표시용
 
-function show(big,title,sub){root.innerHTML='<div class="card msg"><div class="big">'+big+'</div><div class="t">'+esc(title)+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+'</div>';}
+/* ── 로고: 진단평가 설정의 로고 → 없으면 같은 폴더의 logo.png → 없으면 학원 이름 글자 ── */
+var logoSet=false;
+function brandText(){var l=document.getElementById('logo');l.innerHTML='<div class="t">'+esc(BRAND)+'</div>';}
+function setLogo(src){
+  if(logoSet)return;logoSet=true;
+  var l=document.getElementById('logo');
+  function tryFile(){var im=new Image();im.alt=BRAND;im.onload=function(){l.innerHTML='';l.appendChild(im);};im.onerror=brandText;im.src='logo.png';}
+  if(src){var im=new Image();im.alt=BRAND;im.onload=function(){l.innerHTML='';l.appendChild(im);};im.onerror=tryFile;im.src=src;}
+  else tryFile();
+}
 
+function show(big,title,sub,extra){root.innerHTML='<div class="card msg"><div class="big">'+big+'</div><div class="t">'+esc(title)+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+(extra||'')+'</div>';}
+
+/* ── 화면 그리기 ── */
 function render(o){
-  if(o.state==='done'){return show('✅','이미 보강이 완료되었습니다','');}
-  if(o.state==='confirmed'){
-    return show('📅','보강 일정이 확정되어 있습니다',
-      '<b>'+esc(o.studentName)+'</b> 학생<br>'+fmtDate(o.date)+' '+(o.time?range(o.time,endOf(o.time)):'')+'<br><br>변경이 필요하시면 학원으로 연락 주세요.');
-  }
+  S.offer=o;setLogo(o.logo);
+  if(o.state==='done')return show('✅','이미 보강이 완료되었습니다','');
+  if(o.state==='confirmed'&&!S.changing)return renderConfirmed(o);
   var cands=o.candidates||[];
   if(!cands.length){
-    return show('🙏','선택 가능한 시간이 없습니다','현재 정원이 모두 차 있어요.<br>학원에서 따로 연락드려 일정을 잡겠습니다.');
+    return show('🙏','선택 가능한 시간이 없습니다','현재 정원이 모두 차 있어요.<br>학원에서 따로 연락드려 일정을 잡겠습니다.'+(o.current?'<br><br>기존 일정: '+fmtDate(o.current.date)+' '+fmtTime(o.current.time):''));
   }
-  var byDate={};cands.forEach(function(c){(byDate[c.date]=byDate[c.date]||[]).push(c);});
-  var h='<div class="card who"><b>'+esc(o.studentName)+'</b> 학생'+(o.absentDate?' · '+fmtDate(o.absentDate)+' 결석':'')+'<br><span style="font-size:13px;color:var(--sub)">아래에서 보강 가능한 시간을 하나 선택해 주세요. 제출하면 바로 확정됩니다.</span></div><div class="card">';
-  Object.keys(byDate).sort().forEach(function(d){
-    h+='<div class="day">'+fmtDate(d)+'</div><div class="slots">';
-    byDate[d].forEach(function(c){h+='<button class="slot" data-d="'+c.date+'" data-t="'+c.time+'">'+range(c.time,c.end)+'</button>';});
+  S.byDate={};cands.forEach(function(c){(S.byDate[c.date]=S.byDate[c.date]||[]).push(c);});
+  var ms={};Object.keys(S.byDate).forEach(function(d){ms[d.slice(0,7)]=1;});
+  if(o.current)ms[o.current.date.slice(0,7)]=1;
+  S.months=Object.keys(ms).sort();
+  if(S.mi>=S.months.length||S.mi<0)S.mi=0;
+  S.date='';S.time='';
+  drawPicker();
+}
+function renderConfirmed(o){
+  var c=o.current;
+  var extra='';
+  var line=c?'<b>'+esc(o.studentName)+'</b> 학생<br>'+fmtDate(c.date)+' '+(c.time?range(c.time,endOf(c.time,durOf(c.date))):''):'';
+  if(o.canChange)extra='<button class="btn ghost" id="chg">일정 변경하기</button><div class="note" style="margin-top:10px">변경은 앞으로 '+o.changesLeft+'번 더 할 수 있어요.</div>';
+  else extra='<div class="note" style="margin-top:14px">'+(o.limit?'변경 가능 횟수를 모두 사용하셨어요.':'당일이나 지난 일정은 여기서 변경할 수 없어요.')+'<br>변경이 필요하시면 학원으로 연락 주세요.</div>';
+  show('📅','보강 일정이 확정되어 있습니다',line,extra);
+  var b=document.getElementById('chg');if(b)b.onclick=function(){S.changing=true;render(S.offer);};
+}
+
+function drawPicker(){
+  var o=S.offer, ym=S.months[S.mi], y=+ym.slice(0,4), m=+ym.slice(5);
+  var first=new Date(y,m-1,1).getDay(), startCol=first===0?6:first-1, last=new Date(y,m,0).getDate();
+  var today=new Date();var todayIso=today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
+  var h='<div class="card who"><b>'+esc(o.studentName)+'</b> 학생'+(o.absentDate?' · '+fmtDate(o.absentDate)+' 결석':'')+'<div class="sub" style="margin-top:2px">'
+    +(S.changing?'새로 원하시는 날짜와 시간을 선택해 주세요. 제출하면 기존 일정이 바뀝니다.':'가능한 날짜를 누른 뒤 시간을 선택해 주세요. 제출하면 바로 확정됩니다.')+'</div>';
+  if(o.current)h+='<div class="cur">현재 일정: '+fmtDate(o.current.date)+' '+(o.current.time?fmtTime(o.current.time):'')+'</div>';
+  h+='</div><div class="card"><div class="cal-head"><button class="nav" id="pm" '+(S.mi===0?'disabled':'')+'>◀</button><b>'+y+'년 '+m+'월</b><button class="nav" id="nm" '+(S.mi>=S.months.length-1?'disabled':'')+'>▶</button></div><div class="grid">';
+  ['월','화','수','목','금','토','일'].forEach(function(l,i){h+='<div class="dow'+(i===5?' sat':i===6?' sun':'')+'">'+l+'</div>';});
+  for(var i=0;i<startCol;i++)h+='<div></div>';
+  for(var d=1;d<=last;d++){
+    var iso=y+'-'+pad(m)+'-'+pad(d), col=(startCol+d-1)%7;
+    var cls='d'+(col===5?' sat':col===6?' sun':'')+(iso===todayIso?' today':'');
+    var can=!!S.byDate[iso];
+    if(can)cls+=' ok'+(S.date===iso?' on':'');
+    else if(o.current&&o.current.date===iso)cls+=' cur';
+    h+='<button class="'+cls+'" '+(can?'data-d="'+iso+'"':'disabled')+'>'+d+'</button>';
+  }
+  h+='</div><div class="legend"><span><i style="background:#f0f5ff;border:1px solid #c7d7f5"></i>선택 가능</span>'+(o.current?'<span><i style="background:#dcfce7;border:1px solid #86efac"></i>현재 일정</span>':'')+'<span><i style="background:#fff;border:1px solid #e2e8f0"></i>마감·휴무</span></div>';
+  if(S.date){
+    h+='<div class="tt">'+fmtDate(S.date)+' 시간 선택</div><div class="slots">';
+    S.byDate[S.date].forEach(function(c){h+='<button class="slot'+(S.time===c.time?' on':'')+'" data-t="'+c.time+'">'+range(c.time,c.end)+'</button>';});
     h+='</div>';
-  });
-  h+='<button class="btn" id="go" disabled>이 시간으로 확정하기</button><div class="err" id="err"></div></div><div class="note">1시간 수업 기준 · 확정 후 변경은 학원으로 연락 주세요.</div>';
+  } else h+='<div class="hint">날짜를 눌러 주세요</div>';
+  h+='<button class="btn" id="go" '+(S.date&&S.time?'':'disabled')+'>'+(S.date&&S.time?shortDate(S.date)+' '+fmtTime(S.time)+' '+(S.changing?'변경하기':'확정하기'):'날짜와 시간을 선택해 주세요')+'</button>'
+    +(S.changing?'<button class="btn ghost" id="cancel">변경 취소</button>':'')
+    +'<div class="err" id="err"></div></div><div class="note">확정된 일정은 학원 시간표에 바로 반영됩니다.</div>';
   root.innerHTML=h;
-  root.querySelectorAll('.slot').forEach(function(b){b.onclick=function(){
-    root.querySelectorAll('.slot').forEach(function(x){x.classList.remove('on');});
-    b.classList.add('on');selected={d:b.dataset.d,t:b.dataset.t};
-    var go=document.getElementById('go');go.disabled=false;go.textContent=fmtDate(selected.d)+' '+fmtTime(selected.t)+' 확정하기';
-  };});
+  document.getElementById('pm').onclick=function(){S.mi--;S.date='';S.time='';drawPicker();};
+  document.getElementById('nm').onclick=function(){S.mi++;S.date='';S.time='';drawPicker();};
+  root.querySelectorAll('.d.ok').forEach(function(b){b.onclick=function(){S.date=b.dataset.d;S.time='';drawPicker();
+    var t=root.querySelector('.tt');if(t&&t.scrollIntoView)t.scrollIntoView({behavior:'smooth',block:'nearest'});};});
+  root.querySelectorAll('.slot').forEach(function(b){b.onclick=function(){S.time=b.dataset.t;drawPicker();};});
   document.getElementById('go').onclick=submit;
+  var cc=document.getElementById('cancel');if(cc)cc.onclick=function(){S.changing=false;render(S.offer);};
   if(window._notice){document.getElementById('err').textContent=window._notice;window._notice='';}
 }
 
 var fnGet,fnConfirm;
 function load(){
-  fnGet({makeupId:MID,token:TOKEN}).then(function(r){window._last=r.data;render(r.data);})
-  .catch(function(e){show('⚠️','링크를 확인할 수 없습니다','링크가 잘못되었거나 만료되었습니다.<br>학원으로 문의해 주세요.');});
+  fnGet({makeupId:MID,token:TOKEN}).then(function(r){render(r.data);})
+  .catch(function(){brandText();logoSet=true;show('⚠️','링크를 확인할 수 없습니다','링크가 잘못되었거나 만료되었습니다.<br>학원으로 문의해 주세요.');});
 }
 function submit(){
-  if(!selected)return;
+  if(!S.date||!S.time)return;
   var go=document.getElementById('go'),err=document.getElementById('err');
-  go.disabled=true;go.textContent='확정 중…';err.textContent='';
-  fnConfirm({makeupId:MID,token:TOKEN,date:selected.d,time:selected.t}).then(function(r){
+  var pick={d:S.date,t:S.time};
+  go.disabled=true;go.textContent='처리 중…';err.textContent='';
+  fnConfirm({makeupId:MID,token:TOKEN,date:pick.d,time:pick.t}).then(function(r){
     var d=r.data;
-    if(d.ok){show('🎉','보강이 확정되었습니다','<b>'+esc(window._last.studentName)+'</b> 학생<br>'+fmtDate(d.date)+' '+range(d.time,endOf(d.time))+'<br><br>그 시간에 뵙겠습니다. 감사합니다!');}
-    else{selected=null;window._notice='방금 다른 학생이 먼저 선택한 시간입니다. 다른 시간을 선택해 주세요.';load();}
+    if(d.ok){
+      S.changing=false;
+      var end=d.end||endOf(pick.t,durOf(pick.d));
+      show('🎉',d.changed?'보강 일정이 변경되었습니다':'보강이 확정되었습니다',
+        '<b>'+esc(S.offer.studentName)+'</b> 학생<br>'+fmtDate(d.date)+' '+range(d.time,end)+'<br><br>그 시간에 뵙겠습니다. 감사합니다!',
+        '<button class="btn ghost" id="again">일정 다시 변경하기</button>');
+      document.getElementById('again').onclick=function(){S.changing=true;root.innerHTML='<div class="card msg"><div class="s">불러오는 중…</div></div>';load();};
+    } else if(d.reason==='full'){
+      window._notice='방금 다른 학생이 먼저 선택한 시간입니다. 다른 시간을 선택해 주세요.';load();
+    } else if(d.reason==='limit'){
+      S.changing=false;show('🙏','변경 가능 횟수를 모두 사용하셨어요','학원으로 연락 주시면 도와드리겠습니다.');
+    } else { S.changing=false;window._notice='';load(); }
   }).catch(function(){go.disabled=false;go.textContent='다시 시도';err.textContent='처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';});
 }
 
-if(!MID||!TOKEN){show('⚠️','잘못된 링크입니다','학원에서 받은 링크를 그대로 열어 주세요.');}
+if(!MID||!TOKEN){brandText();logoSet=true;show('⚠️','잘못된 링크입니다','학원에서 받은 링크를 그대로 열어 주세요.');}
 else{
   try{
     firebase.initializeApp(FIREBASE_CONFIG);
     var fns=firebase.app().functions(REGION);
     fnGet=fns.httpsCallable('getMakeupOffer');fnConfirm=fns.httpsCallable('confirmMakeupSlot');
     load();
-  }catch(e){show('⚠️','설정 오류','Firebase 설정이 필요합니다.');}
+  }catch(e){brandText();show('⚠️','설정 오류','Firebase 설정이 필요합니다.');}
 }
 </script>
 </body>
