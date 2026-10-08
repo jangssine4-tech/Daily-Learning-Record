@@ -105,7 +105,8 @@ function render(o){
   if(o.state==='confirmed'&&!S.changing)return renderConfirmed(o);
   var cands=o.candidates||[];
   if(!cands.length){
-    return show('🙏','선택 가능한 시간이 없습니다','현재 정원이 모두 차 있어요.<br>학원에서 따로 연락드려 일정을 잡겠습니다.'+(o.current?'<br><br>기존 일정: '+fmtDate(o.current.date)+' '+fmtTime(o.current.time):''));
+    if(o.state==='confirmed')return renderConfirmed(o);
+    return show('🙏','선택 가능한 시간이 없습니다','현재 선택 가능한 시간이 없습니다.<br>학원에서 따로 연락드려 일정을 안내해 드리겠습니다.'+(o.current?'<br><br>기존 일정: '+fmtDate(o.current.date)+' '+fmtTime(o.current.time):'')+diagHtml(o));
   }
   S.byDate={};cands.forEach(function(c){(S.byDate[c.date]=S.byDate[c.date]||[]).push(c);});
   var ms={};Object.keys(S.byDate).forEach(function(d){ms[d.slice(0,7)]=1;});
@@ -119,8 +120,11 @@ function renderConfirmed(o){
   var c=o.current;
   var extra='';
   var line=c?'<b>'+esc(o.studentName)+'</b> 학생<br>'+fmtDate(c.date)+' '+(c.time?range(c.time,endOf(c.time,durOf(c.date))):''):'';
-  if(o.canChange)extra='<button class="btn ghost" id="chg">일정 변경하기</button><div class="note" style="margin-top:10px">변경은 앞으로 '+o.changesLeft+'번 더 할 수 있어요.</div>';
-  else extra='<div class="note" style="margin-top:14px">'+(o.limit?'변경 가능 횟수를 모두 사용하셨어요.':'당일이나 지난 일정은 여기서 변경할 수 없어요.')+'<br>변경이 필요하시면 학원으로 연락 주세요.</div>';
+  var hasCand=(o.candidates||[]).length>0;
+  if(o.canChange&&hasCand)extra='<button class="btn ghost" id="chg">일정 변경하기</button><div class="note" style="margin-top:10px">변경은 앞으로 '+o.changesLeft+'번 더 하실 수 있습니다.</div>';
+  else if(o.canChange)extra='<div class="note" style="margin-top:14px">현재 변경 가능한 시간이 없습니다.<br>변경이 필요하시면 학원으로 연락 부탁드립니다.</div>';
+  else extra='<div class="note" style="margin-top:14px">'+(o.limit?'변경 가능 횟수를 모두 사용하셨습니다.':'당일이나 지난 일정은 여기서 변경할 수 없습니다.')+'<br>변경이 필요하시면 학원으로 연락 부탁드립니다.</div>';
+  extra+=diagHtml(o);
   show('📅','보강 일정이 등록되어 있습니다',line,extra);
   var b=document.getElementById('chg');if(b)b.onclick=function(){S.changing=true;render(S.offer);};
 }
@@ -151,7 +155,7 @@ function drawPicker(){
   } else h+='<div class="hint">날짜를 눌러 주세요</div>';
   h+='<button class="btn" id="go" '+(S.date&&S.time?'':'disabled')+'>'+(S.date&&S.time?shortDate(S.date)+' '+fmtTime(S.time)+' '+(S.changing?'변경하기':'선택하기'):'날짜와 시간을 선택해 주세요')+'</button>'
     +(S.changing?'<button class="btn ghost" id="cancel">변경 취소</button>':'')
-    +'<div class="err" id="err"></div></div><div class="note">부족한 부분은 보강 수업에서 빠짐없이 챙겨 지도해 드리겠습니다.</div>';
+    +'<div class="err" id="err"></div></div><div class="note">부족한 부분은 보강 수업에서 빠짐없이 챙겨 지도하도록 하겠습니다.</div>';
   root.innerHTML=h;
   document.getElementById('pm').onclick=function(){S.mi--;S.date='';S.time='';drawPicker();};
   document.getElementById('nm').onclick=function(){S.mi++;S.date='';S.time='';drawPicker();};
@@ -163,9 +167,15 @@ function drawPicker(){
   if(window._notice){document.getElementById('err').textContent=window._notice;window._notice='';}
 }
 
+var DBG=qs.get('debug')==='1'?'mk-diag-2026':'';
+function diagHtml(o){
+  if(!DBG||!o.diag)return '';
+  var rows=o.diag.map(function(x){return esc(x.date+' '+x.time+' → '+x.why+(x.info?' ('+x.info+')':''));});
+  return '<div class="note" style="text-align:left;margin-top:14px;word-break:break-all">[진단]<br>'+(rows.join('<br>')||'후보 계산 결과 없음')+'</div>';
+}
 var fnGet,fnConfirm;
 function load(){
-  fnGet({makeupId:MID,token:TOKEN}).then(function(r){render(r.data);})
+  fnGet({makeupId:MID,token:TOKEN,debug:DBG}).then(function(r){render(r.data);})
   .catch(function(){brandText();logoSet=true;show('⚠️','링크를 확인할 수 없습니다','링크가 잘못되었거나 만료되었습니다.<br>학원으로 문의해 주세요.');});
 }
 function submit(){
@@ -185,7 +195,7 @@ function submit(){
     } else if(d.reason==='full'){
       window._notice='방금 다른 학생이 먼저 선택한 시간입니다. 다른 시간을 선택해 주세요.';load();
     } else if(d.reason==='limit'){
-      S.changing=false;show('🙏','변경 가능 횟수를 모두 사용하셨어요','학원으로 연락 주시면 도와드리겠습니다.');
+      S.changing=false;show('🙏','변경 가능 횟수를 모두 사용하셨습니다','변경이 필요하시면 학원으로 연락 부탁드립니다.');
     } else { S.changing=false;window._notice='';load(); }
   }).catch(function(){go.disabled=false;go.textContent='다시 시도';err.textContent='처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';});
 }
