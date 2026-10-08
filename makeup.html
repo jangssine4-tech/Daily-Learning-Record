@@ -121,7 +121,7 @@ function renderConfirmed(o){
   var line=c?'<b>'+esc(o.studentName)+'</b> 학생<br>'+fmtDate(c.date)+' '+(c.time?range(c.time,endOf(c.time,durOf(c.date))):''):'';
   if(o.canChange)extra='<button class="btn ghost" id="chg">일정 변경하기</button><div class="note" style="margin-top:10px">변경은 앞으로 '+o.changesLeft+'번 더 할 수 있어요.</div>';
   else extra='<div class="note" style="margin-top:14px">'+(o.limit?'변경 가능 횟수를 모두 사용하셨어요.':'당일이나 지난 일정은 여기서 변경할 수 없어요.')+'<br>변경이 필요하시면 학원으로 연락 주세요.</div>';
-  show('📅','보강 일정이 확정되어 있습니다',line,extra);
+  show('📅','보강 일정이 등록되어 있습니다',line,extra);
   var b=document.getElementById('chg');if(b)b.onclick=function(){S.changing=true;render(S.offer);};
 }
 
@@ -130,7 +130,7 @@ function drawPicker(){
   var first=new Date(y,m-1,1).getDay(), startCol=first===0?6:first-1, last=new Date(y,m,0).getDate();
   var today=new Date();var todayIso=today.getFullYear()+'-'+pad(today.getMonth()+1)+'-'+pad(today.getDate());
   var h='<div class="card who"><b>'+esc(o.studentName)+'</b> 학생'+(o.absentDate?' · '+fmtDate(o.absentDate)+' 결석':'')+'<div class="sub" style="margin-top:2px">'
-    +(S.changing?'새로 원하시는 날짜와 시간을 선택해 주세요. 제출하면 기존 일정이 바뀝니다.':'보강 가능한 날짜를 누른 뒤 시간을 선택해 주세요. 제출하면 바로 확정됩니다.')+'</div>';
+    +(S.changing?'새로 원하시는 날짜와 시간을 선택해 주세요. 선택하시면 기존 일정이 새 일정으로 바뀝니다.':'편하신 날짜와 시간을 선택해 주세요. 선택하신 일정으로 보강이 진행되며, 필요하시면 최대 2회까지 변경하실 수 있습니다.')+'</div>';
   if(o.current)h+='<div class="cur">현재 일정: '+fmtDate(o.current.date)+' '+(o.current.time?fmtTime(o.current.time):'')+'</div>';
   h+='</div><div class="card"><div class="cal-head"><button class="nav" id="pm" '+(S.mi===0?'disabled':'')+'>◀</button><b>'+y+'년 '+m+'월</b><button class="nav" id="nm" '+(S.mi>=S.months.length-1?'disabled':'')+'>▶</button></div><div class="grid">';
   ['월','화','수','목','금','토','일'].forEach(function(l,i){h+='<div class="dow'+(i===5?' sat':i===6?' sun':'')+'">'+l+'</div>';});
@@ -149,9 +149,9 @@ function drawPicker(){
     S.byDate[S.date].forEach(function(c){h+='<button class="slot'+(S.time===c.time?' on':'')+'" data-t="'+c.time+'">'+range(c.time,c.end)+'</button>';});
     h+='</div>';
   } else h+='<div class="hint">날짜를 눌러 주세요</div>';
-  h+='<button class="btn" id="go" '+(S.date&&S.time?'':'disabled')+'>'+(S.date&&S.time?shortDate(S.date)+' '+fmtTime(S.time)+' '+(S.changing?'변경하기':'확정하기'):'날짜와 시간을 선택해 주세요')+'</button>'
+  h+='<button class="btn" id="go" '+(S.date&&S.time?'':'disabled')+'>'+(S.date&&S.time?shortDate(S.date)+' '+fmtTime(S.time)+' '+(S.changing?'변경하기':'선택하기'):'날짜와 시간을 선택해 주세요')+'</button>'
     +(S.changing?'<button class="btn ghost" id="cancel">변경 취소</button>':'')
-    +'<div class="err" id="err"></div></div><div class="note">확정된 일정은 학원 시간표에 바로 반영됩니다.</div>';
+    +'<div class="err" id="err"></div></div><div class="note">부족한 부분은 보강 수업에서 빠짐없이 챙겨 지도해 드리겠습니다.</div>';
   root.innerHTML=h;
   document.getElementById('pm').onclick=function(){S.mi--;S.date='';S.time='';drawPicker();};
   document.getElementById('nm').onclick=function(){S.mi++;S.date='';S.time='';drawPicker();};
@@ -178,7 +178,7 @@ function submit(){
     if(d.ok){
       S.changing=false;
       var end=d.end||endOf(pick.t,durOf(pick.d));
-      show('🎉',d.changed?'보강 일정이 변경되었습니다':'보강이 확정되었습니다',
+      show('🎉',d.changed?'보강 일정이 변경되었습니다':'보강 일정이 등록되었습니다',
         '<b>'+esc(S.offer.studentName)+'</b> 학생<br>'+fmtDate(d.date)+' '+range(d.time,end)+'<br><br>그 시간에 뵙겠습니다. 감사합니다!',
         '<button class="btn ghost" id="again">일정 다시 변경하기</button>');
       document.getElementById('again').onclick=function(){S.changing=true;root.innerHTML='<div class="card msg"><div class="s">불러오는 중…</div></div>';load();};
