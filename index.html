@@ -6369,9 +6369,6 @@ async function showAbsentNotifyModal(s){
     +'<div class="field"><div class="fl">발송 메시지</div>'
     +'<textarea class="fi" id="absent-notify-msg" rows="8" style="font-size:12px;line-height:1.6">'+msg+'</textarea></div>'
     +'<div style="display:flex;gap:6px;margin-top:10px">'
-    +'<button class="btn btn-kakao btn-block" onclick="copyAbsentMsg()">📋 메시지 복사</button>'
-    +'</div>'
-    +'<div style="display:flex;gap:6px;margin-top:6px">'
     +'<button class="btn btn-navy btn-block" onclick="copyAbsentMsg();window.open(\'kakaotalk://\',\'_self\')">💬 복사 후 카카오톡 열기</button>'
     +'</div>'
     +(bookingUrl?'':'<div style="font-size:11px;color:var(--gold);margin-top:8px;text-align:center">⚠️ 설정 > 카카오 채널 설정에서 보강 예약 링크를 등록하세요.</div>')
@@ -8008,7 +8005,7 @@ function _mkOnAbsentRangeChange(){
   var startVal=s.value,endVal=e?e.value:'';
   if(!startVal){info.textContent='';return;}
   if(!endVal||endVal<=startVal){
-    info.textContent='📅 결석일: '+_fmtKorDate(startVal)+' (1일)';
+    info.textContent=(($('mk-note')||{}).value==='결석'?'📅 결석일: ':'📅 보완 필요일: ')+_fmtKorDate(startVal)+(($('mk-note')||{}).value==='결석'?' (1일)':'');
     if(e&&endVal&&endVal<startVal){e.value='';info.textContent='📅 결석일: '+_fmtKorDate(startVal)+' (1일) — 종료일이 시작일보다 빠릅니다';}
     return;
   }
@@ -8044,7 +8041,7 @@ function _mkOnManualTimeChange(){
 // 결석일 수업 내용 불러오기
 function _mkLoadAbsentContent(){
   var startVal=($('mk-absent-date')||{}).value||'';
-  if(!startVal){toast('⚠️ 결석 시작일을 먼저 입력하세요');return;}
+  if(!startVal){toast(($('mk-note')||{}).value==='결석'?'⚠️ 결석 시작일을 먼저 입력하세요':'⚠️ 보완 필요일을 먼저 입력하세요');return;}
   var endVal=($('mk-absent-date-end')||{}).value||'';
   var days=endVal&&endVal>startVal?_getMkWeekdays(startVal,endVal):[startVal];
   var sId='';
@@ -8059,7 +8056,7 @@ function _mkLoadAbsentContent(){
     else{lines.push('['+_fmtKorDate(d)+'] (수업 기록 없음)');}
   });
   var ta=$('mk-content');
-  if(ta){ta.value=lines.join('\n');toast('📋 결석일 수업 내용을 불러왔습니다');}
+  if(ta){ta.value=lines.join('\n');toast(($('mk-note')||{}).value==='결석'?'📋 결석일 수업 내용을 불러왔습니다':'📋 보완 필요일 수업 내용을 불러왔습니다');}
 }
 function _getMkPeriodTime(p){
   // customPeriods에서 시간 조회
@@ -8116,11 +8113,19 @@ function onMkDateChange(){
 }
 function _mkNoteChange(val){
   var sub=$('mk-note-sub');
-  if(!sub)return;
-  if(val==='결석'){sub.style.display='';}
-  else{sub.style.display='none';}
+  var isAbs=(val==='결석');
+  if(sub)sub.style.display=isAbs?'':'none';
+  var endEl=$('mk-absent-date-end'),tilde=$('mk-absent-tilde'),info=$('mk-absent-range-info');
+  if(endEl){endEl.style.display=isAbs?'':'none';if(!isAbs)endEl.value='';}
+  if(tilde)tilde.style.display=isAbs?'':'none';
+  var lb=$('mk-absent-label');if(lb)lb.textContent=isAbs?'결석 기간':'보완 필요일';
+  var cl=$('mk-content-label');if(cl)cl.textContent=isAbs?'결석일 수업 내용':'보완 내용';
+  var ta=$('mk-content');if(ta)ta.placeholder=isAbs?'결석일에 진행한 수업 내용 (아래 버튼으로 불러올 수 있어요)':'예: JOY 2 Unit 5 어휘 테스트 재시험';
+  var lbtn=$('mk-load-btn');if(lbtn)lbtn.textContent=isAbs?'📋 결석일 수업 내용 불러오기':'📋 보완 필요일 수업 내용 불러오기';
+  var nb=$('mk-notify-block');if(nb)nb.style.display=isAbs?'':'none';
+  if(!isAbs){var cb=$('mk-notify-parent');if(cb&&cb.checked){cb.checked=false;var ar=$('mk-notify-area');if(ar)ar.style.display='none';}}
+  if(typeof _mkOnAbsentRangeChange==='function')_mkOnAbsentRangeChange();
 }
-
 function _mkUpdateSaveBtnLabel(){
   var btn=$('mk-save-btn');if(!btn)return;
   var mode=($('mk-mode')||{}).value||'new';
@@ -8634,20 +8639,26 @@ function _openMakeupModal(){
     +'<div class="mt" id="mk-title">보강 관리</div>'
     +'<input type="hidden" id="mk-id"><input type="hidden" id="mk-mode" value="edit"><input type="hidden" id="mk-status" value="pending">'
 
-    // ── 결석 정보 ──
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="display:inline-block;width:3px;height:16px;background:var(--navy);border-radius:2px;flex-shrink:0"></span><span style="font-size:13px;font-weight:800;color:var(--navy);letter-spacing:.3px">보강 정보</span></div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:8px">'
+    // ── 보강 학생 ──
+    +'<div style="display:flex;gap:8px;margin-bottom:6px">'
     +'<div style="flex:1" id="mk-student-row"><div class="fl">보강 학생</div><select class="fi" id="mk-student-select" onchange="_mkUpdateNotifyMsg()"><option value="">학생 선택</option></select></div>'
-    +'<div id="mk-info" style="flex:1;display:none"><div class="fl">보강 학생</div><div style="font-size:14px;font-weight:700;color:var(--navy);padding:4px 0" id="mk-info-name"></div><div style="font-size:11px;color:var(--txt3);margin-top:1px" id="mk-info-date"></div></div>'
-    +'<div style="flex:1"><div class="fl">보강 사유</div>'+'<select class="fi" id="mk-note" style="height:36px;box-sizing:border-box;width:100%" onchange="_mkNoteChange(this.value)">'+'<option value="">선택</option>'+'<option value="학습 보완">학습 보완</option>'+'<option value="결석">결석</option>'+'</select>'+'<select class="fi" id="mk-note-sub" style="height:36px;box-sizing:border-box;width:100%;margin-top:6px;display:none">'+'<option value="병결">병결</option>'+'<option value="가족 여행">가족 여행</option>'+'<option value="학교 행사">학교 행사</option>'+'<option value="기타">기타</option>'+'</select>'+'</div>'
+    +'<div id="mk-info" style="flex:1;display:none"><div class="fl">보강 학생</div><div style="font-size:15px;font-weight:800;color:var(--navy);padding:4px 0" id="mk-info-name"></div><div style="font-size:11px;color:var(--txt3);margin-top:1px" id="mk-info-date"></div></div>'
     +'</div>'
-    +'<div class="fl" style="margin-bottom:4px">결석 기간</div>'
+
+    // ── 보강 사유 ──
+    +'<div style="display:flex;align-items:center;gap:8px;margin-top:14px;margin-bottom:10px"><span style="display:inline-block;width:3px;height:16px;background:var(--navy);border-radius:2px;flex-shrink:0"></span><span style="font-size:13px;font-weight:800;color:var(--navy);letter-spacing:.3px">보강 사유</span></div>'
+    +'<select class="fi" id="mk-note" style="height:36px;box-sizing:border-box;width:100%" onchange="_mkNoteChange(this.value)">'+'<option value="">선택</option>'+'<option value="학습 보완">학습 보완</option>'+'<option value="결석">결석</option>'+'</select>'
+    +'<select class="fi" id="mk-note-sub" style="height:36px;box-sizing:border-box;width:100%;margin-top:6px;display:none">'+'<option value="병결">병결</option>'+'<option value="가족 여행">가족 여행</option>'+'<option value="학교 행사">학교 행사</option>'+'<option value="기타">기타</option>'+'</select>'
+    +'<div class="fl" id="mk-absent-label" style="margin:12px 0 4px">결석 기간</div>'
     +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
     +'<input type="date" class="fi" id="mk-absent-date" onchange="_mkOnAbsentRangeChange()" style="flex:1;height:36px;box-sizing:border-box">'
-    +'<span style="font-size:12px;color:var(--txt3);flex-shrink:0">~</span>'
+    +'<span id="mk-absent-tilde" style="font-size:12px;color:var(--txt3);flex-shrink:0">~</span>'
     +'<input type="date" class="fi" id="mk-absent-date-end" onchange="_mkOnAbsentRangeChange()" style="flex:1;height:36px;box-sizing:border-box" placeholder="종료일 (선택)">'
     +'</div>'
-    +'<div id="mk-absent-range-info" style="font-size:11px;color:var(--txt3);margin-bottom:12px;padding-left:2px;min-height:16px"></div>'
+    +'<div id="mk-absent-range-info" style="font-size:11px;color:var(--txt3);margin-bottom:10px;padding-left:2px;min-height:16px"></div>'
+    +'<div class="fl" id="mk-content-label" style="margin-bottom:4px">보완 내용</div>'
+    +'<textarea class="fi" id="mk-content" rows="3" style="margin-bottom:6px" placeholder="예: JOY 2 Unit 5 어휘 테스트 재시험"></textarea>'
+    +'<button class="btn btn-outline btn-sm" id="mk-load-btn" onclick="_mkLoadAbsentContent()" style="font-size:11px;margin-bottom:4px">📋 보완 필요일 수업 내용 불러오기</button>'
 
     // ── 보강 계획 ──
     +'<div style="display:flex;align-items:center;gap:8px;margin-top:18px;margin-bottom:10px"><span style="display:inline-block;width:3px;height:16px;background:var(--navy);border-radius:2px;flex-shrink:0"></span><span style="font-size:13px;font-weight:800;color:var(--navy);letter-spacing:.3px">보강 계획</span></div>'
@@ -8663,17 +8674,15 @@ function _openMakeupModal(){
     +'<span id="mk-status-badge" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700"></span>'
     +'</div>'
 
-    // ── 보강 수업 내용 ──
-    +'<div style="display:flex;align-items:center;gap:8px;margin-top:18px;margin-bottom:10px"><span style="display:inline-block;width:3px;height:16px;background:var(--navy);border-radius:2px;flex-shrink:0"></span><span style="font-size:13px;font-weight:800;color:var(--navy);letter-spacing:.3px">보강 수업 내용</span></div>'
-    +'<textarea class="fi" id="mk-content" rows="3" style="margin-bottom:6px" placeholder="예: JOY 2 Unit 5, 스토리 듣기 및 워크북 8~10쪽"></textarea>'
-    +'<button class="btn btn-outline btn-sm" onclick="_mkLoadAbsentContent()" style="font-size:11px;margin-bottom:10px">📋 결석일 수업 내용 불러오기</button>'
-    +'<div id="mk-result-memo-wrap" style="display:none" class="field"><div class="fl">보강 결과 메모</div><textarea class="fi" id="mk-result-memo" rows="2" placeholder="보강 수업 내용, 특이사항 등"></textarea></div>'
+    // ── 완료 처리 ──
+    +'<div id="mk-result-memo-wrap" style="display:none;margin-top:10px" class="field"><div class="fl">보강 결과 메모</div><textarea class="fi" id="mk-result-memo" rows="2" placeholder="보강 수업 내용, 특이사항 등"></textarea></div>'
     +'<div id="mk-done-wrap" style="display:none;margin-bottom:10px">'
     +'<button class="btn btn-green btn-block" onclick="_mkMarkDone()">✅ 보강 완료 처리</button>'
     +'</div>'
 
     // ── 학부모 안내 ──
-    +'<div style="display:flex;align-items:center;gap:8px;margin-top:18px;margin-bottom:10px"><span style="display:inline-block;width:3px;height:16px;background:var(--navy);border-radius:2px;flex-shrink:0"></span><span style="font-size:13px;font-weight:800;color:var(--navy);letter-spacing:.3px">학부모 안내</span></div>'
+    +'<div id="mk-notify-block">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-top:18px;margin-bottom:10px"><span style="display:inline-block;width:3px;height:16px;background:var(--navy);border-radius:2px;flex-shrink:0"></span><span style="font-size:13px;font-weight:800;color:var(--navy);letter-spacing:.3px">학부모 안내</span>'+_helpBtn('notify')+'</div>'
     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
     +'<input type="checkbox" id="mk-notify-parent" style="width:16px;height:16px;accent-color:var(--mint)" onchange="_mkToggleNotify(this.checked)">'
     +'<label for="mk-notify-parent" style="font-size:13px;font-weight:600;color:var(--navy);cursor:pointer">📱 <span id="mk-notify-label">결석 안내 발송</span></label>'
@@ -8688,10 +8697,10 @@ function _openMakeupModal(){
     +'</div>'
     +'<div id="mk-notify-no-url" style="display:none;font-size:11px;color:var(--gold);margin-top:8px;text-align:center">⚠️ 설정 > 카카오 채널 설정에서 보강 예약 링크를 먼저 등록하세요.</div>'
     +'</div>'
+    +'</div>'
 
     // ── 하단 버튼 ──
     +'<div style="height:16px"></div>'
-    +'<button class="btn btn-outline btn-sm btn-block" id="mk-plink-btn" onclick="copyParentLinkFromModal()" style="display:none;margin-bottom:8px">🔗 학부모 링크 다시 복사 (재발송용)</button>'
     +'<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-red btn-sm" id="mk-del-btn" onclick="deleteMakeupEntry()" style="flex:0 0 auto">삭제</button><button class="btn btn-outline btn-sm" onclick="closeM(\'makeup\')" style="flex:1">취소</button><button class="btn btn-green btn-sm" id="mk-save-btn" onclick="saveMakeupUnified()" style="flex:2">보강 대기 등록</button></div>'
     +'</div>';
   document.body.appendChild(overlay);
@@ -8715,11 +8724,15 @@ function _showPauseGuide(){
   modal.onclick=function(e){if(e.target===modal)modal.remove();};
   document.body.appendChild(modal);
 }
-function _mkUpdateNotifyMsg(){
+async function _mkUpdateNotifyMsg(){
   var cb=$('mk-notify-parent');if(!cb||!cb.checked)return;
   var kc=window._kakaoConfig||{};
-  var bookingUrl=kc.bookingUrl||'';
-  var noUrlEl=$('mk-notify-no-url');if(noUrlEl)noUrlEl.style.display=bookingUrl?'none':'block';
+  var _mkIdNow=($('mk-id')||{}).value||'';
+  var _mkNow=_mkIdNow?makeups.find(function(x){return x.id===_mkIdNow;}):null;
+  var bookingUrl='';
+  if(_mkNow){try{bookingUrl=await ensureParentLink(_mkNow);}catch(e){console.warn('parent link',e);}}
+  var noUrlEl=$('mk-notify-no-url');
+  if(noUrlEl){noUrlEl.style.display=bookingUrl?'none':'block';noUrlEl.textContent='⚠️ 새로 등록하는 건은 저장한 뒤 다시 열면 학부모 전용 링크가 메시지에 들어갑니다.';}
   // 학생 정보 가져오기 — 신규등록(학생선택) vs 기존건(mk-info-name)
   var sName='',sPhone='';
   var sel=$('mk-student-select');
@@ -8744,7 +8757,7 @@ function _mkUpdateNotifyMsg(){
   var makeupPeriodTxt=makeupPeriodSel&&makeupPeriodSel.value?makeupPeriodSel.options[makeupPeriodSel.selectedIndex].text:'';
   var makeupDateStr=makeupDateVal?makeupDateVal.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1년 $2월 $3일'):'';
   var template=kc.absentMsg||'안녕하세요, 어머니~^^\n{날짜} {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n아래 링크에서 가능하신 보강 시간을 선택해 주시면 바로 확정됩니다.\n\n👉 {링크}\n\n감사합니다~^^';
-  var msg=template.replace(/\{이름\}/g,sName).replace(/\{날짜\}/g,absentDateStr).replace(/\{링크\}/g,bookingUrl||'(링크 미설정)');
+  var msg=template.replace(/\{이름\}/g,sName).replace(/\{날짜\}/g,absentDateStr).replace(/\{링크\}/g,bookingUrl||'(저장 후 링크가 생성됩니다)');
   // 보강 일정이 잡혀 있으면 메시지에 자동 추가
   if(makeupDateStr){
     var scheduleInfo='\n\n📅 보강 일정: '+makeupDateStr+(makeupPeriodTxt?' '+makeupPeriodTxt:'');
@@ -8755,7 +8768,8 @@ function _mkUpdateNotifyMsg(){
 }
 function _mkCopyMsg(){
   var ta=$('mk-notify-msg');
-  if(ta){navigator.clipboard.writeText(ta.value);toast('📋 메시지가 복사되었습니다. 카카오톡에 붙여넣기 하세요!');}
+  if(ta){navigator.clipboard.writeText(ta.value);toast('📋 메시지가 복사되었습니다. 카카오톡에 붙여넣기 하세요!');
+    var _id=($('mk-id')||{}).value;if(_id&&ta.value.indexOf('makeup.html')>=0)markParentLinkSent(_id);}
 }
 function _setMkStatus(val){
   var hidden=$('mk-status');if(hidden)hidden.value=val||'pending';
@@ -8784,8 +8798,9 @@ function openMakeupUnified(id){
     if($('mk-note-sub'))$('mk-note-sub').style.display='none';
   }
   $('mk-content').value=m.makeupContent||m.makeupNote||'';
+  _mkNoteChange($('mk-note').value);
   $('mk-date').value=m.makeupDate||'';
-  var endDate=$('mk-absent-date-end');if(endDate)endDate.value=m.absentDateEnd||'';
+  var endDate=$('mk-absent-date-end');if(endDate)endDate.value=($('mk-note').value==='결석')?(m.absentDateEnd||''):'';
   var manual=$('mk-time-manual');if(manual)manual.value='';
   var hidden=$('mk-time');if(hidden)hidden.value=m.makeupTime||'';
   populateMkPeriod(m.makeupPeriod||'');
@@ -8798,7 +8813,6 @@ function openMakeupUnified(id){
   _mkOnAbsentRangeChange();
   var memo=$('mk-result-memo');if(memo)memo.value=m.makeupResult&&m.makeupResult!==''?(m.makeupResultMemo||''):'';
   var delBtn=$('mk-del-btn');if(delBtn)delBtn.style.display='';
-  var plb=$('mk-plink-btn');if(plb)plb.style.display=(m.makeupStatus==='pending')?'':'none';
   markParentSeen(id);
 }
 
@@ -8811,6 +8825,7 @@ function openMakeupUnifiedNew(dateStr){
   $('mk-absent-date').value=dateStr||todayISO();
   $('mk-note').value='학습 보완';
   if($('mk-note-sub'))$('mk-note-sub').style.display='none';
+  _mkNoteChange('학습 보완');
   var mkSR=$('mk-student-row');
   if(mkSR){
     mkSR.style.display='';
@@ -8845,6 +8860,7 @@ async function saveMakeupUnified(){
   var mkPeriod=($('mk-period')||{}).value||'';
   var mkNote=$('mk-note').value==='결석'?($('mk-note-sub')?$('mk-note-sub').value:'결석'):$('mk-note').value;
   var mkContent=$('mk-content').value;
+  var _isAbsReason=($('mk-note').value==='결석');
   var mkStatus=($('mk-status')||{}).value||'pending';
   var mkResultMemo=$('mk-result-memo')?.value||'';
   var autoStatus=mkDate?(mkStatus==='done'?'done':'scheduled'):'pending';
@@ -8855,7 +8871,7 @@ async function saveMakeupUnified(){
     if(!sId){toast('⚠️ 학생을 선택하세요');loading(false);window._mkSaving=false;return;}
     var s=students.find(function(x){return x.id===sId;});if(!s){loading(false);window._mkSaving=false;return;}
     var absentDateStart=$('mk-absent-date').value||'';
-    var absentDateEnd=($('mk-absent-date-end')||{}).value||'';
+    var absentDateEnd=_isAbsReason?(($('mk-absent-date-end')||{}).value||''):'';
     // 날짜 범위 계산 (주말 제외)
     var absentDays=(absentDateEnd&&absentDateEnd>absentDateStart)
       ?_getMkWeekdays(absentDateStart,absentDateEnd)
@@ -8867,7 +8883,7 @@ async function saveMakeupUnified(){
       var data={studentId:sId,studentName:s.name,absentDate:absentDate,absentDateEnd:absentDays.length>1&&di===0?absentDateEnd:'',absentReason:mkNote||'보강',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
       var ref=await db.collection('makeups').add(data);
       // onSnapshot이 자동으로 배열 업데이트하므로 직접 push 안 함
-      if(absentDate){
+      if(absentDate&&_isAbsReason){
         await autoCreateAbsentReport(sId,absentDate,ref.id);
         reports.filter(function(r){return r.studentId===sId&&r.date===absentDate&&r.absent&&r.absentReason!=='결석';}).forEach(function(r){
           r.absentReason='결석';
@@ -8875,13 +8891,13 @@ async function saveMakeupUnified(){
         });
       }
     }
-    if(firstDate){
+    if(firstDate&&_isAbsReason){
       _scheduleDate=firstDate;
       var datePick=$('schedule-date-pick');if(datePick)datePick.value=firstDate;
     }
-    toast('✅ 보강 등록 완료'+(absentDays.length>1?' — '+absentDays.length+'일 결석 처리됨':(firstDate?' — '+firstDate+' 결석 처리됨':'')));
+    toast('✅ 보강 등록 완료'+(!_isAbsReason?'':absentDays.length>1?' — '+absentDays.length+'일 결석 처리됨':(firstDate?' — '+firstDate+' 결석 처리됨':'')));
   }else{
-    var updateData={absentDate:$('mk-absent-date').value||'',absentDateEnd:($('mk-absent-date-end')||{}).value||'',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:mkStatus==='done'?'보강 ⭕':'',makeupResultMemo:mkResultMemo,updatedAt:new Date().toISOString()};
+    var updateData={absentDate:$('mk-absent-date').value||'',absentDateEnd:_isAbsReason?(($('mk-absent-date-end')||{}).value||''):'',makeupStatus:autoStatus,makeupDate:mkDate,makeupTime:mkTime,makeupPeriod:mkPeriod,makeupNote:mkNote,makeupContent:mkContent,makeupResult:mkStatus==='done'?'보강 ⭕':'',makeupResultMemo:mkResultMemo,updatedAt:new Date().toISOString()};
     await db.collection('makeups').doc(id).update(updateData);
     var idx=makeups.findIndex(function(m){return m.id===id;});
     if(idx>=0)Object.assign(makeups[idx],updateData);
@@ -8889,7 +8905,7 @@ async function saveMakeupUnified(){
   }
   closeM('makeup');
   renderMakeupCalendar();
-  if(mode==='new'&&$('mk-absent-date')&&$('mk-absent-date').value){
+  if(mode==='new'&&_isAbsReason&&$('mk-absent-date')&&$('mk-absent-date').value){
     window._scheduleFromMakeup=true;
     goto('schedule');
     switchSchTab('today');
@@ -24324,6 +24340,7 @@ function _hiddenUsersRow(){
 var _helpTxt={
  retire:['🚪 퇴사 처리','퇴사일을 정하면 재직 명단에서 빠지고 [퇴사] 탭으로 이동합니다.<br>급여(회계 &gt; 강사)에는 퇴사일이 속한 달까지 계속 보이고, 퇴사일 다음 날부터는 근무시간이 0시간으로 계산됩니다.<br>기록은 지워지지 않습니다. 잘못 눌렀다면 퇴사 탭에서 [재직 복귀]로 되돌릴 수 있습니다.'],
  purge:['🗑 삭제 (영구 삭제)','계정이 완전히 지워지며, 근무 시간표와 시급 설정도 함께 사라집니다. 되돌릴 수 없으므로 다음의 경우에만 사용해 주시기 바랍니다.<ol style="margin:4px 0 6px 16px;padding:0"><li>같은 아이디가 중복 등록된 경우</li><li>잘못 만든 계정인 경우</li><li>급여 자료의 보관기간이 지나 삭제할 필요가 있는 경우</li></ol>삭제 전에 필요한 급여 자료는 [이미지 저장]으로 보관하시기 바랍니다.<br>이미 작성된 보고서 등의 기록은 이름이 남아 있어 그대로 보입니다.'],
+ notify:['📱 학부모 안내','보강 계획표에서 직접 등록한 결석(예: 가족 여행 등 미리 알려 온 기간 결석)이나, 보강 일정이 확정된 뒤 학부모에게 다시 안내할 때 사용합니다.<br>안내 메시지에는 학부모가 보강 시간을 고를 수 있는 전용 링크가 들어갑니다.'],
  add:['📌 교사 계정 등록 안내','신규 교사는 [+ 교사 계정 추가] 버튼으로 등록해 주시기 바랍니다. 역할을 "교사"로 등록하면 회계 &gt; 강사 페이지의 급여 명세서에도 자동으로 나타납니다.<br>퇴사한 교사의 이름을 바꿔 새 교사로 재사용하지 마시기 바랍니다. 이전 근무 이력, 시급, 급여 데이터가 새 교사의 데이터와 섞이게 됩니다. 신규 교사는 항상 새로 등록해 주십시오.']
 };
 function _helpBtn(k){return '<button type="button" onclick="event.stopPropagation();_showHelp(this,\''+k+'\')" style="width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--txt2);font-size:11px;font-weight:800;cursor:pointer;line-height:1;vertical-align:middle;margin-left:4px">?</button>';}
