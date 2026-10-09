@@ -17671,7 +17671,7 @@ function _renderAcademicCalendarUI(el){
         var col=catColors[e.cat]||'#94a3b8';
         var dayStr=e.completed?'✅':e.acalType==='repeat'?'🔄':e.annualRepeat?'🔁':(e.date.slice(8));
         var completeBadge=e.completed?'<span style="font-size:9px;background:#f0fdf4;color:#16a34a;border-radius:3px;padding:0 3px">완료</span>':'';
-        html+='<div style="display:flex;align-items:center;gap:4px;padding:3px 6px;border-radius:5px;margin-bottom:2px;background:'+(e.completed?'#f0fdf4':col+'28')+';border-left:3px solid '+(e.completed?'#86efac':col)+';cursor:pointer" data-evtid="'+e.id+'" onclick="openAcalDetail(this.dataset.evtid)">'
+        html+='<div style="display:flex;align-items:center;gap:4px;padding:3px 6px;border-radius:5px;margin-bottom:2px;background:'+(e.completed?'#f0fdf4':col+'28')+';border-left:3px solid '+(e.completed?'#86efac':col)+';cursor:pointer" data-evtid="'+e.id+'" onclick="event.stopPropagation();openAcalDetail(this.dataset.evtid)">'
           +'<span style="font-size:10px;font-weight:700;color:'+col+';min-width:24px;flex-shrink:0">'+dayStr+'</span>'
           +'<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(e.completed?'var(--txt3)':'var(--txt)')+'">'+e.title+'</span>'
           +completeBadge
@@ -17734,6 +17734,8 @@ function _openAcalMonthModal(yr,mo){
       +evtsHTML
       +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
       +'</div>';
+    document.querySelectorAll('.acal-month-mo').forEach(function(m){m.remove();});
+    overlay.classList.add('acal-month-mo');
     document.body.appendChild(overlay);
   }
   if(!_plans||!_plans.length){loadPlans().then(buildModal);}
@@ -17832,8 +17834,10 @@ function openAcalAddModal(editId,defaultMo){
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">취소</button>'
     +'</div>';
   overlay.innerHTML=html;
+  document.querySelectorAll('.acal-add-mo').forEach(function(m){m.remove();});
+  overlay.classList.add('acal-add-mo');
   document.body.appendChild(overlay);
-  document.getElementById('acal-confirm-btn').onclick=async function(){confirmAcalAdd(overlay,editId);};
+  overlay.querySelector('#acal-confirm-btn').onclick=async function(){confirmAcalAdd(overlay,editId);};
 }
 
 
@@ -18864,10 +18868,11 @@ function confirmAcalAdd(overlay,editId){
 function openAcalDetail(evtId){
   var e=(_academicCalendar.events||[]).find(function(x){return x.id===evtId;});
   if(!e)return;
+  document.querySelectorAll('.acal-detail-mo').forEach(function(m){m.remove();});
   // 연결된 플랜 찾기
   var linkedPlans=_plans.filter(function(p){return p.acalId===evtId;});
   var overlay=document.createElement('div');
-  overlay.className='mo';overlay.style.display='flex';
+  overlay.className='mo acal-detail-mo';overlay.style.display='flex';
   overlay.onclick=async function(ev){if(ev.target===overlay)overlay.remove();};
   var dateStr=e.date?(e.endDate&&e.endDate!==e.date?e.date.slice(5)+' ~ '+e.endDate.slice(5):e.date.slice(5)):'-';
   var plansHTML=linkedPlans.length>0
@@ -18910,11 +18915,11 @@ function openAcalDetail(evtId){
     +'<button class="btn btn-outline btn-block" onclick="this.closest(\'.mo\').remove()">닫기</button>'
     +'</div>';
   document.body.appendChild(overlay);
-  document.getElementById('acal-detail-edit-btn').onclick=async function(){
+  overlay.querySelector('#acal-detail-edit-btn').onclick=async function(){
     overlay.remove();
     openAcalAddModal(evtId);
   };
-  document.getElementById('acal-detail-plan-btn').onclick=async function(){
+  overlay.querySelector('#acal-detail-plan-btn').onclick=async function(){
     var _evtId=evtId;
     var _ov=overlay;
     loadPlans().then(async function(){
