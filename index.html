@@ -19379,7 +19379,7 @@ function renderRevGoals(yr,moSel){
   var tableHtml='<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">월별 실적</div>'
     +'<div style="overflow-x:auto"><table class="rev-tbl" style="font-size:12px;width:100%">'
     +'<thead>'
-    +'<tr style="background:var(--navy);color:#fff;font-size:10px"><th colspan="5" style="text-align:center;padding:3px;font-weight:500;opacity:.85">💰 매출 현황</th><th colspan="5" style="text-align:center;padding:3px;font-weight:500;background:#1e3a8a;border-left:2px solid rgba(255,255,255,.55)">👥 원생 현황</th></tr>'
+    +'<tr style="background:var(--navy);color:#fff;font-size:14px"><th colspan="5" style="text-align:center;padding:8px 4px;font-weight:700;letter-spacing:.5px">매출 현황</th><th colspan="5" style="text-align:center;padding:8px 4px;font-weight:700;letter-spacing:.5px;background:#1e3a8a;border-left:2px solid rgba(255,255,255,.55)">원생 현황</th></tr>'
     +'<tr style="background:var(--navy);color:#fff">'
     +'<th style="text-align:center;padding:8px">월</th>'
     +'<th style="text-align:center;padding:8px">월 목표</th>'
@@ -22110,6 +22110,11 @@ function trInit(){
   // Storage 초기화
   try{
     var cfg=getCfg()||{};
+    // storageBucket 미설정 시 projectId로 기본 버킷 자동 보완 (브라우저 접속 시 설정 누락 방지)
+    if(!cfg.storageBucket&&cfg.projectId){
+      cfg.storageBucket=cfg.projectId+'.firebasestorage.app';
+      try{localStorage.setItem('fb_cfg',JSON.stringify(cfg));}catch(e){}
+    }
     if(!cfg.storageBucket){
       document.getElementById('tr-root').innerHTML=
         '<div style="padding:30px;text-align:center">'
@@ -22120,7 +22125,7 @@ function trInit(){
         +'</div>';
       return;
     }
-    _trStorage=firebase.storage();
+    _trStorage=firebase.app().storage('gs://'+cfg.storageBucket);
   }catch(e){
     document.getElementById('tr-root').innerHTML='<div style="padding:20px;color:red;font-size:12px">Firebase Storage 오류: '+e.message+'</div>';
     return;
