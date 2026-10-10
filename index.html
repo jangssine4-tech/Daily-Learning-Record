@@ -13005,15 +13005,16 @@ function renderStaffArea(){
     var hourlyRate=getHourlyRate(u,yr,mo);
     var workDays=_wdEff(u,yr,mo);
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-    var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
+    var _sch=getStaffSchedule(u,yr,mo);
+    var weeklyHours=_weeklyHoursOf(_sch);
     var juhuEnabled=u.juhuEnabled||false;
     // 주휴수당: 주 15시간 이상 시 = (주당근무시간/40) × 8시간 × 시급 × 주수
     var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
     var totalPay=Math.round(totalHours*hourlyRate)+juhuPay;
     var tax33=Math.round(totalPay*0.033);
     var net=totalPay-tax33;
-    var staffDays=u.staffDays||[];
-    var staffHoursPerDay=u.staffHoursPerDay||{};
+    var staffDays=_sch.days;
+    var staffHoursPerDay=_sch.hours;
     var dayBtns=['월','화','수','목','금','토'].map(function(d){
       var isOn=staffDays.includes(d);
       var hrs=staffHoursPerDay[d]||'';
@@ -13026,7 +13027,8 @@ function renderStaffArea(){
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
       +'<div style="display:flex;align-items:center;gap:6px"><strong style="font-size:15px">'+u.name+'</strong>'+(isDupeName?'<span class="badge" style="background:#fef3c7;color:#92400e" title="같은 이름의 계정이 2개 이상 있어요. 중복(유령) 계정일 수 있어요 — 근무 기록이 없는 쪽을 확인 후 🗑 삭제하세요.">⚠️ 중복 의심</span>':'')+'</div>'
       +'<span class="badge bg-blue">교사</span></div>'
-      +'<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap">'+dayBtns+'</div>'
+      +'<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;flex-wrap:wrap">'+dayBtns+'</div>'
+      +'<div style="font-size:10px;color:var(--txt3);margin-bottom:10px">📅 '+(_sch.from?(_sch.from.replace('-','년 ').replace(/ 0?/,' ')+'월부터 적용 중 · 이 달에 바꾸면 이전 달은 그대로예요'):'이 달에 바꾸면 이전 달은 그대로예요')+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;font-size:12px">'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">근무시간</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+totalHours+'h</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">시급</div><div style="font-weight:700;font-size:14px">'+hourlyRate.toLocaleString()+'</div></div>'
@@ -13081,7 +13083,7 @@ function saveFreelancerImage(){
     var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
     var hourlyRate=getHourlyRate(u,yr,mo);
     var juhuEnabled=u.juhuEnabled||false;
-    var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
+    var weeklyHours=_weeklyHoursOf(getStaffSchedule(u,yr,mo));
     var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
     var fee=Math.round(totalHours*hourlyRate)+juhuPay;
     var biz=Math.round(fee*0.03);
@@ -13194,36 +13196,77 @@ async function deleteStaffUserPermanently(userId,name){
     toast('❌ 삭제 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
   }
 }
-function toggleStaffDay(userId,day,el){
+// ── 월별 수업 요일/시수 이력 ──
+// staffScheduleHistory: [{from:'2026-09', days:['월','수'], hours:{월:2,수:3}}, ...]
+// 어떤 달에 설정한 내용은 그 달부터 이후 달에만 적용되고(다음 달은 따로 바꾸지 않으면 그대로 이어짐), 이전 달은 건드리지 않음.
+// 이력이 없는 달(최초 변경 이전)은 예전 필드(staffDays/staffHoursPerDay)를 그대로 사용.
+function _ymKey(yr,mo){return yr+'-'+String(mo).padStart(2,'0');}
+function getStaffSchedule(u,yr,mo){
+  var key=_ymKey(yr,mo);
+  var best=null;
+  ((u&&u.staffScheduleHistory)||[]).forEach(function(h){if(h&&h.from<=key&&(!best||h.from>best.from))best=h;});
+  if(best)return{days:(best.days||[]).slice(),hours:Object.assign({},best.hours||{}),from:best.from};
+  return{days:((u&&u.staffDays)||[]).slice(),hours:Object.assign({},(u&&u.staffHoursPerDay)||{}),from:null};
+}
+function _weeklyHoursOf(sch){return Object.values(sch.hours||{}).reduce(function(s,v){return s+(parseFloat(v)||0);},0);}
+function _currentRevYM(){
+  return{yr:parseInt($('rev-year')?.value)||new Date().getFullYear(),mo:parseInt($('rev-month')?.value)||new Date().getMonth()+1};
+}
+// 지금 보고 있는 달부터 적용되는 새 설정으로 저장
+function _saveStaffSchedule(userId,mutate){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
-  var staffDays=u.staffDays||[];
-  var idx=staffDays.indexOf(day);
-  if(idx>=0)staffDays.splice(idx,1);else staffDays.push(day);
-  u.staffDays=staffDays;
-  db.collection('users').doc(userId).update({staffDays:staffDays});
+  var ym=_currentRevYM();
+  var cur=getStaffSchedule(u,ym.yr,ym.mo);
+  mutate(cur);
+  var from=_ymKey(ym.yr,ym.mo);
+  var hist=(u.staffScheduleHistory||[]).filter(function(h){return h.from!==from;});
+  hist.push({from:from,days:cur.days,hours:cur.hours});
+  hist.sort(function(a,b){return a.from>b.from?1:-1;});
+  u.staffScheduleHistory=hist;
+  db.collection('users').doc(userId).update({staffScheduleHistory:hist}).catch(function(e){
+    console.error('staffScheduleHistory 저장 오류:',e);
+    toast('⚠️ 수업 요일 저장 실패 — 인터넷 연결을 확인해주세요',4000);
+  });
   _syncStaffScheduleToPayroll(userId);
+}
+function toggleStaffDay(userId,day,el){
+  _saveStaffSchedule(userId,function(cur){
+    var idx=cur.days.indexOf(day);
+    if(idx>=0)cur.days.splice(idx,1);else cur.days.push(day);
+  });
   renderStaffArea();saveCacheDebounced();
 }
 function saveStaffDayHours(userId,day,val){
-  var u=users.find(function(x){return x.id===userId;});if(!u)return;
-  var h=u.staffHoursPerDay||{};
-  h[day]=parseFloat(val)||0;
-  u.staffHoursPerDay=h;
-  db.collection('users').doc(userId).update({staffHoursPerDay:h});
-  _syncStaffScheduleToPayroll(userId);
+  _saveStaffSchedule(userId,function(cur){cur.hours[day]=parseFloat(val)||0;});
   saveCacheDebounced();
 }
 // 수업 요일/시수를 바꾸면, 이미 저장된 "근무 시간표"(워크데이)에도 반영 —
-// 단, 이미 지난 날짜(근무 완료된 날)나 공휴일/결근으로 따로 표시해둔 날, 메모가 적힌 날은 건드리지 않음
+// 보고 있는 달과 그 이후 달만 대상. 이미 지난 날짜(근무 완료된 날)나 공휴일/결근으로 따로 표시해둔 날, 메모가 적힌 날은 건드리지 않음
 function _syncStaffScheduleToPayroll(userId){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
-  var yr=parseInt($('rev-year')?.value)||new Date().getFullYear();
-  var mo=parseInt($('rev-month')?.value)||new Date().getMonth()+1;
+  var ym=_currentRevYM();
+  var base=ym.yr*12+ym.mo;
+  var update={};var changed=false;
+  Object.keys(u).forEach(function(k){
+    var m=/^workDays_(\d+)_(\d+)$/.exec(k);if(!m)return;
+    var yr=parseInt(m[1]),mo=parseInt(m[2]);
+    if(yr*12+mo<base)return; // 보고 있는 달보다 이전 달은 소급 적용하지 않음
+    if(_syncStaffScheduleMonth(u,yr,mo)){update[k]=u[k];changed=true;}
+  });
+  if(changed){
+    db.collection('users').doc(userId).update(update).catch(function(e){
+      console.error('_syncStaffScheduleToPayroll 오류:',e);
+      toast('⚠️ 근무 시간표 자동 반영 실패 — 인터넷 연결을 확인해주세요',4000);
+    });
+  }
+}
+function _syncStaffScheduleMonth(u,yr,mo){
   var key='workDays_'+yr+'_'+mo;
   var workDays=u[key];
-  if(!workDays||!workDays.length)return; // 아직 저장 전이면 모달 열 때 최신 요일/시수로 자동 채워지므로 손댈 것 없음
-  var staffDays=u.staffDays||[];
-  var staffHours=u.staffHoursPerDay||{};
+  if(!workDays||!workDays.length)return false; // 아직 저장 전이면 모달 열 때 최신 요일/시수로 자동 채워지므로 손댈 것 없음
+  var sch=getStaffSchedule(u,yr,mo);
+  var staffDays=sch.days;
+  var staffHours=sch.hours;
   var dayNames=['일','월','화','수','목','금','토'];
   var today=new Date();today.setHours(0,0,0,0);
   var changed=false;
@@ -13243,14 +13286,7 @@ function _syncStaffScheduleToPayroll(userId){
       workDays.push({day:d,hours:newHours,type:'normal'});changed=true;
     }
   }
-  if(changed){
-    u[key]=workDays;
-    var update={};update[key]=workDays;
-    db.collection('users').doc(userId).update(update).catch(function(e){
-      console.error('_syncStaffScheduleToPayroll 오류:',e);
-      toast('⚠️ 근무 시간표 자동 반영 실패 — 인터넷 연결을 확인해주세요',4000);
-    });
-  }
+  return changed;
 }
 async function toggleJuhu(userId,enabled){
   var idx=users.findIndex(function(u){return u.id===userId;});
@@ -13333,8 +13369,9 @@ function openPayrollModal(userId,yr,mo){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
   var key='workDays_'+yr+'_'+mo;
   var workDays=u[key]||[];
-  var staffDays=u.staffDays||[];
-  var staffHours=u.staffHoursPerDay||{};
+  var _sch=getStaffSchedule(u,yr,mo);
+  var staffDays=_sch.days;
+  var staffHours=_sch.hours;
   var daysInMo=new Date(yr,mo,0).getDate();
   var dayNames=['일','월','화','수','목','금','토'];
   var wasSaved=u[key+'_saved']||false;
@@ -13444,7 +13481,7 @@ function savePayrollImage(userId,yr,mo,overlay){
   var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
   // 주휴수당 계산
   var juhuEnabled=u.juhuEnabled||false;
-  var weeklyHours=u.staffHoursPerDay?Object.values(u.staffHoursPerDay).reduce(function(s,v){return s+(parseFloat(v)||0);},0):0;
+  var weeklyHours=_weeklyHoursOf(getStaffSchedule(u,yr,mo));
   var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
   var basePay=Math.round(totalHours*hourlyRate);
   var totalPay=basePay+juhuPay;
