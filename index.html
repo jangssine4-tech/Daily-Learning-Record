@@ -3981,7 +3981,6 @@ function _buildTimeline(){
   if(!isTodayDate){
     html+='<button onclick="tlCalSelect(\''+today+'\')" style="background:var(--mint);border:none;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;cursor:pointer">오늘</button>';
   }
-  html+='<button onclick="openRoutineModal()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer">🔁 루틴</button>';
   html+='<button onclick="_toggleTaskCol()" id="btn-toggle-taskcol" style="display:none;background:#1e40af;border:none;color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;margin-left:auto">오늘의 업무</button>';
   html+='</div>';
 
@@ -4051,7 +4050,7 @@ function _tlTaskCard(item,isPastDate){
       var rm=t.min?String(t.min).padStart(2,'0'):'00';
       rTimeLabel='<span style="font-size:11px;font-weight:600;color:#15803d;margin-right:4px;flex-shrink:0">'+String(rh).padStart(2,'0')+':'+rm+'</span>';
     }
-    return '<div style="display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;background:#f0fdf4;border:1.5px dashed #86efac;opacity:0.85">'
+    return '<div class="tl-routine-card" onclick="openRoutineDetail(\''+_dbtEsc(t.id)+'\')" title="누르면 루틴 내용을 볼 수 있습니다" style="cursor:pointer;display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;background:#f0fdf4;border:1.5px dashed #86efac;opacity:0.85">'
       +'<span style="font-size:11px">🔁</span>'
       +'<span style="flex:1;font-size:12px;color:#15803d;font-weight:500">'+rTimeLabel+t.name+'</span>'
       +(t.duration?'<span style="font-size:10px;color:#6b7280">'+t.duration+'분</span>':'')
@@ -4493,180 +4492,158 @@ function _ensureRoutinesLoaded(){
 function _refreshRoutineUI(){
   var l=document.getElementById('today-timeline-col');
   if(l){l.innerHTML=_buildTimeline();if(typeof _initTimelineDnD==='function')_initTimelineDnD();}
-  if(window._routineModal&&window._routineRenderBox){window._routineModal.innerHTML=window._routineRenderBox();}
+  if(typeof _dbtRefreshRoutineList==='function')_dbtRefreshRoutineList();
 }
 
-function openRoutineModal(){
-  var old=document.getElementById('routine-modal');if(old)old.remove();
-  var modal=document.createElement('div');
-  modal.id='routine-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.onclick=async function(e){if(e.target===modal)modal.remove();};
-
-  var DAYS_KR=['월','화','수','목','금','토','일'];
-  var DURATION_PRESETS=[15,30,45,60,90];
-
-  function renderBox(){
-    var routines=_getRoutines();
-    var h='<div style="background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:400px;max-height:88vh;overflow-y:auto">';
-
-    // 헤더
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
-    h+='<div style="font-size:15px;font-weight:800;color:var(--navy)">🔁 루틴 관리</div>';
-    h+='<button onclick="document.getElementById(\'routine-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button>';
-    h+='</div>';
-    h+='<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">매일 반복되는 루틴을 등록하면 타임라인에 자동 표시됩니다.</div>';
-
-    // 등록된 루틴 목록
-    if(routines.length){
-      h+='<div style="margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-      routines.forEach(function(r,i){
-        var hDisp=r.hour===24?'00':String(r.hour).padStart(2,'0');
-        var mDisp=String(r.min||0).padStart(2,'0');
-        var daysLabel=(r.days&&r.days.length&&r.days.length<7)?r.days.join('·'):'매일';
-        h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;'+(i>0?'border-top:1px solid var(--border)':'')+'">';
-        h+='<span style="font-size:12px;font-weight:700;color:var(--navy);flex-shrink:0;min-width:42px">'+hDisp+':'+mDisp+'</span>';
-        h+='<span style="flex:1;font-size:12px;color:var(--txt)">'+r.name+'</span>';
-        h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+daysLabel+'</span>';
-        if(r.duration)h+='<span style="font-size:10px;color:var(--txt3);flex-shrink:0;margin-left:4px">·'+r.duration+'분</span>';
-        h+='<button onclick="deleteRoutine('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;padding:0 2px;line-height:1">×</button>';
-        h+='</div>';
-      });
-      h+='</div>';
-    }else{
-      h+='<div style="text-align:center;padding:14px;color:var(--txt3);font-size:12px;border:1px dashed var(--border);border-radius:10px;margin-bottom:12px">등록된 루틴이 없습니다</div>';
-    }
-
-    // + 루틴 추가 버튼 (폼 토글)
-    h+='<button onclick="_toggleRoutineForm()" id="routine-add-toggle" class="btn btn-outline btn-sm" style="width:100%;margin-bottom:0">＋ 루틴 추가</button>';
-
-    // 입력 폼 (기본 숨김)
-    h+='<div id="routine-form" style="display:none;background:var(--surface2);border-radius:10px;padding:14px;margin-top:10px">';
-
-    // ① 루틴명
-    h+='<div style="margin-bottom:10px">';
-    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">루틴명 *</div>';
-    h+='<input id="routine-name" class="fi" placeholder="예: 아침 출결 확인" style="font-size:13px">';
-    h+='</div>';
-
-    // ② 시작 시간 + 소요시간 (한 줄)
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
-    // 시작 시간
-    h+='<div>';
-    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">시작 시간</div>';
-    h+='<input type="time" id="routine-time" class="fi" value="09:00" style="font-size:13px;font-weight:700;color:var(--navy)">';
-    h+='</div>';
-    // 소요시간
-    h+='<div>';
-    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:4px">소요시간</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
-    DURATION_PRESETS.forEach(function(d){
-      h+='<button type="button" onclick="_selectRoutineDuration('+d+',this)" class="routine-dur-btn" style="font-size:11px;padding:3px 7px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--txt2);cursor:pointer">'+d+'분</button>';
-    });
-    h+='<input type="number" id="routine-duration-custom" placeholder="직접" min="1" max="480" style="width:46px;font-size:11px;padding:3px 5px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--txt)" oninput="_routineCustomDur(this)">';
-    h+='</div>';
-    h+='<input type="hidden" id="routine-duration" value="30">';
-    h+='</div>';
-    h+='</div>';
-
-    // ③ 반복 요일
-    h+='<div style="margin-bottom:12px">';
-    h+='<div style="font-size:10px;font-weight:600;color:var(--txt3);margin-bottom:6px">반복 요일 <span style="font-weight:400">(미선택 시 매일)</span></div>';
-    h+='<div style="display:flex;gap:4px">';
-    DAYS_KR.forEach(function(d){
-      h+='<button type="button" onclick="_toggleRoutineDay(this,\''+d+'\')" data-day="'+d+'" style="flex:1;font-size:11px;font-weight:600;padding:4px 0;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--txt3);cursor:pointer">'+d+'</button>';
-    });
-    h+='</div>';
-    h+='</div>';
-
-    h+='<button onclick="addRoutine()" class="btn btn-navy btn-sm" style="width:100%">루틴 추가</button>';
-    h+='</div>'; // form 끝
-
-    // 닫기
-    h+='<button onclick="document.getElementById(\'routine-modal\').remove();var l=document.getElementById(\'today-timeline-col\');if(l){l.innerHTML=_buildTimeline();_initTimelineDnD();}" class="btn btn-outline btn-sm" style="width:100%;margin-top:10px">닫기</button>';
-    h+='</div>';
-    return h;
-  }
-
-  modal.innerHTML=renderBox();
-  document.body.appendChild(modal);
-  window._routineRenderBox=renderBox;
-  window._routineModal=modal;
+// ── 루틴 등록·삭제는 "업무 추가" 모달의 목록 중 "🔁 루틴"에서 한다 ──
+function _dbtEsc(v){return String(v==null?'':v).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+// '30분' · '1시간' · '1시간 30분' → 분
+function _dbtDurToMin(str){
+  if(!str)return 0;
+  var h=/(\d+)\s*시간/.exec(str),m=/(\d+)\s*분/.exec(str);
+  return (h?parseInt(h[1])*60:0)+(m?parseInt(m[1]):0);
 }
-
-function _toggleRoutineForm(){
-  var f=document.getElementById('routine-form');
-  if(!f)return;
-  var open=f.style.display==='none';
-  f.style.display=open?'block':'none';
-  var btn=document.getElementById('routine-add-toggle');
-  if(btn)btn.textContent=open?'▲ 접기':'＋ 루틴 추가';
-  if(open){setTimeout(function(){var n=document.getElementById('routine-name');if(n)n.focus();},50);}
-}
-
-function _selectRoutineDuration(val,el){
-  var inp=document.getElementById('routine-duration');
-  if(inp)inp.value=val;
-  var cust=document.getElementById('routine-duration-custom');
-  if(cust)cust.value='';
-  document.querySelectorAll('.routine-dur-btn').forEach(function(b){
-    b.style.background=b===el?'var(--navy)':'var(--surface)';
-    b.style.color=b===el?'#fff':'var(--txt2)';
-    b.style.borderColor=b===el?'var(--navy)':'var(--border)';
-  });
-}
-
-function _routineCustomDur(el){
-  var v=parseInt(el.value);
-  var inp=document.getElementById('routine-duration');
-  if(inp&&v>0)inp.value=v;
-  document.querySelectorAll('.routine-dur-btn').forEach(function(b){
-    b.style.background='var(--surface)';b.style.color='var(--txt2)';b.style.borderColor='var(--border)';
-  });
-}
-
-function _toggleRoutineDay(el,day){
+function _dbtToggleRoutineDay(el){
   var on=el.dataset.on==='1';
   el.dataset.on=on?'':'1';
   el.style.background=on?'var(--surface)':'var(--navy)';
   el.style.color=on?'var(--txt3)':'#fff';
   el.style.borderColor=on?'var(--border)':'var(--navy)';
 }
-
-function addRoutine(){
-  var name=(document.getElementById('routine-name')||{}).value||'';
-  if(!name.trim()){toast('루틴명을 입력하세요');return;}
-  var timeVal=(document.getElementById('routine-time')||{}).value||'09:00';
+// 목록에서 "루틴"을 고르면 루틴에 필요한 항목(루틴명·시작 시간·소요시간·반복 요일)만 보이게 전환
+function _dbtSetRoutineMode(on){
+  var m=document.getElementById('db-task-modal');if(!m)return;
+  m.querySelectorAll('.dbt-task-only').forEach(function(e){e.style.display=on?'none':'';});
+  m.querySelectorAll('.dbt-routine-only').forEach(function(e){e.style.display=on?'':'none';});
+  var ttl=document.getElementById('dbt-title');if(ttl&&!_dbEditId)ttl.textContent=on?'+ 루틴 추가':'+ 업무 추가';
+  var lbl=document.getElementById('dbt-name-lbl');if(lbl)lbl.textContent=on?'루틴명 *':'업무명 *';
+  var nm=document.getElementById('dbt-name');if(nm)nm.placeholder=on?'예: 아침 출결 확인':'업무 내용을 입력하세요';
+  var st=document.getElementById('dbt-starthour');
+  var du=document.getElementById('dbt-duration');
+  if(on){
+    // 루틴은 시작 시간이 꼭 필요하고 소요시간 기본값은 30분 — 비어 있으면 채워 두고, 업무로 돌아가면 다시 비움
+    if(st&&!st.value){st.value='09:00';st.dataset.auto='1';}
+    if(du&&!du.value){du.value='30분';du.dataset.auto='1';}
+    _dbtRoutineListOpen=false; // 등록된 루틴 목록은 버튼을 눌러야 펼쳐짐
+    _ensureRoutinesLoaded();
+    _dbtRefreshRoutineList();
+  }else{
+    if(st&&st.dataset.auto==='1'){st.value='';st.dataset.auto='';}
+    if(du&&du.dataset.auto==='1'){du.value='';du.dataset.auto='';}
+  }
+}
+function _dbtRoutineTime(r){
+  var hDisp=r.hour===24?'00':String(r.hour).padStart(2,'0');
+  return hDisp+':'+String(r.min||0).padStart(2,'0');
+}
+function _dbtRoutineDays(r){
+  return (r.days&&r.days.length&&r.days.length<7)?r.days.join('·'):'매일';
+}
+// 등록된 루틴: "📋 등록된 루틴 (N)" 버튼을 눌러야 펼쳐지고, 루틴을 누르면 상세 내용이 열림
+var _dbtRoutineListOpen=false;
+function _dbtToggleRoutineList(){_dbtRoutineListOpen=!_dbtRoutineListOpen;_dbtRefreshRoutineList();}
+function _dbtRefreshRoutineList(){
+  var el=document.getElementById('dbt-routine-list');if(!el)return;
+  var routines=_routinesCache;
+  if(routines===null){el.innerHTML='<div style="font-size:11px;color:var(--txt3)">루틴 목록을 불러오는 중입니다...</div>';return;}
+  var open=_dbtRoutineListOpen;
+  var h='<button type="button" id="dbt-routine-list-toggle" onclick="_dbtToggleRoutineList()" style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer"><span>📋 등록된 루틴 ('+routines.length+')</span><span>'+(open?'▲':'▼')+'</span></button>';
+  if(open){
+    if(!routines.length){
+      h+='<div style="margin-top:6px;text-align:center;padding:10px;color:var(--txt3);font-size:11px;border:1px dashed var(--border);border-radius:10px">등록된 루틴이 없습니다</div>';
+    }else{
+      h+='<div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">';
+      routines.forEach(function(r){
+        h+='<button type="button" class="dbt-routine-item" onclick="openRoutineDetail(\''+_dbtEsc(r.id)+'\')" style="display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer">'
+          +'<span style="font-size:12px;font-weight:700;color:var(--navy);flex-shrink:0;min-width:42px">'+_dbtRoutineTime(r)+'</span>'
+          +'<span style="flex:1;font-size:12px;color:var(--txt)">'+_dbtEsc(r.name)+(r.memo?' <span title="메모 있음">📝</span>':'')+'</span>'
+          +'<span style="font-size:10px;color:var(--txt3);flex-shrink:0">'+_dbtRoutineDays(r)+'</span>'
+          +'</button>';
+      });
+      h+='</div>';
+    }
+  }
+  el.innerHTML=h;
+}
+// 업무 추가 모달에서 "루틴"을 선택한 채 저장했을 때 — 저장했으면 true
+function _dbSaveRoutineFromModal(){
+  var name=((document.getElementById('dbt-name')||{}).value||'').trim();
+  if(!name){showAlert('루틴명을 입력해 주시기 바랍니다.');return false;}
+  var timeVal=(document.getElementById('dbt-starthour')||{}).value||'';
+  if(!timeVal){showAlert('시작 시간을 입력해 주시기 바랍니다.');return false;}
+  if(_routinesCache===null){_ensureRoutinesLoaded();toast('루틴 목록을 불러오는 중입니다. 잠시 후 다시 저장해 주시기 바랍니다.');return false;}
   var parts=timeVal.split(':');
-  var hour=parseInt(parts[0])||9;
+  var hh=parseInt(parts[0])||0;
   var min=parseInt(parts[1])||0;
-  var duration=parseInt((document.getElementById('routine-duration')||{}).value||'30')||30;
-  var selectedDays=[];
-  document.querySelectorAll('[data-day]').forEach(function(b){if(b.dataset.on==='1')selectedDays.push(b.dataset.day);});
+  var hour=hh===0?24:hh; // 자정(00시)은 타임라인에서 24시 칸
+  var duration=_dbtDurToMin((document.getElementById('dbt-duration')||{}).value)||30;
+  var memo=((document.getElementById('dbt-memo')||{}).value||'').trim();
+  var days=[];
+  document.querySelectorAll('#db-task-modal .dbt-routine-day').forEach(function(b){if(b.dataset.on==='1')days.push(b.dataset.dayname);});
   var id='r_'+Date.now();
-  var newRoutine={id:id,name:name,hour:hour,min:min,duration:duration,days:selectedDays};
+  var data={name:name,hour:hour,min:min,duration:duration,days:days,memo:memo};
+  var newRoutine=Object.assign({id:id},data);
   // 낙관적 UI 갱신 (저장 실패 시 아래에서 롤백)
   _routinesCache=(_routinesCache||[]).concat([newRoutine]);
-  if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
-  db.collection('routines').doc(id).set({name:name,hour:hour,min:min,duration:duration,days:selectedDays}).catch(function(e){
-    console.error('addRoutine 오류:',e);
+  var m=document.getElementById('db-task-modal');if(m)m.remove();
+  _refreshRoutineUI();
+  toast('🔁 "'+name+'" 루틴이 추가되었습니다.');
+  db.collection('routines').doc(id).set(data).catch(function(e){
+    console.error('루틴 저장 오류:',e);
     toast('❌ "'+name+'" 루틴 저장 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
     _routinesCache=(_routinesCache||[]).filter(function(r){return r.id!==id;});
-    if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
+    _refreshRoutineUI();
   });
+  return true;
 }
 
-function deleteRoutine(idx){
+// 루틴 상세 보기 — 타임라인의 루틴 카드 또는 "등록된 루틴" 목록에서 열림. 설정한 내용을 보여 주고 삭제할 수 있음
+function openRoutineDetail(id){
+  var r=(_routinesCache||[]).find(function(x){return x.id===id;});
+  if(!r)return;
+  var old=document.getElementById('routine-detail-modal');if(old)old.remove();
+  var modal=document.createElement('div');
+  modal.id='routine-detail-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  function row(label,valueHtml){
+    return '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:var(--txt3);margin-bottom:3px">'+label+'</div><div style="font-size:13px;color:var(--txt)">'+valueHtml+'</div></div>';
+  }
+  var h='<div style="background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:400px;max-height:88vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--navy)">🔁 루틴</div>'
+    +'<button type="button" class="rd-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)">✕</button></div>'
+    +row('루틴명','<b>'+_dbtEsc(r.name)+'</b>')
+    +row('시작 시간',_dbtRoutineTime(r))
+    +row('소요시간',(r.duration||30)+'분')
+    +row('반복 요일',_dbtRoutineDays(r))
+    +row('메모',r.memo?'<div style="white-space:pre-wrap;line-height:1.5">'+_dbtEsc(r.memo)+'</div>':'<span style="color:var(--txt3)">메모가 없습니다</span>')
+    +'<div style="display:flex;gap:8px;margin-top:8px">'
+    +'<button type="button" class="btn btn-red btn-sm rd-delete">삭제</button>'
+    +'<button type="button" class="btn btn-outline btn-sm rd-close" style="margin-left:auto">닫기</button></div></div>';
+  modal.innerHTML=h;
+  modal.querySelectorAll('.rd-close').forEach(function(b){b.onclick=function(){modal.remove();};});
+  modal.querySelector('.rd-delete').onclick=async function(){
+    var okDel=await showConfirm('"'+r.name+'" 루틴을 삭제하시겠습니까?\n등록된 모든 요일의 타임라인에서 사라지며, 삭제한 루틴은 되돌릴 수 없습니다.','삭제','취소',true);
+    if(!okDel)return;
+    modal.remove();
+    deleteRoutine(id);
+  };
+  document.body.appendChild(modal);
+}
+
+function deleteRoutine(id){
   var routines=_getRoutines();
-  var r=routines[idx];if(!r)return;
+  var r=routines.find(function(x){return x.id===id;});
+  if(!r)return;
   // 낙관적 UI 갱신 (삭제 실패 시 아래에서 복구)
-  _routinesCache=routines.filter(function(x,i){return i!==idx;});
-  if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
-  db.collection('routines').doc(r.id).delete().catch(function(e){
+  _routinesCache=routines.filter(function(x){return x.id!==id;});
+  _refreshRoutineUI();
+  db.collection('routines').doc(id).delete().catch(function(e){
     console.error('deleteRoutine 오류:',e);
     toast('❌ "'+(r.name||'루틴')+'" 삭제 실패 — 인터넷 연결을 확인하고 다시 시도해주세요 ('+(e&&e.message?e.message:e)+')',5000);
     _routinesCache=_getRoutines().concat([r]);
-    if(window._routineModal)window._routineModal.innerHTML=window._routineRenderBox();
+    _refreshRoutineUI();
   });
 }
 
@@ -15189,6 +15166,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var hdr=document.createElement('div');
   hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:16px';
   var ttl=document.createElement('div');ttl.style.cssText='font-size:15px;font-weight:800;color:var(--navy)';
+  ttl.id='dbt-title';
   ttl.textContent=id?'✏️ 업무 편집':'+ 업무 추가';
   var xBtn=document.createElement('button');xBtn.style.cssText='background:none;border:none;font-size:20px;cursor:pointer;color:var(--txt3)';
   xBtn.textContent='✕';xBtn.onclick=async function(){modal.remove();};
@@ -15207,6 +15185,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
       {v:'today',  l:'오늘 할 일',   desc:'오늘 실행할 업무'},
       {v:'weekly', l:'주간 할 일',   desc:'이번 주 안에 할 업무'},
       {v:'monthly',l:'이달의 할 일', desc:'이번 달 안에 할 업무'},
+      {v:'routine', l:'🔁 루틴',      desc:'정해진 요일에 반복되는 업무'},
     ];
     var curList='today';
     var listWrap=document.createElement('div');listWrap.style.marginBottom='12px';
@@ -15231,13 +15210,14 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
         });
         var schEl=document.getElementById('dbt-scheduledate');
         var dueEl=document.getElementById('dbt-due');
-        if(schEl){
+        if(schEl&&opt.v!=='routine'){
           var d=new Date();
           if(opt.v==='today'){schEl.value=todayISO();if(dueEl)dueEl.value=todayISO();}
           else if(opt.v==='weekly'){var day=d.getDay(),diff=day===0?6:day-1;d.setDate(d.getDate()+(7-diff));schEl.value=d.toISOString().slice(0,10);if(dueEl)dueEl.value=schEl.value;}
           else{var eom=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);schEl.value=eom;if(dueEl)dueEl.value=eom;}
         }
         document.getElementById('dbt-list-hidden').value=opt.v;
+        _dbtSetRoutineMode(opt.v==='routine');
       };
       listBtnRow.appendChild(btn);
     });
@@ -15257,7 +15237,8 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   // ── 업무명 ──
   var nameInp=document.createElement('input');nameInp.className='fi';nameInp.id='dbt-name';
   nameInp.placeholder='업무 내용을 입력하세요';nameInp.style.fontSize='13px';nameInp.value=t?t.name:'';
-  var nw=document.createElement('div');nw.style.marginBottom='10px';nw.appendChild(mkLbl('업무명 *'));nw.appendChild(nameInp);box.appendChild(nw);
+  var nameLbl=mkLbl('업무명 *');nameLbl.id='dbt-name-lbl';
+  var nw=document.createElement('div');nw.style.marginBottom='10px';nw.appendChild(nameLbl);nw.appendChild(nameInp);box.appendChild(nw);
 
   // ── 메모 ──
   var memoTa=document.createElement('textarea');memoTa.className='fi';memoTa.id='dbt-memo';
@@ -15267,17 +15248,18 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
 
   // ── 업무 영역 ──
   var areaSel=mkSel('dbt-area',_DB_AREAS.map(function(a){return{v:a,l:_DB_AREA_ICONS[a]+' '+a};}),t?t.area:(defaultArea||''));
-  var aw=document.createElement('div');aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
+  var aw=document.createElement('div');aw.className='dbt-task-only';aw.style.marginBottom='10px';aw.appendChild(mkLbl('업무 영역'));aw.appendChild(areaSel);box.appendChild(aw);
 
   // ── 예상 소요시간 ──
   var DUR_OPTS=['15분','30분','45분','1시간','1시간 30분','2시간'];
   var durSel2=mkSel('dbt-duration',
     [{v:'',l:'선택'}].concat(DUR_OPTS.map(function(d){return{v:d,l:d};})),
     t?t.estDuration||'':'');
+  durSel2.addEventListener('change',function(){durSel2.dataset.auto='';});
   var durW2=document.createElement('div');durW2.style.marginBottom='10px';durW2.appendChild(mkLbl('예상 소요시간'));durW2.appendChild(durSel2);box.appendChild(durW2);
 
   // ── 완료 기한 + 실행 예정일 ──
-  var rDate=document.createElement('div');rDate.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
+  var rDate=document.createElement('div');rDate.className='dbt-task-only';rDate.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
   var dueInp=document.createElement('input');dueInp.className='fi';dueInp.id='dbt-due';dueInp.type='date';dueInp.style.fontSize='12px';
   dueInp.value=t&&t.dueDate?t.dueDate:(defaultDueDate||'');
   var schInp=document.createElement('input');schInp.className='fi';schInp.id='dbt-scheduledate';schInp.type='date';schInp.style.fontSize='12px';
@@ -15287,7 +15269,7 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   rDate.appendChild(dueDateW);rDate.appendChild(schDateW);box.appendChild(rDate);
 
   // ── 중요도 + 긴급도 ──
-  var rPri=document.createElement('div');rPri.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
+  var rPri=document.createElement('div');rPri.className='dbt-task-only';rPri.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px';
   var impSel=mkSel('dbt-importance',[{v:'높음',l:'높음'},{v:'보통',l:'보통'},{v:'낮음',l:'낮음'}],
     t?(t.importance||(t.priority==='중요'?'높음':'보통')):'보통');
   var urgSel=mkSel('dbt-urgency',[{v:'긴급',l:'긴급'},{v:'일반',l:'일반'}],
@@ -15306,9 +15288,24 @@ function openDbTaskModal(id,defaultArea,defaultTaskType,defaultDueDate,defaultSl
   var startHourInp=document.createElement('input');
   startHourInp.className='fi';startHourInp.id='dbt-starthour';
   startHourInp.type='time';startHourInp.style.fontSize='12px';startHourInp.value=curHourVal;
-  var slotW=document.createElement('div');slotW.appendChild(mkLbl('실행 시간대'));slotW.appendChild(slotSel);
+  startHourInp.addEventListener('input',function(){startHourInp.dataset.auto='';});
+  var slotW=document.createElement('div');slotW.className='dbt-task-only';slotW.appendChild(mkLbl('실행 시간대'));slotW.appendChild(slotSel);
   var shW=document.createElement('div');shW.appendChild(mkLbl('시작 시간'));shW.appendChild(startHourInp);
   rTime.appendChild(slotW);rTime.appendChild(shW);box.appendChild(rTime);
+
+  // ── 루틴 전용: 반복 요일 + 등록된 루틴 목록 (목록에서 "루틴"을 고른 때만 표시) ──
+  var rtDays=document.createElement('div');rtDays.className='dbt-routine-only';rtDays.style.cssText='display:none;margin-bottom:12px';
+  rtDays.appendChild(mkLbl('반복 요일 (미선택 시 매일)'));
+  var rtDaysRow=document.createElement('div');rtDaysRow.style.cssText='display:flex;gap:4px';
+  ['월','화','수','목','금','토','일'].forEach(function(dn){
+    var b=document.createElement('button');b.type='button';b.className='dbt-routine-day';b.dataset.dayname=dn;b.textContent=dn;
+    b.style.cssText='flex:1;font-size:11px;font-weight:600;padding:6px 0;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--txt3);cursor:pointer';
+    b.onclick=function(){_dbtToggleRoutineDay(b);};
+    rtDaysRow.appendChild(b);
+  });
+  rtDays.appendChild(rtDaysRow);box.appendChild(rtDays);
+  var rtList=document.createElement('div');rtList.id='dbt-routine-list';rtList.className='dbt-routine-only';rtList.style.cssText='display:none;margin-bottom:12px';
+  box.appendChild(rtList);
 
   // 실행 예정일 변경 시 타임라인 힌트 표시
   schInp.addEventListener('change',function(){});
@@ -15338,6 +15335,11 @@ function _dbSaveTaskModal(id){
   var name=(document.getElementById('dbt-name')||{}).value||'';
   var area=(document.getElementById('dbt-area')||{}).value||'';
   var listChoice=(document.getElementById('dbt-list-hidden')||{}).value||'today';
+  if(listChoice==='routine'&&!id){
+    _dbSaveTaskModal._saving=false;
+    _dbSaveRoutineFromModal();
+    return;
+  }
   // listChoice → taskType 매핑 (하위 호환)
   var taskType=listChoice==='monthly'?'이달의 할 일':'일반 업무';
   var dueDate=(document.getElementById('dbt-due')||{}).value||'';
