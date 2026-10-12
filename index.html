@@ -10912,8 +10912,7 @@ function calcMonthExpTotal(yr,mo){
   // Auto 인건비+세금 (전월분) - same check as renderRevExpense (autoFromLedger)
   if(!list.some(function(e2){return e2.category==='인건비'&&e2.autoFromLedger;})){
     tl.forEach(function(u2){
-      var wd=_wdEff(u2,pyr,pmo);var th=wd.reduce(function(s2,d2){return s2+(parseFloat(d2.hours)||0);},0);
-      var fee=Math.round(th*(u2.hourlyRate||15000));var bt=Math.round(fee*0.03);var rt=Math.round(bt*0.1);var nt=fee-bt-rt;
+      var pp=calcStaffPay(u2,pyr,pmo);var bt=pp.biz,rt=pp.res,nt=pp.net;
       if(nt>0)list.push({category:'인건비',amount:nt,autoFromLedger:true});
       if(bt>0)list.push({category:'세금-원천 소득세',amount:bt,autoFromLedger:true});
       if(rt>0)list.push({category:'세금-원천 지방 소득세',amount:rt,autoFromLedger:true});
@@ -12934,23 +12933,63 @@ function getMkDailyTasks(){var cfg=window._mkConfig||_MK_DEFAULT_CONFIG;return (
 function getMkMonthlyCriteria(){var cfg=window._mkConfig||_MK_DEFAULT_CONFIG;return (cfg.monthlyCriteria||'').split('\n').filter(function(t){return t.trim();});}
 
 // ══ STAFF ══
-function calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo){
-  if(!juhuEnabled||weeklyHours<15)return 0;
+// ── 주휴수당 계산 ──
+// 주당 주휴수당 = (주간 시수 ÷ 40) × 8 × 시급. 지급 주 수는 4.3주를 기준으로 하되,
+// 그 달에 월요일이 있는 주 중 (결석이 있는 주) 또는 (그 주 실제 근무가 15시간 미만인 주)는 제외한다.
+// 한 주(월~일)는 앞뒤 달의 근무 기록까지 합쳐서 판단하고, 앞뒤 달 기록이 아직 없으면 주간 시간표로 추정한다.
+// 공휴일로 표시한 날은 주간 시간표의 시수만큼 근무한 것으로 본다.
+var _JUHU_DAYNAMES=['일','월','화','수','목','금','토'];
+function _juhuDayInfo(u,date,ovArr,ovYr,ovMo){
+  var y=date.getFullYear(),m=date.getMonth()+1,d=date.getDate();
+  var iso=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  var sch=getStaffSchedule(u,y,m);
+  var dow=_JUHU_DAYNAMES[date.getDay()];
+  var sched=sch.days.indexOf(dow)>=0?(parseFloat(sch.hours[dow])||0):0;
+  var afterEnd=!!(u.endDate&&iso>u.endDate);
+  var thisMonth=(y===ovYr&&m===ovMo);
+  var arr=(ovArr&&thisMonth)?ovArr:u['workDays_'+y+'_'+m];
+  if(!arr){
+    if(thisMonth)return{h:0,absent:false}; // 계산 중인 달에 기록이 없으면 근무 0
+    var beforeStart=!!(u.startDate&&iso<u.startDate);
+    return{h:(afterEnd||beforeStart)?0:sched,absent:false}; // 앞뒤 달 기록이 없으면 주간 시간표로 추정
+  }
+  var e=arr.find(function(w){return w.day===d;});
+  if(!e)return{h:0,absent:false};
+  if(e.type==='absent')return{h:0,absent:true};
+  if(afterEnd)return{h:0,absent:false};
+  if(e.type==='holiday')return{h:sched,absent:false};
+  return{h:parseFloat(e.hours)||0,absent:false};
+}
+function calcJuhuPay(u,yr,mo,weeklyHours,hourlyRate,ovArr){
+  if(!u||!u.juhuEnabled||weeklyHours<15)return 0;
   var weeklyJuhu=Math.round((weeklyHours/40)*8*hourlyRate);
-  // Find weeks with absences: group workDays by Mon-Sun week
-  var absentWeeks=new Set();
-  workDays.forEach(function(wd){
-    if(wd.type!=='absent')return;
-    // Get Monday of this day's week
-    var dt=new Date(yr||2026,mo?mo-1:0,wd.day);
-    var dow=dt.getDay(); // 0=Sun
-    var mondayOffset=dow===0?-6:1-dow;
-    var monday=new Date(dt);monday.setDate(dt.getDate()+mondayOffset);
-    absentWeeks.add(monday.toISOString().substring(0,10));
-  });
-  var absentCount=absentWeeks.size;
-  var validWeeks=Math.max(0,4.3-absentCount);
-  return Math.round(weeklyJuhu*validWeeks);
+  var excluded=0;
+  var daysInMo=new Date(yr,mo,0).getDate();
+  for(var d=1;d<=daysInMo;d++){
+    if(new Date(yr,mo-1,d).getDay()!==1)continue; // 월요일이 이 달에 있는 주만 이 달에 계산
+    var sum=0,absent=false;
+    for(var k=0;k<7;k++){
+      var info=_juhuDayInfo(u,new Date(yr,mo-1,d+k),ovArr,yr,mo);
+      sum+=info.h;if(info.absent)absent=true;
+    }
+    if(absent||sum<15)excluded++;
+  }
+  return Math.round(weeklyJuhu*Math.max(0,4.3-excluded));
+}
+// 한 선생님의 한 달 급여를 계산하는 공통 함수 — 급여 카드, 용역 대장(화면·이미지), 근무 시간표 이미지, 지출 자동 입력이 모두 이 값을 쓴다.
+// ovArr: 저장 전 근무 시간표(모달에서 편집 중인 값)를 넘기면 그 값으로 계산
+function calcStaffPay(u,yr,mo,ovArr){
+  var rate=getHourlyRate(u,yr,mo);
+  var arr=ovArr||_wdEff(u,yr,mo);
+  var hours=arr.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
+  var weekly=_weeklyHoursOf(getStaffSchedule(u,yr,mo));
+  var juhu=calcJuhuPay(u,yr,mo,weekly,rate,ovArr||null);
+  var base=Math.round(hours*rate);
+  var fee=base+juhu;
+  var biz=Math.round(fee*0.03);
+  var res=Math.round(biz*0.1);
+  var tax=biz+res;
+  return{rate:rate,hours:hours,weekly:weekly,juhu:juhu,base:base,fee:fee,biz:biz,res:res,tax:tax,net:fee-tax};
 }
 function showStaffGuide(){
   showAlert('📌 강사 등록 안내\n\n신규 강사는 관리자 페이지의 [+ 교사 계정 추가] 버튼으로 등록해주세요. 역할을 "교사"로 등록하면 이 급여 명세서 페이지에도 자동으로 나타나요.\n\n퇴사한 강사의 이름을 바꿔서 새 강사로 재사용하지 마세요 — 이전 근무 이력, 시급, 급여 데이터가 그대로 남아 새 강사의 데이터와 섞이게 됩니다. 신규 강사는 항상 관리자 페이지에서 새로 등록해주세요.');
@@ -13002,17 +13041,15 @@ function renderStaffArea(){
   users.forEach(function(u){if(u.role==='teacher')_nameCount[u.name]=(_nameCount[u.name]||0)+1;});
   var payrollHTML=teacherList.length?teacherList.map(function(u,idx){
     var isDupeName=_nameCount[u.name]>1;
-    var hourlyRate=getHourlyRate(u,yr,mo);
-    var workDays=_wdEff(u,yr,mo);
-    var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
+    var pay=calcStaffPay(u,yr,mo);
+    var hourlyRate=pay.rate;
+    var totalHours=pay.hours;
     var _sch=getStaffSchedule(u,yr,mo);
-    var weeklyHours=_weeklyHoursOf(_sch);
     var juhuEnabled=u.juhuEnabled||false;
-    // 주휴수당: 주 15시간 이상 시 = (주당근무시간/40) × 8시간 × 시급 × 주수
-    var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
-    var totalPay=Math.round(totalHours*hourlyRate)+juhuPay;
-    var tax33=Math.round(totalPay*0.033);
-    var net=totalPay-tax33;
+    var juhuPay=pay.juhu;
+    var totalPay=pay.fee;
+    var tax33=pay.tax;
+    var net=pay.net;
     var staffDays=_sch.days;
     var staffHoursPerDay=_sch.hours;
     var dayBtns=['월','화','수','목','금','토'].map(function(d){
@@ -13029,12 +13066,13 @@ function renderStaffArea(){
       +'<span class="badge bg-blue">교사</span></div>'
       +'<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;flex-wrap:wrap">'+dayBtns+'</div>'
       +'<div style="font-size:10px;color:var(--txt3);margin-bottom:10px">📅 '+(_sch.from?(_sch.from.replace('-','년 ').replace(/ 0?/,' ')+'월부터 적용 중 · 이 달에 바꾸면 이전 달은 그대로예요'):'이 달에 바꾸면 이전 달은 그대로예요')+'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;font-size:12px">'
+      +'<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px;font-size:12px">'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">근무시간</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+totalHours+'h</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">시급</div><div style="font-weight:700;font-size:14px">'+hourlyRate.toLocaleString()+'</div></div>'
       +(juhuEnabled?'<div style="background:#f0fdf4;border:1px solid #86efac;padding:8px;border-radius:6px;text-align:center"><div style="color:#16a34a;font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:#16a34a">'+juhuPay.toLocaleString()+'</div></div>':'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:var(--txt3)">미적용</div></div>')
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">총 급여</div><div style="font-weight:700;font-size:14px;color:var(--mint)">'+totalPay.toLocaleString()+'</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">원천세(3.3%)</div><div style="font-weight:700;font-size:14px;color:var(--red)">'+tax33.toLocaleString()+'</div></div>'
+      +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">차감 수령액</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+net.toLocaleString()+'</div></div>'
       +'</div>'
       +'<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openPayrollModal(\''+u.id+'\','+yr+','+mo+')">📝 근무 시간표</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
@@ -13048,13 +13086,11 @@ function renderStaffArea(){
   var freelancerHTML='<table class="rev-tbl" style="font-size:12px"><thead><tr><th style="text-align:center">번호</th><th style="text-align:center">이름</th><th style="text-align:center">주민번호</th><th style="text-align:center">주소</th><th style="text-align:center">용역비</th><th style="text-align:center">사업소득세(3%)</th><th style="text-align:center">주민세</th><th style="text-align:center">차감수령액</th><th style="text-align:center">지급날짜</th></tr></thead><tbody>';
   var totalFee=0,totalBizTax=0,totalResTax=0,totalNet=0;
   teacherList.forEach(function(u,idx){
-    var hourlyRate=getHourlyRate(u,yr,mo);
-    var workDays=_wdEff(u,yr,mo);
-    var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-    var fee=Math.round(totalHours*hourlyRate);
-    var bizTax=Math.round(fee*0.03);
-    var resTax=Math.round(bizTax*0.1);
-    var net2=fee-bizTax-resTax;
+    var pay=calcStaffPay(u,yr,mo);
+    var fee=pay.fee;
+    var bizTax=pay.biz;
+    var resTax=pay.res;
+    var net2=pay.net;
     totalFee+=fee;totalBizTax+=bizTax;totalResTax+=resTax;totalNet+=net2;
     var ssn=u.ssn?'***-***':'';
     freelancerHTML+='<tr><td style="text-align:center">'+(idx+1)+'</td><td style="text-align:center;font-weight:600">'+u.name+'</td><td style="text-align:center;font-size:11px">'+ssn+'</td><td style="text-align:center;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(u.address||'-')+'</td><td style="text-align:center">'+fee.toLocaleString()+'</td><td style="text-align:center">'+bizTax.toLocaleString()+'</td><td style="text-align:center">'+resTax.toLocaleString()+'</td><td style="text-align:center;font-weight:700">'+net2.toLocaleString()+'</td><td style="text-align:center">'+payDateStr+'</td></tr>';
@@ -13079,16 +13115,13 @@ function saveFreelancerImage(){
   });
   var rows='';var totalFee=0,totalBiz=0,totalRes=0,totalNet=0;
   teacherList.forEach(function(u,idx){
-    var workDays=_wdEff(u,yr,mo);
-    var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-    var hourlyRate=getHourlyRate(u,yr,mo);
-    var juhuEnabled=u.juhuEnabled||false;
-    var weeklyHours=_weeklyHoursOf(getStaffSchedule(u,yr,mo));
-    var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
-    var fee=Math.round(totalHours*hourlyRate)+juhuPay;
-    var biz=Math.round(fee*0.03);
-    var res=Math.round(biz*0.1);
-    var net=fee-biz-res;
+    var pay=calcStaffPay(u,yr,mo);
+    var totalHours=pay.hours;
+    var hourlyRate=pay.rate;
+    var fee=pay.fee;
+    var biz=pay.biz;
+    var res=pay.res;
+    var net=pay.net;
     totalFee+=fee;totalBiz+=biz;totalRes+=res;totalNet+=net;
     rows+='<tr>'
       +'<td style="text-align:center;border:1px solid #ccc;padding:3px 6px">'+(idx+1)+'</td>'
@@ -13208,7 +13241,7 @@ function getStaffSchedule(u,yr,mo){
   if(best)return{days:(best.days||[]).slice(),hours:Object.assign({},best.hours||{}),from:best.from};
   return{days:((u&&u.staffDays)||[]).slice(),hours:Object.assign({},(u&&u.staffHoursPerDay)||{}),from:null};
 }
-function _weeklyHoursOf(sch){return Object.values(sch.hours||{}).reduce(function(s,v){return s+(parseFloat(v)||0);},0);}
+function _weeklyHoursOf(sch){var h=sch.hours||{};return (sch.days||[]).reduce(function(s,d){return s+(parseFloat(h[d])||0);},0);}
 function _currentRevYM(){
   return{yr:parseInt($('rev-year')?.value)||new Date().getFullYear(),mo:parseInt($('rev-month')?.value)||new Date().getMonth()+1};
 }
@@ -13477,16 +13510,15 @@ function savePayrollImage(userId,yr,mo,overlay){
   var u=users.find(function(x){return x.id===userId;});if(!u)return;
   var inputs=[...document.querySelectorAll('.payroll-hrs')];
   var workDays=inputs.map(function(inp){return{day:parseInt(inp.dataset.day),hours:parseFloat(inp.value)||0,type:inp.dataset.type||'normal'};}).filter(function(d){return d.hours>0||d.type==='holiday'||d.type==='absent'});
-  var hourlyRate=getHourlyRate(u,yr,mo);
-  var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-  // 주휴수당 계산
+  var pay=calcStaffPay(u,yr,mo,workDays);
+  var hourlyRate=pay.rate;
+  var totalHours=pay.hours;
   var juhuEnabled=u.juhuEnabled||false;
-  var weeklyHours=_weeklyHoursOf(getStaffSchedule(u,yr,mo));
-  var juhuPay=calcJuhuPay(workDays,weeklyHours,hourlyRate,juhuEnabled,yr,mo);
-  var basePay=Math.round(totalHours*hourlyRate);
-  var totalPay=basePay+juhuPay;
-  var tax33=Math.round(totalPay*0.033);
-  var net=totalPay-tax33;
+  var juhuPay=pay.juhu;
+  var basePay=pay.base;
+  var totalPay=pay.fee;
+  var tax33=pay.tax;
+  var net=pay.net;
   var dayNames=['일','월','화','수','목','금','토'];
   var daysInMo=new Date(yr,mo,0).getDate();
   var startDate=yr+'. '+mo+'. 1';
@@ -13591,11 +13623,9 @@ function renderRevExpense(yr,mo){
   var hasAutoSalary=list.some(function(e2){return e2.category==='인건비'&&e2.autoFromLedger;});
   if(!hasAutoSalary&&teacherList.length){
     teacherList.forEach(function(u){
-      var workDays=_wdEff(u,prevYrS,prevMoS);
-      var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-      var fee=Math.round(totalHours*(u.hourlyRate||15000));
-      var bizTax=Math.round(fee*0.03);var resTax=Math.round(bizTax*0.1);
-      var net=fee-bizTax-resTax;
+      var pay=calcStaffPay(u,prevYrS,prevMoS);
+      var bizTax=pay.biz;var resTax=pay.res;
+      var net=pay.net;
       var ovKey='ovr_salary_'+u.id+'_'+yr+'_'+mo;
       var overridden=list.some(function(e2){return e2.overrideOf===ovKey;});
       if(net>0&&!overridden){
@@ -13608,10 +13638,8 @@ function renderRevExpense(yr,mo){
   var hasAutoTax=list.some(function(e2){return e2.category==='세금-원천 소득세'&&e2.autoFromLedger;});
   if(!hasAutoTax&&teacherList.length){
     teacherList.forEach(function(u){
-      var workDays=_wdEff(u,prevYrS,prevMoS);
-      var totalHours=workDays.reduce(function(s,d){return s+(parseFloat(d.hours)||0);},0);
-      var fee=Math.round(totalHours*(u.hourlyRate||15000));
-      var bizTax=Math.round(fee*0.03);var resTax=Math.round(bizTax*0.1);
+      var pay=calcStaffPay(u,prevYrS,prevMoS);
+      var bizTax=pay.biz;var resTax=pay.res;
       var bizKey='ovr_biztax_'+u.id+'_'+yr+'_'+mo;
       var resKey='ovr_restax_'+u.id+'_'+yr+'_'+mo;
       var bizOverridden=list.some(function(e2){return e2.overrideOf===bizKey;});
