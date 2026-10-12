@@ -12961,7 +12961,7 @@ function _juhuDayInfo(u,date,ovArr,ovYr,ovMo){
   return{h:parseFloat(e.hours)||0,absent:false};
 }
 function calcJuhuPay(u,yr,mo,weeklyHours,hourlyRate,ovArr){
-  if(!u||!u.juhuEnabled||weeklyHours<15)return 0;
+  if(!u||!getJuhuEnabled(u,yr,mo)||weeklyHours<15)return 0;
   var weeklyJuhu=Math.round((weeklyHours/40)*8*hourlyRate);
   var excluded=0;
   var daysInMo=new Date(yr,mo,0).getDate();
@@ -13045,7 +13045,7 @@ function renderStaffArea(){
     var hourlyRate=pay.rate;
     var totalHours=pay.hours;
     var _sch=getStaffSchedule(u,yr,mo);
-    var juhuEnabled=u.juhuEnabled||false;
+    var juhuEnabled=getJuhuEnabled(u,yr,mo);
     var juhuPay=pay.juhu;
     var totalPay=pay.fee;
     var tax33=pay.tax;
@@ -13076,7 +13076,7 @@ function renderStaffArea(){
       +'</div>'
       +'<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openPayrollModal(\''+u.id+'\','+yr+','+mo+')">📝 근무 시간표</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
-      +'<button class="btn btn-xs '+(juhuEnabled?'btn-green':'btn-outline')+'" onclick="toggleJuhu(\''+u.id+'\','+!juhuEnabled+')" title="주휴수당: 주 15시간 이상 근무 시 지급">'+(juhuEnabled?'✅ 주휴수당 ON':'주휴수당 OFF')+'</button>'
+      +'<button class="btn btn-xs '+(juhuEnabled?'btn-green':'btn-outline')+'" onclick="toggleJuhu(\''+u.id+'\','+!juhuEnabled+')" title="주휴수당: 주 15시간 이상 근무 시 지급 · 이 달부터 적용되고 이전 달은 그대로예요">'+(juhuEnabled?'✅ 주휴수당 ON':'주휴수당 OFF')+'</button>'
       +'</div>'
       +(u.endDate?'<div style="margin-top:6px;font-size:11px;color:#92400e">🚪 퇴사일 '+u.endDate+' — 이후 근무는 0시간으로 처리돼요</div>':'')
       +'<div style="margin-top:6px;font-size:10px;color:var(--txt3)">퇴사·삭제는 관리자 페이지에서 해 주세요</div>'
@@ -13321,12 +13321,36 @@ function _syncStaffScheduleMonth(u,yr,mo){
   }
   return changed;
 }
+// 주휴수당 ON/OFF는 월별 이력(juhuHistory: [{from:'2026-10',on:true}, ...])으로 저장 —
+// 스위치를 바꾼 달부터 적용되고 이전 달은 그대로. 이력이 없는 달(최초 변경 이전)은 미적용.
+// 예전 방식(juhuEnabled 하나만 저장)으로 켜져 있던 경우에는 이 기능이 생긴 2026-10월부터만 켜진 것으로 본다.
+var _JUHU_LEGACY_FROM='2026-10';
+function getJuhuEnabled(u,yr,mo){
+  if(!u)return false;
+  var key=_ymKey(yr,mo);
+  var hist=u.juhuHistory||[];
+  if(!hist.length)return !!u.juhuEnabled&&key>=_JUHU_LEGACY_FROM;
+  var best=null;
+  hist.forEach(function(h){if(h&&h.from<=key&&(!best||h.from>best.from))best=h;});
+  return best?!!best.on:false;
+}
 async function toggleJuhu(userId,enabled){
-  var idx=users.findIndex(function(u){return u.id===userId;});
-  if(idx<0)return;
-  users[idx].juhuEnabled=enabled;
-  db.collection('users').doc(userId).update({juhuEnabled:enabled}).catch(function(){});
-  renderStaffArea();
+  var u=users.find(function(x){return x.id===userId;});
+  if(!u)return;
+  var ym=_currentRevYM();
+  var from=_ymKey(ym.yr,ym.mo);
+  var hist=(u.juhuHistory||[]).filter(function(h){return h.from!==from;});
+  // 예전 방식으로 켜져 있던 강사의 첫 변경: 기존 상태(2026-10부터 ON)를 이력으로 보존
+  if(!(u.juhuHistory&&u.juhuHistory.length)&&u.juhuEnabled&&from>_JUHU_LEGACY_FROM)hist.unshift({from:_JUHU_LEGACY_FROM,on:true});
+  hist.push({from:from,on:!!enabled});
+  hist.sort(function(a,b){return a.from>b.from?1:-1;});
+  u.juhuHistory=hist;
+  db.collection('users').doc(userId).update({juhuHistory:hist}).catch(function(e){
+    console.error('juhuHistory 저장 오류:',e);
+    toast('⚠️ 주휴수당 설정 저장 실패 — 인터넷 연결을 확인해주세요',4000);
+  });
+  renderStaffArea();saveCacheDebounced();
+  toast(enabled?('✅ '+ym.yr+'년 '+ym.mo+'월부터 주휴수당이 적용됩니다'):('주휴수당이 '+ym.yr+'년 '+ym.mo+'월부터 적용되지 않습니다'));
 }
 function getHourlyRate(u,yr,mo){
   // hourlyRateHistory: [{from:'2026-07',rate:17000}, ...]
@@ -13513,7 +13537,7 @@ function savePayrollImage(userId,yr,mo,overlay){
   var pay=calcStaffPay(u,yr,mo,workDays);
   var hourlyRate=pay.rate;
   var totalHours=pay.hours;
-  var juhuEnabled=u.juhuEnabled||false;
+  var juhuEnabled=getJuhuEnabled(u,yr,mo);
   var juhuPay=pay.juhu;
   var basePay=pay.base;
   var totalPay=pay.fee;
