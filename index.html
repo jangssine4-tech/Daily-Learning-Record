@@ -1347,6 +1347,10 @@ function studentAtDate(s,dateISO){
     return Object.assign({},s,{days:sc.days,periods:sc.periods,specialPeriods:sc.specialPeriods});
   }catch(e){return s;}
 }
+// 날짜 기준 전체 학생 목록 (이력 적용 복사본). 화면 렌더링용 읽기 전용
+function _studentsAtDate(dateISO){
+  try{return students.map(function(s){return studentAtDate(s,dateISO);});}catch(e){return students;}
+}
 function isHoliday(yr,mo,d){
   // mo는 0-based
   var mm=String(mo+1).padStart(2,'0'),dd=String(d).padStart(2,'0'),key=mm+dd;
@@ -3460,8 +3464,25 @@ function _buildWeeklyGrid() {
   }
 
   // 1. 학생 원본 데이터 기반 그리드 생성
+  var _mm2 = String(mo).padStart(2, '0');
+  var _mStart = yr + '-' + _mm2 + '-01';
+  var _mEnd = yr + '-' + _mm2 + '-' + String(new Date(yr, mo, 0).getDate()).padStart(2, '0');
   var activeStudents = students.filter(function(s) {
     var st = s.status || '재원'; return st === '재원' || st === '신규';
+  }).map(function(s0) {
+    // 월말 기준 시간표 적용 + 월 중간 변경이면 표시용 날짜 기록
+    var s = studentAtDate(s0, _mEnd);
+    try {
+      if (s !== s0 && s0.scheduleHistory) {
+        var a = studentAtDate(s0, _mStart);
+        if (_normSched(a.days, a.periods, a.specialPeriods) !== _normSched(s.days, s.periods, s.specialPeriods)) {
+          var ch = s0.scheduleHistory.filter(function(h) { return h.from > _mStart && h.from <= _mEnd; })
+            .sort(function(x, y) { return x.from < y.from ? -1 : 1; }).pop();
+          if (ch) s = Object.assign({}, s, { _schedChange: parseInt(ch.from.slice(5, 7)) + '/' + parseInt(ch.from.slice(8, 10)) });
+        }
+      }
+    } catch (e) {}
+    return s;
   });
 
   activeStudents.forEach(function(s) {
@@ -3637,7 +3658,8 @@ function _doRenderWT(area, data, yr, mo) {
             + 'style="cursor:pointer;color:#ef4444;font-size:10px" title="이 셀에서 제거">✕</span>'
             + '</div>';
         } else {
-          html += '<div style="' + badgeBase + ';background:' + bg + ';color:' + color + '">' + s.name + '</div>';
+          html += '<div style="' + badgeBase + ';background:' + bg + ';color:' + color + '">' + s.name
+            + (s._schedChange ? '<span style="font-size:9px;opacity:.75;margin-left:2px" title="수업 시간 변경일">' + s._schedChange + '~</span>' : '') + '</div>';
         }
       });
 
@@ -6061,6 +6083,7 @@ function renderSchedule(){
   $('schedule-day-title').textContent=dateLabel+' · '+dayNames[dow===0?6:dow-1]+'요일';
   var dp=$('schedule-date-pick');if(dp&&!dp.value)dp.value=todayISO();
   var todayStr=_scheduleDate||todayISO();
+  var students=_studentsAtDate(todayStr); // 해당 날짜 기준 시간표 적용(이력 없으면 현재값)
   var todayMakeups=makeups.filter(function(m){return m.makeupDate===todayStr&&(m.makeupStatus==='scheduled'||m.makeupStatus==='done');});
   // 결석일이 오늘인 보강 학생도 시간표에 결석 카드로 표시
   var todayAbsentMakeups=makeups.filter(function(m){
