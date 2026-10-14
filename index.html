@@ -3531,7 +3531,7 @@ function _buildWeeklyGrid() {
       var planKey2 = _wtPlanKey();
       var planData2 = _wtPlanData[planKey2] || {};
       var removed2 = (planData2[blk] && planData2[blk]._removed) ? planData2[blk]._removed : [];
-      if (!_wtEditMode || removed2.indexOf(s.id) === -1) { // 확정 탭에서는 계획(제거) 반영 안 함
+      if (!_wtEditMode || (removed2.indexOf(s.id) === -1 && removed2.indexOf(s.id + '|' + d) === -1)) { // 확정 탭에서는 계획(제거) 반영 안 함
         grid[blk][d].push(Object.assign({}, s, { _overridden: !!ov[d] }));
       }
     });
@@ -3635,7 +3635,7 @@ function _doRenderWT(area, data, yr, mo) {
     + '<select class="fi" style="width:80px;font-size:11px" onchange="_wtAutoSaveAndSwitch(\'yr\',this.value)">' + yrOpts + '</select>'
     + '<select class="fi" style="width:60px;font-size:11px" onchange="_wtAutoSaveAndSwitch(\'mo\',this.value)">' + moOpts + '</select>'
     + '<label style="font-size:11px;color:var(--txt3);display:inline-flex;align-items:center;gap:4px">기준일 <input type="date" class="fi" style="width:130px;font-size:11px" value="' + _wtRefDate(yr, mo) + '" onchange="_wtSetRef(this.value)"></label>'
-    + (_wtEditMode ? '<button class="btn btn-green btn-xs" onclick="_wtSavePlan()">💾 저장</button>' : '')
+    + (_wtEditMode ? '<button class="btn btn-green btn-xs" onclick="_wtSavePlan()">💾 저장</button><button class="btn btn-navy btn-xs" onclick="_wtOpenApply()" title="계획을 실제 학생 시간표(적용 시작일부터)로 반영">✅ 이 계획대로 적용</button>' : '')
     + '<span style="font-size:10px;color:var(--txt3)">🔵 재원 · 🩷 계획 · <span style="display:inline-flex;align-items:center;gap:2px"><span style="display:inline-block;width:14px;height:14px;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;vertical-align:middle"></span><span style="color:var(--txt3)"> 특강</span></span></span>'
     + '<button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="toggleWeeklyTimetable()">접기 ▲</button>'
     + '</div>';
@@ -3730,7 +3730,9 @@ function _wtDeleteOrigCard(ts, day, sid, cellDiv) {
   if (!_wtPlanData[key][ts]) _wtPlanData[key][ts] = {};
   if (!_wtPlanData[key][ts]._removed) _wtPlanData[key][ts]._removed = [];
   var removed = _wtPlanData[key][ts]._removed;
-  if (removed.indexOf(sid) === -1) removed.push(sid);
+  // 요일별로 기록 (같은 시간대의 다른 요일 수업은 유지). 기존 데이터의 sid 단독 항목은 시간대 전체 제거로 계속 해석
+  var _rk = sid + '|' + day;
+  if (removed.indexOf(_rk) === -1) removed.push(_rk);
   _wtRefresh();
 }
 
@@ -3752,6 +3754,136 @@ function _wtAddPlanCard(ts, day, cellDiv) {
   _wtRefresh();
 }
 
+
+
+// ── 계획(초안) → 실제 시간표 적용 ─────────────────────
+var _wtApplyPending=null;
+function _wtBlk(t){
+  var mm=String(t||'').match(/(\d{1,2}):(\d{2})/);if(!mm)return null;
+  return String(parseInt(mm[1])).padStart(2,'0')+':'+(parseInt(mm[2])<30?'00':'30');
+}
+function _wtFmtSched(days,periods){
+  var order=['월','화','수','목','금','토','일'];
+  var ds=(days||[]).slice().sort(function(a,b){return order.indexOf(a)-order.indexOf(b);});
+  if(!ds.length)return '(없음)';
+  return ds.map(function(d){var p=(periods||{})[d];var tm=p&&typeof p==='object'?p.time:'';return d+(tm?' '+fmt12h(tm):'');}).join(', ');
+}
+function _wtComputeApply(){
+  var yr=window._wtYr||new Date().getFullYear(),mo=window._wtMo||(new Date().getMonth()+1);
+  var key='monthlyPlan_'+yr+'_'+String(mo).padStart(2,'0');
+  var plan=_wtPlanData[key]||{};
+  var ref=_wtRefDate(yr,mo);
+  var order=['월','화','수','목','금','토','일'];
+  var act=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var work={};var unresolved=[];
+  function getW(s){
+    if(!work[s.id]){var b=studentAtDate(s,ref);work[s.id]={s:s,days:(b.days||[]).slice(),periods:JSON.parse(JSON.stringify(b.periods||{})),base:b,notes:[]};}
+    return work[s.id];
+  }
+  Object.keys(plan).forEach(function(ts){
+    var cell=plan[ts]||{};
+    (cell._removed||[]).forEach(function(rk){
+      var parts=String(rk).split('|');var sid=parts[0],rday=parts[1]||null;
+      var s=act.find(function(x){return x.id===sid;});if(!s)return;
+      var w=getW(s);
+      w.days=w.days.filter(function(d){if(rday&&d!==rday)return true;var pd=w.periods[d];var b=_wtBlk(pd&&pd.time);if(b===ts){delete w.periods[d];return false;}return true;});
+    });
+  });
+  Object.keys(plan).forEach(function(ts){
+    var cell=plan[ts]||{};
+    Object.keys(cell).forEach(function(d){
+      if(d==='_removed'||!Array.isArray(cell[d]))return;
+      cell[d].forEach(function(name){
+        var nm=String(name||'').trim();
+        var ms=act.filter(function(s){return (s.name||'').trim()===nm;});
+        if(ms.length!==1){unresolved.push(nm+' ('+d+' '+fmt12h(ts)+') — '+(ms.length?'동명이인 '+ms.length+'명':'등록된 재원생 아님'));return;}
+        var w=getW(ms[0]);
+        var h=1;for(var k=0;k<order.length;k++){var pp=w.periods[order[k]];if(pp&&pp.hours!==undefined&&pp.hours!==''){h=parseFloat(pp.hours)||1;break;}}
+        if(w.days.indexOf(d)===-1)w.days.push(d);
+        else w.notes.push(d+'요일 기존 수업은 이 시간으로 대체');
+        w.periods[d]={period:findPeriod(ts)||1,time:ts,hours:h};
+      });
+    });
+  });
+  var changes=[];
+  Object.keys(work).forEach(function(id){
+    var w=work[id];
+    w.days.sort(function(a,b){return order.indexOf(a)-order.indexOf(b);});
+    if(_normSched(w.base.days,w.base.periods,w.base.specialPeriods)!==_normSched(w.days,w.periods,w.base.specialPeriods))changes.push(w);
+  });
+  return {changes:changes,unresolved:unresolved,key:key,ref:ref};
+}
+function _wtOpenApply(){
+  var r=_wtComputeApply();
+  _wtApplyPending=r;
+  var old=document.getElementById('wt-apply-modal');if(old)old.remove();
+  var rows=r.changes.map(function(w){
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--border)"><b>'+w.s.name+'</b><div style="font-size:11px;color:var(--txt3)">'+_wtFmtSched(w.base.days,w.base.periods)+'</div><div style="font-size:12px;color:var(--navy)">→ '+_wtFmtSched(w.days,w.periods)+'</div>'
+      +(w.notes.length?'<div style="font-size:10px;color:#b45309">⚠ '+w.notes.join(', ')+'</div>':'')+'</div>';
+  }).join('');
+  var un=r.unresolved.length?'<div style="margin-top:8px;font-size:11px;color:#b91c1c;background:#fef2f2;border-radius:6px;padding:6px 8px">⚠ 적용할 수 없는 항목(건너뜀):<br>'+r.unresolved.join('<br>')+'</div>':'';
+  var m=document.createElement('div');m.id='wt-apply-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML='<div style="background:var(--surface);border-radius:12px;max-width:460px;width:100%;max-height:85vh;overflow:auto;padding:16px">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:8px">✅ 이 계획대로 적용</div>'
+    +(r.changes.length?('<div style="font-size:12px;color:var(--txt2);margin-bottom:6px">아래 학생의 수업 요일·시간이 <b>적용 시작일부터</b> 바뀌고, 이전 날짜의 시간표는 그대로 유지돼요.</div>'+rows):'<div style="font-size:12px;color:var(--txt3);padding:10px 0">적용할 변경 사항이 없어요.</div>')
+    +un
+    +(r.changes.length?'<div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:12px"><b>적용 시작일</b><input type="date" id="wt-apply-from" class="fi" style="width:auto" value="'+todayISO()+'"></div>'
+      +(r.unresolved.length?'':'<label style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12px"><input type="checkbox" id="wt-apply-clear" checked> 적용 후 이 달의 계획 비우기</label>'):'')
+    +'<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'wt-apply-modal\').remove()">취소</button>'
+    +(r.changes.length?'<button class="btn btn-navy btn-sm" onclick="_wtDoApply()">적용</button>':'')+'</div></div>';
+  document.body.appendChild(m);
+}
+async function _wtDoApply(){
+  var r=_wtApplyPending;if(!r||!r.changes.length)return;
+  var from=($('wt-apply-from')||{}).value;if(!from){toast('⚠️ 적용 시작일을 선택하세요');return;}
+  var clr=$('wt-apply-clear')&&$('wt-apply-clear').checked;
+  var mdl=document.getElementById('wt-apply-modal');if(mdl)mdl.remove();
+  loading(true);
+  try{
+    var fy=parseInt(from.slice(0,4)),fm=parseInt(from.slice(5,7)),ym=from.slice(0,7);
+    for(var i=0;i<r.changes.length;i++){
+      var w=r.changes[i];
+      var oldS=students.find(function(x){return x.id===w.s.id;});if(!oldS)continue;
+      var hist=(oldS.scheduleHistory||[]).slice();
+      if(!hist.length)hist.push({from:'2000-01-01',days:oldS.days||[],periods:oldS.periods||{},specialPeriods:oldS.specialPeriods||{}});
+      var entry={from:from,days:w.days,periods:w.periods,specialPeriods:oldS.specialPeriods||{}};
+      var ix=hist.findIndex(function(h){return h.from===from;});
+      if(ix>=0)hist[ix]=entry;else hist.push(entry);
+      hist.sort(function(a,b){return a.from<b.from?-1:a.from>b.from?1:0;});
+      var latest=hist[hist.length-1];
+      var newWeekly=0;(latest.days||[]).forEach(function(d){var pp=(latest.periods||{})[d];newWeekly+=(pp&&pp.hours!==undefined&&pp.hours!=='')?parseFloat(pp.hours):1;});
+      var upd={days:latest.days,periods:latest.periods,weeklyHours:newWeekly,scheduleHistory:hist};
+      // 시수 이력: 적용 시작 월부터의 주당 시수가 달라지면 기록
+      var entryWeekly=0;w.days.forEach(function(d){var pp=w.periods[d];entryWeekly+=(pp&&pp.hours!==undefined&&pp.hours!=='')?parseFloat(pp.hours):1;});
+      var newTotal=entryWeekly+(parseFloat(oldS.specialWeeklyHours)||0);
+      var oldTotal=getStudentWeeklyHoursAtMonth(oldS,fy,fm);
+      if(Math.abs(oldTotal-newTotal)>0.001){
+        var hh=(oldS.hoursHistory||[]).slice();
+        var hi=hh.findIndex(function(h){return h.ym===ym;});
+        var he={ym:ym,weeklyHours:newTotal};
+        if(hi>=0)hh[hi]=he;else hh.push(he);
+        hh.sort(function(a,b){return a.ym<b.ym?-1:a.ym>b.ym?1:0;});
+        upd.hoursHistory=hh;
+      }
+      await db.collection('students').doc(oldS.id).update(upd);
+      var si=students.findIndex(function(x){return x.id===oldS.id;});
+      if(si>=0)students[si]=Object.assign({},students[si],upd);
+    }
+    if(clr){
+      _wtPlanData[r.key]={};
+      await db.collection('config').doc(r.key).set({plan:{}},{merge:false});
+    }
+    loading(false);
+    toast('✅ '+r.changes.length+'명 시간표 적용됨 ('+from+'부터)');
+    try{saveCacheDebounced();}catch(e){}
+    try{renderStudents();}catch(e){}
+    try{_wtRefresh();}catch(e){}
+    try{if(currentSchTab==='capacity')renderAssignPanel();}catch(e){}
+  }catch(e){
+    console.error('계획 적용 오류',e);loading(false);toast('❌ 적용 실패: '+e.message);
+  }
+}
 
 function switchDashTab(tab){
   if(tab==='calendar'){goto('acal');return;}
@@ -10386,7 +10518,7 @@ function closeAssignModal(){document.getElementById('modal-assign').style.displa
 function toggleAssignDay(el){el.classList.toggle('on');}
 
 function _buildAssignGrid(){
-  var activeS=students.filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
+  var activeS=_studentsAtDate(todayISO()).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';});
   var slotGrid={};var allTimes=new Set();
   activeS.forEach(function(s){
     (s.days||[]).forEach(function(day){
@@ -13133,6 +13265,59 @@ function calcStaffPay(u,yr,mo,ovArr){
   var tax=biz+res;
   return{rate:rate,hours:hours,weekly:weekly,juhu:juhu,base:base,fee:fee,biz:biz,res:res,tax:tax,net:fee-tax};
 }
+// 주휴수당 계산 과정 상세 (calcJuhuPay와 같은 규칙으로 주차별 내역을 만든다)
+function _juhuDetail(u,yr,mo,weeklyHours,hourlyRate,ovArr){
+  var det={enabled:getJuhuEnabled(u,yr,mo),weekly:weeklyHours,rate:hourlyRate,weeklyJuhu:Math.round((weeklyHours/40)*8*hourlyRate),weeks:[],excluded:0};
+  var dn=['일','월','화','수','목','금','토'];
+  var daysInMo=new Date(yr,mo,0).getDate();
+  for(var d=1;d<=daysInMo;d++){
+    if(new Date(yr,mo-1,d).getDay()!==1)continue;
+    var sum=0,absent=false;
+    var s0=new Date(yr,mo-1,d),s6=new Date(yr,mo-1,d+6);
+    for(var k=0;k<7;k++){
+      var info=_juhuDayInfo(u,new Date(yr,mo-1,d+k),ovArr,yr,mo);
+      sum+=info.h;if(info.absent)absent=true;
+    }
+    var why='';if(absent)why='결근';else if(sum<15)why='근무 15시간 미만';
+    if(why)det.excluded++;
+    det.weeks.push({label:(s0.getMonth()+1)+'/'+s0.getDate()+' ~ '+(s6.getMonth()+1)+'/'+s6.getDate(),hours:sum,why:why});
+  }
+  det.paidWeeks=Math.max(0,4.3-det.excluded);
+  det.total=(det.enabled&&weeklyHours>=15)?Math.round(det.weeklyJuhu*det.paidWeeks):0;
+  return det;
+}
+function showJuhuExplain(userId,yr,mo){
+  var u=users.find(function(x){return x.id===userId;});if(!u)return;
+  var rate=getHourlyRate(u,yr,mo);
+  var weekly=_weeklyHoursOf(getStaffSchedule(u,yr,mo));
+  var det=_juhuDetail(u,yr,mo,weekly,rate,null);
+  var f=function(n){return n.toLocaleString();};
+  var rows='';
+  if(weekly<15){
+    rows='<div style="color:#b91c1c;font-size:12px;margin:8px 0">주간 시간표 합계가 15시간 미만이라 주휴수당이 지급되지 않아요.</div>';
+  }else{
+    rows='<table style="width:100%;border-collapse:collapse;font-size:12px;margin:6px 0"><thead><tr style="background:var(--surface2)"><th style="padding:4px;border:1px solid var(--border)">주(월~일)</th><th style="padding:4px;border:1px solid var(--border)">근무시간</th><th style="padding:4px;border:1px solid var(--border)">판정</th></tr></thead><tbody>'
+      +det.weeks.map(function(w){return '<tr><td style="padding:4px;border:1px solid var(--border);text-align:center">'+w.label+'</td><td style="padding:4px;border:1px solid var(--border);text-align:center">'+w.hours+'h</td><td style="padding:4px;border:1px solid var(--border);text-align:center;color:'+(w.why?'#b91c1c':'#16a34a')+'">'+(w.why?'제외 ('+w.why+')':'지급')+'</td></tr>';}).join('')
+      +'</tbody></table>';
+  }
+  var body=''
+    +'<div style="font-size:12px;color:var(--txt2);margin-bottom:8px">'+u.name+' · '+yr+'년 '+mo+'월</div>'
+    +'<div style="font-size:13px;font-weight:700;margin:8px 0 4px">① 주당 주휴수당</div>'
+    +'<div style="font-size:12px;background:var(--surface2);border-radius:6px;padding:8px">(주간 시수 ÷ 40) × 8 × 시급<br>= ('+weekly+' ÷ 40) × 8 × '+f(rate)+'<br>= <b>₩'+f(det.weeklyJuhu)+'</b> <span style="color:var(--txt3)">(원 단위 반올림)</span><div style="font-size:10px;color:var(--txt3);margin-top:3px">주간 시수는 이 달 기준 근무 요일별 시간(근무 설정)의 합계예요. 주 15시간 미만이면 지급되지 않아요.</div></div>'
+    +'<div style="font-size:13px;font-weight:700;margin:12px 0 4px">② 이 달 지급 주 수</div>'
+    +'<div style="font-size:11px;color:var(--txt3)">이 달에 월요일이 있는 주만 계산해요. 기본 4.3주에서 결근이 있는 주와 실제 근무가 15시간 미만인 주는 뺍니다. (공휴일로 표시한 날은 시간표 시수만큼 근무한 것으로 보고, 앞뒤 달 기록이 없으면 주간 시간표로 추정해요.)</div>'
+    +rows
+    +(weekly>=15?'<div style="font-size:12px;background:var(--surface2);border-radius:6px;padding:8px">지급 주 수 = 4.3 − 제외 '+det.excluded+'주 = <b>'+(Math.round(det.paidWeeks*10)/10)+'주</b></div>':'')
+    +'<div style="font-size:13px;font-weight:700;margin:12px 0 4px">③ 이 달 주휴수당</div>'
+    +'<div style="font-size:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:8px">₩'+f(det.weeklyJuhu)+' × '+(Math.round(det.paidWeeks*10)/10)+'주 = <b style="color:#16a34a">₩'+f(det.total)+'</b></div>'
+    +'<div style="font-size:10px;color:var(--txt3);margin-top:8px">총 급여 = 기본 급여(근무시간 × 시급) + 주휴수당. 아직 근무가 기록되지 않은 주는 근무 0시간으로 계산돼요.</div>';
+  var old=document.getElementById('juhu-explain-modal');if(old)old.remove();
+  var m=document.createElement('div');m.id='juhu-explain-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.innerHTML='<div style="background:var(--surface);border-radius:12px;max-width:440px;width:100%;max-height:85vh;overflow:auto;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:15px;font-weight:800;color:var(--navy)">❓ 주휴수당 계산 방법</div><button class="btn btn-outline btn-xs" onclick="document.getElementById(\'juhu-explain-modal\').remove()">닫기</button></div>'+body+'</div>';
+  document.body.appendChild(m);
+}
 function showStaffGuide(){
   showAlert('📌 강사 등록 안내\n\n신규 강사는 관리자 페이지의 [+ 교사 계정 추가] 버튼으로 등록해주세요. 역할을 "교사"로 등록하면 이 급여 명세서 페이지에도 자동으로 나타나요.\n\n퇴사한 강사의 이름을 바꿔서 새 강사로 재사용하지 마세요 — 이전 근무 이력, 시급, 급여 데이터가 그대로 남아 새 강사의 데이터와 섞이게 됩니다. 신규 강사는 항상 관리자 페이지에서 새로 등록해주세요.');
 }
@@ -13211,7 +13396,7 @@ function renderStaffArea(){
       +'<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px;font-size:12px">'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">근무시간</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+totalHours+'h</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">시급</div><div style="font-weight:700;font-size:14px">'+hourlyRate.toLocaleString()+'</div></div>'
-      +(juhuEnabled?'<div style="background:#f0fdf4;border:1px solid #86efac;padding:8px;border-radius:6px;text-align:center"><div style="color:#16a34a;font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:#16a34a">'+juhuPay.toLocaleString()+'</div></div>':'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:var(--txt3)">미적용</div></div>')
+      +(juhuEnabled?'<div style="background:#f0fdf4;border:1px solid #86efac;padding:8px;border-radius:6px;text-align:center"><div style="color:#16a34a;font-size:10px">주휴수당 <span onclick="showJuhuExplain(\''+u.id+'\','+yr+','+mo+')" title="계산 방법 보기" style="cursor:pointer;display:inline-block;width:14px;height:14px;line-height:14px;border-radius:50%;background:#16a34a;color:#fff;font-size:10px;font-weight:700">?</span></div><div style="font-weight:700;font-size:14px;color:#16a34a">'+juhuPay.toLocaleString()+'</div></div>':'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:var(--txt3)">미적용</div></div>')
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">총 급여</div><div style="font-weight:700;font-size:14px;color:var(--mint)">'+totalPay.toLocaleString()+'</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">원천세(3.3%)</div><div style="font-weight:700;font-size:14px;color:var(--red)">'+tax33.toLocaleString()+'</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">차감 수령액</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+net.toLocaleString()+'</div></div>'
