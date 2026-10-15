@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b2c5c">
+<title>체크콜 – 교재 점검</title>
+<style>
+:root{
+  --navy:#0b2c5c;--blue:#2563eb;--mint:#00b894;--mint-d:#059669;--amber:#f59e0b;--red:#ef4444;
+  --bg:#eef4ff;--card:#fff;--txt:#1e293b;--txt2:#64748b;--line:#dbe4f3;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;color:var(--txt);background:var(--bg);user-select:none;-webkit-user-select:none;touch-action:manipulation;overscroll-behavior:none}
+button{font-family:inherit;cursor:pointer;border:none}
+.screen{display:none;min-height:100%;padding:24px 20px;align-items:center;justify-content:center;flex-direction:column}
+.screen.on{display:flex}
+.card{background:var(--card);border-radius:28px;box-shadow:0 12px 40px rgba(11,44,92,.12);padding:32px 28px;width:100%;max-width:560px}
+.brand{text-align:center;margin-bottom:22px}
+.brand .logo{font-size:44px;line-height:1}
+.brand h1{margin:6px 0 2px;font-size:30px;color:var(--navy);letter-spacing:-1px}
+.brand p{margin:0;color:var(--txt2);font-size:15px}
+.inp{width:100%;font-size:24px;padding:16px 18px;border:2.5px solid var(--line);border-radius:18px;text-align:center;font-family:inherit;color:var(--txt);background:#f8fafc;user-select:text;-webkit-user-select:text}
+.inp:focus{outline:none;border-color:var(--blue);background:#fff}
+.dots{display:flex;gap:14px;justify-content:center;margin:18px 0 14px}
+.dots i{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);background:#fff;transition:.12s}
+.dots i.f{background:var(--navy);border-color:var(--navy);transform:scale(1.08)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{font-size:28px;font-weight:700;padding:16px 0;border-radius:18px;background:#f1f5f9;color:var(--navy)}
+.pad button:active{background:#dbe7ff}
+.pad .fn{font-size:18px;color:var(--txt2)}
+.err{height:22px;text-align:center;color:var(--red);font-weight:700;font-size:15px;margin-top:4px}
+.shake{animation:shake .4s}
+@keyframes shake{0%,100%{transform:none}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.go{width:100%;margin-top:12px;font-size:22px;font-weight:800;padding:18px;border-radius:20px;background:var(--navy);color:#fff}
+.go:disabled{opacity:.35}
+
+/* 점검 화면 */
+#sMain{justify-content:flex-start;padding-top:28px}
+.top{width:100%;max-width:720px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.hello{font-size:28px;font-weight:800;color:var(--navy);letter-spacing:-.5px}
+.hello small{display:block;font-size:15px;font-weight:600;color:var(--txt2);margin-top:4px}
+.out{background:#fff;color:var(--txt2);padding:10px 16px;border-radius:14px;font-size:15px;font-weight:700;border:2px solid var(--line)}
+.prog{width:100%;max-width:720px;background:#fff;border-radius:20px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 16px rgba(11,44,92,.06)}
+.bar{flex:1;height:14px;background:#e2e8f0;border-radius:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--mint),#34d399);border-radius:8px;transition:width .4s}
+.prog b{font-size:20px;color:var(--navy);min-width:52px;text-align:right}
+.grid{width:100%;max-width:720px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.bk{position:relative;background:#fff;border-radius:26px;padding:26px 18px 20px;text-align:center;box-shadow:0 8px 24px rgba(11,44,92,.1);border:4px solid transparent;color:var(--navy);min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:transform .1s}
+.bk:active:not(:disabled){transform:scale(.97)}
+.bk .ic{font-size:40px;line-height:1}
+.bk .nm{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.bk .st{font-size:15px;font-weight:700;color:var(--txt2)}
+.bk.wait{background:#fffbeb;border-color:var(--amber)}
+.bk.wait .st{color:#b45309}
+.bk.call{background:#ecfdf5;border-color:var(--mint);animation:pulse 1s infinite}
+.bk.call .st{color:var(--mint-d);font-size:17px}
+.bk.done{background:#f1f5f9;color:#94a3b8;box-shadow:none}
+.bk.done .nm{text-decoration:line-through}
+.bk.done .st{color:#94a3b8}
+.cx{position:absolute;top:10px;right:10px;background:#fff;border:2px solid #fcd34d;color:#b45309;border-radius:12px;padding:6px 12px;font-size:13px;font-weight:700}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,184,148,.55)}50%{box-shadow:0 0 0 14px rgba(0,184,148,0)}}
+.hint{margin-top:18px;color:var(--txt2);font-size:15px;text-align:center}
+
+/* 호출 오버레이 */
+#call{position:fixed;inset:0;z-index:100;background:linear-gradient(160deg,#059669,#10b981);display:none;align-items:center;justify-content:center;flex-direction:column;color:#fff;text-align:center;padding:24px}
+#call.on{display:flex}
+#call .bell{font-size:120px;animation:ring .6s infinite;transform-origin:50% 10%}
+@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(18deg)}40%{transform:rotate(-16deg)}60%{transform:rotate(10deg)}80%{transform:rotate(-8deg)}}
+#call h2{font-size:46px;margin:12px 0 6px;letter-spacing:-1px}
+#call p{font-size:30px;margin:0 0 34px;font-weight:700;opacity:.95}
+#call button{background:#fff;color:var(--mint-d);font-size:30px;font-weight:800;padding:22px 56px;border-radius:30px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+
+/* 완료 */
+#sDone{background:linear-gradient(160deg,#fef3c7,#fde68a)}
+#sDone .big{font-size:110px}
+#sDone h2{font-size:40px;margin:10px 0 6px;color:var(--navy)}
+#sDone p{font-size:20px;color:#92400e;margin:0 0 24px;font-weight:700}
+#sDone button{background:var(--navy);color:#fff;font-size:20px;font-weight:800;padding:16px 40px;border-radius:20px}
+.cf{position:fixed;top:-20px;font-size:28px;animation:fall linear forwards;pointer-events:none;z-index:5}
+@keyframes fall{to{transform:translateY(110vh) rotate(360deg)}}
+
+/* 설정 */
+.setup input{width:100%;margin:6px 0;padding:12px;border:2px solid var(--line);border-radius:12px;font-size:16px;user-select:text;-webkit-user-select:text}
+.setup button{margin-top:10px;width:100%;padding:14px;border-radius:14px;background:var(--navy);color:#fff;font-size:17px;font-weight:700}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:14px 26px;border-radius:30px;font-size:17px;font-weight:700;z-index:200;opacity:0;pointer-events:none;transition:.25s}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- Firebase 설정 (학생관리앱을 같은 주소에서 연 적이 없는 기기에서만 표시) -->
+<div class="screen" id="sSetup">
+  <div class="card setup">
+    <div class="brand"><div class="logo">⚙️</div><h1>처음 한 번만 설정</h1><p>학생관리앱과 같은 Firebase 정보를 입력하세요</p></div>
+    <input id="c-apiKey" placeholder="apiKey">
+    <input id="c-authDomain" placeholder="authDomain">
+    <input id="c-projectId" placeholder="projectId">
+    <input id="c-storageBucket" placeholder="storageBucket">
+    <button onclick="saveCfg()">저장하고 시작</button>
+  </div>
+</div>
+
+<!-- 로그인 -->
+<div class="screen" id="sLogin">
+  <div class="card" id="loginCard">
+    <div class="brand"><div class="logo">📚</div><h1>체크콜</h1><p>내 번호(ID 5자리)를 눌러 주세요</p></div>
+    <div class="dots" id="dots"></div>
+    <div class="pad" id="pad"></div>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<!-- 점검 모달(전체 화면) -->
+<div class="screen" id="sMain">
+  <div class="top">
+    <div class="hello"><span id="hName"></span><small>오늘 점검받을 교재를 눌러서 선생님을 불러요</small></div>
+    <button class="out" onclick="logout()">나가기</button>
+  </div>
+  <div class="prog"><span style="font-weight:800;color:var(--navy)">오늘 점검</span><div class="bar"><i id="barFill" style="width:0"></i></div><b id="barTxt">0/0</b></div>
+  <div class="grid" id="grid"></div>
+  <div class="hint" id="hint"></div>
+</div>
+
+<!-- 모두 끝 -->
+<div class="screen" id="sDone">
+  <div class="big">🎉</div>
+  <h2 id="dName"></h2>
+  <p>오늘 교재 점검을 모두 마쳤어요!</p>
+  <button onclick="logout()">확인</button>
+</div>
+
+<!-- 호출 -->
+<div id="call">
+  <div class="bell">🔔</div>
+  <h2 id="callWho"></h2>
+  <p id="callItem"></p>
+  <button onclick="ackCall()">갈게요! 👍</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" onerror="window.__fbFail=1"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" onerror="window.__fbFail=1"></script>
+<script>
+var $=function(i){return document.getElementById(i);};
+var db=null;
+var S=null;               // {sid,name,items}
+var checks={};            // item -> doc data (+id)
+var unsub=null, pin='', busy=false;
+var AC=null, ringTimer=null, shownCall={}, idleTimer=null, doneTimer=null;
+
+function todayISO(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+function safeId(s){return String(s).replace(/[^\w가-힣]/g,'_');}
+function show(id){['sSetup','sLogin','sMain','sDone'].forEach(function(s){$(s).classList.toggle('on',s===id);});}
+function toast(m){var t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('on');},2200);}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+/* ── 시작 ── */
+function loadScript(u){return new Promise(function(res,rej){var s=document.createElement('script');s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+async function ensureFirebase(){
+  if(window.firebase&&firebase.firestore)return true;
+  var bases=['https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/','https://cdn.jsdelivr.net/npm/firebase@10.12.2/'];
+  for(var i=0;i<bases.length;i++){
+    try{await loadScript(bases[i]+'firebase-app-compat.js');await loadScript(bases[i]+'firebase-firestore-compat.js');if(window.firebase&&firebase.firestore)return true;}catch(e){}
+  }
+  return false;
+}
+async function boot(){
+  if(!(await ensureFirebase())){document.body.innerHTML='<div style="padding:40px;text-align:center;font-size:20px;color:#334155">⚠️ Firebase를 불러오지 못했어요.<br><br>인터넷 연결을 확인하고 새로고침해 주세요.<br><small style="color:#94a3b8">(광고·콘텐츠 차단 설정이 gstatic.com을 막고 있을 수도 있어요)</small></div>';return;}
+  var cfg=null;try{cfg=JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){}
+  if(!cfg||!cfg.apiKey||!cfg.projectId){show('sSetup');return;}
+  try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
+  db=firebase.firestore();
+  buildPad();
+  var sid=null;try{sid=sessionStorage.getItem('cc_sid');}catch(e){}
+  if(sid){resume(sid);}else{show('sLogin');}
+}
+function saveCfg(){
+  var cfg={apiKey:$('c-apiKey').value.trim(),authDomain:$('c-authDomain').value.trim(),projectId:$('c-projectId').value.trim(),storageBucket:$('c-storageBucket').value.trim()};
+  if(!cfg.apiKey||!cfg.projectId){toast('apiKey와 projectId를 입력하세요');return;}
+  localStorage.setItem('fb_cfg',JSON.stringify(cfg));location.reload();
+}
+
+/* ── 로그인 ── */
+function buildPad(){
+  var h='';
+  [1,2,3,4,5,6,7,8,9].forEach(function(n){h+='<button onclick="key('+n+')">'+n+'</button>';});
+  h+='<button class="fn" onclick="clr()">지우기</button><button onclick="key(0)">0</button><button class="fn" onclick="back()">←</button>';
+  $('pad').innerHTML=h;
+}
+function paintDots(){var h='';for(var i=0;i<5;i++)h+='<i class="'+(i<pin.length?'f':'')+'"></i>';$('dots').innerHTML=h;}
+function key(n){initAudio();if(busy)return;if(pin.length<5){pin+=n;paintDots();}if(pin.length===5)tryLogin();}
+function back(){pin=pin.slice(0,-1);paintDots();$('err').textContent='';}
+function clr(){pin='';paintDots();$('err').textContent='';}
+function fail(msg){
+  $('err').textContent=msg;var c=$('loginCard');c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake');
+  pin='';paintDots();busy=false;
+}
+async function tryLogin(){
+  if(pin.length!==5){fail('번호 5자리를 눌러 주세요');return;}
+  busy=true;$('err').textContent='';
+  try{
+    var snap=await db.collection('checkRoster').where('pin','==',pin).get();
+    if(snap.empty){fail('없는 번호예요. 다시 눌러 주세요');return;}
+    var d=snap.docs[0];
+    startSession(d.id,d.data());
+  }catch(e){console.error(e);fail('연결이 불안정해요. 잠시 후 다시!');}
+  busy=false;
+}
+async function resume(sid){
+  try{
+    var d=await db.collection('checkRoster').doc(sid).get();
+    if(d.exists){startSession(sid,d.data());return;}
+  }catch(e){}
+  try{sessionStorage.removeItem('cc_sid');}catch(e){}
+  show('sLogin');
+}
+
+/* ── 세션 ── */
+function startSession(sid,data){
+  S={sid:sid,name:data.name,items:(data.items||[]).slice()};
+  try{sessionStorage.setItem('cc_sid',sid);}catch(e){}
+  shownCall={};checks={};
+  $('hName').textContent=S.name+' 안녕! 👋';
+  pin='';paintDots();
+  if(unsub)unsub();
+  unsub=db.collection('bookChecks').where('studentId','==',sid).where('date','==',todayISO()).onSnapshot(function(snap){
+    checks={};
+    snap.forEach(function(d){var x=d.data();x.id=d.id;checks[x.item]=x;});
+    render();
+  },function(e){console.error(e);toast('연결이 끊겼어요. 잠시만요…');});
+  show('sMain');render();bumpIdle();
+}
+function logout(){
+  if(unsub){unsub();unsub=null;}
+  S=null;checks={};stopRing();$('call').classList.remove('on');
+  clearTimeout(idleTimer);clearTimeout(doneTimer);
+  try{sessionStorage.removeItem('cc_sid');}catch(e){}
+  pin='';paintDots();$('err').textContent='';
+  show('sLogin');
+}
+function bumpIdle(){
+  clearTimeout(idleTimer);
+  idleTimer=setTimeout(function(){
+    // 대기·호출 중이면 유지, 아니면 90초 뒤 자동 나가기
+    var active=S&&Object.keys(checks).some(function(k){return checks[k].status!=='done';});
+    if(active){bumpIdle();}else{logout();}
+  },90000);
+}
+document.addEventListener('touchstart',function(){if(S)bumpIdle();},{passive:true});
+
+/* ── 화면 그리기 ── */
+function render(){
+  if(!S)return;
+  var total=S.items.length,done=0,html='',anyCall=null;
+  S.items.forEach(function(it,i){
+    var c=checks[it],st=c?c.status:'none';
+    if(st==='done')done++;
+    var cls='bk',icon='📘',label='',cancel='';
+    if(st==='waiting'){cls+=' wait';icon='⏳';label='선생님께 알렸어요! 기다려 주세요';cancel='<span class="cx" onclick="event.stopPropagation();cancelReq('+i+')">취소</span>';}
+    else if(st==='called'){cls+=' call';icon='🔔';label=esc(c.calledBy||'선생님')+' 선생님께 가세요!';}
+    else if(st==='done'){cls+=' done';icon='✅';label='검사 끝!';}
+    else{label='눌러서 선생님 부르기';}
+    html+='<button class="'+cls+'" '+(st==='done'||st==='called'?'disabled ':'')+'onclick="request('+i+')">'+cancel
+      +'<span class="ic">'+icon+'</span><span class="nm">'+esc(it)+'</span><span class="st">'+label+'</span></button>';
+    if(st==='called'&&!anyCall)anyCall=c;
+  });
+  $('grid').innerHTML=html;
+  $('barFill').style.width=(total?done/total*100:0)+'%';
+  $('barTxt').textContent=done+'/'+total;
+  $('hint').textContent=total?'':'오늘 점검할 교재가 아직 설정되지 않았어요. 선생님께 말씀드리세요.';
+  // 호출 오버레이 (calledAt이 바뀔 때마다 다시 띄움)
+  if(anyCall){
+    var stamp=anyCall.calledAt&&anyCall.calledAt.toMillis?anyCall.calledAt.toMillis():0;
+    if(stamp&&shownCall[anyCall.id]!==stamp){shownCall[anyCall.id]=stamp;openCall(anyCall);}
+  }else if($('call').classList.contains('on')){closeCall();}
+  // 전부 완료
+  if(total&&done===total&&!S.finished){S.finished=true;finishAll();}
+}
+function finishAll(){
+  $('dName').textContent=S.name+', 잘했어! 👏';
+  show('sDone');confetti();
+  clearTimeout(idleTimer);idleTimer=setTimeout(logout,12000);
+}
+function confetti(){
+  var e=['🎉','⭐','🎊','✨','🌟'];
+  for(var i=0;i<26;i++){(function(i){setTimeout(function(){
+    var s=document.createElement('div');s.className='cf';s.textContent=e[i%e.length];
+    s.style.left=Math.random()*100+'vw';s.style.animationDuration=(2.5+Math.random()*2)+'s';
+    document.body.appendChild(s);setTimeout(function(){s.remove();},5200);},i*90);})(i);}
+}
+
+/* ── 요청 / 취소 ── */
+async function request(i){
+  initAudio();
+  var it=S.items[i],c=checks[it];
+  if(c&&c.status!=='none')return;
+  var ref=db.collection('bookChecks').doc(todayISO()+'_'+S.sid+'_'+safeId(it));
+  try{
+    await ref.set({date:todayISO(),studentId:S.sid,studentName:S.name,item:it,status:'waiting',requestedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('📣 선생님께 알렸어요!');
+  }catch(e){console.error(e);toast('전송 실패. 다시 눌러 주세요');}
+}
+async function cancelReq(i){
+  var it=S.items[i],c=checks[it];if(!c||c.status!=='waiting')return;
+  if(!confirm('"'+it+'" 요청을 취소할까요?'))return;
+  try{await db.collection('bookChecks').doc(c.id).delete();}catch(e){toast('취소 실패');}
+}
+
+/* ── 호출 알림 ── */
+function initAudio(){
+  try{if(!AC){var C=window.AudioContext||window.webkitAudioContext;if(C)AC=new C();}if(AC&&AC.state==='suspended')AC.resume();}catch(e){}
+}
+function ding(){
+  if(!AC)return;
+  try{[880,1175,1568].forEach(function(f,i){
+    var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+i*.16;
+    o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.35,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.35);
+    o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+.4);});}catch(e){}
+  try{if(navigator.vibrate)navigator.vibrate([200,100,200]);}catch(e){}
+}
+function openCall(c){
+  $('callWho').textContent=(c.calledBy||'선생님')+' 선생님이 부르세요!';
+  $('callItem').textContent='📘 '+c.item+' 검사';
+  $('call').classList.add('on');
+  stopRing();ding();ringTimer=setInterval(ding,2600);
+}
+function stopRing(){if(ringTimer){clearInterval(ringTimer);ringTimer=null;}}
+function closeCall(){stopRing();$('call').classList.remove('on');}
+async function ackCall(){
+  closeCall();
+  Object.keys(checks).forEach(function(k){
+    var c=checks[k];
+    if(c.status==='called')db.collection('bookChecks').doc(c.id).update({ackAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
+  });
+}
+
+window.addEventListener('load',boot);
+</script>
+</body>
+</html>
