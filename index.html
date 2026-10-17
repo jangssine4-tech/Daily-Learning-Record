@@ -8964,8 +8964,55 @@ var _MK_DEF={0:{on:false,open:true,from:null,to:null,fixed:[],blocked:[]},
   5:{on:true,open:true,from:null,to:null,fixed:['19:00'],blocked:[]},
   6:{on:true,open:true,from:'10:00',to:'12:00',fixed:[],blocked:[]}};
 var _MK_DN=['일','월','화','수','목','금','토'];
-function _mkrChip(el){var on=el.dataset.on!=='1';el.dataset.on=on?'1':'';
-  el.style.background=on?'#fee2e2':'var(--surface)';el.style.color=on?'#b91c1c':'var(--txt2)';el.style.borderColor=on?'#fca5a5':'var(--border)';el.style.textDecoration=on?'line-through':'none';}
+function _mkrMin(t){var m=/(\d{1,2}):(\d{2})/.exec(t||'');return m?(+m[1]*60+ +m[2]):null;}
+function _mkrHM(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+// 요일별 정규수업 인원(30분 시작 칸 기준) — 서버 후보 계산·신규학생 배정과 같은 기준
+function _mkrGrid(d){
+  var g={},dn=_MK_DN[d];
+  var list=(typeof _studentsAtDate==='function')?_studentsAtDate(todayISO()):students;
+  (list||[]).forEach(function(s){
+    var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
+    if((s.days||[]).indexOf(dn)<0)return;
+    var pd=(s.periods||{})[dn];var m=_mkrMin(pd&&typeof pd==='object'?pd.time:'');if(m===null)return;
+    var k=_mkrHM(Math.floor(m/30)*30);g[k]=(g[k]||0)+1;
+  });
+  return g;
+}
+// 교시 설정의 가장 이른 시작 ~ 가장 늦은 종료 (없으면 14:00~19:00)
+function _mkrPeriodRange(){
+  var f=null,t=null;
+  (customPeriods||[]).forEach(function(p){
+    if(!(p.period>0))return;var a=_mkrMin(p.time);if(a===null)return;
+    var b=_mkrMin(p.endTime);var e=b===null?a+60:b;
+    f=f===null?a:Math.min(f,a);t=t===null?e:Math.max(t,e);
+  });
+  return(f!==null&&t>f)?{from:f,to:t}:{from:14*60,to:19*60};
+}
+// 보강 불가로 고를 수 있는 30분 칸 = 그 요일 보강 제시 범위 안에서 정규수업 정원(cap)이 차지 않은 칸 (+ 이미 불가로 체크된 칸)
+function _mkrRefresh(box){
+  var cap=parseInt(document.getElementById('mkr-cap').value)||4;
+  var pr=_mkrPeriodRange(),d=+box.dataset.dow,grid=_mkrGrid(d);
+  var f=_mkrMin(box.querySelector('.mkr-from').value),t=_mkrMin(box.querySelector('.mkr-to').value);
+  var from=f!==null?f:pr.from,to=t!==null?t:pr.to;
+  var set={};
+  (box.querySelector('.mkr-fixed').value||'').split(/[,\s]+/).forEach(function(x){var a=_mkrMin(x);if(a!==null){set[_mkrHM(Math.floor(a/30)*30)]=1;set[_mkrHM(Math.floor(a/30)*30+30)]=1;}});
+  if(box.querySelector('.mkr-open').checked){for(var x=Math.ceil(from/30)*30;x<to;x+=30)set[_mkrHM(x)]=1;}
+  var blk=box._blk||(box._blk={});
+  Object.keys(blk).forEach(function(k){if(blk[k])set[k]=1;});
+  var keys=Object.keys(set).filter(function(k){return blk[k]||(grid[k]||0)<cap;}).sort();
+  var wrap=box.querySelector('.mkr-chips');
+  if(!keys.length){wrap.innerHTML='<div style="font-size:11px;color:var(--txt3)">이 요일에는 정원이 남는 시간이 없습니다.</div>';return;}
+  wrap.innerHTML=keys.map(function(k){
+    var on=!!blk[k],c=grid[k]||0;
+    return '<button type="button" class="mkr-chip" data-t="'+k+'" data-on="'+(on?'1':'')+'" onclick="_mkrChip(this)" title="정규수업 '+c+'/'+cap+'명" style="padding:4px 7px;font-size:11px;border:1px solid '+(on?'#fca5a5':'var(--border)')+';border-radius:6px;background:'+(on?'#fee2e2':'var(--surface)')+';color:'+(on?'#b91c1c':'var(--txt2)')+';text-decoration:'+(on?'line-through':'none')+';cursor:pointer">'+k+(c?' <span style="font-size:9px;opacity:.6">'+c+'/'+cap+'</span>':'')+'</button>';
+  }).join('');
+}
+function _mkrRefreshAll(){document.querySelectorAll('#modal-mkrules [data-dow]').forEach(_mkrRefresh);}
+function _mkrChip(el){
+  var box=el.closest('[data-dow]');var on=el.dataset.on!=='1';el.dataset.on=on?'1':'';
+  (box._blk||(box._blk={}))[el.dataset.t]=on;
+  el.style.background=on?'#fee2e2':'var(--surface)';el.style.color=on?'#b91c1c':'var(--txt2)';el.style.borderColor=on?'#fca5a5':'var(--border)';el.style.textDecoration=on?'line-through':'none';
+}
 function _mkrToggleDay(cb){var box=cb.closest('[data-dow]');var body=box.querySelector('.mkr-body');body.style.opacity=cb.checked?'1':'.4';body.style.pointerEvents=cb.checked?'':'none';}
 async function openMkRules(){
   var cfg={};
@@ -8974,31 +9021,32 @@ async function openMkRules(){
   var h='<div class="mh"></div><div class="mt">⚙ 보강 시간 규칙</div>'
    +'<div style="font-size:11.5px;color:var(--txt3);line-height:1.6;margin-bottom:10px">학부모가 보강 날짜·시간을 고를 때 보여 줄 시간을 정합니다. 보강은 1시간 기준이며, <b>정원이 찬 시간은 자동으로 제외</b>됩니다. 설정하지 않은 항목은 기본값이 적용됩니다.</div>'
    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
-   +'<div style="flex:1"><div class="fl">30분 칸당 정원</div><input class="fi" type="number" id="mkr-cap" min="1" max="50" value="'+(cfg.cap||4)+'"></div>'
+   +'<div style="flex:1"><div class="fl">30분 칸당 정원</div><input class="fi" type="number" id="mkr-cap" min="1" max="50" value="'+(cfg.cap||4)+'" oninput="_mkrRefreshAll()"></div>'
    +'<div style="flex:1"><div class="fl">결석일부터 며칠 뒤까지</div><input class="fi" type="number" id="mkr-win" min="1" max="90" value="'+(cfg.windowDays||14)+'"></div>'
    +'<div style="flex:1"><div class="fl">오늘부터 몇 일 뒤부터</div><input class="fi" type="number" id="mkr-lead" min="0" max="30" value="'+(cfg.leadDays==null?1:cfg.leadDays)+'"></div></div>';
-  var slots=[];for(var m=8*60;m<=21*60+30;m+=30)slots.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+  var init={};
   [1,2,3,4,5,6,0].forEach(function(d){
     var w=Object.assign({},_MK_DEF[d]);var l=lg[d];var ls=Array.isArray(l)?l:(l&&l.starts);if(Array.isArray(ls))w.fixed=ls;
     var sv=wk[d]||wk[String(d)];if(sv&&typeof sv==='object'){['on','open','from','to','fixed','blocked'].forEach(function(k){if(k in sv)w[k]=sv[k];});}
-    var bl=w.blocked||[];
+    init[d]=w.blocked||[];
+    var rf='_mkrRefresh(this.closest(\'[data-dow]\'))';
     h+='<div data-dow="'+d+'" style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">'
      +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--navy);cursor:pointer"><input type="checkbox" class="mkr-on" '+(w.on?'checked':'')+' onchange="_mkrToggleDay(this)"> '+_MK_DN[d]+'요일 보강 사용</label>'
      +'<div class="mkr-body" style="margin-top:8px;'+(w.on?'':'opacity:.4;pointer-events:none')+'">'
-     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;cursor:pointer"><input type="checkbox" class="mkr-open" '+(w.open?'checked':'')+'> 정원이 남는 빈 시간 자동 제시</label>'
-     +'<div style="display:flex;gap:8px;margin-bottom:6px"><div style="flex:1"><div class="fl">가장 이른 시작</div><input class="fi mkr-from" type="time" step="1800" value="'+(w.from||'')+'"></div>'
-     +'<div style="flex:1"><div class="fl">마지막 종료</div><input class="fi mkr-to" type="time" step="1800" value="'+(w.to||'')+'"></div></div>'
+     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;cursor:pointer"><input type="checkbox" class="mkr-open" '+(w.open?'checked':'')+' onchange="'+rf+'"> 정원이 남는 빈 시간 자동 제시</label>'
+     +'<div style="display:flex;gap:8px;margin-bottom:6px"><div style="flex:1"><div class="fl">가장 이른 시작</div><input class="fi mkr-from" type="time" step="1800" value="'+(w.from||'')+'" onchange="'+rf+'"></div>'
+     +'<div style="flex:1"><div class="fl">마지막 종료</div><input class="fi mkr-to" type="time" step="1800" value="'+(w.to||'')+'" onchange="'+rf+'"></div></div>'
      +'<div style="font-size:10.5px;color:var(--txt3);margin:-2px 0 6px">비워 두면 교시 설정의 시간 범위를 따릅니다. 예) 마지막 종료 19:00 → 18:00~19:00 보강이 마지막</div>'
-     +'<div class="fl">항상 제시할 시작 시각 (쉼표로 구분, 예: 19:00, 19:30)</div><input class="fi mkr-fixed" type="text" placeholder="없으면 비움" value="'+(w.fixed||[]).join(', ')+'" style="margin-bottom:6px">'
-     +'<div class="fl">보강 불가 시간대 (누르면 빨간색 = 불가, 해당 30분과 겹치는 보강은 제시하지 않음)</div><div style="display:flex;flex-wrap:wrap;gap:4px">'
-     +slots.map(function(t){var on=bl.indexOf(t)>=0;return '<button type="button" class="mkr-chip" data-t="'+t+'" data-on="'+(on?'1':'')+'" onclick="_mkrChip(this)" style="padding:4px 7px;font-size:11px;border:1px solid '+(on?'#fca5a5':'var(--border)')+';border-radius:6px;background:'+(on?'#fee2e2':'var(--surface)')+';color:'+(on?'#b91c1c':'var(--txt2)')+';text-decoration:'+(on?'line-through':'none')+';cursor:pointer">'+t+'</button>';}).join('')
-     +'</div></div></div>';
+     +'<div class="fl">항상 제시할 시작 시각 (쉼표로 구분, 예: 19:00, 19:30)</div><input class="fi mkr-fixed" type="text" placeholder="없으면 비움" value="'+(w.fixed||[]).join(', ')+'" oninput="'+rf+'" style="margin-bottom:6px">'
+     +'<div class="fl">보강 불가 시간대 — 정규수업 정원이 안 찬 30분 칸만 표시됩니다. 눌러서 빨간색이 되면 그 칸과 겹치는 보강은 제시하지 않습니다. (칸 오른쪽 숫자 = 정규수업 인원/정원)</div><div class="mkr-chips" style="display:flex;flex-wrap:wrap;gap:4px"></div>'
+     +'</div></div>';
   });
   h+='<div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-outline" style="flex:1" onclick="closeM(\'mkrules\')">취소</button><button class="btn btn-green" style="flex:2" onclick="saveMkRules()">저장</button></div>';
   var old=document.getElementById('modal-mkrules');if(old)old.remove();
   var mo=document.createElement('div');mo.id='modal-mkrules';mo.className='mo';mo.dataset.dynamic='1';mo.style.display='flex';
   mo.onclick=function(e){if(e.target===mo)closeM('mkrules');};
   mo.innerHTML='<div class="ms" style="max-width:560px">'+h+'</div>';document.body.appendChild(mo);
+  mo.querySelectorAll('[data-dow]').forEach(function(box){var b={};(init[box.dataset.dow]||[]).forEach(function(k){b[k]=true;});box._blk=b;_mkrRefresh(box);});
 }
 async function saveMkRules(){
   var mo=document.getElementById('modal-mkrules');if(!mo)return;
@@ -9010,8 +9058,9 @@ async function saveMkRules(){
       return String(+m[1]).padStart(2,'0')+':'+m[2];}).filter(Boolean);
     var from=box.querySelector('.mkr-from').value||null,to=box.querySelector('.mkr-to').value||null;
     if(from&&to&&from>=to)bad=_MK_DN[d]+'요일 가장 이른 시작이 마지막 종료보다 늦습니다';
+    var blk=box._blk||{};
     weekly[d]={on:box.querySelector('.mkr-on').checked,open:box.querySelector('.mkr-open').checked,from:from,to:to,fixed:fixed,
-      blocked:[].slice.call(box.querySelectorAll('.mkr-chip')).filter(function(c){return c.dataset.on==='1';}).map(function(c){return c.dataset.t;})};
+      blocked:Object.keys(blk).filter(function(k){return blk[k];}).sort()};
   });
   if(bad){toast('⚠️ '+bad);return;}
   var n=function(id,def,mn,mx){var v=parseInt(document.getElementById(id).value);return(isFinite(v)&&v>=mn&&v<=mx)?v:def;};
