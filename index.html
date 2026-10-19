@@ -124,6 +124,11 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .bc-b.call{background:#2563eb;color:#fff}.bc-b.ok{background:#00b894;color:#fff}.bc-b.x{background:var(--surface2);color:var(--txt3)}
 .bc-done-chip{display:inline-block;background:var(--surface2);border-radius:10px;padding:1px 7px;margin:1px 2px;font-size:10px;color:var(--txt2)}
 .bc-done-chip a{cursor:pointer;color:var(--blue)}
+.bc-pres{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 8px;padding-bottom:7px;border-bottom:1px solid var(--border)}
+.bc-pchip{display:inline-flex;align-items:center;gap:5px;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--txt2)}
+.bc-pchip i{width:7px;height:7px;border-radius:50%;background:var(--txt3)}
+.bc-pchip.in{background:#ecfdf5;color:#047857}.bc-pchip.in i{background:#10b981}
+.bc-pchip.out{background:#fffbeb;color:#92400e}.bc-pchip.out i{background:#f59e0b}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes bulbBlink{0%,100%{opacity:1;filter:drop-shadow(0 0 3px gold)}50%{opacity:0.2;filter:none}}
 .notes-bulb{display:inline-block;animation:bulbBlink 1.2s ease-in-out infinite;position:absolute;top:-10px;left:100%;font-size:13px;transform:rotate(45deg);transform-origin:bottom left;line-height:1;pointer-events:none;}
@@ -2704,7 +2709,7 @@ var _BC_DEFAULT_ITEMS=['단어장','워크북','스토리북','오답노트'];
 window._bcConfig={defaultItems:_BC_DEFAULT_ITEMS.slice(),groups:{},extraItems:[]};
 window._bcChecks=[];
 window._schDdOpen={};
-var _bcUnsub=null,_bcDate='',_bcFirst=true,_bcSyncTimer=null,_bcAC=null;
+var _bcPUnsub=null,_bcUnsub=null,_bcDate='',_bcFirst=true,_bcSyncTimer=null,_bcAC=null;
 
 function _bcEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function _bcParseList(str){
@@ -2821,6 +2826,14 @@ function _bcSubscribeToday(){
       _bcRender();
     },function(e){console.warn('bookChecks',e);});
   }catch(e){}
+  // 학생 태블릿 접속/로그아웃 상태
+  if(_bcPUnsub){try{_bcPUnsub();}catch(e){}}
+  try{
+    _bcPUnsub=db.collection('checkPresence').where('date','==',_bcDate).onSnapshot(function(snap){
+      window._bcPresence=snap.docs.map(function(d){var x=d.data();x.id=d.id;return x;});
+      _bcRender();
+    },function(e){console.warn('checkPresence',e);});
+  }catch(e){}
 }
 function _bcBeep(){
   try{
@@ -2879,6 +2892,17 @@ function _bcRender(){
     +'<div class="sch-dd-panel" style="display:'+(isOpen?'block':'none')+';min-width:340px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;color:var(--txt3)">번호·이름·교재를 누르면 학생 태블릿에 <b>'+_bcEsc(_bcTeacher())+'</b> 선생님 호출이 떠요</span>'
     +'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 교재 설정</button></div>';
+  var pres=(window._bcPresence||[]).slice().sort(function(a,b){var ta=a.at&&a.at.toMillis?a.at.toMillis():0,tb=b.at&&b.at.toMillis?b.at.toMillis():0;return tb-ta;});
+  var presMap={};pres.forEach(function(p){presMap[p.studentId]=p;});
+  if(pres.length){
+    h+='<div class="bc-pres">';
+    pres.forEach(function(p){
+      var tm=p.at&&p.at.toMillis?new Date(p.at.toMillis()):null;
+      var hm=tm?(('0'+tm.getHours()).slice(-2)+':'+('0'+tm.getMinutes()).slice(-2)):'';
+      h+='<span class="bc-pchip '+(p.status==='in'?'in':'out')+'"><i></i>'+_bcEsc(p.studentName)+' '+(p.status==='in'?'접속 중':'로그아웃 '+hm)+'</span>';
+    });
+    h+='</div>';
+  }
   if(!act.length)h+='<div style="padding:14px 6px;font-size:12px;color:var(--txt3);text-align:center">대기 중인 학생이 없어요</div>';
   act.forEach(function(x,i){
     var called=x.status==='called';
@@ -2886,7 +2910,8 @@ function _bcRender(){
       +'<span class="bc-no">'+(i+1)+'</span>'
       +'<span class="bc-nm">'+_bcEsc(x.studentName)+'</span>'
       +'<span class="bc-it">'+_bcEsc(x.item)+'</span>'
-      +(called?'<span class="bc-tag">'+(x.ackAt?'👀 확인함':'📢 호출 중')+'</span>':'')
+      +(called?'<span class="bc-tag">'+(x.ackAt?'📲 학생 화면에 표시됨':'📢 호출 중')+'</span>':'')
+      +((presMap[x.studentId]&&presMap[x.studentId].status==='out')?'<span class="bc-tag" style="color:#b45309">⚠ 로그아웃</span>':'')
       +'<span style="margin-left:auto;display:flex;gap:4px">'
       +'<button class="bc-b call" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'+(called?'다시 호출':'호출')+'</button>'
       +'<button class="bc-b ok" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcDone(this.dataset.id)">완료</button>'

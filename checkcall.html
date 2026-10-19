@@ -189,7 +189,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
   <div class="rings"><div class="core"><svg><use href="#i-bell"/></svg></div></div>
   <h2 id="callWho"></h2>
   <div class="chip" id="callChip"><i></i><b id="callItem"></b></div>
-  <button class="ok" onclick="ackCall()">알겠어요, 갈게요</button>
+  <button class="ok" onclick="closeCall()">확인</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -202,7 +202,7 @@ var db=null;
 var S=null;               // {sid,name,items}
 var checks={};            // item -> doc data (+id)
 var unsub=null, pin='', busy=false;
-var AC=null, ringTimers=[], shownCall={}, idleTimer=null;
+var AC=null, ringTimers=[], shownCall={};
 var COLORS=['#3E63DD','#12A594','#8E4EC6','#E5960B','#E5484D'];
 
 function todayISO(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
@@ -229,7 +229,7 @@ async function boot(){
   try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
   db=firebase.firestore();
   buildPad();paintDots();
-  var sid=null;try{sid=sessionStorage.getItem('cc_sid');}catch(e){}
+  var sid=null;try{sid=localStorage.getItem('cc_sid');}catch(e){}
   if(sid){resume(sid);}else{show('sLogin');}
 }
 function saveCfg(){
@@ -269,14 +269,14 @@ async function resume(sid){
     var d=await db.collection('checkRoster').doc(sid).get();
     if(d.exists){startSession(sid,d.data());return;}
   }catch(e){}
-  try{sessionStorage.removeItem('cc_sid');}catch(e){}
+  try{localStorage.removeItem('cc_sid');}catch(e){}
   show('sLogin');
 }
 
 /* ── 세션 ── */
 function startSession(sid,data){
   S={sid:sid,name:data.name,items:(data.items||[]).slice()};
-  try{sessionStorage.setItem('cc_sid',sid);}catch(e){}
+  try{localStorage.setItem('cc_sid',sid);}catch(e){}
   shownCall={};checks={};
   $('hName').textContent=S.name+' 안녕';
   pin='';paintDots();
@@ -286,27 +286,16 @@ function startSession(sid,data){
     snap.forEach(function(d){var x=d.data();x.id=d.id;checks[x.item]=x;});
     render();
   },function(e){console.error(e);toast('연결이 끊겼어요. 잠시만 기다려 주세요');});
-  show('sMain');render();bumpIdle();
+  S.date=todayISO();setPresence('in');show('sMain');render();
 }
 function logout(){
+  setPresence('out');
   if(unsub){unsub();unsub=null;}
   S=null;checks={};stopRing();$('call').classList.remove('on');
-  clearTimeout(idleTimer);
-  try{sessionStorage.removeItem('cc_sid');}catch(e){}
+  try{localStorage.removeItem('cc_sid');}catch(e){}
   pin='';paintDots();$('err').textContent='';
   show('sLogin');
 }
-// 대기·호출 중인 교재가 없으면 90초 뒤 자동으로 나가요 (다음 학생이 쓸 수 있게)
-function bumpIdle(){
-  clearTimeout(idleTimer);
-  idleTimer=setTimeout(function(){
-    var active=S&&Object.keys(checks).some(function(k){return checks[k].status!=='done';});
-    if(active){bumpIdle();}else{logout();}
-  },90000);
-}
-document.addEventListener('touchstart',function(){if(S)bumpIdle();},{passive:true});
-document.addEventListener('mousedown',function(){if(S)bumpIdle();});
-
 /* ── 화면 그리기 ── */
 function render(){
   if(!S)return;
@@ -339,7 +328,6 @@ function render(){
 function finishAll(){
   $('dName').textContent=S.name+', 수고했어요';
   show('sDone');
-  clearTimeout(idleTimer);idleTimer=setTimeout(logout,12000);
 }
 
 /* ── 요청 / 취소 ── */
@@ -372,23 +360,24 @@ function ding(){
   }
   try{if(navigator.vibrate)navigator.vibrate([200,100,200]);}catch(e){}
 }
+function setPresence(status){
+  if(!S)return;
+  db.collection('checkPresence').doc(S.sid).set({studentId:S.sid,studentName:S.name,date:todayISO(),status:status,at:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
+}
+// 자정이 지나면 오늘 기록으로 자동 갱신 (로그아웃은 하지 않아요)
+setInterval(function(){if(S&&S.date&&S.date!==todayISO())resume(S.sid);},60000);
+
 function openCall(c){
   $('callWho').textContent=(c.calledBy||'선생님')+' 선생님이 불러요';
   $('callItem').textContent=c.item+' 검사';
   $('callChip').style.setProperty('--c','#7CE3BD');
   $('call').classList.add('on');
-  stopRing();ding();ringTimers.push(setTimeout(ding,1500));   // 총 2번
+  stopRing();ding();ringTimers.push(setTimeout(ding,1500));   // 벨 총 2번
+  ringTimers.push(setTimeout(closeCall,4800));                 // 벨이 끝나면 알림창은 저절로 닫혀요
+  db.collection('bookChecks').doc(c.id).update({ackAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});  // 선생님 화면에 '표시됨'
 }
 function stopRing(){ringTimers.forEach(clearTimeout);ringTimers=[];}
 function closeCall(){stopRing();$('call').classList.remove('on');}
-async function ackCall(){
-  closeCall();
-  Object.keys(checks).forEach(function(k){
-    var c=checks[k];
-    if(c.status==='called')db.collection('bookChecks').doc(c.id).update({ackAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
-  });
-}
-
 window.addEventListener('load',boot);
 </script>
 </body>
