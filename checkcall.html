@@ -265,11 +265,14 @@ async function tryLogin(){
   busy=false;
 }
 async function resume(sid){
-  try{
-    var d=await db.collection('checkRoster').doc(sid).get();
-    if(d.exists){startSession(sid,d.data());return;}
-  }catch(e){}
-  try{localStorage.removeItem('cc_sid');}catch(e){}
+  var d=null;
+  try{d=await db.collection('checkRoster').doc(sid).get();}
+  catch(e){            // 인터넷이 잠깐 끊긴 것: 로그인 정보는 지우지 않고 다시 시도해요
+    show('sLogin');toast('다시 연결하는 중이에요');
+    setTimeout(function(){resume(sid);},3000);return;
+  }
+  if(d.exists){startSession(sid,d.data());return;}
+  try{localStorage.removeItem('cc_sid');}catch(e){}   // 명단에서 정말 빠진 학생일 때만
   show('sLogin');
 }
 
