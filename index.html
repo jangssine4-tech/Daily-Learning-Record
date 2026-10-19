@@ -2708,16 +2708,20 @@ function refreshCurrentView(trigger){
 // 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
 //   to: tablet|book 호출 대상, link: hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
 var CC_DEFAULT_TEMPLATE={sections:[
- {title:'Basic 단계',items:[
+ {title:'숙제 했나요?',items:[
   {id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},
   {id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]},
- {title:'스마트 학습',items:[
+ {title:'스마트 학습 1',items:[
   {id:'vt',t:'check',l:'어휘트레이닝'}]},
  {title:'단어장',items:[
   {id:'w1',t:'check',l:'그림보고 영어 단어 말하기'},
   {id:'w2',t:'check',l:'영어 단어 읽고 뜻 말하기'},
   {id:'w3',t:'call',l:'단어장 검사 받기',to:'tablet'},
-  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'}]},
+  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'},
+  {id:'w5',t:'call',l:'받아쓰기 검사 받기',to:'book'}]},
+ {title:'스마트 학습 2',items:[
+  {id:'ds',t:'check',l:'Daily Study'},
+  {id:'sp',t:'check',l:'스피킹 트레이닝'}]},
  {title:'스토리북',items:[
   {id:'s1',t:'check',l:'모르는 단어 형광펜 표시하며 읽기'},
   {id:'s2',t:'call',l:'스토리북 검사 받기 1',to:'book'},
@@ -2736,6 +2740,7 @@ var CC_DEFAULT_TEMPLATE={sections:[
 var CC_DEFAULT_MINUTES=90;
 window._bcConfig={templates:{},totalMin:CC_DEFAULT_MINUTES};
 window._ccLogs={};
+var _bcLastProg={};
 window._bcChecks=[];
 window._schDdOpen={};
 var _bcPUnsub=null,_bcUnsub=null,_bcDate='',_bcFirst=true,_bcSyncTimer=null,_bcAC=null;
@@ -2995,6 +3000,26 @@ function _bcCallTag(x){
   var mine=nm&&nm===_bcTeacher();
   return '<span class="bc-tag" style="'+(mine?'color:#0E7C5A;font-weight:800':'')+'">'+(book?'교재 교사':'태블릿 교사')+(nm?' · '+_bcEsc(nm):'')+'</span>';
 }
+// 학습 일지의 단계·진도를 체크콜(태블릿)에 자동 전달: checkLogs/{날짜_학생ID}.lv / .pg
+function _bcSyncProgress(){
+  try{
+    if(!db||!currentUser||typeof reports==='undefined'||!reports||!reports.length)return;
+    var d=todayISO(),best={};
+    reports.forEach(function(r){
+      if(r.date!==d||!r.studentId||r.absent)return;
+      var lv=String(r.level||'').trim(),pg=String(r.progress||'').trim();
+      var cur=best[r.studentId],t=String(r.updatedAt||r.savedAt||r.createdAt||'');
+      if(!cur||(pg&&!cur.pg)||(!!pg===!!cur.pg&&t>cur.t))best[r.studentId]={lv:lv,pg:pg,t:t};
+    });
+    Object.keys(best).forEach(function(sid){
+      var b=best[sid],sig=d+'|'+b.lv+'|'+b.pg;
+      if(_bcLastProg[sid]===sig)return;
+      _bcLastProg[sid]=sig;
+      db.collection('checkLogs').doc(d+'_'+sid).set({date:d,studentId:sid,lv:b.lv,pg:b.pg},{merge:true}).catch(function(){_bcLastProg[sid]='';});
+    });
+  }catch(e){}
+}
+setInterval(_bcSyncProgress,5000);
 function _bcRef(id){return db.collection('bookChecks').doc(id);}
 function _bcCall(id){
   _bcRef(id).update({status:'called',calledBy:_bcTeacher(),calledAt:firebase.firestore.FieldValue.serverTimestamp(),ackAt:firebase.firestore.FieldValue.delete()})

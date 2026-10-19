@@ -78,6 +78,10 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .bx.on svg{display:block}
 .nn{width:clamp(66px,14vw,90px);height:clamp(44px,9vw,52px);border-radius:12px;border:3px solid #A59E8E;font:900 clamp(20px,4.4vw,26px) var(--font);text-align:center;color:#1F2433;background:#fff;user-select:text;-webkit-user-select:text}
 .nn:focus{outline:none;border-color:#E4572E}
+.nn.pl{width:clamp(92px,19vw,120px);font-size:clamp(18px,4vw,24px)}
+.nn.pl::placeholder{font-size:12px;font-weight:600;color:#8B8478;letter-spacing:-.02em}
+.dt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.lv{display:inline-flex;max-width:100%;padding:3px 12px;border-radius:999px;background:#1F2433;color:#fff;font-size:clamp(13px,2.8vw,16px);font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nu{display:flex;align-items:center;gap:8px;font-size:clamp(16px,3.4vw,20px);font-weight:600}
 .cbtn{display:flex;align-items:center;width:100%;min-height:clamp(68px,13vw,84px);border-radius:20px;background:#E4572E;color:#fff;font-size:clamp(19px,4.2vw,24px);font-weight:900;padding:0 clamp(16px,3vw,26px);margin:6px 0 14px;text-align:left;letter-spacing:-.03em;gap:12px}
 .cbtn small{margin-left:auto;font-size:clamp(13px,2.8vw,15px);font-weight:600;letter-spacing:-.01em}
@@ -172,7 +176,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 <div class="screen" id="sMain">
   <div class="wrap">
     <div class="top">
-      <div><div class="hello" id="hName"></div><div class="dt" id="hDate"></div></div>
+      <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span></div></div>
       <button class="out" onclick="logout()">나가기</button>
     </div>
     <div class="tbar"><span>시작 <b id="tStart">--:--</b></span><div class="tr"><i id="tFill"></i></div><span>끝 <b id="tEnd">--:--</b></span></div>
@@ -212,16 +216,20 @@ var AC=null, ringTimers=[], shownCall={};
 // 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
 //   to: tablet|book 호출 대상, link: hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
 var CC_DEFAULT_TEMPLATE={sections:[
- {title:'Basic 단계',items:[
+ {title:'숙제 했나요?',items:[
   {id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},
   {id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]},
- {title:'스마트 학습',items:[
+ {title:'스마트 학습 1',items:[
   {id:'vt',t:'check',l:'어휘트레이닝'}]},
  {title:'단어장',items:[
   {id:'w1',t:'check',l:'그림보고 영어 단어 말하기'},
   {id:'w2',t:'check',l:'영어 단어 읽고 뜻 말하기'},
   {id:'w3',t:'call',l:'단어장 검사 받기',to:'tablet'},
-  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'}]},
+  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'},
+  {id:'w5',t:'call',l:'받아쓰기 검사 받기',to:'book'}]},
+ {title:'스마트 학습 2',items:[
+  {id:'ds',t:'check',l:'Daily Study'},
+  {id:'sp',t:'check',l:'스피킹 트레이닝'}]},
  {title:'스토리북',items:[
   {id:'s1',t:'check',l:'모르는 단어 형광펜 표시하며 읽기'},
   {id:'s2',t:'call',l:'스토리북 검사 받기 1',to:'book'},
@@ -439,11 +447,11 @@ function itemHtml(it,si,ii){
   }
   if(it.t==='number'){
     var v=LOG.v[it.id];
-    return '<div class="bi"><span class="lb">'+esc(it.l)+'</span><span class="nu"><input class="nn" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-id="'+esc(it.id)+'" data-si="'+si+'" data-ii="'+ii+'" value="'+(v===undefined?'':esc(v))+'" placeholder="--" oninput="numIn(this)" onchange="numIn(this,1)" aria-label="'+esc(it.l)+'">'+esc(it.u||'')+'</span><span class="t">'+tm+'</span></div>';
+    return '<div class="bi"><span class="lb">'+esc(it.l)+'</span><span class="nu"><input class="nn" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-id="'+esc(it.id)+'" data-si="'+si+'" data-ii="'+ii+'" value="'+(v===undefined?'':esc(v))+'" oninput="numIn(this)" onchange="numIn(this,1)" aria-label="'+esc(it.l)+'">'+esc(it.u||'')+'</span><span class="t">'+tm+'</span></div>';
   }
   if(it.t==='dict'){
     var d=LOG.v[it.id]||{},lastT='';try{lastT=localStorage.getItem('cc_dt')||'';}catch(e){}
-    return '<div class="bi"><span class="lb">'+esc(it.l)+'</span><span class="nu"><input class="nn" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-id="'+esc(it.id)+'" data-k="c" value="'+(d.c===undefined?'':esc(d.c))+'" placeholder="맞은" oninput="dictIn(this)" onchange="dictIn(this,1)" aria-label="맞은 개수"> / <input class="nn" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-id="'+esc(it.id)+'" data-k="t" value="'+(d.t===undefined?esc(lastT):esc(d.t))+'" placeholder="전체" oninput="dictIn(this)" onchange="dictIn(this,1)" aria-label="전체 개수">개</span><span class="t">'+tm+'</span></div>';
+    return '<div class="bi"><span class="lb">'+esc(it.l)+'</span><span class="nu"><input class="nn pl" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-id="'+esc(it.id)+'" data-k="c" value="'+(d.c===undefined?'':esc(d.c))+'" placeholder="맞은 개수" oninput="dictIn(this)" onchange="dictIn(this,1)" aria-label="맞은 개수"> / <input class="nn pl" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-id="'+esc(it.id)+'" data-k="t" value="'+(d.t===undefined?esc(lastT):esc(d.t))+'" placeholder="전체 개수" oninput="dictIn(this)" onchange="dictIn(this,1)" aria-label="전체 개수">개</span><span class="t">'+tm+'</span></div>';
   }
   // call: 검사 받기
   var c=checks[it.l],st=c?c.status:'none',cls='cbtn',small='',cancel='',dis='';
@@ -454,6 +462,8 @@ function itemHtml(it,si,ii){
 }
 function paintBar(){
   if(!S)return;
+  var lv=[LOG.lv,LOG.pg].filter(function(x){return x&&String(x).trim();}).join(' · '),el=$('hLv');
+  if(el){el.textContent=lv;el.style.display=lv?'inline-flex':'none';}
   var st=LOG.startAt,en=LOG.endAt;
   $('tStart').textContent=st?hm(st):'--:--';
   $('tEnd').textContent=en?hm(en):'--:--';
