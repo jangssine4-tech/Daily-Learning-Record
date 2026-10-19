@@ -175,6 +175,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 <!-- 점검 -->
 <div class="screen" id="sMain">
   <div class="wrap">
+    <div id="snd" style="display:none;margin:0 0 10px;padding:9px 14px;border-radius:12px;background:#FFF1D6;color:#7A4B00;font-size:14px;font-weight:700;text-align:center">소리가 꺼져 있어요. 화면을 한 번 터치하면 벨 소리가 켜져요</div>
     <div class="top">
       <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span></div></div>
       <button class="out" onclick="logout()">나가기</button>
@@ -526,15 +527,28 @@ async function cancelReq(si,ii){
 
 /* ── 호출 알림: 벨은 2번만 ── */
 function initAudio(){
-  try{if(!AC){var C=window.AudioContext||window.webkitAudioContext;if(C)AC=new C();}if(AC&&AC.state==='suspended')AC.resume();}catch(e){}
+  try{
+    if(!AC){var C=window.AudioContext||window.webkitAudioContext;if(C){AC=new C();AC.onstatechange=paintSnd;}}
+    if(AC&&AC.state!=='running'&&AC.resume)AC.resume().then(paintSnd).catch(function(){});
+  }catch(e){}
+  paintSnd();
 }
+// 소리가 막혀 있으면(앱을 다시 열고 화면을 한 번도 안 눌렀을 때 등) 안내를 보여요
+function paintSnd(){var b=$('snd');if(b)b.style.display=(AC&&AC.state==='running')?'none':'block';}
+['pointerdown','touchstart','keydown','click'].forEach(function(ev){document.addEventListener(ev,initAudio,{passive:true,capture:true});});
+document.addEventListener('visibilitychange',function(){if(!document.hidden)initAudio();});
 function ding(){
-  if(AC){
-    try{[880,1175,1568].forEach(function(f,i){
-      var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+i*.16;
-      o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.35,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.35);
-      o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+.4);});}catch(e){}
-  }
+  var play=function(){
+    if(AC){
+      try{[880,1175,1568].forEach(function(f,i){
+        var o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+i*.16;
+        o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.5,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.35);
+        o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+.4);});}catch(e){}
+    }
+  };
+  try{
+    if(AC&&AC.state!=='running'&&AC.resume){AC.resume().then(play).catch(play);}else play();
+  }catch(e){play();}
   try{if(navigator.vibrate)navigator.vibrate([200,100,200]);}catch(e){}
 }
 function setPresence(status){
