@@ -2705,8 +2705,37 @@ function refreshCurrentView(trigger){
 //   checkRoster/{학생ID}   : 태블릿 로그인용 {name,pin,items,level}  (학생관리앱이 자동 동기화)
 //   bookChecks/{날짜_학생ID_교재} : {status:'waiting'|'called'|'done', ...}
 // ═══════════════════════════════════════════════════════════
-var _BC_DEFAULT_ITEMS=['단어장','워크북','스토리북','오답노트'];
-window._bcConfig={defaultItems:_BC_DEFAULT_ITEMS.slice(),groups:{},extraItems:[]};
+// 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
+//   to: tablet|book 호출 대상, link: hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
+var CC_DEFAULT_TEMPLATE={sections:[
+ {title:'Basic 단계',items:[
+  {id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},
+  {id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]},
+ {title:'스마트 학습',items:[
+  {id:'vt',t:'check',l:'어휘트레이닝'}]},
+ {title:'단어장',items:[
+  {id:'w1',t:'check',l:'그림보고 영어 단어 말하기'},
+  {id:'w2',t:'check',l:'영어 단어 읽고 뜻 말하기'},
+  {id:'w3',t:'call',l:'단어장 검사 받기',to:'tablet'},
+  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'}]},
+ {title:'스토리북',items:[
+  {id:'s1',t:'check',l:'모르는 단어 형광펜 표시하며 읽기'},
+  {id:'s2',t:'call',l:'스토리북 검사 받기 1',to:'book'},
+  {id:'s3',t:'check',l:'배웠던 부분 집중해서 읽기'},
+  {id:'s4',t:'check',l:'애니메이션 속도로 읽기'},
+  {id:'s5',t:'call',l:'스토리북 검사 받기 2',to:'book'}]},
+ {title:'워크북',items:[
+  {id:'k1',t:'check',l:'문법표 외우기'},
+  {id:'k2',t:'check',l:'큰소리로 읽으며 문제 풀기'},
+  {id:'k3',t:'call',l:'워크북 검사 받기',to:'tablet'}]},
+ {title:'Daily Quiz · 오답 노트',items:[
+  {id:'q1',t:'number',l:'Daily Quiz 점수',u:'점',link:'quiz'},
+  {id:'q2',t:'check',l:'오답 노트 하기'},
+  {id:'q3',t:'call',l:'오답 노트 검사 받기',to:'tablet'}]}
+]};
+var CC_DEFAULT_MINUTES=90;
+window._bcConfig={templates:{},totalMin:CC_DEFAULT_MINUTES};
+window._ccLogs={};
 window._bcChecks=[];
 window._schDdOpen={};
 var _bcPUnsub=null,_bcUnsub=null,_bcDate='',_bcFirst=true,_bcSyncTimer=null,_bcAC=null;
@@ -2732,15 +2761,23 @@ function _bcBooksOfModule(modKey){
   });
   return out;
 }
-// 학생 점검 교재: ① 교재 설정에서 모듈별로 직접 적은 값 → ② 평가 모듈 자동값 → ③ 공통 기본값, 그리고 공통 추가 교재(오답노트 등)를 덧붙임
+// ── 점검 항목 템플릿 (단계별 편집) ──
+function _bcClone(o){return JSON.parse(JSON.stringify(o));}
+function _bcCanon(o){
+  if(Array.isArray(o))return '['+o.map(_bcCanon).join(',')+']';
+  if(o&&typeof o==='object')return '{'+Object.keys(o).sort().map(function(k){return JSON.stringify(k)+':'+_bcCanon(o[k]);}).join(',')+'}';
+  return JSON.stringify(o===undefined?null:o);
+}
+function _bcTplFor(s){
+  var cfg=window._bcConfig||{},t=cfg.templates||{};
+  var mk=s?getEvalModuleForLevel(getStudentLevel(s)):'';
+  return _bcClone((mk&&t[mk])||t['default']||CC_DEFAULT_TEMPLATE);
+}
+// 학생이 받아야 하는 '검사 받기' 항목 이름들 (점검 마무리 판단용)
 function _bcItemsFor(s){
-  if(!s)return [];
-  var cfg=window._bcConfig||{};
-  var mk=getEvalModuleForLevel(getStudentLevel(s));
-  var base=(mk&&cfg.groups&&cfg.groups[mk]&&cfg.groups[mk].length)?cfg.groups[mk].slice():_bcBooksOfModule(mk);
-  if(!base.length)base=(cfg.defaultItems||[]).slice();
-  (cfg.extraItems||[]).forEach(function(x){if(base.indexOf(x)<0)base.push(x);});
-  return base;
+  var out=[];
+  _bcTplFor(s).sections.forEach(function(sec){(sec.items||[]).forEach(function(i){if(i.t==='call')out.push(i.l);});});
+  return out;
 }
 
 // ── 태블릿 로그인용 명단 동기화 ──
@@ -2757,12 +2794,12 @@ async function _bcSyncRoster(){
     students.forEach(function(s){
       var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
       var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return;
-      want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,items:_bcItemsFor(s),level:getStudentLevel(s)};
+      want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),totalMin:(window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES,level:getStudentLevel(s)};
     });
     var ops=[];
     Object.keys(want).forEach(function(id){
       var c=have[id];
-      if(c&&JSON.stringify({name:c.name,pin:c.pin,items:c.items,level:c.level})===JSON.stringify(want[id]))return;
+      if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,totalMin:c.totalMin,level:c.level})===_bcCanon(want[id]))return;
       ops.push({t:'set',id:id,d:want[id]});
     });
     Object.keys(have).forEach(function(id){if(!want[id])ops.push({t:'del',id:id});});
@@ -2802,9 +2839,9 @@ function _bcInitGlobal(){
 function _bcStartListeners(){
   _bcInitGlobal();
   try{
-    db.collection('config').doc('bookCheckConfig').onSnapshot(function(d){
+    db.collection('config').doc('checkTemplates').onSnapshot(function(d){
       var c=d.exists?d.data():{};
-      window._bcConfig={defaultItems:(c.defaultItems&&c.defaultItems.length)?c.defaultItems:_BC_DEFAULT_ITEMS.slice(),groups:c.groups||{},extraItems:c.extraItems||[]};
+      window._bcConfig={templates:c.templates||{},totalMin:c.totalMin||CC_DEFAULT_MINUTES};
       _bcSyncSoon();
     },function(){});
   }catch(e){}
@@ -2825,6 +2862,15 @@ function _bcSubscribeToday(){
       _bcFirst=false;
       _bcRender();
     },function(e){console.warn('bookChecks',e);});
+  }catch(e){}
+  // 체크콜 진행 기록 (학습 일지 자동 연동용)
+  if(window._ccLUnsub){try{window._ccLUnsub();}catch(e){}}
+  try{
+    window._ccLUnsub=db.collection('checkLogs').where('date','==',_bcDate).onSnapshot(function(snap){
+      var m={};snap.forEach(function(d){var x=d.data();m[x.studentId]=x;});
+      window._ccLogs=m;
+      try{_ccFillJournal();}catch(e){}
+    },function(e){console.warn('checkLogs',e);});
   }catch(e){}
   // 학생 태블릿 접속/로그아웃 상태
   if(_bcPUnsub){try{_bcPUnsub();}catch(e){}}
@@ -2891,7 +2937,7 @@ function _bcRender(){
   var h='<button class="sch-dd-btn'+(waiting?' bc-blink':(act.length?' has':''))+'" onclick="event.stopPropagation();if(window._bcDragged)return;_schDdToggle(\'check\')">🔔 점검 받을 학생 ('+act.length+')'+(waiting?' <span class="bc-new">NEW</span>':'')+' <span style="font-size:9px">▼</span></button>'
     +'<div class="sch-dd-panel" style="display:'+(isOpen?'block':'none')+';min-width:340px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;color:var(--txt3)">번호·이름·교재를 누르면 학생 태블릿에 <b>'+_bcEsc(_bcTeacher())+'</b> 선생님 호출이 떠요</span>'
-    +'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 교재 설정</button></div>';
+    +'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 점검 항목 편집</button></div>';
   var pres=(window._bcPresence||[]).slice().sort(function(a,b){var ta=a.at&&a.at.toMillis?a.at.toMillis():0,tb=b.at&&b.at.toMillis?b.at.toMillis():0;return tb-ta;});
   var presMap={};pres.forEach(function(p){presMap[p.studentId]=p;});
   if(pres.length){
@@ -2910,6 +2956,7 @@ function _bcRender(){
       +'<span class="bc-no">'+(i+1)+'</span>'
       +'<span class="bc-nm">'+_bcEsc(x.studentName)+'</span>'
       +'<span class="bc-it">'+_bcEsc(x.item)+'</span>'
+      +_bcCallTag(x)
       +(called?'<span class="bc-tag">'+(x.ackAt?'📲 학생 화면에 표시됨':'📢 호출 중')+'</span>':'')
       +((presMap[x.studentId]&&presMap[x.studentId].status==='out')?'<span class="bc-tag" style="color:#b45309">⚠ 로그아웃</span>':'')
       +'<span style="margin-left:auto;display:flex;gap:4px">'
@@ -2942,6 +2989,12 @@ function _bcRender(){
   box.innerHTML=h;
   if(isOpen)_schDdAlign('check');
 }
+function _bcCallTag(x){
+  var r=(typeof reports!=='undefined'&&reports||[]).find(function(z){return z.studentId===x.studentId&&z.date===x.date;});
+  var book=x.callTo==='book',nm=r?(book?r.teacherBook:(r.teacherTablet||r.teacher)):'';
+  var mine=nm&&nm===_bcTeacher();
+  return '<span class="bc-tag" style="'+(mine?'color:#0E7C5A;font-weight:800':'')+'">'+(book?'교재 교사':'태블릿 교사')+(nm?' · '+_bcEsc(nm):'')+'</span>';
+}
 function _bcRef(id){return db.collection('bookChecks').doc(id);}
 function _bcCall(id){
   _bcRef(id).update({status:'called',calledBy:_bcTeacher(),calledAt:firebase.firestore.FieldValue.serverTimestamp(),ackAt:firebase.firestore.FieldValue.delete()})
@@ -2960,37 +3013,182 @@ function _bcRemove(id){
   _bcRef(id).delete().catch(function(){});
 }
 
-// ── 교재 설정 모달 ──
+// ── 점검 항목 편집 모달 (단계별) ──
+var _bcEd=null;
+var _BCED_TYPES=[['check','체크'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)']];
 function _bcOpenSettings(){
   var old=document.getElementById('modal-bcset');if(old)old.remove();
   var cfg=window._bcConfig||{};
+  _bcEd={key:'default',tpl:_bcClone(cfg.templates||{}),view:null,totalMin:cfg.totalMin||CC_DEFAULT_MINUTES};
   var m=document.createElement('div');m.id='modal-bcset';m.className='mo';m.dataset.dynamic='1';m.style.display='flex';
   m.onclick=function(e){if(e.target===m)m.remove();};
-  var h='<div class="ms"><div class="mt">⚙ 점검 교재 설정</div>'
-    +'<div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:12px">점검 교재는 학생 단계에 맞는 <b>평가 모듈</b>(단어장·스토리북·워크북 등)에서 <b>자동으로</b> 가져옵니다. 그대로 쓰시면 되고, 바꾸고 싶은 곳만 적어 주세요. (쉼표로 구분)</div>'
-    +'<div class="field"><div class="fl">모든 학생에게 추가할 교재</div><input class="fi" id="bcs-extra" value="'+_bcEsc((cfg.extraItems||[]).join(', '))+'" placeholder="예: 오답노트"></div>'
-    +'<div class="field"><div class="fl">평가 모듈을 찾지 못한 학생의 기본 교재</div><input class="fi" id="bcs-default" value="'+_bcEsc((cfg.defaultItems||[]).join(', '))+'" placeholder="단어장, 워크북, 스토리북, 오답노트"></div>'
-    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:12px 0 6px">단계별 교재 직접 지정 (비우면 자동)</div>';
-  Object.keys(EVAL_MODULES).forEach(function(k){
-    var mod=EVAL_MODULES[k];
-    h+='<div class="field"><div class="fl">'+_bcEsc(mod.label||k)+'</div><input class="fi bcs-g" data-g="'+_bcEsc(k)+'" value="'+_bcEsc(((cfg.groups||{})[k]||[]).join(', '))+'" placeholder="자동: '+_bcEsc(_bcBooksOfModule(k).join(', ')||'없음')+'"></div>';
-  });
-  h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-outline" style="flex:1;justify-content:center;padding:11px" onclick="document.getElementById(\'modal-bcset\').remove()">취소</button>'
+  var opts='<option value="default">공통 (단계별 설정이 없을 때)</option>';
+  Object.keys(EVAL_MODULES).forEach(function(k){opts+='<option value="'+_bcEsc(k)+'">'+_bcEsc(EVAL_MODULES[k].label||k)+'</option>';});
+  m.innerHTML='<div class="ms" style="max-width:680px"><div class="mt">⚙ 점검 항목 편집</div>'
+    +'<div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:10px">학생 태블릿(체크콜)에 보이는 점검 항목을 <b>단계(평가 모듈)별</b>로 정합니다. 단계별 설정이 없으면 <b>공통</b> 설정을 따릅니다. 저장하면 태블릿에 자동 반영돼요.</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><select class="fi" id="bced-key" onchange="_bcEdKey(this.value)" style="flex:1">'+opts+'</select>'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap">시간 막대 기준 <input class="fi" id="bced-min" type="number" min="10" max="300" value="'+_bcEd.totalMin+'" style="width:64px;padding:6px"> 분</div></div>'
+    +'<div id="bced-note" style="font-size:11px;color:var(--txt3);margin-bottom:6px"></div>'
+    +'<div id="bced-body" oninput="_bcEdTouch()"></div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center">'
+    +'<button class="btn btn-outline btn-xs" onclick="_bcEdOp(\'secadd\')">＋ 구역 추가</button>'
+    +'<button class="btn btn-outline btn-xs" onclick="_bcEdReset()">기본 구성으로</button>'
+    +'<button class="btn btn-outline btn-xs" id="bced-clear" onclick="_bcEdClear()">이 단계 설정 지우기(공통 따르기)</button>'
+    +'<span style="margin-left:auto;display:flex;gap:4px;align-items:center"><select class="fi" id="bced-copy" style="font-size:11px;padding:5px">'+opts+'</select><button class="btn btn-outline btn-xs" onclick="_bcEdCopy()">여기에 복사</button></span></div>'
+    +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-outline" style="flex:1;justify-content:center;padding:11px" onclick="document.getElementById(\'modal-bcset\').remove()">취소</button>'
     +'<button class="btn btn-navy" style="flex:2;justify-content:center;padding:11px" onclick="_bcSaveSettings()">저장</button></div></div>';
-  m.innerHTML=h;document.body.appendChild(m);
+  document.body.appendChild(m);
+  _bcEdKey('default',true);
+}
+function _bcEdKey(k,first){
+  if(!first)_bcEdSync();
+  _bcEd.key=k;
+  _bcEd.view=_bcEd.tpl[k]||_bcClone(_bcEd.tpl['default']||CC_DEFAULT_TEMPLATE);
+  var sel=document.getElementById('bced-key');if(sel)sel.value=k;
+  _bcEdDraw();
+}
+function _bcEdTouch(){if(_bcEd&&!_bcEd.tpl[_bcEd.key])_bcEd.tpl[_bcEd.key]=_bcEd.view;}
+function _bcEdDraw(){
+  var v=_bcEd.view,k=_bcEd.key,own=!!_bcEd.tpl[k];
+  document.getElementById('bced-note').textContent=k==='default'?'모든 단계에 공통으로 쓰는 항목입니다.':(own?'이 단계 전용 설정을 쓰고 있어요.':'아직 이 단계 전용 설정이 없어 공통 설정을 따르고 있어요. 항목을 고치면 이 단계 전용으로 저장됩니다.');
+  document.getElementById('bced-clear').style.display=(k!=='default'&&own)?'':'none';
+  var h='';
+  v.sections.forEach(function(sec,si){
+    h+='<div style="border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--surface2)">'
+      +'<div style="display:flex;gap:4px;align-items:center;margin-bottom:6px"><input class="fi bced-title" data-s="'+si+'" value="'+_bcEsc(sec.title)+'" placeholder="구역 이름 (예: 단어장)" style="flex:1;font-weight:700">'
+      +'<button class="bc-b" onclick="_bcEdOp(\'secup\','+si+')" title="위로">▲</button><button class="bc-b" onclick="_bcEdOp(\'secdown\','+si+')" title="아래로">▼</button><button class="bc-b x" onclick="_bcEdOp(\'secdel\','+si+')" title="구역 삭제">✕</button></div>';
+    sec.items.forEach(function(it,ii){
+      var d='data-s="'+si+'" data-i="'+ii+'" data-id="'+_bcEsc(it.id)+'"';
+      h+='<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;flex-wrap:wrap">'
+        +'<select class="fi bced-t" '+d+' onchange="_bcEdRe()" style="width:128px;font-size:11px;padding:5px">'+_BCED_TYPES.map(function(t){return '<option value="'+t[0]+'"'+(it.t===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
+        +'<input class="fi bced-l" '+d+' value="'+_bcEsc(it.l)+'" placeholder="항목 이름" style="flex:1;min-width:130px">';
+      if(it.t==='call')h+='<select class="fi bced-to" '+d+' style="width:92px;font-size:11px;padding:5px"><option value="tablet"'+(it.to!=='book'?' selected':'')+'>태블릿 교사</option><option value="book"'+(it.to==='book'?' selected':'')+'>교재 교사</option></select>';
+      if(it.t==='number')h+='<input class="fi bced-u" '+d+' value="'+_bcEsc(it.u||'')+'" placeholder="단위" style="width:48px;padding:5px">';
+      var lk=[];
+      if(it.t==='check')lk=[['','일지 연동 없음'],['hwBook','→ 교재 숙제'],['hwVideo','→ 영상 숙제']];
+      if(it.t==='number')lk=[['','일지 연동 없음'],['quiz','→ Daily Quiz']];
+      if(it.t==='dict')lk=[['','일지 연동 없음'],['dict','→ 받아쓰기']];
+      if(lk.length)h+='<select class="fi bced-link" '+d+' style="width:112px;font-size:11px;padding:5px">'+lk.map(function(x){return '<option value="'+x[0]+'"'+((it.link||'')===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
+      h+='<button class="bc-b" onclick="_bcEdOp(\'up\','+si+','+ii+')">▲</button><button class="bc-b" onclick="_bcEdOp(\'down\','+si+','+ii+')">▼</button><button class="bc-b x" onclick="_bcEdOp(\'del\','+si+','+ii+')">✕</button></div>';
+    });
+    h+='<button class="btn btn-outline btn-xs" onclick="_bcEdOp(\'add\','+si+')">＋ 항목 추가</button></div>';
+  });
+  document.getElementById('bced-body').innerHTML=h;
+}
+function _bcEdSync(){
+  if(!_bcEd||!_bcEd.view)return;
+  var v=_bcEd.view;
+  document.querySelectorAll('#bced-body .bced-title').forEach(function(el){var sec=v.sections[+el.dataset.s];if(sec)sec.title=el.value;});
+  document.querySelectorAll('#bced-body [data-i]').forEach(function(el){
+    var sec=v.sections[+el.dataset.s],it=sec&&sec.items[+el.dataset.i];if(!it)return;
+    if(el.classList.contains('bced-t'))it.t=el.value;
+    else if(el.classList.contains('bced-l'))it.l=el.value;
+    else if(el.classList.contains('bced-to'))it.to=el.value;
+    else if(el.classList.contains('bced-u'))it.u=el.value;
+    else if(el.classList.contains('bced-link'))it.link=el.value;
+  });
+  var mn=document.getElementById('bced-min');if(mn)_bcEd.totalMin=Math.max(10,Math.min(300,parseInt(mn.value,10)||CC_DEFAULT_MINUTES));
+}
+function _bcEdRe(){_bcEdSync();_bcEdTouch();
+  _bcEd.view.sections.forEach(function(sec){sec.items.forEach(function(it){   // 종류가 바뀌면 맞지 않는 옵션 정리
+    if(it.t!=='call')delete it.to;else if(!it.to)it.to='tablet';
+    if(it.t!=='number')delete it.u;
+    var ok={check:['','hwBook','hwVideo'],number:['','quiz'],dict:['','dict'],call:['']}[it.t]||[''];
+    if(ok.indexOf(it.link||'')<0)it.link='';
+  });});
+  _bcEdDraw();}
+function _bcEdOp(op,si,ii){
+  _bcEdSync();_bcEdTouch();
+  var v=_bcEd.view,a;
+  function mv(arr,i,d){var j=i+d;if(j<0||j>=arr.length)return;var t=arr[i];arr[i]=arr[j];arr[j]=t;}
+  if(op==='secadd')v.sections.push({title:'새 구역',items:[{id:_bcNewId(),t:'check',l:'새 항목'}]});
+  else if(op==='secup')mv(v.sections,si,-1);
+  else if(op==='secdown')mv(v.sections,si,1);
+  else if(op==='secdel'){if(!confirm('이 구역을 삭제할까요?'))return;v.sections.splice(si,1);}
+  else if(op==='add')v.sections[si].items.push({id:_bcNewId(),t:'check',l:'새 항목'});
+  else if(op==='up')mv(v.sections[si].items,ii,-1);
+  else if(op==='down')mv(v.sections[si].items,ii,1);
+  else if(op==='del')v.sections[si].items.splice(ii,1);
+  _bcEdDraw();
+}
+function _bcNewId(){return 'n'+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36);}
+function _bcEdReset(){if(!confirm('이 단계의 구성을 기본 구성으로 되돌릴까요?'))return;_bcEd.view=_bcClone(CC_DEFAULT_TEMPLATE);_bcEd.tpl[_bcEd.key]=_bcEd.view;_bcEdDraw();}
+function _bcEdClear(){delete _bcEd.tpl[_bcEd.key];_bcEdKey(_bcEd.key,true);}
+function _bcEdCopy(){
+  _bcEdSync();var to=document.getElementById('bced-copy').value;
+  if(to===_bcEd.key){toast('같은 단계예요');return;}
+  if(!confirm('현재 구성을 선택한 단계에 덮어씌울까요?'))return;
+  _bcEd.tpl[to]=_bcClone(_bcEd.view);toast('복사했어요 (저장해야 반영돼요)');
+}
+function _bcCleanTpl(t){
+  var out={sections:[]};
+  (t.sections||[]).forEach(function(sec){
+    var items=[];
+    (sec.items||[]).forEach(function(it){
+      var l=String(it.l||'').trim();if(!l)return;
+      var o={id:it.id||_bcNewId(),t:it.t||'check',l:l};
+      if(o.t==='call')o.to=it.to==='book'?'book':'tablet';
+      if(o.t==='number'&&it.u)o.u=String(it.u);
+      if(it.link)o.link=it.link;
+      items.push(o);
+    });
+    var title=String(sec.title||'').trim();
+    if(title&&items.length)out.sections.push({title:title,items:items});
+  });
+  return out;
 }
 async function _bcSaveSettings(){
-  var def=_bcParseList(document.getElementById('bcs-default').value);
-  if(!def.length){toast('⚠️ 기본 교재는 1개 이상 필요해요');return;}
-  var extra=_bcParseList(document.getElementById('bcs-extra').value);
-  var groups={};
-  document.querySelectorAll('.bcs-g').forEach(function(el){var l=_bcParseList(el.value);if(l.length)groups[el.dataset.g]=l;});
+  _bcEdSync();
+  var t0=_bcEd.tpl,templates={},bad=false;
+  Object.keys(t0).forEach(function(k){var c=_bcCleanTpl(t0[k]);if(c.sections.length)templates[k]=c;else bad=true;});
+  if(bad&&!templates['default']){toast('⚠️ 구역과 항목이 1개 이상 필요해요');return;}
+  var labels={};   // 같은 단계 안에서 호출 항목 이름이 겹치면 호출 기록이 섞여요
+  for(var k in templates){
+    var seen={};
+    for(var a=0;a<templates[k].sections.length;a++){var its=templates[k].sections[a].items;for(var b=0;b<its.length;b++){if(its[b].t!=='call')continue;if(seen[its[b].l]){toast('⚠️ 같은 이름의 "검사 받기"가 있어요: '+its[b].l);return;}seen[its[b].l]=1;}}
+  }
   try{
-    await db.collection('config').doc('bookCheckConfig').set({defaultItems:def,extraItems:extra,groups:groups});
+    await db.collection('config').doc('checkTemplates').set({templates:templates,totalMin:_bcEd.totalMin||CC_DEFAULT_MINUTES});
     var m=document.getElementById('modal-bcset');if(m)m.remove();
     toast('✅ 저장 — 태블릿에 자동 반영돼요');
   }catch(e){toast('⚠️ 저장 실패');console.warn(e);}
 }
+
+// ── 체크콜 → 학습 일지 자동 연동 (checkLogs/{날짜_학생ID}.j) ──
+function _ccFillJournal(){
+  var g=function(i){return document.getElementById(i);};
+  var sid=g('r-student-id')&&g('r-student-id').value,dt=g('r-date')&&g('r-date').value;
+  if(!sid||!dt||!db)return;
+  var apply=function(log){
+    var j=log&&log.j;if(!j)return;
+    var n=0;
+    function put(id,val){var el=g(id);if(!el||!val)return;if(!el.value||el.dataset.ccv===el.value){if(el.value!==val){el.value=val;n++;}el.dataset.ccv=val;}}
+    put('r-hw-book',j.hwBook);put('r-hw-video',j.hwVideo);
+    if(j.hwBook||j.hwVideo)combineHw();
+    put('r-quiz',j.quiz);
+    var dm=j.dict&&String(j.dict).match(/^(\d+)\/(\d+)$/);
+    var hid=g('r-dictation');
+    if(dm&&hid&&(!hid.value||hid.dataset.ccv===hid.value)){
+      ['r-dictation-correct','r-dictation-total'].forEach(function(id,k){
+        var el=g(id);if(!el)return;var v=dm[k+1];
+        if(!Array.prototype.some.call(el.options,function(o){return o.value===v;})){var o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);}
+        el.value=v;
+      });
+      if(typeof updateDictationValue==='function')updateDictationValue();
+      hid.dataset.ccv=hid.value;n++;
+    }
+    if(n&&!window._ccToasted){window._ccToasted=1;toast('📲 체크콜 기록을 일지에 불러왔어요');setTimeout(function(){window._ccToasted=0;},3000);}
+  };
+  if(dt===_bcDate&&window._ccLogs&&window._ccLogs[sid])apply(window._ccLogs[sid]);
+  else if(dt!==_bcDate)db.collection('checkLogs').doc(dt+'_'+sid).get().then(function(d){if(d.exists)apply(d.data());}).catch(function(){});
+}
+(function(){
+  var _orig=window.startReport;
+  if(typeof _orig==='function'){
+    window.startReport=function(){var r=_orig.apply(this,arguments);setTimeout(_ccFillJournal,600);return r;};
+    startReport=window.startReport;
+  }
+})();
 
 function startRealtimeListeners(){
   if(!db)return;
