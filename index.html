@@ -236,6 +236,8 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .makeup-chip .mk-hint-parent{color:#0f766e}
 .makeup-chip .mk-hint-wait{color:#9ca3af}
 .makeup-chip.parent-new{box-shadow:0 0 0 2px #14b8a6}
+.makeup-chip.mk-focus{outline:2px solid #0f766e;outline-offset:1px;background:#f0fdfa;animation:mkFocusPulse 1.1s ease-in-out 3}
+@keyframes mkFocusPulse{0%,100%{box-shadow:0 0 0 0 rgba(20,184,166,.0)}50%{box-shadow:0 0 0 5px rgba(20,184,166,.35)}}
 .mk-sum-chip{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 9px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--txt2);white-space:nowrap}
 .mk-sum-chip.full{background:#dcfce7;border-color:#86efac;color:#166534}
 .mk-sum-chip.part{background:#fefce8;border-color:#f59e0b;color:#92400e}
@@ -3418,6 +3420,7 @@ function initYearSelects(which){
 
 // OPTIMIZED goto - ensures populate only when needed
 function goto(view){
+  if(view!=='makeup'&&window._mkFocus)window._mkFocus='';
   // 학습일지(write)에서 다른 페이지로 이동 시 카메라 스트림 자동 종료
   if(view!=='write'&&typeof rrStopStream==='function'){
     rrStopStream();
@@ -9243,13 +9246,37 @@ function _mkParentHint(m){
     var unseen=m.parentSeen===false;
     var chg=!!m.parentChangedAt;
     var ttl=chg?('학부모가 일정을 변경함'+(m.parentPrevSlot?' (이전: '+m.parentPrevSlot+')':'')):'학부모가 직접 선택·확정';
-    return{cls:unseen?' parent-new':'',html:'<span class="mk-hint mk-hint-parent" title="'+ttl+'">👪'+(unseen?(chg?'변경':'NEW'):(chg?'↻':''))+'</span>'};
+    return{cls:(unseen?' parent-new':'')+(_mkFocusMatch(m)?' mk-focus':''),html:'<span class="mk-hint mk-hint-parent" title="'+ttl+'">👪'+(unseen?(chg?'변경':'NEW'):(chg?'↻':''))+'</span>'};
   }
   if(m.parentStatus==='waiting'&&m.makeupStatus==='pending'){
-    return{cls:'',html:'<span class="mk-hint mk-hint-wait" title="링크 발송 · 학부모 응답 대기">⏳</span>'};
+    return{cls:_mkFocusMatch(m)?' mk-focus':'',html:'<span class="mk-hint mk-hint-wait" title="링크 발송 · 학부모 응답 대기">⏳</span>'};
   }
   return{cls:'',html:''};
 }
+
+// 오늘의 시간표 배지 → 보강 계획표로 이동 (해당 달로 맞추고 해당 항목 강조)
+function _mkFocusMatch(m,kind){
+  kind=kind||window._mkFocus;
+  if(kind==='new')return m.parentStatus==='confirmed'&&m.parentSeen===false;
+  if(kind==='wait')return m.parentStatus==='waiting'&&m.makeupStatus==='pending';
+  return false;
+}
+function goMakeupFocus(kind){
+  var list=(makeups||[]).filter(function(m){return _mkFocusMatch(m,kind);});
+  var key=function(m){return kind==='new'?(m.makeupDate||m.absentDate||''):(m.absentDate||'');};
+  var ds=list.map(key).filter(Boolean).sort();
+  if(ds.length){
+    var t=todayISO();
+    var pick=ds.filter(function(d){return d>=t;})[0]||ds[ds.length-1];
+    var cur=makeupViewYear+'-'+String(makeupViewMonth+1).padStart(2,'0');
+    if(!ds.some(function(d){return d.slice(0,7)===cur;})){
+      makeupViewYear=+pick.slice(0,4);makeupViewMonth=+pick.slice(5,7)-1;
+    }
+  }
+  window._mkFocus=kind;window._mkFocusScrolled=false;
+  goto('makeup');
+}
+function clearMkFocus(){window._mkFocus='';window._mkFocusScrolled=false;renderMakeupCalendar();}
 function updateParentBadges(){
   var el=document.getElementById('sch-parent-badges');if(!el)return;
   var nNew=0,nWait=0;
@@ -9258,8 +9285,8 @@ function updateParentBadges(){
     else if(m.parentStatus==='waiting'&&m.makeupStatus==='pending')nWait++;
   });
   var h='';
-  if(nNew)h+='<span class="sch-pbadge new" onclick="goto(\'makeup\')" title="학부모가 선택해서 자동 확정된 보강 (확인 전)">👪 학부모 확정 '+nNew+'건</span>';
-  if(nWait)h+='<span class="sch-pbadge wait" onclick="goto(\'makeup\')" title="링크를 보냈지만 아직 선택하지 않은 학부모">⏳ 응답 대기 '+nWait+'건</span>';
+  if(nNew)h+='<span class="sch-pbadge new" onclick="goMakeupFocus(\'new\')" title="학부모가 선택해서 자동 확정된 보강 (확인 전)">👪 학부모 확정 '+nNew+'건</span>';
+  if(nWait)h+='<span class="sch-pbadge wait" onclick="goMakeupFocus(\'wait\')" title="링크를 보냈지만 아직 선택하지 않은 학부모">⏳ 응답 대기 '+nWait+'건</span>';
   el.innerHTML=h;
 }
 function _mkBaseLinkUrl(){
@@ -9323,7 +9350,15 @@ function renderMakeupSummary(){
   var pending=rows.filter(function(r){return r.need>r.done;}).length;
   var scopeLbl=_mkSumScope==='all'?'전체':(mo+1)+'월';
   var btn=function(sc,l){var on=_mkSumScope===sc;return '<button onclick="setMkSumScope(\''+sc+'\',event)" style="font-size:10px;padding:1px 8px;border-radius:10px;cursor:pointer;border:1px solid var(--border2);background:'+(on?'var(--navy)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt3)')+'">'+l+'</button>';};
-  var h='<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">'
+  var h='';
+  if(window._mkFocus){
+    var fk=window._mkFocus,fAll=(makeups||[]).filter(function(m){return _mkFocusMatch(m,fk);});
+    var fMon=fAll.filter(function(m){var d=fk==='new'?(m.makeupDate||m.absentDate):m.absentDate;return d&&d.slice(0,7)===yr+'-'+String(mo+1).padStart(2,'0');}).length;
+    h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f0fdfa;border:1px solid #14b8a6;color:#0f766e;border-radius:10px;padding:7px 12px;margin-bottom:8px;font-size:12px;font-weight:700">'
+      +'<span>'+(fk==='new'?'👪 학부모 확정(확인 전)':'⏳ 응답 대기')+' 강조 중 · 이 달 '+fMon+'건 / 전체 '+fAll.length+'건</span>'
+      +'<button class="btn btn-outline btn-sm" style="margin-left:auto;font-size:11px;padding:2px 10px" onclick="clearMkFocus()">강조 해제</button></div>';
+  }
+  h+='<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">'
     +'<div onclick="toggleMkSummary()" style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer">'
     +'<span style="font-size:11px;font-weight:700;color:var(--txt2)">📊 학생별 보강 현황 ('+scopeLbl+' · '+rows.length+'명 · 남은 보강 '+remain+'회)</span>'
     +'<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">'+btn('month','이번 달 결석')+btn('all','전체')+'<span style="font-size:10px;color:var(--txt3);margin-left:4px">'+(_mkSumOpen?'▲':'▼')+'</span></span></div>';
@@ -9431,6 +9466,10 @@ function renderMakeupCalendar(){
   html+='</div>';
   $('makeup-calendar').innerHTML=html;
   try{renderMakeupSummary();updateParentBadges();}catch(e){console.warn('makeup summary',e);}
+  if(window._mkFocus&&!window._mkFocusScrolled){
+    window._mkFocusScrolled=true;
+    setTimeout(function(){var c=document.querySelector('#makeup-calendar .makeup-chip.mk-focus');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});},80);
+  }
   $('makeup-calendar').onclick=async function(e){
     if(e.target.closest('.mk-block-btn'))return;
     var chip=e.target.closest('.makeup-chip');
