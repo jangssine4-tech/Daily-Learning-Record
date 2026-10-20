@@ -414,7 +414,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   <!-- 학생 정보 고정 바 - #content 스크롤 기준 sticky -->
   <div id="write-student-info-bar" style="position:sticky;top:0;z-index:50;background:var(--navy);color:#fff;padding:8px 16px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);display:none">학생을 선택하세요</div>
   <div style="display:flex;gap:16px;align-items:flex-start;padding:0 0 0 0;overflow-x:auto;-webkit-overflow-scrolling:touch">
-  <div class="cp" style="width:440px;max-width:440px;min-width:320px;flex:0 1 440px"><div class="card" style="padding:14px">
+  <div class="cp" style="max-width:560px;min-width:320px;flex:0 0 auto"><div class="card" style="padding:16px">
     <input type="hidden" id="r-student-id">
     <div class="r2"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">수행/지필 평가</div><div style="display:flex;gap:4px"><input type="date" class="fi" id="r-exam-date" style="flex:1"><select class="fi" id="r-exam-type" style="width:auto;font-size:11px;padding:6px 4px"><option value="">종류</option><option value="수행">수행</option><option value="중간">중간</option><option value="기말">기말</option><option value="모의고사">모의고사</option><option value="Tosel 정기">Tosel 정기</option><option value="Tosel Voca">Tosel Voca 올림피아드</option><option value="PFC">PFC</option></select></div></div></div>
     <div class="field"><div class="fl">태블릿 점검 교사</div><select class="fi" id="r-teacher-tablet"></select></div>
@@ -464,11 +464,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
     <div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap"><button class="btn btn-green" style="flex:1;min-width:80px" onclick="saveReport()">💾 저장</button><button class="btn btn-navy" style="flex:1;min-width:80px" onclick="saveReportAndImage()">📷 저장 + 이미지</button><button class="btn btn-outline" style="min-width:50px;color:var(--txt3)" onclick="returnToSchedule()">← 시간표</button></div>
     <div id="temp-save-indicator" style="display:none;text-align:center;margin-top:6px;font-size:11px;color:var(--blue)">📋 임시 저장된 데이터가 있습니다</div>
   </div></div>
-  <!-- 가운데: 체크콜 실시간 패널 (보기 전용) -->
-  <div id="write-live-panel" style="flex:1;min-width:280px;max-width:400px;display:none;align-self:flex-start;position:sticky;top:60px;max-height:calc(100vh - 80px);overflow-y:auto">
-    <div class="card" style="padding:14px"><div id="write-live-content"></div></div>
-  </div>
-  <!-- 오른쪽: 최근 4주 학습 결과 패널 -->
+  <!-- 오른쪽: 최근 2주 학습 흐름 패널 -->
   <div id="write-flow-panel" style="flex:1;min-width:260px;max-width:380px;display:none;align-self:flex-start;position:sticky;top:60px;max-height:calc(100vh - 80px);overflow-y:auto">
     <div class="card" style="padding:14px">
       <div id="write-flow-content"></div>
@@ -3034,7 +3030,7 @@ function _bcRender(){
   var box=document.getElementById('sch-dd-check');if(!box)return;
   var all=(window._bcChecks||[]).slice().sort(function(a,b){return _bcTs(a)-_bcTs(b);});
   var act=all.filter(function(x){return x.status!=='done';});
-  var dn=all.filter(function(x){return x.status==='done'&&x.kind!=='ask';});
+  var dn=all.filter(function(x){return x.status==='done';});
   var waiting=act.filter(function(x){return x.status==='waiting';}).length;
   var isOpen=!!(window._schDdOpen&&window._schDdOpen.check);
   var h='<button class="sch-dd-btn'+(waiting?' bc-blink':(act.length?' has':''))+'" onclick="event.stopPropagation();if(window._bcDragged)return;_schDdToggle(\'check\')">🔔 점검 받을 학생 ('+act.length+')'+(waiting?' <span class="bc-new">NEW</span>':'')+' <span style="font-size:9px">▼</span></button>'
@@ -3058,12 +3054,12 @@ function _bcRender(){
     h+='<div class="bc-row'+(called?' called':'')+'" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'
       +'<span class="bc-no">'+(i+1)+'</span>'
       +'<span class="bc-nm">'+_bcEsc(x.studentName)+'</span>'
-      +'<span class="bc-it">'+(x.kind==='ask'?(x.item.indexOf('화장실')>=0?'🚻 ':'💧 '):'')+_bcEsc(x.item)+'</span>'
-      +(x.kind==='ask'?'<span class="bc-tag" style="color:#b45309">학생 요청</span>':_bcCallTag(x))
+      +'<span class="bc-it">'+_bcEsc(x.item)+'</span>'
+      +_bcCallTag(x)
       +((presMap[x.studentId]&&presMap[x.studentId].status==='out')?'<span class="bc-tag" style="color:#b45309">⚠ 로그아웃</span>':'')
       +'<span style="margin-left:auto;display:flex;gap:4px">'
-      +'<button class="bc-b call" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'+(x.kind==='ask'?(called?'다시 알림':'허락'):(called?'다시 호출':'호출'))+'</button>'
-      +(x.kind==='ask'?'':'<button class="bc-b ok" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcDone(this.dataset.id)">완료</button>')
+      +'<button class="bc-b call" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'+(called?'다시 호출':'호출')+'</button>'
+      +'<button class="bc-b ok" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcDone(this.dataset.id)">완료</button>'
       +'<button class="bc-b x" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcRemove(this.dataset.id)" title="삭제">✕</button>'
       +'</span></div>';
   });
@@ -3737,90 +3733,7 @@ function goto(view){
 
 // ══ SCHEDULE ══
 var _scheduleDate=null; // null = today
-// ── 학습 일지 작성 페이지: 체크콜 실시간 패널 (보기 전용, A안 체크시트) ──
-var _wl={sid:null,date:null,unsubL:null,unsubC:null,log:null,checks:{}};
-function _wlStop(){
-  if(_wl.unsubL){try{_wl.unsubL();}catch(e){}}
-  if(_wl.unsubC){try{_wl.unsubC();}catch(e){}}
-  _wl.unsubL=_wl.unsubC=null;_wl.sid=_wl.date=null;_wl.log=null;_wl.checks={};
-}
-function _wlShow(sid){
-  var p=$('write-live-panel');if(!p)return;
-  var s=sid&&students.find(function(x){return x.id===sid;});
-  if(!s||!db){_wlStop();p.style.display='none';return;}
-  var date=($('r-date')&&$('r-date').value)||todayISO();
-  p.style.display='';
-  if(_wl.sid===sid&&_wl.date===date){_wlPaint();return;}
-  _wlStop();_wl.sid=sid;_wl.date=date;
-  try{
-    _wl.unsubL=db.collection('checkLogs').doc(date+'_'+sid).onSnapshot(function(snap){
-      if(_wl.sid!==sid)return;_wl.log=snap.exists?snap.data():null;_wlPaint();
-    },function(e){console.warn('wl log',e);});
-    _wl.unsubC=db.collection('bookChecks').where('studentId','==',sid).where('date','==',date).onSnapshot(function(snap){
-      if(_wl.sid!==sid)return;_wl.checks={};snap.forEach(function(d){var x=d.data();_wl.checks[x.item]=x;});_wlPaint();
-    },function(e){console.warn('wl chk',e);});
-  }catch(e){console.warn(e);}
-  _wlPaint();
-}
-function _wlHM(ms){if(!ms)return '';var d=new Date(ms),p=function(n){return String(n).padStart(2,'0');};return p(d.getHours())+':'+p(d.getMinutes());}
-function _wlPaint(){
-  var el=$('write-live-content');if(!el||!_wl.sid)return;
-  var s=students.find(function(x){return x.id===_wl.sid;});if(!s)return;
-  var L=_wl.log||{},e=L.e||{},v=L.v||{};
-  var lvl=L.lv||($('r-level')&&$('r-level').value)||getStudentLevel(s);
-  var pg=L.pg||($('r-progress')&&$('r-progress').value)||'';
-  var tpl=null;
-  try{tpl=ccResolve(_ccEffPlan(ccPlanKey(lvl,s.grade)),lvl,pg);}catch(x){}
-  if(!tpl)tpl=_bcTplFor(s);
-  var done=0,total=0,h='';
-  (tpl.sections||[]).forEach(function(sec){
-    var items=(sec.items||[]).filter(function(i){return i&&i.l;});if(!items.length)return;
-    var rows='';
-    items.forEach(function(it){
-      var chk='<span class="wl-dot"></span>',right='',cls='';
-      if(it.t==='check'){
-        total++;var on=!!e[it.id];if(on){done++;cls=' on';chk='<span class="wl-dot on">✓</span>';right=_wlHM(e[it.id]);}
-        rows+='<div class="wl-row'+cls+'">'+chk+'<span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-t">'+right+'</span></div>';
-      }else if(it.t==='number'){
-        var nv=v[it.id];var has=nv!==undefined&&nv!==null&&nv!=='';
-        rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has?' on':'')+'">'+(has?_bcEsc(nv)+(it.u?_bcEsc(it.u):'점'):'')+'</span></div>';
-      }else if(it.t==='dict'){
-        var d=v[it.id]||{};var has2=d.c!==undefined&&d.c!==null&&d.c!=='';
-        rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has2?' on':'')+'">'+(has2?_bcEsc(d.c)+' / '+_bcEsc(d.t===undefined?'?':d.t)+'개':'')+'</span></div>';
-      }else{
-        var c=_wl.checks[it.l],st=c?c.status:'none',tx='',k='';
-        if(st==='waiting'){tx='호출 중';k=' wait';}
-        else if(st==='called'){tx=_bcEsc(c.calledBy||'선생님')+' 선생님 호출됨';k=' call';}
-        else if(st==='done'){tx='검사 끝'+(c.doneAt&&c.doneAt.toMillis?' · '+_wlHM(c.doneAt.toMillis()):'');k=' done';}
-        else tx='대기 전';
-        rows+='<div class="wl-call'+k+'"><span>'+_bcEsc(it.l)+'</span><small>'+tx+'</small></div>';
-      }
-    });
-    h+='<div class="wl-sec"><div class="wl-sh">'+_bcEsc(sec.title||'')+'</div>'+rows+'</div>';
-  });
-  var head='<div class="wl-head"><b>📡 '+_bcEsc(s.name)+' · 체크콜 실시간</b></div>';
-  var meta='';
-  if(_wl.log){
-    meta='<div class="wl-meta">시작 <b>'+(_wlHM(L.startAt)||'--:--')+'</b> · 끝 <b>'+(_wlHM(L.endAt)||'--:--')+'</b> · 체크 <b>'+done+'/'+total+'</b>'+(pg?'<br><span style="color:var(--txt3)">'+_bcEsc(lvl)+' · '+_bcEsc(pg)+'</span>':'')+'</div>';
-  }else{
-    meta='<div class="wl-meta" style="color:var(--txt3)">아직 체크콜을 시작하지 않았어요 ('+_wl.date+')</div>';
-  }
-  el.innerHTML=head+meta+h;
-}
-(function(){
-  var st=document.createElement('style');
-  st.textContent='.wl-head{font-size:13px;color:var(--navy);margin-bottom:6px}.wl-meta{font-size:11px;color:var(--txt2);background:var(--surface2);border-radius:8px;padding:6px 8px;margin-bottom:8px;line-height:1.5}'
-  +'.wl-sec{border:1px solid var(--border,#e5e7eb);border-radius:10px;padding:2px 10px 4px;margin-bottom:8px;background:var(--surface)}.wl-sh{font-weight:800;font-size:12px;color:var(--navy);padding:7px 0 3px}'
-  +'.wl-row{display:flex;align-items:center;gap:8px;min-height:28px;border-top:1px solid var(--surface2);font-size:12px;color:var(--txt2)}.wl-row.on{color:var(--txt)}'
-  +'.wl-dot{width:16px;height:16px;border-radius:5px;border:1.5px solid #9aa3b5;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:900}.wl-dot.on{background:#0f766e;border-color:#0f766e}'
-  +'.wl-lb{flex:1;min-width:0}.wl-t,.wl-val{margin-left:auto;font-size:11px;color:var(--txt3);white-space:nowrap;font-variant-numeric:tabular-nums}.wl-val.on{color:var(--navy);font-weight:800;font-size:12px}'
-  +'.wl-call{display:flex;align-items:center;gap:8px;margin:4px 0;padding:5px 9px;border-radius:8px;background:#eef0f4;color:#4a4f5e;font-size:12px;font-weight:700}.wl-call small{margin-left:auto;font-size:10px;font-weight:600;white-space:nowrap}'
-  +'.wl-call.wait{background:#fde7b0;color:#7a4a00;animation:wlb 1.1s ease-in-out infinite}.wl-call.call{background:#fcd5c9;color:#9a2d10}.wl-call.done{background:#e3f1ee;color:#0b5a53}@keyframes wlb{50%{opacity:.55}}';
-  document.head.appendChild(st);
-})();
-
 function renderWriteFlowPanel(studentId){
-  try{_wlShow(studentId);}catch(e){console.warn(e);}
   function hwIcon(val,absent){
     if(absent)return '<span style="color:var(--txt3)">-</span>';
     if(!val||val===''||val==='-')return '<span style="color:var(--txt3)">-</span>';
@@ -8379,7 +8292,6 @@ function refreshWriteFormIfNeeded(){
   toast('🔄 '+repTeacher+' 선생님이 일지를 업데이트했습니다');
 }
 function onReportDateChange(){
-  try{_wlShow($('r-student-id').value);}catch(e){}
   var sId=$('r-student-id').value;if(!sId)return;
   var s=students.find(function(x){return x.id===sId;});if(!s)return;
   var newDate=$('r-date').value;if(!newDate)return;
