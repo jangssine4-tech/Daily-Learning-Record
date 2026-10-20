@@ -56,6 +56,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .tbar b{font-size:clamp(17px,4vw,22px);font-variant-numeric:tabular-nums}
 .tbar .tr{flex:1;height:12px;border-radius:6px;background:#DDD6C6;overflow:hidden}
 .tbar .tr i{display:block;height:100%;width:0;background:#E4572E;transition:width .6s}
+.ask{display:flex;flex-wrap:wrap;gap:10px;margin:-4px 0 14px}.ask .nt{flex:0 0 100%;font-size:13px;font-weight:600;color:#6B6558;text-align:center;margin-top:-2px}.ask button.used{background:#E9E5DA;color:#8B8478;border-color:#D9D2C3}.ask button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;border-radius:14px;border:2px solid #D9D2C3;background:#fff;color:#1F2433;font:700 clamp(14px,3.3vw,18px) var(--font);padding:6px 10px}.ask button.wait{background:#FFF1D6;border-color:#E9B04A;color:#7A4B00;animation:pulse 1.2s ease-in-out infinite}.ask button small{font-size:12px;font-weight:600}.ask button:disabled{opacity:1}
 .tabs{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;padding:4px 4px 10px;margin-left:-4px;margin-right:-4px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tab{flex:1 0 auto;min-width:84px;min-height:64px;border-radius:16px;border:2px solid #D9D2C3;background:#fff;color:#4A4F5E;font-size:clamp(13px,2.8vw,15px);font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 10px;line-height:1.2}
@@ -182,6 +183,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
       <button class="out" onclick="logout()">나가기</button>
     </div>
     <div class="tbar"><span>시작 <b id="tStart">--:--</b></span><div class="tr"><i id="tFill"></i></div><span>끝 <b id="tEnd">--:--</b></span></div>
+    <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
     <div class="hint" id="hint"></div>
@@ -201,7 +203,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
   <div class="rings"><div class="core"><svg><use href="#i-bell"/></svg></div></div>
   <h2 id="callWho"></h2>
   <div class="chip" id="callChip"><i></i><b id="callItem"></b></div>
-  <button class="ok" onclick="closeCall()">확인</button>
+  <button class="ok" onclick="callOk()">확인</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -482,9 +484,12 @@ function calcJ(){
   return j;
 }
 function commit(ePatch,vPatch){
-  var del=firebase.firestore.FieldValue.delete(),u={date:S.date,studentId:S.sid,studentName:S.name,e:{},v:{}};
-  Object.keys(ePatch||{}).forEach(function(k){if(ePatch[k]){LOG.e[k]=ePatch[k];u.e[k]=ePatch[k];}else{delete LOG.e[k];u.e[k]=del;}});
-  Object.keys(vPatch||{}).forEach(function(k){var x=vPatch[k];if(x===null){delete LOG.v[k];u.v[k]=del;}else{LOG.v[k]=x;u.v[k]=x;}});
+  // 주의: set(merge) 에서 빈 객체({})는 기존 map 을 통째로 덮어써요 → 바뀐 항목이 있을 때만 e / v 를 보냅니다
+  var del=firebase.firestore.FieldValue.delete(),u={date:S.date,studentId:S.sid,studentName:S.name},ue={},uv={};
+  Object.keys(ePatch||{}).forEach(function(k){if(ePatch[k]){LOG.e[k]=ePatch[k];ue[k]=ePatch[k];}else{delete LOG.e[k];ue[k]=del;}});
+  Object.keys(vPatch||{}).forEach(function(k){var x=vPatch[k];if(x===null){delete LOG.v[k];uv[k]=del;}else{LOG.v[k]=x;uv[k]=x;}});
+  if(Object.keys(ue).length)u.e=ue;
+  if(Object.keys(uv).length)u.v=uv;
   u.j=calcJ();
   logRef().set(u,{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
@@ -510,7 +515,7 @@ function render(){
     var p=secProg(sec),cls='tab'+(secOk(sec)?' ok':'')+(i===curSec?' cur':'')+(i===nextIdx?' next':'');
     tb+='<button class="'+cls+'" onclick="goSec('+i+')"><span>'+esc(sec.title)+'</span><small>'+p.d+'/'+p.n+'</small></button>';
   });
-  $('tabs').innerHTML=tb;
+  $('tabs').innerHTML=tb;paintAsk();
   // 항목
   var sec=S.secs[curSec],h='';
   if(sec){
@@ -567,6 +572,25 @@ function paintBar(){
   $('tEnd').textContent=en?hm(en):'--:--';
   var pct=0;if(st){pct=Math.max(0,Math.min(100,((en||Date.now())-st)/(S.totalMin*60000)*100));}
   $('tFill').style.width=pct+'%';
+}
+var ASKS=[{k:'화장실 가고 싶어요',ic:'🚻',ok:'화장실 다녀오세요 🚻'},{k:'물 마시고 싶어요',ic:'💧',ok:'물 마시고 오세요 💧'}];
+function paintAsk(){
+  var el=$('ask');if(!el)return;var h='';
+  ASKS.forEach(function(a,i){
+    var c=checks[a.k],st=c?c.status:'none';
+    h+='<button class="'+(st==='waiting'?'wait':st==='used'?'used':'')+'"'+(st==='none'?'':' disabled')+' onclick="askT('+i+')"><span>'+a.ic+' '+esc(a.k)+'</span>'+(st==='waiting'?'<small>선생님께 전달했어요</small>':st==='called'?'<small>선생님이 허락했어요</small>':st==='used'?'<small>오늘은 다녀왔어요</small>':'')+'</button>';
+  });
+  el.innerHTML=h+'<div class="nt">화장실과 물 마시기는 하루에 한 번씩만 갈 수 있어요</div>';
+}
+async function askT(i){
+  initAudio();var a=ASKS[i],c=checks[a.k];if(c&&c.status!=='none')return;
+  try{await db.collection('bookChecks').doc(S.date+'_'+S.sid+'_'+safeId(a.k)).set({date:S.date,studentId:S.sid,studentName:S.name,item:a.k,kind:'ask',callTo:'tablet',section:'요청',status:'waiting',requestedAt:firebase.firestore.FieldValue.serverTimestamp()});toast('선생님께 전달했어요');}
+  catch(e){console.error(e);toast('전달하지 못했어요. 다시 눌러 주세요');}
+}
+function callOk(){
+  var id=window._curAskId;window._curAskId=null;
+  if(id){db.collection('bookChecks').doc(id).update({status:'used',usedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});}   // 확인하면 '오늘 사용함'으로 남아 다시 요청할 수 없어요
+  closeCall();
 }
 function goSec(i){curSec=i;render();var l=$('list');if(l)window.scrollTo({top:0,behavior:'smooth'});}
 document.addEventListener('focusout',function(e){if(e.target&&e.target.tagName==='INPUT'&&S){setTimeout(render,80);}});
@@ -656,12 +680,18 @@ function setPresence(status){
 setInterval(function(){if(S&&S.date&&S.date!==todayISO())resume(S.sid);},60000);
 
 function openCall(c){
+  var ask=ASKS.filter(function(a){return a.k===c.item;})[0];
+  window._curAskId=ask&&c.kind==='ask'?c.id:null;
+  if(window._curAskId){
+    $('callWho').textContent=(c.calledBy||'선생님')+' 선생님이 허락했어요';
+    $('callItem').textContent=ask.ok;
+  }else{
   $('callWho').textContent=(c.calledBy||'선생님')+' 선생님이 불러요';
-  $('callItem').textContent=String(c.item).replace(/\s*받기/,'');
+  $('callItem').textContent=String(c.item).replace(/\s*받기/,'');}
   $('callChip').style.setProperty('--c','#7CE3BD');
   $('call').classList.add('on');
   stopRing();ding();ringTimers.push(setTimeout(ding,1500));   // 벨 총 2번
-  ringTimers.push(setTimeout(closeCall,4800));                 // 벨이 끝나면 알림창은 저절로 닫혀요
+  if(!window._curAskId)ringTimers.push(setTimeout(closeCall,4800));   // 호출은 벨이 끝나면 저절로 닫혀요 (허락 알림은 확인을 눌러야 닫혀요)
   db.collection('bookChecks').doc(c.id).update({ackAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});  // 선생님 화면에 '표시됨'
 }
 function stopRing(){ringTimers.forEach(clearTimeout);ringTimers=[];}
