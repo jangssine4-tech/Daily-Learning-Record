@@ -71,6 +71,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .stt{margin:0 4px 18px;font-size:clamp(28px,6vw,36px);font-weight:900;color:#1F2433;letter-spacing:-.04em}
 .bi{display:flex;align-items:center;gap:16px;min-height:clamp(68px,13vw,84px);background:#fff;border-radius:20px;padding:0 clamp(14px,3vw,24px);margin-bottom:12px;font-size:clamp(18px,3.8vw,23px);font-weight:700;color:#1F2433;letter-spacing:-.02em}
 .bi .lb{flex:1;min-width:0;line-height:1.25}
+.bi .hn{display:block;margin-top:3px;font-size:clamp(12px,2.6vw,14px);font-weight:500;color:#6B6458}
 .bi .t{margin-left:auto;font-size:clamp(15px,3vw,18px);font-weight:500;color:#5C6170;font-variant-numeric:tabular-nums;white-space:nowrap}
 .bx{width:clamp(38px,8vw,46px);height:clamp(38px,8vw,46px);border-radius:14px;border:3px solid #A59E8E;background:#fff;flex:none;display:flex;align-items:center;justify-content:center;padding:0;color:#fff}
 .bx svg{width:60%;height:60%;display:none}
@@ -247,6 +248,94 @@ var CC_DEFAULT_TEMPLATE={sections:[
   {id:'q3',t:'call',l:'오답 노트 검사 받기',to:'tablet'}]}
 ]};
 var CC_DEFAULT_MINUTES=90;
+// ── Study Plan(레슨별 계획표) 해석: 단계+진도 → 체크콜 화면 항목 ──
+// 계획표 셀: c=해야 함(체크) / x=해당 없음 / s=점수 입력
+function ccPlanKey(level,grade){
+  var l=String(level||'').replace(/\s+/g,' ').trim(),m;
+  if(/^Phonics ?1A$/i.test(l))return 'Phonics 1A';
+  if(/^Phonics ?1B$/i.test(l))return 'Phonics 1B';
+  if(/^Phonics ?[23][AB]$/i.test(l))return 'Phonics 2A~3B';
+  if((m=l.match(/^Master Pho\w* ?(\d)/i)))return 'Master Phonics '+m[1];
+  if(/^(Joy|Wise|Pride) ?\d[ABC]$/i.test(l))return 'Basic';
+  if(/^Grammar Plus/i.test(l))return /초[1-3](\D|$)/.test(String(grade||''))?'Grammar Plus 2~3':'Grammar Plus 4~6';
+  if((m=l.match(/^(Prime|Advanced) ?\d ?([AB])$/i)))return m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()+' '+m[2].toUpperCase();
+  if(/^First Grammar/i.test(l))return 'First Grammar';
+  return '';
+}
+function ccNormProg(p){
+  p=String(p||'').replace(/\s+/g,' ').trim();
+  p=p.replace(/^Unt /,'Unit ').replace(/^전체 ?/,'');
+  return p;
+}
+var CC_AUTO_CALL={voca:['단어장 검사 받기','tablet'],storybook:['스토리북 검사 받기','book'],studentbook:['교재 검사 받기','book'],guidebook:['가이드북 검사 받기','book'],workbook:['워크북 검사 받기','tablet'],mainbook:['메인북 검사 받기','book']};
+function ccSplitChecks(text){
+  var t=String(text||'').replace(/\s+/g,' ').trim();
+  var parts=t.indexOf('□')>=0?t.split('□'):[t];
+  return parts.map(function(x){return x.trim();}).filter(Boolean);
+}
+// 단계·진도에 맞는 점검 항목 (템플릿 형태 {sections:[{title,grp,items}]}) 을 돌려줘요. 못 찾으면 null
+function ccResolve(plan,level,progress){
+  if(!plan||!plan.blocks)return null;
+  var p=ccNormProg(progress);if(!p)return null;
+  var hw={title:'숙제 했나요?',items:[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]};
+  // 레벨 테스트 / 포트폴리오 (레슨이 아닌 특별 진도)
+  function special(text,title,withScore,idp){
+    var its=[];
+    ccSplitChecks(text).forEach(function(part,i){
+      part=part.replace(/\(\s*나의\s*점수\s*[:：]?[^)]*\)/,'').trim();
+      var m=part.match(/^(.*?)\s*[→>]+\s*검사\s*$/);
+      if(m)its.push({id:idp+i,t:'call',l:m[1].trim()+' 검사 받기',to:'tablet'});
+      else if(part)its.push({id:idp+i,t:'check',l:part});
+    });
+    if(withScore)its.push({id:idp+'sc',t:'number',l:title+' 점수',u:'점',link:'quiz'});
+    return {title:title,items:its};
+  }
+  if(p==='Level Test'){
+    if(!plan.lt)return null;
+    if(plan.ltSuf&&!new RegExp(plan.ltSuf+'$').test(String(level||'').trim()))return null;
+    return {sections:[hw,special(plan.lt,'Level Test',true,'lt')]};
+  }
+  if(p==='Portfolio'){
+    if(!plan.pf)return null;
+    return {sections:[hw,special(plan.pf,'Portfolio',false,'pf')]};
+  }
+  var bi=-1,li=-1;
+  for(var b=0;b<plan.blocks.length&&bi<0;b++){var ix=plan.blocks[b].lessons.indexOf(p);if(ix>=0){bi=b;li=ix;}}
+  if(bi<0)return null;
+  var blk=plan.blocks[bi],secs=[],map={};
+  blk.rows.forEach(function(r,ri){
+    var ch=r.c.charAt(li);if(ch==='x'||!ch)return;
+    var key=(r.g||'')+'|'+(r.s||''),sec=map[key];
+    if(!sec){sec={title:r.s||r.g||'',grp:r.g||'',items:[],_k:key};map[key]=sec;secs.push(sec);}
+    var note=r.n&&r.n[String(li)]?' ('+r.n[String(li)]+')':'';
+    var id='b'+bi+'r'+ri,lab=r.l;
+    if(ch==='s'){
+      sec.items.push({id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:'점',link:'quiz'});
+    }else if(/받아쓰기/.test(lab)){
+      sec.items.push({id:id,t:'dict',l:lab+note,link:'dict'});
+      sec.items.push({id:id+'c',t:'call',l:'받아쓰기 검사 받기',to:'book'});
+    }else if(/선생님/.test(lab)){
+      sec.items.push({id:id,t:'call',l:lab+note,to:'tablet',hint:r.h||''});
+    }else{
+      var it={id:id,t:'check',l:lab+note};if(r.h)it.hint=r.h;sec.items.push(it);
+    }
+  });
+  // 교재 학습 구역 끝에 '검사 받기' 호출 버튼 자동 추가 (선생님 호출 항목이 이미 있으면 생략)
+  secs.forEach(function(sec){
+    var g=sec.grp||'';if(g.indexOf('교재')<0)return;
+    var k=String(sec.title).toLowerCase().replace(/\s+/g,'').replace(/\(.*\)/,'');
+    var def=CC_AUTO_CALL[k];if(!def)return;
+    if(sec.items.some(function(i){return i.t==='call';}))return;
+    if(!sec.items.some(function(i){return i.t==='check';}))return;
+    sec.items.push({id:'ac_'+sec._k.replace(/\W/g,'_'),t:'call',l:def[0],to:def[1]});
+  });
+  // 같은 이름의 구역이 둘이면 묶음 이름을 붙여 구분
+  var cnt={};secs.forEach(function(s){cnt[s.title]=(cnt[s.title]||0)+1;});
+  secs.forEach(function(s){if(cnt[s.title]>1&&s.grp)s.title=s.grp.replace(/\s+/g,' ')+' '+s.title;delete s._k;});
+  if(!secs.length)return null;
+  return {sections:[hw].concat(secs)};
+}
+
 
 
 function todayISO(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
@@ -327,10 +416,10 @@ function dateLabel(){var d=new Date(),w=['일','월','화','수','목','금','�
 function logRef(){return db.collection('checkLogs').doc(S.date+'_'+S.sid);}
 function normTpl(t){
   var src=(t&&t.sections&&t.sections.length)?t:CC_DEFAULT_TEMPLATE;
-  return src.sections.map(function(sec){return {title:sec.title||'',items:(sec.items||[]).filter(function(i){return i&&i.l;})};}).filter(function(s){return s.items.length;});
+  return src.sections.map(function(sec){return {title:sec.title||'',grp:sec.grp||'',items:(sec.items||[]).filter(function(i){return i&&i.l;})};}).filter(function(s){return s.items.length;});
 }
 function startSession(sid,data){
-  S={sid:sid,name:data.name,secs:normTpl(data.template),totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
+  S={sid:sid,name:data.name,plan:data.plan||null,lvl:data.lvl||data.level||'',fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
   try{localStorage.setItem('cc_sid',sid);}catch(e){}
   shownCall={};checks={};LOG={e:{},v:{}};curSec=0;
   $('hName').textContent=S.name;$('hDate').textContent=dateLabel();
@@ -405,6 +494,7 @@ function render(){
   if(!S)return;
   var a=document.activeElement;
   if(a&&a.tagName==='INPUT'&&$('list').contains(a)){paintBar();return;}   // 입력 중에는 화면을 다시 그리지 않아요
+  applySecs();
   if(!S.secInit&&S.gotLog&&S.gotChk){
     S.secInit=true;
     var f=S.secs.findIndex(function(s){return !secOk(s);});
@@ -424,7 +514,7 @@ function render(){
   // 항목
   var sec=S.secs[curSec],h='';
   if(sec){
-    h+='<div class="now">지금 단계</div><div class="stt">'+esc(sec.title)+'</div>';
+    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="stt">'+esc(sec.title)+'</div>';
     sec.items.forEach(function(it,ii){h+=itemHtml(it,curSec,ii);});
   }
   $('list').innerHTML=h;
@@ -440,11 +530,18 @@ function render(){
   // 전부 완료
   if(S.secs.length&&S.gotLog&&S.gotChk&&S.secs.every(secOk)&&!S.finished){S.finished=true;finishAll();}
 }
+// 오늘 일지의 단계·진도에 맞는 점검 항목 (계획표 기준). 진도를 모르면 기본 항목을 써요
+function applySecs(){
+  var t=null;
+  try{t=ccResolve(S.plan,LOG.lv||S.lvl,LOG.pg);}catch(e){}
+  var secs=normTpl(t||S.fb),sig=JSON.stringify(secs);
+  if(sig!==S.secSig){S.secSig=sig;S.secs=secs;if(curSec>=secs.length)curSec=0;}
+}
 function itemHtml(it,si,ii){
   var chk='<svg viewBox="0 0 24 24"><use href="#i-check"/></svg>',tm=LOG.e[it.id]?hm(LOG.e[it.id]):'';
   if(it.t==='check'){
     var on=!!LOG.e[it.id];
-    return '<div class="bi"><button class="bx'+(on?' on':'')+'" aria-label="'+esc(it.l)+(on?' 완료':' 미완료')+'" onclick="toggle('+si+','+ii+')">'+chk+'</button><span class="lb">'+esc(it.l)+'</span><span class="t">'+tm+'</span></div>';
+    return '<div class="bi"><button class="bx'+(on?' on':'')+'" aria-label="'+esc(it.l)+(on?' 완료':' 미완료')+'" onclick="toggle('+si+','+ii+')">'+chk+'</button><span class="lb">'+esc(it.l)+(it.hint?'<small class="hn">'+esc(it.hint)+'</small>':'')+'</span><span class="t">'+tm+'</span></div>';
   }
   if(it.t==='number'){
     var v=LOG.v[it.id];
