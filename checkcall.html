@@ -482,9 +482,12 @@ function calcJ(){
   return j;
 }
 function commit(ePatch,vPatch){
-  var del=firebase.firestore.FieldValue.delete(),u={date:S.date,studentId:S.sid,studentName:S.name,e:{},v:{}};
-  Object.keys(ePatch||{}).forEach(function(k){if(ePatch[k]){LOG.e[k]=ePatch[k];u.e[k]=ePatch[k];}else{delete LOG.e[k];u.e[k]=del;}});
-  Object.keys(vPatch||{}).forEach(function(k){var x=vPatch[k];if(x===null){delete LOG.v[k];u.v[k]=del;}else{LOG.v[k]=x;u.v[k]=x;}});
+  // 주의: set(merge) 에서 빈 객체({})는 기존 map 을 통째로 덮어써요 → 바뀐 항목이 있을 때만 e / v 를 보냅니다
+  var del=firebase.firestore.FieldValue.delete(),u={date:S.date,studentId:S.sid,studentName:S.name},ue={},uv={};
+  Object.keys(ePatch||{}).forEach(function(k){if(ePatch[k]){LOG.e[k]=ePatch[k];ue[k]=ePatch[k];}else{delete LOG.e[k];ue[k]=del;}});
+  Object.keys(vPatch||{}).forEach(function(k){var x=vPatch[k];if(x===null){delete LOG.v[k];uv[k]=del;}else{LOG.v[k]=x;uv[k]=x;}});
+  if(Object.keys(ue).length)u.e=ue;
+  if(Object.keys(uv).length)u.v=uv;
   u.j=calcJ();
   logRef().set(u,{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
