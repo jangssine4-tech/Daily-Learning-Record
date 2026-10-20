@@ -2976,7 +2976,7 @@ function _bcSubscribeToday(){
   try{
     _bcPUnsub=db.collection('checkPresence').where('date','==',_bcDate).onSnapshot(function(snap){
       window._bcPresence=snap.docs.map(function(d){var x=d.data();x.id=d.id;return x;});
-      _bcRender();
+      _bcRender();try{_ccPaintPres();}catch(e){}
     },function(e){console.warn('checkPresence',e);});
   }catch(e){}
 }
@@ -3039,15 +3039,6 @@ function _bcRender(){
     +'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_ccOpenPlans()">📋 레슨별 계획표</button> <button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 공통 항목</button></div>';
   var pres=(window._bcPresence||[]).slice().sort(function(a,b){var ta=a.at&&a.at.toMillis?a.at.toMillis():0,tb=b.at&&b.at.toMillis?b.at.toMillis():0;return tb-ta;});
   var presMap={};pres.forEach(function(p){presMap[p.studentId]=p;});
-  if(pres.length){
-    h+='<div class="bc-pres">';
-    pres.forEach(function(p){
-      var tm=p.at&&p.at.toMillis?new Date(p.at.toMillis()):null;
-      var hm=tm?(('0'+tm.getHours()).slice(-2)+':'+('0'+tm.getMinutes()).slice(-2)):'';
-      h+='<span class="bc-pchip '+(p.status==='in'?'in':'out')+'"><i></i>'+_bcEsc(p.studentName)+' '+(p.status==='in'?'접속 중':'로그아웃 '+hm)+'</span>';
-    });
-    h+='</div>';
-  }
   if(!act.length)h+='<div style="padding:14px 6px;font-size:12px;color:var(--txt3);text-align:center">대기 중인 학생이 없어요</div>';
   act.forEach(function(x,i){
     var called=x.status==='called';
@@ -3063,29 +3054,21 @@ function _bcRender(){
       +'<button class="bc-b x" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcRemove(this.dataset.id)" title="삭제">✕</button>'
       +'</span></div>';
   });
-  // 오늘 전체 점검을 마친 학생
-  var byStu={};dn.forEach(function(x){(byStu[x.studentId]=byStu[x.studentId]||[]).push(x);});
-  var finished=[],partial=[];
-  Object.keys(byStu).forEach(function(sid){
-    var s=students.find(function(z){return z.id===sid;});
-    var need=_bcItemsFor(s);var got=byStu[sid].map(function(x){return x.item;});
-    var nm=byStu[sid][0].studentName;
-    if(need.length&&need.every(function(n){return got.indexOf(n)>=0;}))finished.push(nm);
-    else partial.push(nm+' '+got.length+'/'+(need.length||got.length));
-  });
-  if(finished.length||partial.length||dn.length){
-    h+='<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;font-size:11px;color:var(--txt2);line-height:1.7">';
-    if(finished.length)h+='🎉 <b>점검 마무리</b> ('+finished.length+'명): '+finished.map(_bcEsc).join(', ')+'<br>';
-    if(partial.length)h+='📝 <b>진행 중</b>: '+partial.map(_bcEsc).join(', ')+'<br>';
-    h+='<span style="color:var(--txt3)">완료 기록: </span>';
-    dn.sort(function(a,b){return _bcTs(b)-_bcTs(a);}).slice(0,12).forEach(function(x){
-      h+='<span class="bc-done-chip">'+_bcEsc(x.studentName)+'·'+_bcEsc(x.item)+'</span>';
-    });
-    h+='</div>';
-  }
   h+='</div>';
   box.innerHTML=h;
   if(isOpen)_schDdAlign('check');
+}
+// 오늘의 시간표 학생 카드: 체크콜 접속 상태 (이름 없이 '접속 중' / '로그아웃 00:00')
+function _ccPresHtml(sid){
+  var p=(window._bcPresence||[]).find(function(x){return x.studentId===sid;});
+  if(!p)return '';
+  var t=p.at&&p.at.toMillis?new Date(p.at.toMillis()):null;
+  var hm=t?(('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)):'';
+  var on=p.status==='in';
+  return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap;margin-left:2px;'+(on?'background:#ecfdf5;color:#047857;border:1px solid #a7f3d0':'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0')+'"><i style="width:5px;height:5px;border-radius:50%;background:'+(on?'#10b981':'#94a3b8')+'"></i>'+(on?'접속 중':'로그아웃 '+hm)+'</span>';
+}
+function _ccPaintPres(){
+  document.querySelectorAll('.cc-pres').forEach(function(el){el.innerHTML=_ccPresHtml(el.dataset.sid);});
 }
 function _bcCallTag(x){
   var r=(typeof reports!=='undefined'&&reports||[]).find(function(z){return z.studentId===x.studentId&&z.date===x.date;});
@@ -7319,6 +7302,7 @@ function renderSchedule(){
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #60a5fa;background:'+(isTablet?'#3b82f6;color:#fff':'#eff6ff;color:#1e40af')+'" onclick="event.stopPropagation();toggleCardTag(\'tbl_'+s.id+'\',this)">T</span>'
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #a78bfa;background:'+(isBook?'#7c3aed;color:#fff':'#f3e8ff;color:#6b21a8')+'" onclick="event.stopPropagation();toggleCardTag(\'bk_'+s.id+'\',this)">B</span>'
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #94a3b8;background:#f1f5f9;color:#475569" title="메모 작성" onclick="event.stopPropagation();goToMemo(\''+s.id+'\')">M</span>'
+          +'<span class="cc-pres" data-sid="'+s.id+'">'+_ccPresHtml(s.id)+'</span>'
           +'</div>';
         html+='<div class="s-card-sub">'+((rep&&rep.level)?rep.level:getStudentLevel(s))+'</div>';
         html+='<div class="s-card-btns">';

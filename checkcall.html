@@ -56,10 +56,10 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .tbar b{font-size:clamp(17px,4vw,22px);font-variant-numeric:tabular-nums}
 .tbar .tr{flex:1;height:12px;border-radius:6px;background:#DDD6C6;overflow:hidden}
 .tbar .tr i{display:block;height:100%;width:0;background:#E4572E;transition:width .6s}
-.ask{display:flex;flex-wrap:wrap;gap:10px;margin:-4px 0 14px}.ask .nt{flex:0 0 100%;font-size:13px;font-weight:600;color:#6B6558;text-align:center;margin-top:-2px}.ask button.used{background:#E9E5DA;color:#8B8478;border-color:#D9D2C3}.ask button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;border-radius:14px;border:2px solid #D9D2C3;background:#fff;color:#1F2433;font:700 clamp(14px,3.3vw,18px) var(--font);padding:6px 10px}.ask button.wait{background:#FFF1D6;border-color:#E9B04A;color:#7A4B00;animation:pulse 1.2s ease-in-out infinite}.ask button small{font-size:12px;font-weight:600}.ask button:disabled{opacity:1}
-.tabs{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;padding:4px 4px 10px;margin-left:-4px;margin-right:-4px;scrollbar-width:none}
+.ask{display:flex;align-items:center;gap:10px;margin:-4px 0 14px}.ask button{flex:none;width:clamp(56px,11vw,68px);height:clamp(50px,9vw,58px);display:flex;align-items:center;justify-content:center;border-radius:14px;border:2px solid #D9D2C3;background:#fff;font-size:clamp(24px,5vw,30px);padding:0;line-height:1}.ask button.wait{background:#FFF1D6;border-color:#E9B04A;animation:pulse 1.2s ease-in-out infinite}.ask button.used{background:#E9E5DA;border-color:#D9D2C3;opacity:.55;filter:grayscale(1)}.ask button:disabled{cursor:default}.ask .nt{flex:1;min-width:0;font-size:clamp(12px,2.8vw,14px);font-weight:600;color:#6B6558;line-height:1.35}.ask .nt.st{color:#7A4B00;font-weight:800}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;padding:4px 0 10px}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex:1 0 auto;min-width:84px;min-height:64px;border-radius:16px;border:2px solid #D9D2C3;background:#fff;color:#4A4F5E;font-size:clamp(13px,2.8vw,15px);font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 10px;line-height:1.2}
+.tab{flex:1 1 auto;min-width:84px;max-width:100%;min-height:64px;border-radius:16px;border:2px solid #D9D2C3;background:#fff;color:#4A4F5E;font-size:clamp(13px,2.8vw,15px);font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 10px;line-height:1.2}
 .tab small{font-size:12px;font-weight:500;color:#5C6170}
 .tab.ok{background:#E3F1EE;border-color:#BFE0D9;color:#0B5A53}
 .tab.ok small{color:#0B5A53}
@@ -575,12 +575,15 @@ function paintBar(){
 }
 var ASKS=[{k:'화장실 가고 싶어요',ic:'🚻',ok:'화장실 다녀오세요 🚻'},{k:'물 마시고 싶어요',ic:'💧',ok:'물 마시고 오세요 💧'}];
 function paintAsk(){
-  var el=$('ask');if(!el)return;var h='';
+  var el=$('ask');if(!el)return;var h='',note='화장실 가기와 물 마시기는 하루에 한 번만 갈 수 있어요',cls='nt';
   ASKS.forEach(function(a,i){
     var c=checks[a.k],st=c?c.status:'none';
-    h+='<button class="'+(st==='waiting'?'wait':st==='used'?'used':'')+'"'+(st==='none'?'':' disabled')+' onclick="askT('+i+')"><span>'+a.ic+' '+esc(a.k)+'</span>'+(st==='waiting'?'<small>선생님께 전달했어요</small>':st==='called'?'<small>선생님이 허락했어요</small>':st==='used'?'<small>오늘은 다녀왔어요</small>':'')+'</button>';
+    var nm=a.k.indexOf('화장실')>=0?'화장실':'물 마시기';
+    h+='<button class="'+(st==='waiting'?'wait':st==='used'?'used':'')+'"'+(st==='none'?'':' disabled')+' onclick="askT('+i+')" aria-label="'+esc(a.k)+'" title="'+esc(a.k)+'">'+a.ic+'</button>';
+    if(st==='waiting'){note=nm+' 요청을 선생님께 전달했어요';cls='nt st';}
+    else if(st==='called'){note='선생님이 허락했어요';cls='nt st';}
   });
-  el.innerHTML=h+'<div class="nt">화장실과 물 마시기는 하루에 한 번씩만 갈 수 있어요</div>';
+  el.innerHTML=h+'<div class="'+cls+'">'+note+'</div>';
 }
 async function askT(i){
   initAudio();var a=ASKS[i],c=checks[a.k];if(c&&c.status!=='none')return;
