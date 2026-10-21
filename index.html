@@ -2927,7 +2927,7 @@ async function _bcSyncRoster(manual){
   if(!students.length){if(manual===true)toast('⚠️ 학생 데이터를 아직 못 불러왔어요');return;}
   try{
     var snap=await db.collection('checkRoster').get();
-    var have={};snap.forEach(function(d){have[d.id]=d.data();});
+    var have={};if(manual!==true)snap.forEach(function(d){have[d.id]=d.data();});   // 수동 갱신은 전부 다시 저장
     var want={};
     students.forEach(function(s){
       var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
@@ -2950,7 +2950,7 @@ async function _bcSyncRoster(manual){
       ops.slice(i,i+400).forEach(function(o){var r=db.collection('checkRoster').doc(o.id);if(o.t==='set')b.set(r,o.d);else b.delete(r);});
       await b.commit();
     }
-    if(manual===true)toast('✅ 체크콜 명단 '+Object.keys(want).length+'명 (변경 '+ops.length+'건)');
+    if(manual===true){var _pj='';try{_pj=firebase.app().options.projectId;}catch(e){}toast('✅ 체크콜 명단 '+Object.keys(want).length+'명 저장 · 프로젝트 '+_pj);}
   }catch(e){console.warn('checkRoster 동기화 실패',e);toast('⚠️ 체크콜 명단 저장 실패: '+((e&&e.message)||e));}
 }
 
