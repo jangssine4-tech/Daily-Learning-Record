@@ -2922,8 +2922,9 @@ function _bcSyncSoon(){
   clearTimeout(_bcSyncTimer);
   _bcSyncTimer=setTimeout(_bcSyncRoster,4000);
 }
-async function _bcSyncRoster(){
-  if(!db||!currentUser||!students.length)return;
+async function _bcSyncRoster(manual){
+  if(!db||!currentUser)return;
+  if(!students.length){if(manual===true)toast('⚠️ 학생 데이터를 아직 못 불러왔어요');return;}
   try{
     var snap=await db.collection('checkRoster').get();
     var have={};snap.forEach(function(d){have[d.id]=d.data();});
@@ -2934,6 +2935,10 @@ async function _bcSyncRoster(){
       var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:(window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES,level:getStudentLevel(s),lvl:_inf.lvl,ses:_ccSesMap(s)};
     });
     var ops=[];
+    if(!Object.keys(want).length){   // 명단에 넣을 학생이 하나도 없으면 기존 명단을 지우지 않아요
+      if(manual===true)toast('⚠️ 학생 '+students.length+'명 중 체크콜 조건(재원·신규, 학생번호)에 맞는 학생이 0명이에요');
+      return;
+    }
     Object.keys(want).forEach(function(id){
       var c=have[id];
       if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,plan:c.plan||null,totalMin:c.totalMin,level:c.level,lvl:c.lvl,ses:c.ses||{}})===_bcCanon(want[id]))return;
@@ -2945,7 +2950,8 @@ async function _bcSyncRoster(){
       ops.slice(i,i+400).forEach(function(o){var r=db.collection('checkRoster').doc(o.id);if(o.t==='set')b.set(r,o.d);else b.delete(r);});
       await b.commit();
     }
-  }catch(e){console.warn('checkRoster 동기화 실패',e);}
+    if(manual===true)toast('✅ 체크콜 명단 '+Object.keys(want).length+'명 (변경 '+ops.length+'건)');
+  }catch(e){console.warn('checkRoster 동기화 실패',e);toast('⚠️ 체크콜 명단 저장 실패: '+((e&&e.message)||e));}
 }
 
 // ── 실시간 구독 ──
@@ -3078,7 +3084,7 @@ function _bcRender(){
   var h='<button class="sch-dd-btn'+(waiting?' bc-blink':(act.length?' has':''))+'" onclick="event.stopPropagation();if(window._bcDragged)return;_schDdToggle(\'check\')">🔔 점검 받을 학생 ('+act.length+')'+(waiting?' <span class="bc-new">NEW</span>':'')+' <span style="font-size:9px">▼</span></button>'
     +'<div class="sch-dd-panel" style="display:'+(isOpen?'block':'none')+';min-width:340px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span></span>'
-    +''+(_ccCan('cc_plan')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_ccOpenPlans()">📋 레슨별 계획표</button> ':'')+(_ccCan('cc_common')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 공통 항목</button>':'')+'</div>';
+    +''+(_ccCan('cc_plan')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_ccOpenPlans()">📋 레슨별 계획표</button> ':'')+(_ccCan('cc_common')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 공통 항목</button> ':'')+'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcSyncRoster(true)" title="학생 태블릿 로그인용 명단을 지금 갱신해요">🔄 명단 갱신</button></div>';
   var pres=(window._bcPresence||[]).slice().sort(function(a,b){var ta=a.at&&a.at.toMillis?a.at.toMillis():0,tb=b.at&&b.at.toMillis?b.at.toMillis():0;return tb-ta;});
   var presMap={};pres.forEach(function(p){presMap[p.studentId]=p;});
   if(!act.length)h+='<div style="padding:14px 6px;font-size:12px;color:var(--txt3);text-align:center">대기 중인 학생이 없어요</div>';
