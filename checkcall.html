@@ -229,8 +229,7 @@ var CC_DEFAULT_TEMPLATE={sections:[
   {id:'w1',t:'check',l:'그림보고 영어 단어 말하기'},
   {id:'w2',t:'check',l:'영어 단어 읽고 뜻 말하기'},
   {id:'w3',t:'call',l:'단어장 검사 받기',to:'tablet'},
-  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'},
-  {id:'w5',t:'call',l:'받아쓰기 검사 받기',to:'book'}]},
+  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'}]},
  {title:'스마트 학습 2',items:[
   {id:'ds',t:'check',l:'Daily Study'},
   {id:'sp',t:'check',l:'스피킹 트레이닝'}]},
@@ -315,7 +314,6 @@ function ccResolve(plan,level,progress){
       sec.items.push({id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:'점',link:'quiz'});
     }else if(/받아쓰기/.test(lab)){
       sec.items.push({id:id,t:'dict',l:lab+note,link:'dict'});
-      sec.items.push({id:id+'c',t:'call',l:'받아쓰기 검사 받기',to:'book'});
     }else if(/선생님/.test(lab)){
       sec.items.push({id:id,t:'call',l:lab+note,to:'tablet',hint:r.h||''});
     }else{
@@ -418,7 +416,7 @@ function dateLabel(){var d=new Date(),w=['일','월','화','수','목','금','�
 function logRef(){return db.collection('checkLogs').doc(S.date+'_'+S.sid);}
 function normTpl(t){
   var src=(t&&t.sections&&t.sections.length)?t:CC_DEFAULT_TEMPLATE;
-  return src.sections.map(function(sec){return {title:sec.title||'',grp:sec.grp||'',items:(sec.items||[]).filter(function(i){return i&&i.l;})};}).filter(function(s){return s.items.length;});
+  return src.sections.map(function(sec){return {title:sec.title||'',grp:sec.grp||'',items:(sec.items||[]).filter(function(i){return i&&i.l&&i.l!=='받아쓰기 검사 받기';})};}).filter(function(s){return s.items.length;});
 }
 function startSession(sid,data){
   S={sid:sid,name:data.name,plan:data.plan||null,lvl:data.lvl||data.level||'',fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
@@ -513,7 +511,8 @@ function render(){
   var tb='';
   S.secs.forEach(function(sec,i){
     var p=secProg(sec),cls='tab'+(secOk(sec)?' ok':'')+(i===curSec?' cur':'')+(i===nextIdx?' next':'');
-    tb+='<button class="'+cls+'" onclick="goSec('+i+')"><span>'+esc(sec.title)+'</span><small>'+p.d+'/'+p.n+'</small></button>';
+    var mk='';sec.items.forEach(function(it){if(it.t!=='call')return;var c=checks[it.l];if(c&&c.status==='called')mk='go';else if(c&&c.status==='waiting'&&mk!=='go')mk='wt';});
+    tb+='<button class="'+cls+'" onclick="goSec('+i+')"><span>'+esc(sec.title)+'</span><small>'+p.d+'/'+p.n+(mk==='go'?' · 📢 선생님이 불러요':mk==='wt'?' · ⏳ 기다리는 중':'')+'</small></button>';
   });
   $('tabs').innerHTML=tb;paintAsk();
   // 항목
@@ -526,12 +525,15 @@ function render(){
   $('hint').textContent=S.secs.length?'':'오늘 점검할 항목이 아직 없어요. 선생님께 말씀드려 주세요.';
   paintBar();
   // 호출 오버레이 (선생님이 호출할 때마다 한 번씩, 벨은 두 번)
-  var anyCall=null;
-  Object.keys(checks).forEach(function(k){if(!anyCall&&checks[k].status==='called')anyCall=checks[k];});
-  if(anyCall){
-    var stamp=anyCall.calledAt&&anyCall.calledAt.toMillis?anyCall.calledAt.toMillis():0;
-    if(stamp&&shownCall[anyCall.id]!==stamp){shownCall[anyCall.id]=stamp;openCall(anyCall);}
-  }else if($('call').classList.contains('on')){closeCall();}
+  var anyCall=null,newCall=null;
+  Object.keys(checks).forEach(function(k){
+    var c=checks[k];if(c.status!=='called')return;
+    anyCall=anyCall||c;
+    var st=c.calledAt&&c.calledAt.toMillis?c.calledAt.toMillis():0;
+    if(st&&shownCall[c.id]!==st&&!newCall)newCall=c;   // 여러 검사가 동시에 호출돼도 하나씩 모두 알려 줘요
+  });
+  if(newCall){shownCall[newCall.id]=newCall.calledAt.toMillis();openCall(newCall);}
+  else if(!anyCall&&$('call').classList.contains('on')){closeCall();}
   // 전부 완료
   if(S.secs.length&&S.gotLog&&S.gotChk&&S.secs.every(secOk)&&!S.finished){S.finished=true;finishAll();}
 }
@@ -539,7 +541,27 @@ function render(){
 function applySecs(){
   var t=null;
   try{t=ccResolve(S.plan,LOG.lv||S.lvl,LOG.pg);}catch(e){}
-  var secs=normTpl(t||S.fb),sig=JSON.stringify(secs);
+  var secs=normTpl(t||S.fb);
+  // 선생님이 '연습'을 누르면 해당 검사 받기 버튼 바로 아래에 연습 항목이 생겨요 (checkLogs.x)
+  var xs=LOG.x||{},xk=Object.keys(xs).sort(function(a,b){return (xs[a].at||0)-(xs[b].at||0);}),last={};
+  xk.forEach(function(k){
+    var x=xs[k];if(!x||!x.after||!x.l)return;
+    for(var si=0;si<secs.length;si++){
+      var its=secs[si].items,ix=-1;
+      for(var ii=0;ii<its.length;ii++){if(its[ii].t==='call'&&its[ii].l===x.after)ix=ii;}
+      if(ix<0)continue;
+      var at=(last[x.after]!==undefined)?last[x.after]:ix;
+      its.splice(at+1,0,{id:k,t:'check',l:x.l});last[x.after]=at+1;break;
+    }
+  });
+  // Daily Quiz 100점이면 오답 노트 항목은 자동으로 사라져요
+  secs.forEach(function(sec){
+    var q=sec.items.filter(function(i){return i.t==='number'&&i.link==='quiz';})[0];
+    if(!q)return;var v=LOG.v[q.id];
+    if(v!==undefined&&v!==''&&Number(v)>=100)sec.items=sec.items.filter(function(i){return !/오답\s*노트/.test(i.l);});
+  });
+  secs=secs.filter(function(s){return s.items.length;});
+  var sig=JSON.stringify(secs);
   if(sig!==S.secSig){S.secSig=sig;S.secs=secs;if(curSec>=secs.length)curSec=0;}
 }
 function itemHtml(it,si,ii){
@@ -579,14 +601,19 @@ function paintAsk(){
   ASKS.forEach(function(a,i){
     var c=checks[a.k],st=c?c.status:'none';
     var nm=a.k.indexOf('화장실')>=0?'화장실':'물 마시기';
-    h+='<button class="'+(st==='waiting'?'wait':st==='used'?'used':'')+'"'+(st==='none'?'':' disabled')+' onclick="askT('+i+')" aria-label="'+esc(a.k)+'" title="'+esc(a.k)+'">'+a.ic+'</button>';
-    if(st==='waiting'){note=nm+' 요청을 선생님께 전달했어요';cls='nt st';}
+    h+='<button class="'+(st==='waiting'?'wait':st==='used'?'used':'')+'"'+(st==='none'||st==='waiting'?'':' disabled')+' onclick="askT('+i+')" aria-label="'+esc(a.k)+(st==='waiting'?' (누르면 취소)':'')+'" title="'+esc(a.k)+'">'+a.ic+'</button>';
+    if(st==='waiting'){note=nm+' 요청을 선생님께 전달했어요 (다시 누르면 취소)';cls='nt st';}
     else if(st==='called'){note='선생님이 허락했어요';cls='nt st';}
   });
   el.innerHTML=h+'<div class="'+cls+'">'+note+'</div>';
 }
 async function askT(i){
-  initAudio();var a=ASKS[i],c=checks[a.k];if(c&&c.status!=='none')return;
+  initAudio();var a=ASKS[i],c=checks[a.k];
+  if(c&&c.status==='waiting'){   // 다시 누르면 요청 취소 (선생님 화면에서도 같이 사라져요)
+    try{await db.collection('bookChecks').doc(c.id).delete();toast('요청을 취소했어요');}catch(e){toast('취소하지 못했어요');}
+    return;
+  }
+  if(c&&c.status!=='none')return;
   try{await db.collection('bookChecks').doc(S.date+'_'+S.sid+'_'+safeId(a.k)).set({date:S.date,studentId:S.sid,studentName:S.name,item:a.k,kind:'ask',callTo:'tablet',section:'요청',status:'waiting',requestedAt:firebase.firestore.FieldValue.serverTimestamp()});toast('선생님께 전달했어요');}
   catch(e){console.error(e);toast('전달하지 못했어요. 다시 눌러 주세요');}
 }

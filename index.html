@@ -35,7 +35,6 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .sb-logo{padding:18px 16px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.1)}
 .sb-logo span{font-size:17px;font-weight:800;color:#fff;letter-spacing:-0.5px}
 .sb-logo span em{color:var(--mint);font-style:normal}
-.sb-logo img{max-height:40px;max-width:100%;object-fit:contain;display:block}
 .sb-sec{font-size:10px;font-weight:700;color:rgba(255,255,255,.4);padding:14px 16px 5px;letter-spacing:.8px;text-transform:uppercase}
 .sb-item{display:flex;align-items:center;gap:9px;padding:10px 14px;color:rgba(255,255,255,.7);cursor:pointer;border-radius:8px;margin:1px 6px;font-size:12px;font-weight:500;transition:all .15s}
 .sb-item svg{width:15px;height:15px;flex-shrink:0;opacity:.7}
@@ -389,7 +388,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
 
 <div id="mob-overlay" onclick="toggleMobMenu()"></div>
 <nav id="sidebar">
-  <div class="sb-logo" id="sb-logo" onclick="openSbLogoModal()" title="클릭해서 로고 변경" style="cursor:pointer"><span>english<em>eye</em></span></div>
+  <div class="sb-logo"><span>english<em>eye</em></span></div>
   <div id="hdr-user" style="display:flex;align-items:center;justify-content:space-between"><div><strong id="sb-username">-</strong><span id="sb-date"></span></div><button onclick="doLogout()" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;font-size:10px;padding:3px 8px;border-radius:12px;cursor:pointer">로그아웃</button></div>
 </nav>
 
@@ -1425,6 +1424,33 @@ function saveStorageBucket(){
 }
 
 function getCfg(){try{return JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){return null;}}
+// ── 로그인 유지: 화면을 떠난 지 1시간이 안 되면 로그인 상태 유지, 1시간 이상이면 자동 로그아웃 ──
+var _SESS_KEY='academy_login',_SESS_TTL=60*60*1000,_sessLast=0;
+function _sessSave(){
+  if(!currentUser)return;
+  _sessLast=Date.now();
+  try{localStorage.setItem(_SESS_KEY,JSON.stringify({d:currentUser.docId||'',a:0,t:_sessLast}));}catch(e){}
+}
+function _sessClear(){_sessLast=0;try{localStorage.removeItem(_SESS_KEY);}catch(e){}}
+async function _sessRestore(){   // 비밀번호는 저장하지 않고 계정 번호만 기억해요
+  var s=null;try{s=JSON.parse(localStorage.getItem(_SESS_KEY));}catch(e){}
+  if(!s||!s.t||Date.now()-s.t>_SESS_TTL){_sessClear();return false;}
+  if(!s.d)return false;
+  try{
+    var d=await db.collection('users').doc(s.d).get();
+    if(!d.exists||d.data().adminDeleted){_sessClear();return false;}
+    currentUser={...d.data(),docId:d.id};return true;
+  }catch(e){return false;}
+}
+function _sessExpire(){_sessClear();try{localStorage.removeItem('academy_cache');}catch(e){}currentUser=null;location.reload();}
+document.addEventListener('visibilitychange',function(){
+  if(!currentUser)return;
+  if(document.hidden){_sessSave();return;}
+  if(_sessLast&&Date.now()-_sessLast>_SESS_TTL){_sessExpire();return;}
+  _sessSave();
+});
+window.addEventListener('pagehide',function(){_sessSave();});
+setInterval(function(){if(currentUser&&!document.hidden)_sessSave();},30000);
 function saveFbConfig(){
   var cfg={apiKey:$('c-apiKey').value.trim(),authDomain:$('c-authDomain').value.trim(),projectId:$('c-projectId').value.trim(),storageBucket:$('c-storageBucket').value.trim()};
   if(!cfg.apiKey||!cfg.projectId){toast('⚠️ API Key와 Project ID 필수');return;}
@@ -1435,8 +1461,13 @@ function initFb(cfg){
   db=firebase.firestore();
   db.settings({cacheSizeBytes:50*1024*1024,merge:true});
   db.enablePersistence({synchronizeTabs:true}).catch(function(){});
-  setTimeout(function(){
+  setTimeout(async function(){
     $('setup-screen').style.display='none';
+    var ok=false;try{ok=await _sessRestore();}catch(e){}
+    if(ok){   // 1시간 안에 다시 열면 로그인 없이 바로 들어가요
+      try{bootProgress(20,'데이터 로딩...');await yield_();await bootApp();_sessSave();return;}
+      catch(e){console.warn('로그인 유지 복원 실패',e);currentUser=null;_sessClear();}
+    }
     $('login-screen').style.display='flex';
     hideBootOverlay();
   }, 100);
@@ -1455,13 +1486,6 @@ async function login(){
   bootProgress(10, '인증 중...');
   // YIELD so overlay renders before blocking work
   await yield_();
-  if(id==='admin'&&pw==='1234'){
-    currentUser={name:'관리자',role:'admin',loginId:'admin'};
-    bootProgress(20, '데이터 로딩...');
-    await yield_();
-    await bootApp();
-    return;
-  }
   try{
     var snap=await db.collection('users').where('loginId','==',id).get();
     var cand=snap.docs;
@@ -1474,7 +1498,7 @@ async function login(){
     var hit=cand.find(function(d){return d.data().password===pw;})||cand.find(function(d){return String(d.data().password||'').trim()===pw.trim();});
     if(!hit){toast('❌ 비밀번호가 맞지 않아요'+(cand.length>1?' (같은 아이디 계정이 '+cand.length+'개 있어요 — 관리자 페이지에서 중복 계정을 정리해 주세요)':''));$('login-screen').style.display='flex';hideBootOverlay();return;}
     var u=hit.data();
-    currentUser={...u,docId:hit.id};
+    currentUser={...u,docId:hit.id};_sessSave();
     bootProgress(20, '데이터 로딩...');
     await yield_();
     await bootApp();
@@ -1567,7 +1591,6 @@ async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
   $('sb-date').textContent=todayISO();
-  applySbLogo();
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -2643,6 +2666,7 @@ async function toggleMobMenu(){
 async function doLogout(){
   var _cm=await showConfirm('로그아웃 하시겠습니까?');if(!_cm)return;
   localStorage.removeItem('academy_cache');
+  _sessClear();
   currentUser=null;
   location.reload();
 }
@@ -2719,8 +2743,7 @@ var CC_DEFAULT_TEMPLATE={sections:[
   {id:'w1',t:'check',l:'그림보고 영어 단어 말하기'},
   {id:'w2',t:'check',l:'영어 단어 읽고 뜻 말하기'},
   {id:'w3',t:'call',l:'단어장 검사 받기',to:'tablet'},
-  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'},
-  {id:'w5',t:'call',l:'받아쓰기 검사 받기',to:'book'}]},
+  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'}]},
  {title:'스마트 학습 2',items:[
   {id:'ds',t:'check',l:'Daily Study'},
   {id:'sp',t:'check',l:'스피킹 트레이닝'}]},
@@ -2806,7 +2829,6 @@ function ccResolve(plan,level,progress){
       sec.items.push({id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:'점',link:'quiz'});
     }else if(/받아쓰기/.test(lab)){
       sec.items.push({id:id,t:'dict',l:lab+note,link:'dict'});
-      sec.items.push({id:id+'c',t:'call',l:'받아쓰기 검사 받기',to:'book'});
     }else if(/선생님/.test(lab)){
       sec.items.push({id:id,t:'call',l:lab+note,to:'tablet',hint:r.h||''});
     }else{
@@ -2891,12 +2913,12 @@ async function _bcSyncRoster(){
     students.forEach(function(s){
       var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
       var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return;
-      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:(window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES,level:getStudentLevel(s),lvl:_inf.lvl};
+      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:(window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES,level:getStudentLevel(s),lvl:_inf.lvl,ses:_ccSesMap(s)};
     });
     var ops=[];
     Object.keys(want).forEach(function(id){
       var c=have[id];
-      if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,plan:c.plan||null,totalMin:c.totalMin,level:c.level,lvl:c.lvl})===_bcCanon(want[id]))return;
+      if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,plan:c.plan||null,totalMin:c.totalMin,level:c.level,lvl:c.lvl,ses:c.ses||{}})===_bcCanon(want[id]))return;
       ops.push({t:'set',id:id,d:want[id]});
     });
     Object.keys(have).forEach(function(id){if(!want[id])ops.push({t:'del',id:id});});
@@ -2968,7 +2990,7 @@ function _bcSubscribeToday(){
   if(window._ccLUnsub){try{window._ccLUnsub();}catch(e){}}
   try{
     window._ccLUnsub=db.collection('checkLogs').where('date','==',_bcDate).onSnapshot(function(snap){
-      var m={};snap.forEach(function(d){var x=d.data();m[x.studentId]=x;});
+      var m={};snap.forEach(function(d){var x=d.data();m[_ccKey(x.studentId,x.sess===2?2:1)]=x;});
       window._ccLogs=m;
       try{_ccFillJournal();}catch(e){}
     },function(e){console.warn('checkLogs',e);});
@@ -3047,12 +3069,14 @@ function _bcRender(){
     h+='<div class="bc-row'+(called?' called':'')+'" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'
       +'<span class="bc-no">'+(i+1)+'</span>'
       +'<span class="bc-nm">'+_bcEsc(x.studentName)+'</span>'
+      +(x.sess===2?'<span class="bc-tag" style="color:#7c3aed;font-weight:800">2회차</span>':'')
       +'<span class="bc-it">'+(x.kind==='ask'?(x.item.indexOf('화장실')>=0?'🚻 ':'💧 '):'')+_bcEsc(x.item)+'</span>'
       +(x.kind==='ask'?'<span class="bc-tag" style="color:#b45309">학생 요청</span>':_bcCallTag(x))
       +((presMap[x.studentId]&&presMap[x.studentId].status==='out')?'<span class="bc-tag" style="color:#b45309">⚠ 로그아웃</span>':'')
       +'<span style="margin-left:auto;display:flex;gap:4px">'
       +'<button class="bc-b call" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'+(x.kind==='ask'?(called?'다시 알림':'허락'):(called?'다시 호출':'호출'))+'</button>'
       +(x.kind==='ask'?'':'<button class="bc-b ok" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcDone(this.dataset.id)">완료</button>')
+      +((x.kind!=='ask'&&/스토리북/.test(x.item))?'<button class="bc-b" style="background:#fef3c7;color:#92400e" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcPractice(this.dataset.id)" title="연습이 더 필요해요">연습</button>':'')
       +'<button class="bc-b x" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcRemove(this.dataset.id)" title="삭제">✕</button>'
       +'</span></div>';
   });
@@ -3072,8 +3096,27 @@ function _ccPresHtml(sid){
 function _ccPaintPres(){
   document.querySelectorAll('.cc-pres').forEach(function(el){el.innerHTML=_ccPresHtml(el.dataset.sid);});
 }
+// ── 2회차(특강) 지원: 하루에 수업이 두 번인 학생은 늦은 시간 수업을 2회차로 구분해요 ──
+var _CC_DN=['일','월','화','수','목','금','토'];
+function _ccTM(t){var m=String(t||'').match(/(\d{1,2}):(\d{2})/);return m?parseInt(m[1])*60+parseInt(m[2]):-1;}
+function _ccTimesDn(s,dn){
+  var a=[],seen={},p=(s.periods||{})[dn],sp=(s.specialPeriods||{})[dn];
+  if(p&&typeof p==='object'&&p.time)a.push(p.time);
+  if(sp&&sp.time)a.push(sp.time);
+  return a.filter(function(t){var k=_ccTM(t);if(k<0||seen[k])return false;seen[k]=1;return true;}).sort(function(x,y){return _ccTM(x)-_ccTM(y);});
+}
+function _ccSesMap(s){var o={};_CC_DN.forEach(function(dn){var a=_ccTimesDn(s,dn);if(a.length>=2)o[dn]=a.slice(0,2);});return o;}
+function _ccSess(s,dateStr,sessionTime){
+  if(!s||!dateStr)return 1;
+  var ts=_ccTimesDn(s,_CC_DN[new Date(dateStr+'T12:00:00').getDay()]);if(ts.length<2)return 1;
+  var m=_ccTM(sessionTime);return (m>=0&&m>=_ccTM(ts[1]))?2:1;
+}
+function _ccDocId(date,sid,sess){return date+'_'+sid+(sess===2?'_2':'');}
+function _ccKey(sid,sess){return sid+(sess===2?'#2':'');}
 function _bcCallTag(x){
-  var r=(typeof reports!=='undefined'&&reports||[]).find(function(z){return z.studentId===x.studentId&&z.date===x.date;});
+  var _st=(typeof students!=='undefined'&&students||[]).find(function(z){return z.id===x.studentId;}),_want=x.sess===2?2:1;
+  var _rl=(typeof reports!=='undefined'&&reports||[]).filter(function(z){return z.studentId===x.studentId&&z.date===x.date;});
+  var r=_rl.find(function(z){return !z.makeupId&&_ccSess(_st,z.date,z.sessionTime)===_want;})||_rl[0];
   var book=x.callTo==='book',nm=r?(book?r.teacherBook:(r.teacherTablet||r.teacher)):'';
   var mine=nm&&nm===_bcTeacher();
   return '<span class="bc-tag" style="'+(mine?'color:#0E7C5A;font-weight:800':'')+'">'+(book?'교재 교사':'태블릿 교사')+(nm?' · '+_bcEsc(nm):'')+'</span>';
@@ -3082,20 +3125,23 @@ function _bcCallTag(x){
 function _bcSyncProgress(){
   try{
     if(!db||!currentUser||typeof reports==='undefined'||!reports||!reports.length)return;
-    var d=todayISO(),best={};
+    var d=todayISO(),best={},stuMap={};
+    (typeof students!=='undefined'&&students||[]).forEach(function(z){stuMap[z.id]=z;});
     reports.forEach(function(r){
       if(r.date!==d||!r.studentId||r.absent)return;
       var lv=String(r.level||'').trim(),pg=String(r.progress||'').trim();
-      var cur=best[r.studentId],t=String(r.updatedAt||r.savedAt||r.createdAt||'');
-      if(!cur||(pg&&!cur.pg)||(!!pg===!!cur.pg&&t>cur.t))best[r.studentId]={lv:lv,pg:pg,t:t};
+      var sess=_ccSess(stuMap[r.studentId],d,r.sessionTime),key=_ccKey(r.studentId,sess);   // 2회차 일지는 2회차 기록에 따로 전달
+      var cur=best[key],t=String(r.updatedAt||r.savedAt||r.createdAt||'');
+      if(!cur||(pg&&!cur.pg)||(!!pg===!!cur.pg&&t>cur.t))best[key]={lv:lv,pg:pg,t:t,sid:r.studentId,sess:sess};
     });
-    Object.keys(best).forEach(function(sid){
-      var b=best[sid],sig=d+'|'+b.lv+'|'+b.pg;
-      if(_bcLastLv[sid]!==undefined&&_bcLastLv[sid]!==b.lv&&b.lv)_bcSyncSoon();
-      _bcLastLv[sid]=b.lv;
-      if(_bcLastProg[sid]===sig)return;
-      _bcLastProg[sid]=sig;
-      db.collection('checkLogs').doc(d+'_'+sid).set({date:d,studentId:sid,lv:b.lv,pg:b.pg},{merge:true}).catch(function(){_bcLastProg[sid]='';});
+    Object.keys(best).forEach(function(key){
+      var b=best[key],sid=b.sid,sig=d+'|'+b.lv+'|'+b.pg;
+      if(_bcLastLv[key]!==undefined&&_bcLastLv[key]!==b.lv&&b.lv)_bcSyncSoon();
+      _bcLastLv[key]=b.lv;
+      if(_bcLastProg[key]===sig)return;
+      _bcLastProg[key]=sig;
+      var u={date:d,studentId:sid,lv:b.lv,pg:b.pg};if(b.sess===2)u.sess=2;
+      db.collection('checkLogs').doc(_ccDocId(d,sid,b.sess)).set(u,{merge:true}).catch(function(){_bcLastProg[key]='';});
     });
   }catch(e){}
 }
@@ -3108,6 +3154,18 @@ function _bcCall(id){
 function _bcDone(id){
   _bcRef(id).update({status:'done',doneBy:_bcTeacher(),doneAt:firebase.firestore.FieldValue.serverTimestamp()})
     .then(function(){toast('✅ 검사 완료');}).catch(function(e){toast('⚠️ 처리 실패');});
+}
+// 연습이 더 필요할 때: 학생 체크콜의 해당 '검사 받기' 아래에 '3번 읽기 연습하기'가 생기고, 검사 요청은 초기화돼요
+function _bcPractice(id){
+  var x=(window._bcChecks||[]).find(function(z){return z.id===id;});if(!x)return;
+  var sess=x.sess===2?2:1,lg=(window._ccLogs&&window._ccLogs[_ccKey(x.studentId,sess)])||{},xs=lg.x||{},n=0;
+  Object.keys(xs).forEach(function(k){if(xs[k]&&xs[k].after===x.item)n++;});
+  var xid='px'+Date.now().toString(36),o={};
+  o[xid]={after:x.item,l:'3번 읽기 연습하기'+(n?' '+(n+1):''),at:Date.now()};
+  var pu={date:x.date,studentId:x.studentId,studentName:x.studentName,x:o};if(sess===2)pu.sess=2;
+  db.collection('checkLogs').doc(_ccDocId(x.date,x.studentId,sess)).set(pu,{merge:true})
+    .then(function(){return _bcRef(id).delete();})
+    .then(function(){toast('📖 연습 항목을 보냈어요');}).catch(function(e){toast('⚠️ 연습 전달 실패');console.warn(e);});
 }
 function _bcUndo(id){
   _bcRef(id).update({status:'waiting',doneBy:firebase.firestore.FieldValue.delete(),doneAt:firebase.firestore.FieldValue.delete(),calledBy:firebase.firestore.FieldValue.delete(),calledAt:firebase.firestore.FieldValue.delete(),ackAt:firebase.firestore.FieldValue.delete()})
@@ -3397,8 +3455,11 @@ function _ccFillJournal(){
     }
     if(n&&!window._ccToasted){window._ccToasted=1;toast('📲 체크콜 기록을 일지에 불러왔어요');setTimeout(function(){window._ccToasted=0;},3000);}
   };
-  if(dt===_bcDate&&window._ccLogs&&window._ccLogs[sid])apply(window._ccLogs[sid]);
-  else if(dt!==_bcDate)db.collection('checkLogs').doc(dt+'_'+sid).get().then(function(d){if(d.exists)apply(d.data());}).catch(function(){});
+  // 열려 있는 일지가 몇 회차 수업인지(수업 시간 기준)에 맞는 체크콜 기록을 불러와요
+  var _stu=(typeof students!=='undefined'&&students||[]).find(function(z){return z.id===sid;});
+  var _ss=_ccSess(_stu,dt,window._currentSessionTime||''),_k=_ccKey(sid,_ss);
+  if(dt===_bcDate&&window._ccLogs&&window._ccLogs[_k])apply(window._ccLogs[_k]);
+  else if(dt!==_bcDate)db.collection('checkLogs').doc(_ccDocId(dt,sid,_ss)).get().then(function(d){if(d.exists)apply(d.data());}).catch(function(){});
 }
 (function(){
   var _orig=window.startReport;
@@ -15679,118 +15740,40 @@ var _TODAY_FOCUS_OPTIONS=['집중 업무','일반 업무','짧은 업무'];
 var _TODAY_FOCUS_COLORS={'집중 업무':'#7c3aed','일반 업무':'#2563eb','짧은 업무':'#6b7280'};
 var _TODAY_FOCUS_BG={'집중 업무':'#f5f3ff','일반 업무':'#eff6ff','짧은 업무':'#f8fafc'};
 
-
-// ── 사이드바 로고: 원장님(계정)마다 개별 설정 ──────────────────
-var _SB_LOGO_LS='sb_logo_v1_';
-function _sbLogoKey(){return _SB_LOGO_LS+((currentUser&&(currentUser.docId||currentUser.loginId))||'guest');}
-function _getSbLogo(){
-  if(currentUser&&currentUser.sbLogo)return currentUser.sbLogo;
-  try{return localStorage.getItem(_sbLogoKey())||'';}catch(e){return '';}
-}
-function applySbLogo(){
-  var el=document.getElementById('sb-logo');if(!el)return;
-  var url=_getSbLogo();
-  if(url){
-    el.innerHTML='';
-    var img=document.createElement('img');img.src=url;img.alt='logo';
-    el.appendChild(img);
-  }else{
-    el.innerHTML='<span>english<em>eye</em></span>';
-  }
-}
-async function _saveSbLogo(url){
-  if(currentUser)currentUser.sbLogo=url||'';
-  try{if(url)localStorage.setItem(_sbLogoKey(),url);else localStorage.removeItem(_sbLogoKey());}catch(e){}
-  if(currentUser&&currentUser.docId){
-    try{await db.collection('users').doc(currentUser.docId).update({sbLogo:url||''});}
-    catch(e){toast('⚠️ 서버 저장 실패 — 이 기기에만 저장됐어요');}
-  }
-  applySbLogo();
-}
-function openSbLogoModal(){
-  var old=document.getElementById('sb-logo-modal');if(old)old.remove();
-  var modal=document.createElement('div');
-  modal.id='sb-logo-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.onclick=function(e){if(e.target===modal)modal.remove();};
-  var box=document.createElement('div');
-  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:340px';
-  var cur=_getSbLogo();
-  box.innerHTML='<div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:4px">🖼 내 로고 설정</div>'
-    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:12px">사이드바 맨 위 로고를 계정(원장님)별로 따로 지정할 수 있어요.<br>가로로 긴 PNG/JPG 이미지를 권장합니다.</div>'
-    +'<div style="background:#0b2c5c;border-radius:10px;padding:14px 16px;margin-bottom:14px;min-height:44px;display:flex;align-items:center">'
-    +(cur?'<img src="'+cur+'" style="max-height:40px;max-width:100%;object-fit:contain">':'<span style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.5px">english<em style="color:var(--mint);font-style:normal">eye</em></span>')
-    +'</div>'
-    +'<div style="display:flex;gap:8px">'
-    +'<label class="btn btn-navy btn-sm" style="flex:1;text-align:center;cursor:pointer">이미지 선택<input type="file" accept="image/*" style="display:none" onchange="sbLogoPick(this)"></label>'
-    +'<button class="btn btn-outline btn-sm" style="flex:1" onclick="sbLogoReset()">기본 로고로</button>'
-    +'</div>';
-  modal.appendChild(box);
-  document.body.appendChild(modal);
-}
-function sbLogoPick(inp){
-  var f=inp.files&&inp.files[0];if(!f)return;
-  var rd=new FileReader();
-  rd.onload=function(){
-    var img=new Image();
-    img.onload=async function(){
-      var w=img.width,h=img.height,max=400,sc=Math.min(1,max/Math.max(w,h));
-      var cv=document.createElement('canvas');cv.width=Math.round(w*sc);cv.height=Math.round(h*sc);
-      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-      var url=cv.toDataURL('image/png');
-      if(url.length>150000)url=cv.toDataURL('image/jpeg',0.85);
-      if(url.length>300000){toast('⚠️ 로고 파일이 너무 커요. 더 작은 이미지를 사용해 주세요');return;}
-      await _saveSbLogo(url);
-      var m=document.getElementById('sb-logo-modal');if(m)m.remove();
-      toast('로고가 변경됐어요');
-    };
-    img.onerror=function(){toast('⚠️ 이미지를 읽을 수 없어요');};
-    img.src=rd.result;
-  };
-  rd.readAsDataURL(f);
-}
-async function sbLogoReset(){
-  await _saveSbLogo('');
-  var m=document.getElementById('sb-logo-modal');if(m)m.remove();
-  toast('기본 로고로 복원됐어요');
-}
-
 function _isOnTimeline(sh){
   // startHour가 실제 시간 숫자(0~24)인 경우만 타임라인에 배치된 것으로 판단
   return sh!==undefined&&sh!==null&&sh!==''&&sh!=='undefined'&&!isNaN(parseInt(sh));
 }
 // ── 오늘 수업 시간 기반 가용시간 계산 ──────────────────────
 var _AVAIL_KEY='tl_avail_override_v1';
+var _classMinCache={date:null,min:null};
 function _getTodayClassMinutes(){
-  // 학생별 오늘 요일의 수업(periods[요일]={period,time:'HH:MM',hours})을 모아 겹치는 시간은 한 번만 합산
+  var todayStr=todayISO();
+  if(_classMinCache.date===todayStr&&_classMinCache.min!==null)return _classMinCache.min;
   var DOW=['일','월','화','수','목','금','토'];
   var todayDow=DOW[new Date().getDay()];
-  var segs=[];
+  var activePeriodNums={};
   (students||[]).forEach(function(s){
     var st=s.status||'재원';
     if(st!=='재원'&&st!=='신규')return;
     if((s.days||[]).indexOf(todayDow)===-1)return;
     var pObj=(s.periods||{})[todayDow];
     if(!pObj)return;
-    var tm=String(pObj.time||'');
-    if(!tm){ // time이 없으면 교시 설정에서 찾기
-      var cp=(customPeriods||[]).find(function(c){return String(c.period)===String(pObj.period);});
-      tm=cp&&cp.time?String(cp.time):'';
-    }
-    var m=tm.match(/(\d+):(\d+)/);if(!m)return;
+    Object.keys(pObj).forEach(function(pNum){if(pObj[pNum])activePeriodNums[pNum]=true;});
+  });
+  var totalMin=0;
+  customPeriods.forEach(function(cp){
+    if(!activePeriodNums[String(cp.period)])return;
+    if(!cp.time)return;
+    var m=cp.time.match(/(\d+):(\d+)/);if(!m)return;
     var start=parseInt(m[1])*60+parseInt(m[2]);
-    var hrs=parseFloat(pObj.hours);if(isNaN(hrs)||hrs<=0)hrs=1;
-    segs.push([start,start+Math.round(hrs*60)]);
+    var end;
+    if(cp.endTime){var em=cp.endTime.match(/(\d+):(\d+)/);end=em?parseInt(em[1])*60+parseInt(em[2]):start+60;}
+    else{end=start+60;}
+    totalMin+=Math.max(0,end-start);
   });
-  segs.sort(function(a,b){return a[0]-b[0];});
-  var total=0,curS=null,curE=null;
-  segs.forEach(function(g){
-    if(curS===null){curS=g[0];curE=g[1];}
-    else if(g[0]<=curE){curE=Math.max(curE,g[1]);}
-    else{total+=curE-curS;curS=g[0];curE=g[1];}
-  });
-  if(curS!==null)total+=curE-curS;
-  return total;
+  _classMinCache={date:todayStr,min:totalMin};
+  return totalMin;
 }
 var _availMinCache={date:null,min:null};
 function _getTodayAvailMin(){
@@ -15800,19 +15783,19 @@ function _getTodayAvailMin(){
     var ov=JSON.parse(localStorage.getItem(_AVAIL_KEY)||'{}');
     if(ov.date===todayStr&&typeof ov.min==='number')return ov.min;
   }catch(e){}
-  // (캐시 제거: 학생/교시 데이터가 늦게 로드돼도 항상 최신 값으로 계산)
-  return Math.max(0,900-_getTodayClassMinutes());
+  // 캐시 확인
+  if(_availMinCache.date===todayStr&&_availMinCache.min!==null)return _availMinCache.min;
+  var classMin=_getTodayClassMinutes();
+  var result=Math.max(0,900-classMin);
+  _availMinCache={date:todayStr,min:result};
+  return result;
 }
 function _setTodayAvailMin(min){
   try{localStorage.setItem(_AVAIL_KEY,JSON.stringify({date:todayISO(),min:parseInt(min)}));}catch(e){}
 }
 function _parseDurationMin(str){
-  // '15분' / '1시간' / '1시간 30분' / '1.5시간' 모두 분 단위로 변환 (기존 parseInt는 '1시간 30분'→1로 잘못 계산했음)
   if(!str)return 0;
-  str=String(str);
-  var h=/(\d+(?:\.\d+)?)\s*시간/.exec(str),m=/(\d+)\s*분/.exec(str);
-  if(h||m)return Math.round((h?parseFloat(h[1])*60:0)+(m?parseInt(m[1]):0));
-  var n=parseInt(str);return isNaN(n)?0:n;
+  var m=parseInt(str);return isNaN(m)?0:m;
 }
 
 function _renderTodayCapacityBar(totalMin,scheduledMin){
