@@ -83,6 +83,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .nn.pl{width:clamp(92px,19vw,120px);font-size:clamp(16px,3.4vw,20px);font-weight:600;line-height:1;padding:0;box-sizing:border-box}
 .nn.pl::placeholder{font-size:clamp(16px,3.4vw,20px);font-weight:600;color:#8B8478;letter-spacing:-.02em}
 .dt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.sw{display:inline-flex;gap:6px}.sw button{font-size:clamp(13px,2.8vw,15px);font-weight:700;padding:4px 12px;border-radius:999px;border:2px solid #A59E8E;background:#fff;color:#4A4F5E}.sw button.on{background:#1F2433;border-color:#1F2433;color:#fff}
 .lv{display:inline-flex;max-width:100%;padding:3px 12px;border-radius:999px;background:#1F2433;color:#fff;font-size:clamp(13px,2.8vw,16px);font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nu{display:flex;align-items:center;gap:8px;font-size:clamp(16px,3.4vw,20px);font-weight:600}
 .cbtn{display:flex;align-items:center;width:100%;min-height:clamp(68px,13vw,84px);border-radius:20px;background:#E4572E;color:#fff;font-size:clamp(19px,4.2vw,24px);font-weight:900;padding:0 clamp(16px,3vw,26px);margin:6px 0 14px;text-align:left;letter-spacing:-.03em;gap:12px}
@@ -179,7 +180,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
   <div class="wrap">
     <div id="snd" style="display:none;margin:0 0 10px;padding:9px 14px;border-radius:12px;background:#FFF1D6;color:#7A4B00;font-size:14px;font-weight:700;text-align:center">소리가 꺼져 있어요. 화면을 한 번 터치하면 벨 소리가 켜져요</div>
     <div class="top">
-      <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span></div></div>
+      <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span><span class="sw" id="hSess" style="display:none"></span></div></div>
       <button class="out" onclick="logout()">나가기</button>
     </div>
     <div class="tbar"><span>시작 <b id="tStart">--:--</b></span><div class="tr"><i id="tFill"></i></div><span>끝 <b id="tEnd">--:--</b></span></div>
@@ -391,7 +392,9 @@ async function tryLogin(){
   busy=true;$('err').textContent='';
   try{
     var snap=await db.collection('checkRoster').where('pin','==',pin).get();
-    if(snap.empty){fail('없는 번호예요. 다시 눌러 주세요');return;}
+    if(snap.empty){
+      var cnt='';try{var all=await db.collection('checkRoster').get();cnt=' (명단 '+all.size+'명)';}catch(e2){cnt=' (명단을 읽지 못했어요)';}
+      fail('없는 번호예요. 다시 눌러 주세요'+cnt);return;}
     var d=snap.docs[0];
     startSession(d.id,d.data());
   }catch(e){console.error(e);fail('연결이 불안정해요. 잠시 후 다시 눌러 주세요');}
@@ -413,13 +416,41 @@ async function resume(sid){
 var LOG={e:{},v:{}},unsubLog=null,curSec=0,tickT=null,saveT={};
 function hm(ms){var d=new Date(ms),p=function(n){return String(n).padStart(2,'0');};return p(d.getHours())+':'+p(d.getMinutes());}
 function dateLabel(){var d=new Date(),w=['일','월','화','수','목','금','토'];return (d.getMonth()+1)+'월 '+d.getDate()+'일 · '+w[d.getDay()]+'요일';}
-function logRef(){return db.collection('checkLogs').doc(S.date+'_'+S.sid);}
+function logRef(){return db.collection('checkLogs').doc(S.date+'_'+S.sid+(S.sess===2?'_2':''));}
+function sessBase(){return S.date+'_'+S.sid+(S.sess===2?'_2':'');}
+var DN=['일','월','화','수','목','금','토'];
+function tmin(t){var m=String(t||'').match(/(\d{1,2}):(\d{2})/);return m?parseInt(m[1])*60+parseInt(m[2]):-1;}
+// 하루에 수업이 두 번(특강)인 학생은 몇 회차인지 정해요: 직접 고른 값 > 1회차를 모두 마쳤으면 2회차 > 2회차 수업 30분 전부터 2회차
+async function pickSess(sid,data){
+  var ses=data.ses&&data.ses[DN[new Date().getDay()]];
+  if(!ses||ses.length<2)return 1;
+  try{var sv=JSON.parse(localStorage.getItem('cc_sess'));if(sv&&sv.d===todayISO()&&sv.s===sid&&(sv.n===1||sv.n===2))return sv.n;}catch(e){}
+  try{var l1=await db.collection('checkLogs').doc(todayISO()+'_'+sid).get();if(l1.exists&&l1.data().fin)return 2;}catch(e){}
+  var n=new Date(),nm=n.getHours()*60+n.getMinutes(),t2=tmin(ses[1]);
+  return (t2>=0&&nm>=t2-30)?2:1;
+}
+async function switchSess(n){
+  if(!S||S.sess===n||!S.data)return;
+  try{localStorage.setItem('cc_sess',JSON.stringify({d:S.date,s:S.sid,n:n}));}catch(e){}
+  if(!LOG.endAt){try{await logRef().set({endAt:Date.now()},{merge:true});}catch(e){}}
+  var sid=S.sid,data=S.data;
+  closeSessListeners();
+  openSession(sid,data,n);
+}
+function closeSessListeners(){
+  if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}
+  clearInterval(tickT);stopRing();$('call').classList.remove('on');
+}
 function normTpl(t){
   var src=(t&&t.sections&&t.sections.length)?t:CC_DEFAULT_TEMPLATE;
   return src.sections.map(function(sec){return {title:sec.title||'',grp:sec.grp||'',items:(sec.items||[]).filter(function(i){return i&&i.l&&i.l!=='받아쓰기 검사 받기';})};}).filter(function(s){return s.items.length;});
 }
-function startSession(sid,data){
-  S={sid:sid,name:data.name,plan:data.plan||null,lvl:data.lvl||data.level||'',fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
+async function startSession(sid,data){
+  var n=await pickSess(sid,data);
+  openSession(sid,data,n);
+}
+function openSession(sid,data,sess){
+  S={sid:sid,data:data,sess:sess,ses:(data.ses&&data.ses[DN[new Date().getDay()]])||null,name:data.name,plan:data.plan||null,lvl:data.lvl||data.level||'',fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
   try{localStorage.setItem('cc_sid',sid);}catch(e){}
   shownCall={};checks={};LOG={e:{},v:{}};curSec=0;
   $('hName').textContent=S.name;$('hDate').textContent=dateLabel();
@@ -427,7 +458,7 @@ function startSession(sid,data){
   if(unsub)unsub();if(unsubLog)unsubLog();
   unsub=db.collection('bookChecks').where('studentId','==',sid).where('date','==',S.date).onSnapshot(function(snap){
     if(!S)return;checks={};
-    snap.forEach(function(d){var x=d.data();x.id=d.id;checks[x.item]=x;});
+    snap.forEach(function(d){var x=d.data();x.id=d.id;if(x.kind!=='ask'&&(x.sess===2?2:1)!==S.sess)return;checks[x.item]=x;});
     S.gotChk=true;render();
   },function(e){console.error(e);toast('연결이 끊겼어요. 잠시만 기다려 주세요');});
   unsubLog=logRef().onSnapshot(function(d){
@@ -436,6 +467,7 @@ function startSession(sid,data){
   // 시작 시간 = 오늘 처음 로그인한 순간 (이미 있으면 유지), 끝 시간은 다시 비움
   logRef().get().then(function(snap){
     var u={date:S.date,studentId:sid,studentName:S.name,endAt:firebase.firestore.FieldValue.delete()};
+    if(S.sess===2)u.sess=2;
     if(!snap.exists||!snap.data().startAt)u.startAt=Date.now();
     return logRef().set(u,{merge:true});
   }).catch(function(e){console.warn(e);});
@@ -448,7 +480,7 @@ function logout(){
   if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}
   clearInterval(tickT);
   S=null;checks={};LOG={e:{},v:{}};stopRing();$('call').classList.remove('on');
-  try{localStorage.removeItem('cc_sid');}catch(e){}
+  try{localStorage.removeItem('cc_sid');localStorage.removeItem('cc_sess');}catch(e){}
   pin='';paintDots();$('err').textContent='';
   show('sLogin');
 }
@@ -484,6 +516,7 @@ function calcJ(){
 function commit(ePatch,vPatch){
   // 주의: set(merge) 에서 빈 객체({})는 기존 map 을 통째로 덮어써요 → 바뀐 항목이 있을 때만 e / v 를 보냅니다
   var del=firebase.firestore.FieldValue.delete(),u={date:S.date,studentId:S.sid,studentName:S.name},ue={},uv={};
+  if(S.sess===2)u.sess=2;
   Object.keys(ePatch||{}).forEach(function(k){if(ePatch[k]){LOG.e[k]=ePatch[k];ue[k]=ePatch[k];}else{delete LOG.e[k];ue[k]=del;}});
   Object.keys(vPatch||{}).forEach(function(k){var x=vPatch[k];if(x===null){delete LOG.v[k];uv[k]=del;}else{LOG.v[k]=x;uv[k]=x;}});
   if(Object.keys(ue).length)u.e=ue;
@@ -512,7 +545,7 @@ function render(){
   S.secs.forEach(function(sec,i){
     var p=secProg(sec),cls='tab'+(secOk(sec)?' ok':'')+(i===curSec?' cur':'')+(i===nextIdx?' next':'');
     var mk='';sec.items.forEach(function(it){if(it.t!=='call')return;var c=checks[it.l];if(c&&c.status==='called')mk='go';else if(c&&c.status==='waiting'&&mk!=='go')mk='wt';});
-    tb+='<button class="'+cls+'" onclick="goSec('+i+')"><span>'+esc(sec.title)+'</span><small>'+p.d+'/'+p.n+(mk==='go'?' · 📢 선생님이 불러요':mk==='wt'?' · ⏳ 기다리는 중':'')+'</small></button>';
+    tb+='<button class="'+cls+'" onclick="goSec('+i+')"><span>'+esc(sec.title)+'</span><small>'+p.d+'/'+p.n+(mk==='wt'?' · ⏳ 기다리는 중':'')+'</small></button>';
   });
   $('tabs').innerHTML=tb;paintAsk();
   // 항목
@@ -587,6 +620,14 @@ function itemHtml(it,si,ii){
 }
 function paintBar(){
   if(!S)return;
+  var sw=$('hSess');
+  if(sw){
+    if(S.ses&&S.ses.length>=2){
+      var shs='';[1,2].forEach(function(k){shs+='<button class="'+(S.sess===k?'on':'')+'" onclick="switchSess('+k+')">'+k+'회차 '+esc(S.ses[k-1])+'</button>';});
+      if(sw.dataset.h!==shs+S.sess){sw.innerHTML=shs;sw.dataset.h=shs+S.sess;}
+      sw.style.display='inline-flex';
+    }else{sw.style.display='none';sw.dataset.h='';}
+  }
   var lv=[LOG.lv,LOG.pg].filter(function(x){return x&&String(x).trim();}).join(' · '),el=$('hLv');
   if(el){el.textContent=lv;el.style.display=lv?'inline-flex':'none';}
   var st=LOG.startAt,en=LOG.endAt;
@@ -655,7 +696,8 @@ function dictIn(el,now){
 }
 function finishAll(){
   $('dName').textContent=S.name+', 수고했어요';
-  if(!LOG.endAt){LOG.endAt=Date.now();try{logRef().set({endAt:LOG.endAt},{merge:true});}catch(e){}}
+  if(!LOG.endAt){LOG.endAt=Date.now();}
+  try{logRef().set({endAt:LOG.endAt,fin:true},{merge:true});}catch(e){}   // fin: 이 회차 점검을 모두 마침
   show('sDone');
 }
 
@@ -664,9 +706,11 @@ async function request(si,ii){
   initAudio();
   var sec=S.secs[si],it=sec.items[ii],c=checks[it.l];
   if(c&&c.status!=='none')return;
-  var ref=db.collection('bookChecks').doc(S.date+'_'+S.sid+'_'+safeId(it.l));
+  var ref=db.collection('bookChecks').doc(sessBase()+'_'+safeId(it.l));
   try{
-    await ref.set({date:S.date,studentId:S.sid,studentName:S.name,item:it.l,callTo:it.to==='book'?'book':'tablet',section:sec.title,status:'waiting',requestedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    var rq={date:S.date,studentId:S.sid,studentName:S.name,item:it.l,callTo:it.to==='book'?'book':'tablet',section:sec.title,status:'waiting',requestedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    if(S.sess===2)rq.sess=2;
+    await ref.set(rq);
     toast('선생님을 불렀어요');
   }catch(e){console.error(e);toast('보내지 못했어요. 다시 눌러 주세요');}
 }
