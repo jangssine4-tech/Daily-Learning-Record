@@ -1424,6 +1424,19 @@ function saveStorageBucket(){
 }
 
 function getCfg(){try{return JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){return null;}}
+// ── 비밀번호 암호화(SHA-256 + 사람마다 다른 salt). 기존 평문 비밀번호는 로그인할 때 자동으로 바뀌어요 ──
+async function _pwHash(pw,salt){
+  var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));
+  return Array.from(new Uint8Array(b)).map(function(x){return ('0'+x.toString(16)).slice(-2);}).join('');
+}
+async function _pwMake(pw){
+  try{var a=new Uint8Array(16);crypto.getRandomValues(a);var salt=Array.from(a).map(function(x){return ('0'+x.toString(16)).slice(-2);}).join('');return {pwSalt:salt,pwHash:await _pwHash(pw,salt)};}
+  catch(e){return null;}
+}
+async function _pwCheck(u,pw){
+  if(u.pwHash&&u.pwSalt){try{return (await _pwHash(pw,u.pwSalt))===u.pwHash;}catch(e){return false;}}
+  return u.password===pw||String(u.password||'').trim()===pw.trim();
+}
 // ── 로그인 유지: 화면을 떠난 지 1시간이 안 되면 로그인 상태 유지, 1시간 이상이면 자동 로그아웃 ──
 var _SESS_KEY='academy_login',_SESS_TTL=60*60*1000,_sessLast=0;
 function _sessSave(){
@@ -1495,10 +1508,15 @@ async function login(){
     }
     if(!cand.length){toast('❌ 아이디를 찾을 수 없어요 ('+id+')');$('login-screen').style.display='flex';hideBootOverlay();return;}
     // 같은 아이디 계정이 여러 개여도 비밀번호가 맞는 계정으로 로그인
-    var hit=cand.find(function(d){return d.data().password===pw;})||cand.find(function(d){return String(d.data().password||'').trim()===pw.trim();});
+    var hit=null;
+    for(var ci=0;ci<cand.length&&!hit;ci++){if(await _pwCheck(cand[ci].data(),pw))hit=cand[ci];}
     if(!hit){toast('❌ 비밀번호가 맞지 않아요'+(cand.length>1?' (같은 아이디 계정이 '+cand.length+'개 있어요 — 관리자 페이지에서 중복 계정을 정리해 주세요)':''));$('login-screen').style.display='flex';hideBootOverlay();return;}
     var u=hit.data();
-    currentUser={...u,docId:hit.id};_sessSave();
+    if(u.password&&!u.pwHash){   // 예전 평문 비밀번호 → 암호화해서 저장하고 평문은 지워요
+      try{var pm=await _pwMake(pw);if(pm){await db.collection('users').doc(hit.id).update({pwSalt:pm.pwSalt,pwHash:pm.pwHash,password:firebase.firestore.FieldValue.delete()});}}catch(e){console.warn('비밀번호 암호화 실패',e);}
+    }
+    currentUser={...u,docId:hit.id};
+    delete currentUser.password;delete currentUser.pwHash;delete currentUser.pwSalt;_sessSave();
     bootProgress(20, '데이터 로딩...');
     await yield_();
     await bootApp();
@@ -23000,13 +23018,15 @@ async function saveUser(){
   loading(true);
   var data={name:name,engName:$('u-engname').value.trim(),role:$('u-role').value,loginId:loginId,phone:$('u-phone').value.trim(),address:$('u-address').value.trim(),startDate:$('u-startdate').value||null,endDate:$('u-enddate').value||null,updatedAt:new Date().toISOString()};
   var ssnVal=$('u-ssn').value;if(ssnVal&&ssnVal!=='******'){data.ssn=btoa(ssnVal);}
-  var pw=$('u-pw').value;if(pw)data.password=pw;
+  var pw=$('u-pw').value;
+  var _pm=pw?await _pwMake(pw):null;
+  if(pw){if(_pm){data.pwSalt=_pm.pwSalt;data.pwHash=_pm.pwHash;data.password=firebase.firestore.FieldValue.delete();}else data.password=pw;}
   var id=$('u-id-key').value;
   // 이름 변경 감지 — 기존 이름 저장
   var oldName='';
   if(id){var existingU=users.find(function(x){return x.id===id;});if(existingU)oldName=existingU.name||'';}
   if(id)await db.collection('users').doc(id).update(data);
-  else{data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}
+  else{var _pm2=pw?_pm:await _pwMake('1234');if(_pm2){data.pwSalt=_pm2.pwSalt;data.pwHash=_pm2.pwHash;delete data.password;}else data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}
   // 이름이 바뀐 경우 학사일정 담당자 일괄 업데이트
   if(id&&oldName&&oldName!==name){
     await _syncManagerNameInAcal(oldName,name);
