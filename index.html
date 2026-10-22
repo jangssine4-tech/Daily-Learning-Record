@@ -506,7 +506,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   </div>
 </div>
 <div class="view" id="view-students"><div class="page-top"><h2>학생 정보</h2></div>
-  <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-year" onchange="renderStudents()"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-month" onchange="renderStudents()"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-status" onchange="renderStudents()"><option value="">전체</option><option value="재원">재원생</option><option value="신규">신규</option><option value="휴원">휴원</option><option value="퇴원">퇴원</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-cls" onchange="renderStudents()"><option value="">전체 모듈</option></select><input class="fi" style="flex:1;max-width:200px;font-size:12px;padding:6px 10px" id="s-search" placeholder="🔍 이름 검색" oninput="renderStudents()"><button class="btn btn-green btn-sm" onclick="openStudentModal()">+ 학생 등록</button></div>
+  <div class="toolbar"><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-year" onchange="renderStudents()"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-month" onchange="renderStudents()"></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-status" onchange="renderStudents()"><option value="">전체</option><option value="재원">재원생</option><option value="신규">신규</option><option value="휴원">휴원</option><option value="퇴원">퇴원</option></select><select class="fi" style="width:auto;font-size:12px;padding:6px 24px 6px 9px" id="s-filter-cls" onchange="renderStudents()"><option value="">전체 모듈</option></select><input class="fi" style="flex:1;max-width:200px;font-size:12px;padding:6px 10px" id="s-search" placeholder="🔍 이름 검색" oninput="renderStudents()"><button class="btn btn-green btn-sm" onclick="openStudentModal()">+ 학생 등록</button><span class="gtip-h" data-help="stuReg" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-left:6px;border-radius:50%;background:#e2e8f0;color:#475569;font-size:12px;font-weight:800;cursor:help">?</span></div>
   <div class="cp"><div class="card" style="overflow:hidden"><div class="tw"><table class="tbl"><thead><tr><th style="text-align:center">번호</th><th style="text-align:center">상태</th><th style="text-align:center">ID</th><th style="text-align:center">이름</th><th style="text-align:center">할인</th><th style="text-align:center">학년</th><th style="text-align:center">클래스</th><th style="text-align:center">단계</th><th style="text-align:center">월 수업 시수</th><th style="text-align:center">수업 요일 및 시수</th><th style="text-align:center">연락처</th><th style="text-align:center">관리</th></tr></thead><tbody id="students-tbody"></tbody></table></div></div></div></div>
 <div class="view" id="view-special"><div class="page-top"><h2>특강</h2></div>
   <div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex">
@@ -1294,9 +1294,22 @@ function _gtipAttr(names,label){
   var tip=null;
   function hide(){if(tip)tip.classList.remove('on');}
   document.addEventListener('mouseover',function(e){
-    var c=e.target.closest&&e.target.closest('.gtip-c');
+    var c=e.target.closest&&e.target.closest('.gtip-c,.gtip-h');
     if(!c){hide();return;}
     if(!tip){tip=document.createElement('div');tip.id='gtip';document.body.appendChild(tip);}
+    if(c.classList.contains('gtip-h')){
+      tip.style.width='330px';
+      tip.innerHTML='<div class="gt-h"><span class="gt-ic" style="background:#2563eb">i</span>학생 등록은 이렇게 연동돼요</div>'
+        +'<div class="gt-d"><b>신규 상담</b>에서 상태를 <b>등록 완료</b>로 저장하면 학생 정보가 자동으로 만들어집니다.</div>'
+        +'<div class="gt-s">자동으로 들어가는 내용</div><ul>'
+        +'<li><b>수업 요일 · 교시 · 시작 시간 · 수업시수</b></li>'
+        +'<li>이름, 학년, 성별, 생일, 학교, 주소</li>'
+        +'<li>학부모·학생 연락처, 이메일</li>'
+        +'<li>레벨, 유입 경로, 메모, 등록일</li></ul>'
+        +'<div class="gt-w">⚠ 팝업에서 “학생 자동 생성”을 눌러야 해요. “나중에”를 누르면 만들어지지 않아요.</div>'
+        +'<div class="gt-w" style="margin-top:6px">반(클래스)은 비어 있으니 직접 지정하세요. 한 번 만든 뒤 상담을 고쳐도 학생 정보는 바뀌지 않아요.</div>';
+    }else{
+    tip.style.width='';
     var SUF='(퇴원일 없음→수정일 기준)',warn=false;
     var names=c.getAttribute('data-tip').split(', ').map(function(n){if(n.indexOf(SUF)>=0){warn=true;return n.replace(SUF,'')+' *';}return n;});
     var lb=c.getAttribute('data-tl'),isNew=lb==='신규';
@@ -1304,6 +1317,7 @@ function _gtipAttr(names,label){
       +'<div class="gt-d">'+(isNew?'이번 달 새로 등록한 학생입니다.':'이번 달 퇴원 처리된 학생입니다.')+'</div>'
       +'<div class="gt-s">해당 학생</div><ul>'+names.map(function(n){return '<li><b>'+n+'</b></li>';}).join('')+'</ul>'
       +(warn?'<div class="gt-w">⚠ * 표시는 퇴원일이 없어 수정일 기준이에요</div>':'');
+    }
     tip.classList.remove('dn');
     var r=c.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
     var x=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2));
@@ -1641,7 +1655,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1022-e';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1022-f';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -7485,7 +7499,7 @@ function renderSchedule(){
         var isBook=(window._cardBadges||{})['bk_'+s.id];
         var _mkBadge=s._isMakeup?(s._makeupDone?'<span style="color:#16a34a;font-size:10px;font-weight:700;background:#f0fdf4;padding:1px 6px;border-radius:8px;border:1px solid #bbf7d0">보강완료</span>':'<span style="color:#e74c3c;font-size:10px;font-weight:700;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>'):'';
         var _timeLabel=pTime2||'';
-        html+='<div class="s-card-name" data-student-id="'+s.id+'">'+(isNew?'<span title="신규 원생 (1개월간 표시)" style="position:absolute;top:-6px;left:-6px;background:#ec4899;color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:8px;border:2px solid #fff;line-height:1.3;z-index:2">신규</span>':'')+s.name+(_timeLabel?'<span style="font-size:9px;font-weight:600;color:var(--txt3);margin-left:5px;background:var(--surface2);padding:1px 5px;border-radius:6px">'+_timeLabel+'</span>':'')
+        html+='<div class="s-card-name" data-student-id="'+s.id+'">'+(isNew?'<span title="신규 원생 (1개월간 표시)" style="position:absolute;top:-6px;left:-6px;font-size:15px;line-height:1;z-index:2;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))">💗</span>':'')+s.name+(_timeLabel?'<span style="font-size:9px;font-weight:600;color:var(--txt3);margin-left:5px;background:var(--surface2);padding:1px 5px;border-radius:6px">'+_timeLabel+'</span>':'')
           +(s._isSpecialClass?'<span style="position:absolute;top:-5px;right:-5px;width:24px;height:24px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2" title="특강">특</span>':'')
           +_mkBadge
           +'<span style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')">관찰</span>'
