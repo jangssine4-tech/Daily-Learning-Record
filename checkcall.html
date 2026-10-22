@@ -588,6 +588,7 @@ function render(){
     var c=checks[k];if(c.status!=='called')return;
     anyCall=anyCall||c;
     var st=c.calledAt&&c.calledAt.toMillis?c.calledAt.toMillis():0;
+    if(c.kind!=='ask'&&c.callTo!=='book'){if(st)shownCall[c.id]=st;return;}   // 태블릿 선생님은 직접 학생에게 가므로 알림이 필요 없어요
     if(st&&shownCall[c.id]!==st&&!newCall)newCall=c;   // 여러 검사가 동시에 호출돼도 하나씩 모두 알려 줘요
   });
   if(newCall){shownCall[newCall.id]=newCall.calledAt.toMillis();openCall(newCall);}
@@ -608,8 +609,8 @@ function applySecs(){
       var its=secs[si].items,ix=-1;
       for(var ii=0;ii<its.length;ii++){if(its[ii].t==='call'&&its[ii].l===x.after)ix=ii;}
       if(ix<0)continue;
-      var at=(last[x.after]!==undefined)?last[x.after]:ix;
-      its.splice(at+1,0,{id:k,t:'check',l:x.l});last[x.after]=at+1;break;
+      var at=(last[x.after]!==undefined)?last[x.after]+1:ix;   // 검사 받기 버튼 바로 위에 들어가요 (여러 개면 먼저 만든 것이 위)
+      its.splice(at,0,{id:k,t:'check',l:x.l});last[x.after]=at;break;
     }
   });
   // Daily Quiz 100점이면 오답 노트 항목은 자동으로 사라져요
@@ -639,7 +640,7 @@ function itemHtml(it,si,ii){
   // call: 검사 받기
   var c=checks[it.l],st=c?c.status:'none',cls='cbtn',small='',cancel='',dis='';
   if(st==='waiting'){cls+=' wait';small='선생님을 호출 중';cancel='<span class="cx" role="button" onclick="event.stopPropagation();cancelReq('+si+','+ii+')">취소</span>';}
-  else if(st==='called'){cls+=' call';small=esc(c.calledBy||'선생님')+' 선생님께 가세요';dis=' disabled';}
+  else if(st==='called'){cls+=' call';small=(c.callTo==='book')?esc(c.calledBy||'선생님')+' 선생님께 가세요':'선생님이 곧 가요';dis=' disabled';}
   else if(st==='done'){cls+=' done';small='검사 끝'+(c.doneAt&&c.doneAt.toMillis?' · '+hm(c.doneAt.toMillis()):'');dis=' disabled';}
   return '<button class="'+cls+'"'+dis+' onclick="request('+si+','+ii+')"><span>'+esc(it.l)+'</span><small>'+small+'</small>'+cancel+'</button>';
 }
@@ -789,8 +790,8 @@ function openCall(c){
   $('callItem').textContent=String(c.item).replace(/\s*받기/,'');}
   $('callChip').style.setProperty('--c','#7CE3BD');
   $('call').classList.add('on');
-  stopRing();ding();ringTimers.push(setTimeout(ding,1500));   // 벨 총 2번
-  if(!window._curAskId)ringTimers.push(setTimeout(closeCall,4800));   // 호출은 벨이 끝나면 저절로 닫혀요 (허락 알림은 확인을 눌러야 닫혀요)
+  stopRing();ding();   // 벨은 한 번만
+  if(!window._curAskId)ringTimers.push(setTimeout(closeCall,3500));   // 호출은 벨이 끝나면 저절로 닫혀요 (허락 알림은 확인을 눌러야 닫혀요)
   db.collection('bookChecks').doc(c.id).update({ackAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});  // 선생님 화면에 '표시됨'
 }
 function stopRing(){ringTimers.forEach(clearTimeout);ringTimers=[];}
