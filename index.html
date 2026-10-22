@@ -1283,6 +1283,34 @@ function getStudentLevelAtMonth(s,yr,mo){
   return matched?(matched.customLevel||matched.level||''):getStudentLevel(s);
 }
 // 학생의 "수업 시작 기준일": 수업 시작일이 입력돼 있으면 그 값을, 없으면 등록일을 사용(과거 데이터 호환).
+function _gtipAttr(names,label){
+  if(!names)return '';
+  return 'class="gtip-c" data-tip="'+String(names).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')+'" data-tl="'+label+'"';
+}
+(function(){
+  var st=document.createElement('style');
+  st.textContent='#gtip{position:fixed;z-index:99999;max-width:260px;background:#1e293b;color:#fff;font-size:12px;line-height:1.5;padding:9px 12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}#gtip.on{opacity:1;transform:none}#gtip:after{content:"";position:absolute;left:var(--ax,50%);bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#1e293b}#gtip.dn:after{bottom:auto;top:-6px;border-top:0;border-bottom:6px solid #1e293b;border-top-color:transparent}#gtip b{display:block;font-size:11px;color:#94a3b8;margin-bottom:3px}#gtip span{display:inline-block;background:rgba(255,255,255,.14);border-radius:10px;padding:1px 8px;margin:2px 3px 2px 0}.gtip-c{cursor:help}';
+  document.head.appendChild(st);
+  var tip=null;
+  function hide(){if(tip)tip.classList.remove('on');}
+  document.addEventListener('mouseover',function(e){
+    var c=e.target.closest&&e.target.closest('.gtip-c');
+    if(!c){hide();return;}
+    if(!tip){tip=document.createElement('div');tip.id='gtip';document.body.appendChild(tip);}
+    var names=c.getAttribute('data-tip').split(', ');
+    tip.innerHTML='<b>'+c.getAttribute('data-tl')+' '+names.length+'명</b>'+names.map(function(n){return '<span>'+n+'</span>';}).join('');
+    tip.classList.remove('dn');
+    var r=c.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
+    var x=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2));
+    var y=r.top-h-10,dn=false;
+    if(y<8){y=r.bottom+10;dn=true;}
+    tip.style.left=x+'px';tip.style.top=y+'px';
+    tip.style.setProperty('--ax',(r.left+r.width/2-x)+'px');
+    if(dn)tip.classList.add('dn');
+    tip.classList.add('on');
+  });
+  window.addEventListener('scroll',hide,true);
+})();
 function getStudentEffectiveStartDate(s){
   if(!s)return '';
   return s.classStartDate||s.enrollDate||'';
@@ -1608,7 +1636,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1022-c';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1022-d';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3677,15 +3705,19 @@ function startPeriodicSync(){
     syncFromFirestore();
   },30000);
 }
+// ── 신규 상태: 수업 시작(없으면 등록/생성)일로부터 1개월(30일) 유지 ──
+function _newDaysLeft(s){
+  var ed=getStudentEffectiveStartDate(s)||s.startDate||(s.createdAt?String(s.createdAt).slice(0,10):'');
+  if(!ed)return 30;
+  var d=new Date(ed);if(isNaN(d))return 30;
+  var t=new Date();t.setHours(0,0,0,0);d.setHours(0,0,0,0);
+  return 30-Math.floor((t-d)/86400000);
+}
 // ── Auto: 신규 → 재원 전환 ──
 async function autoConvertNewStudents(){
-  var now=new Date();var curYr=now.getFullYear();var curMo=now.getMonth()+1;
   var toUpdate=students.filter(function(s){
     if(s.status!=='신규')return false;
-    var ed=getStudentEffectiveStartDate(s);if(!ed)return false;
-    var d=new Date(ed);var eMo=d.getMonth()+1;var eYr=d.getFullYear();
-    // 수업 시작월(없으면 등록월)이 지난 달이면 재원으로 전환
-    return eYr<curYr||(eYr===curYr&&eMo<curMo);
+    return _newDaysLeft(s)<=0;
   });
   if(!toUpdate.length)return;
   for(var i=0;i<toUpdate.length;i++){
@@ -7434,12 +7466,12 @@ function renderSchedule(){
         // Auto PM conversion + range time display fix
         if(pTime3)pTime3=_fmt12hRange(pTime3);
         var dispTime=pTime3;
-        var isNew=(s.status||'재원')==='신규';
+        var isNew=(s.status||'재원')==='신규'&&_newDaysLeft(s)>0;
         var _cardLevel=(rep&&rep.level)?rep.level:getStudentLevel(s);var isJoy=(_cardLevel||'').toLowerCase().startsWith('joy');
         var isObserved=(window._cardBadges||{})['obs_'+s.id];
         var cardCls='s-card';
         if(done)cardCls+=' done';else if(absent)cardCls+=' absent';else if(early)cardCls+=' early';
-        if(isNew||isObserved)cardCls+=' observed';
+        if(isObserved)cardCls+=' observed';
         html+='<div class="'+cardCls+'" style="position:relative">';
         // Action/Pin 메모 블록 (출석 버튼 아래 표시, 실행 메모 우선)
         var aMemos=actionMemoMap[s.id]||[];
@@ -7448,7 +7480,7 @@ function renderSchedule(){
         var isBook=(window._cardBadges||{})['bk_'+s.id];
         var _mkBadge=s._isMakeup?(s._makeupDone?'<span style="color:#16a34a;font-size:10px;font-weight:700;background:#f0fdf4;padding:1px 6px;border-radius:8px;border:1px solid #bbf7d0">보강완료</span>':'<span style="color:#e74c3c;font-size:10px;font-weight:700;background:#fef2f2;padding:1px 6px;border-radius:8px;border:1px solid #fca5a5">보강</span>'):'';
         var _timeLabel=pTime2||'';
-        html+='<div class="s-card-name" data-student-id="'+s.id+'">'+s.name+(_timeLabel?'<span style="font-size:9px;font-weight:600;color:var(--txt3);margin-left:5px;background:var(--surface2);padding:1px 5px;border-radius:6px">'+_timeLabel+'</span>':'')
+        html+='<div class="s-card-name" data-student-id="'+s.id+'">'+(isNew?'<span title="신규 원생 (1개월간 표시)" style="position:absolute;top:-6px;left:-6px;background:#2563eb;color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:8px;border:2px solid #fff;line-height:1.3;z-index:2">신규</span>':'')+s.name+(_timeLabel?'<span style="font-size:9px;font-weight:600;color:var(--txt3);margin-left:5px;background:var(--surface2);padding:1px 5px;border-radius:6px">'+_timeLabel+'</span>':'')
           +(s._isSpecialClass?'<span style="position:absolute;top:-5px;right:-5px;width:24px;height:24px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2" title="특강">특</span>':'')
           +_mkBadge
           +'<span style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')">관찰</span>'
@@ -20795,8 +20827,8 @@ function renderRevGoals(yr,moSel){
       +'<td style="text-align:center;font-weight:'+fw+';'+(isThisMo?'background:#eff6ff':'')+'">'+(moPct!==null?'<span style="font-size:11px;font-weight:'+fw+';color:'+moColor+'">'+moPct+'%</span>':'-')+'</td>'
       +'<td style="text-align:center;color:var(--navy);font-weight:'+fw+';border-left:2px solid #CBD5E1;'+stuBg+'">'+activeDisp+'</td>'
       +'<td style="text-align:center;color:#d97706;font-weight:'+fw+';'+stuBg+'">'+(d.holdCnt>0?d.holdCnt+'명':'–')+'</td>'
-      +'<td title="'+(d.newNames||'').replace(/"/g,'&quot;')+'" style="text-align:center;color:#16a34a;font-weight:'+fw+';'+stuBg+'">'+(d.newStu>0?'+'+d.newStu:'–')+'</td>'
-      +'<td title="'+(d.outNames||'').replace(/"/g,'&quot;')+'" style="text-align:center;color:#dc2626;font-weight:'+fw+';'+stuBg+'">'+(d.outStu>0?'-'+d.outStu:'–')+'</td>'
+      +'<td '+_gtipAttr(d.newNames,'신규')+' style="text-align:center;color:#16a34a;font-weight:'+fw+';'+stuBg+'">'+(d.newStu>0?'+'+d.newStu:'–')+'</td>'
+      +'<td '+_gtipAttr(d.outNames,'퇴원')+' style="text-align:center;color:#dc2626;font-weight:'+fw+';'+stuBg+'">'+(d.outStu>0?'-'+d.outStu:'–')+'</td>'
       +'<td style="text-align:center;font-weight:'+fw+';color:'+(net>0?'#16a34a':net<0?'#dc2626':'var(--txt3)')+';'+stuBg+'">'+(net>0?'+':'')+net+'</td>'
       +'</tr>';
   });
