@@ -1654,7 +1654,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1023-a';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1023-b';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3504,7 +3504,7 @@ function _ccPlanDraw(){
     +'<span style="margin-left:8px">범위 적용:</span> <select class="fi" id="ccp-from" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> <span>의 설정을</span> <select class="fi" id="ccp-a" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> ~ <select class="fi" id="ccp-z" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> <span>에 적용</span> <button class="btn btn-outline btn-xs" onclick="_ccPlanRange()">적용</button>';
   document.getElementById('ccp-from').value=sel;document.getElementById('ccp-a').value=Math.min(sel+1,ls.length-1);document.getElementById('ccp-z').value=ls.length-1;
   var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:230px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
-  ls.forEach(function(n,i){h+='<th onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+'" style="position:sticky;top:0;z-index:2;cursor:pointer;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+'</th>';});
+  ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;"position:sticky;top:0;z-index:2;cursor:pointer;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
   b.rows.forEach(function(r,ri){
     h+='<tr><td style="position:sticky;left:0;z-index:1;background:#fff;padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3)">'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
@@ -3559,6 +3559,27 @@ function _ccLessonDel(){
   _ccShiftNotes(b,sel,-1);
   b.rows.forEach(function(r){r.c=r.c.slice(0,sel)+r.c.slice(sel+1);});
   _ccEd.sel=Math.max(0,sel-1);_ccMark();_ccPlanDraw();
+}
+// ── 레슨(열) 드래그로 순서 바꾸기 ──
+var _ccDragFrom=-1;
+function _ccDrag(e,i){_ccDragFrom=i;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(i));}catch(x){}}
+function _ccDragOver(e){if(_ccDragFrom<0)return;e.preventDefault();e.currentTarget.style.boxShadow='inset 3px 0 0 #2563eb';}
+function _ccDrop(e,to){
+  e.preventDefault();e.currentTarget.style.boxShadow='';
+  var from=_ccDragFrom;_ccDragFrom=-1;
+  if(from<0||from===to)return;
+  _ccLessonMove(from,to);
+}
+function _ccLessonMove(from,to){
+  var b=_ccWork().blocks[_ccEd.bi],n=b.lessons.length;
+  var order=[];for(var i=0;i<n;i++)order.push(i);   // order[새 위치]=원래 위치
+  order.splice(from,1);order.splice(to,0,from);
+  b.lessons=order.map(function(o){return b.lessons[o];});
+  b.rows.forEach(function(r){
+    r.c=order.map(function(o){return r.c.charAt(o);}).join('');
+    if(r.n){var nn={};order.forEach(function(o,ni){if(r.n[String(o)]!==undefined)nn[String(ni)]=r.n[String(o)];});r.n=nn;}
+  });
+  _ccEd.sel=to;_ccMark();_ccPlanDraw();toast('"'+b.lessons[to]+'" 레슨 순서를 바꿨어요. 저장하세요');
 }
 function _ccCopyCol(b,from,to){b.rows.forEach(function(r){r.c=r.c.slice(0,to)+r.c.charAt(from)+r.c.slice(to+1);});}
 function _ccPlanSame(){var b=_ccWork().blocks[_ccEd.bi],i=_ccEd.sel;if(i<1)return;_ccCopyCol(b,i-1,i);_ccMark();_ccPlanDraw();toast('이전 레슨과 같게 맞췄어요');}
