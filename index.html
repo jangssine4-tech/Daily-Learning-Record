@@ -12338,7 +12338,9 @@ function renderRevMonthly(yr,mo){
     if(extraTotal>0){
       extraBtn='<button class="btn btn-outline btn-xs" '
         +'data-t1="'+extra1Type+'" data-a1="'+extra1Amt+'" data-t2="'+extra2Type+'" data-a2="'+extra2Amt+'" '
-        +'onclick="event.stopPropagation();var b=this;_showExtraDetail(b,b.dataset.t1,parseInt(b.dataset.a1||0),b.dataset.t2,parseInt(b.dataset.a2||0))">'
+        +'data-d1="'+(lastRev&&lastRev.extra1Date||'')+'" data-m1="'+(lastRev&&lastRev.extra1Method||'')+'" '
+        +'data-d2="'+(lastRev&&lastRev.extra2Date||'')+'" data-m2="'+(lastRev&&lastRev.extra2Method||'')+'" '
+        +'onclick="event.stopPropagation();var b=this;_showExtraDetail(b,b.dataset.t1,parseInt(b.dataset.a1||0),b.dataset.t2,parseInt(b.dataset.a2||0),b.dataset.d1,b.dataset.m1,b.dataset.d2,b.dataset.m2)">'
         +'+'+extraTotal.toLocaleString()+'원 ▾</button>';
     }else{extraBtn='-';}
 
@@ -12920,15 +12922,22 @@ function saveExpectedDetailModal(studentId,yr,mo,overlay){
   }
 }
 
-function _showExtraDetail(btn,t1,a1,t2,a2){
+function _showExtraDetail(btn,t1,a1,t2,a2,d1,m1,d2,m2){
   var existing=document.getElementById('extra-detail-popup');
   if(existing){existing.remove();return;}
   var popup=document.createElement('div');
   popup.id='extra-detail-popup';
-  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:9999;min-width:160px;font-size:12px';
+  popup.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:9999;min-width:200px;font-size:12px';
   var html='<div style="font-weight:700;color:var(--navy);margin-bottom:6px">추가비용 내역</div>';
-  if(t1&&a1>0)html+='<div style="display:flex;justify-content:space-between;gap:16px;padding:3px 0"><span>'+t1+'</span><span>'+a1.toLocaleString()+'원</span></div>';
-  if(t2&&a2>0)html+='<div style="display:flex;justify-content:space-between;gap:16px;padding:3px 0"><span>'+t2+'</span><span>'+a2.toLocaleString()+'원</span></div>';
+  function row(t,a,d,m){
+    var sub=[];
+    sub.push('결제일 '+(d||'-'));
+    sub.push('결제수단 '+(m||'-'));
+    return '<div style="padding:3px 0"><div style="display:flex;justify-content:space-between;gap:16px"><span>'+t+'</span><span>'+a.toLocaleString()+'원</span></div>'
+      +'<div style="font-size:10px;color:var(--txt3);margin-top:1px">'+sub.join(' · ')+'</div></div>';
+  }
+  if(t1&&a1>0)html+=row(t1,a1,d1,m1);
+  if(t2&&a2>0)html+=row(t2,a2,d2,m2);
   html+='<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-weight:700"><span>합계</span><span>'+(a1+a2).toLocaleString()+'원</span></div>';
   popup.innerHTML=html;
   document.body.appendChild(popup);
