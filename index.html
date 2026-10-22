@@ -9466,8 +9466,11 @@ function openStudentModal(id){
   (s?.siblings||[]).forEach(function(sib){var i=siblingCount++;var d2=document.createElement('div');d2.id='sib-'+i;d2.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px';d2.innerHTML='<input class="fi" value="'+sib.name+'" id="sib-name-'+i+'" style="flex:2;font-size:11px;padding:5px 8px"><select class="fi" id="sib-grade-'+i+'" style="flex:1;font-size:11px;padding:5px 8px"><option value="">학년</option>'+GRADE_ORDER.map(function(g){return'<option value="'+g+'"'+(g===sib.grade?' selected':'')+'>'+g+'</option>';}).join('')+'</select><label style="font-size:11px;white-space:nowrap"><input type="checkbox" id="sib-enrolled-'+i+'"'+(sib.enrolled===false?'':' checked')+'> 재원중</label><button class="btn btn-red btn-xs" onclick="document.getElementById(\'sib-'+i+'\').remove()">✕</button>';sibArea.appendChild(d2);});
   $('modal-student').style.display='flex';
 }
+var _savingStudent=false;
 async function saveStudent(){
+  if(_savingStudent)return;   // 저장 버튼을 연달아 눌러도 한 번만 저장해요
   var name=$('s-name').value.trim();if(!name){toast('⚠️ 이름 필수');return;}
+  _savingStudent=true;setTimeout(function(){_savingStudent=false;},4000);
   loading(true);
   var selectedDays=[...document.querySelectorAll('#s-days .day-pill.on')].map(function(el){return el.dataset.day;});
   var periods={};var weeklyHours=0;selectedDays.forEach(function(day){
@@ -9571,7 +9574,8 @@ async function saveStudent(){
       if(idx>=0)students[idx]=Object.assign({},students[idx],data);
     }else{
       var ref=await db.collection('students').add(Object.assign({},data,{createdAt:new Date().toISOString()}));
-      students.push(Object.assign({id:ref.id},data,{createdAt:new Date().toISOString()}));
+      // 실시간 목록(onSnapshot)이 먼저 새 학생을 넣어 둔 경우가 있어서, 이미 있으면 다시 넣지 않아요 (중복 방지)
+      if(!students.some(function(x){return x.id===ref.id;}))students.push(Object.assign({id:ref.id},data,{createdAt:new Date().toISOString()}));
     }
     // 로컬 배열 가나다순 정렬 유지
     students.sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
@@ -9608,7 +9612,7 @@ async function saveStudent(){
     console.error('saveStudent error:',e);
     loading(false);
     toast('❌ 저장 실패: '+e.message);
-  }
+  }finally{_savingStudent=false;}
 }
 async function deleteStudent(){
   var id=$('s-id').value;if(!id)return;var _cm=await showConfirm('삭제?',true);if(!_cm)return;loading(true);
@@ -11442,7 +11446,7 @@ async function _createStudentFromConsult(nc){
   };
   var ref=await db.collection('students').add(newStudent);
   newStudent.id=ref.id;
-  students.push(newStudent);
+  if(!students.some(function(x){return x.id===ref.id;}))students.push(newStudent);
   // 상담 기록에 studentId 연결
   var ncId=$('nc-id').value;
   if(ncId)await db.collection('newConsults').doc(ncId).update({studentId:ref.id});
