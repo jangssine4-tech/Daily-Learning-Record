@@ -1424,6 +1424,46 @@ function saveStorageBucket(){
 }
 
 function getCfg(){try{return JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){return null;}}
+// ── 비밀번호 암호화(SHA-256 + 사람마다 다른 salt). 기존 평문 비밀번호는 로그인할 때 자동으로 바뀌어요 ──
+async function _pwHash(pw,salt){
+  var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));
+  return Array.from(new Uint8Array(b)).map(function(x){return ('0'+x.toString(16)).slice(-2);}).join('');
+}
+async function _pwMake(pw){
+  try{var a=new Uint8Array(16);crypto.getRandomValues(a);var salt=Array.from(a).map(function(x){return ('0'+x.toString(16)).slice(-2);}).join('');return {pwSalt:salt,pwHash:await _pwHash(pw,salt)};}
+  catch(e){return null;}
+}
+async function _pwCheck(u,pw){
+  if(u.pwHash&&u.pwSalt){try{return (await _pwHash(pw,u.pwSalt))===u.pwHash;}catch(e){return false;}}
+  return u.password===pw||String(u.password||'').trim()===pw.trim();
+}
+// ── 로그인 유지: 화면을 떠난 지 1시간이 안 되면 로그인 상태 유지, 1시간 이상이면 자동 로그아웃 ──
+var _SESS_KEY='academy_login',_SESS_TTL=60*60*1000,_sessLast=0;
+function _sessSave(){
+  if(!currentUser)return;
+  _sessLast=Date.now();
+  try{localStorage.setItem(_SESS_KEY,JSON.stringify({d:currentUser.docId||'',a:0,t:_sessLast}));}catch(e){}
+}
+function _sessClear(){_sessLast=0;try{localStorage.removeItem(_SESS_KEY);}catch(e){}}
+async function _sessRestore(){   // 비밀번호는 저장하지 않고 계정 번호만 기억해요
+  var s=null;try{s=JSON.parse(localStorage.getItem(_SESS_KEY));}catch(e){}
+  if(!s||!s.t||Date.now()-s.t>_SESS_TTL){_sessClear();return false;}
+  if(!s.d)return false;
+  try{
+    var d=await db.collection('users').doc(s.d).get();
+    if(!d.exists||d.data().adminDeleted){_sessClear();return false;}
+    currentUser={...d.data(),docId:d.id};return true;
+  }catch(e){return false;}
+}
+function _sessExpire(){_sessClear();try{localStorage.removeItem('academy_cache');}catch(e){}currentUser=null;location.reload();}
+document.addEventListener('visibilitychange',function(){
+  if(!currentUser)return;
+  if(document.hidden){_sessSave();return;}
+  if(_sessLast&&Date.now()-_sessLast>_SESS_TTL){_sessExpire();return;}
+  _sessSave();
+});
+window.addEventListener('pagehide',function(){_sessSave();});
+setInterval(function(){if(currentUser&&!document.hidden)_sessSave();},30000);
 function saveFbConfig(){
   var cfg={apiKey:$('c-apiKey').value.trim(),authDomain:$('c-authDomain').value.trim(),projectId:$('c-projectId').value.trim(),storageBucket:$('c-storageBucket').value.trim()};
   if(!cfg.apiKey||!cfg.projectId){toast('⚠️ API Key와 Project ID 필수');return;}
@@ -1434,8 +1474,13 @@ function initFb(cfg){
   db=firebase.firestore();
   db.settings({cacheSizeBytes:50*1024*1024,merge:true});
   db.enablePersistence({synchronizeTabs:true}).catch(function(){});
-  setTimeout(function(){
+  setTimeout(async function(){
     $('setup-screen').style.display='none';
+    var ok=false;try{ok=await _sessRestore();}catch(e){}
+    if(ok){   // 1시간 안에 다시 열면 로그인 없이 바로 들어가요
+      try{bootProgress(20,'데이터 로딩...');await yield_();await bootApp();_sessSave();return;}
+      catch(e){console.warn('로그인 유지 복원 실패',e);currentUser=null;_sessClear();}
+    }
     $('login-screen').style.display='flex';
     hideBootOverlay();
   }, 100);
@@ -1454,13 +1499,6 @@ async function login(){
   bootProgress(10, '인증 중...');
   // YIELD so overlay renders before blocking work
   await yield_();
-  if(id==='admin'&&pw==='1234'){
-    currentUser={name:'관리자',role:'admin',loginId:'admin'};
-    bootProgress(20, '데이터 로딩...');
-    await yield_();
-    await bootApp();
-    return;
-  }
   try{
     var snap=await db.collection('users').where('loginId','==',id).get();
     var cand=snap.docs;
@@ -1470,10 +1508,15 @@ async function login(){
     }
     if(!cand.length){toast('❌ 아이디를 찾을 수 없어요 ('+id+')');$('login-screen').style.display='flex';hideBootOverlay();return;}
     // 같은 아이디 계정이 여러 개여도 비밀번호가 맞는 계정으로 로그인
-    var hit=cand.find(function(d){return d.data().password===pw;})||cand.find(function(d){return String(d.data().password||'').trim()===pw.trim();});
+    var hit=null;
+    for(var ci=0;ci<cand.length&&!hit;ci++){if(await _pwCheck(cand[ci].data(),pw))hit=cand[ci];}
     if(!hit){toast('❌ 비밀번호가 맞지 않아요'+(cand.length>1?' (같은 아이디 계정이 '+cand.length+'개 있어요 — 관리자 페이지에서 중복 계정을 정리해 주세요)':''));$('login-screen').style.display='flex';hideBootOverlay();return;}
     var u=hit.data();
+    if(u.password&&!u.pwHash){   // 예전 평문 비밀번호 → 암호화해서 저장하고 평문은 지워요
+      try{var pm=await _pwMake(pw);if(pm){await db.collection('users').doc(hit.id).update({pwSalt:pm.pwSalt,pwHash:pm.pwHash,password:firebase.firestore.FieldValue.delete()});}}catch(e){console.warn('비밀번호 암호화 실패',e);}
+    }
     currentUser={...u,docId:hit.id};
+    delete currentUser.password;delete currentUser.pwHash;delete currentUser.pwSalt;_sessSave();
     bootProgress(20, '데이터 로딩...');
     await yield_();
     await bootApp();
@@ -2641,6 +2684,7 @@ async function toggleMobMenu(){
 async function doLogout(){
   var _cm=await showConfirm('로그아웃 하시겠습니까?');if(!_cm)return;
   localStorage.removeItem('academy_cache');
+  _sessClear();
   currentUser=null;
   location.reload();
 }
@@ -2717,8 +2761,7 @@ var CC_DEFAULT_TEMPLATE={sections:[
   {id:'w1',t:'check',l:'그림보고 영어 단어 말하기'},
   {id:'w2',t:'check',l:'영어 단어 읽고 뜻 말하기'},
   {id:'w3',t:'call',l:'단어장 검사 받기',to:'tablet'},
-  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'},
-  {id:'w5',t:'call',l:'받아쓰기 검사 받기',to:'book'}]},
+  {id:'w4',t:'dict',l:'받아쓰기',link:'dict'}]},
  {title:'스마트 학습 2',items:[
   {id:'ds',t:'check',l:'Daily Study'},
   {id:'sp',t:'check',l:'스피킹 트레이닝'}]},
@@ -2804,7 +2847,6 @@ function ccResolve(plan,level,progress){
       sec.items.push({id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:'점',link:'quiz'});
     }else if(/받아쓰기/.test(lab)){
       sec.items.push({id:id,t:'dict',l:lab+note,link:'dict'});
-      sec.items.push({id:id+'c',t:'call',l:'받아쓰기 검사 받기',to:'book'});
     }else if(/선생님/.test(lab)){
       sec.items.push({id:id,t:'call',l:lab+note,to:'tablet',hint:r.h||''});
     }else{
@@ -2880,21 +2922,26 @@ function _bcSyncSoon(){
   clearTimeout(_bcSyncTimer);
   _bcSyncTimer=setTimeout(_bcSyncRoster,4000);
 }
-async function _bcSyncRoster(){
-  if(!db||!currentUser||!students.length)return;
+async function _bcSyncRoster(manual){
+  if(!db||!currentUser)return;
+  if(!students.length){if(manual===true)toast('⚠️ 학생 데이터를 아직 못 불러왔어요');return;}
   try{
     var snap=await db.collection('checkRoster').get();
-    var have={};snap.forEach(function(d){have[d.id]=d.data();});
+    var have={};if(manual!==true)snap.forEach(function(d){have[d.id]=d.data();});   // 수동 갱신은 전부 다시 저장
     var want={};
     students.forEach(function(s){
       var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
       var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return;
-      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:(window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES,level:getStudentLevel(s),lvl:_inf.lvl};
+      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:(window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES,level:getStudentLevel(s),lvl:_inf.lvl,ses:_ccSesMap(s)};
     });
     var ops=[];
+    if(!Object.keys(want).length){   // 명단에 넣을 학생이 하나도 없으면 기존 명단을 지우지 않아요
+      if(manual===true)toast('⚠️ 학생 '+students.length+'명 중 체크콜 조건(재원·신규, 학생번호)에 맞는 학생이 0명이에요');
+      return;
+    }
     Object.keys(want).forEach(function(id){
       var c=have[id];
-      if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,plan:c.plan||null,totalMin:c.totalMin,level:c.level,lvl:c.lvl})===_bcCanon(want[id]))return;
+      if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,plan:c.plan||null,totalMin:c.totalMin,level:c.level,lvl:c.lvl,ses:c.ses||{}})===_bcCanon(want[id]))return;
       ops.push({t:'set',id:id,d:want[id]});
     });
     Object.keys(have).forEach(function(id){if(!want[id])ops.push({t:'del',id:id});});
@@ -2903,7 +2950,8 @@ async function _bcSyncRoster(){
       ops.slice(i,i+400).forEach(function(o){var r=db.collection('checkRoster').doc(o.id);if(o.t==='set')b.set(r,o.d);else b.delete(r);});
       await b.commit();
     }
-  }catch(e){console.warn('checkRoster 동기화 실패',e);}
+    if(manual===true){var _pj='';try{_pj=firebase.app().options.projectId;}catch(e){}toast('✅ 체크콜 명단 '+Object.keys(want).length+'명 저장 · 프로젝트 '+_pj);}
+  }catch(e){console.warn('checkRoster 동기화 실패',e);toast('⚠️ 체크콜 명단 저장 실패: '+((e&&e.message)||e));}
 }
 
 // ── 실시간 구독 ──
@@ -2966,7 +3014,7 @@ function _bcSubscribeToday(){
   if(window._ccLUnsub){try{window._ccLUnsub();}catch(e){}}
   try{
     window._ccLUnsub=db.collection('checkLogs').where('date','==',_bcDate).onSnapshot(function(snap){
-      var m={};snap.forEach(function(d){var x=d.data();m[x.studentId]=x;});
+      var m={};snap.forEach(function(d){var x=d.data();m[_ccKey(x.studentId,x.sess===2?2:1)]=x;});
       window._ccLogs=m;
       try{_ccFillJournal();}catch(e){}
     },function(e){console.warn('checkLogs',e);});
@@ -2976,7 +3024,7 @@ function _bcSubscribeToday(){
   try{
     _bcPUnsub=db.collection('checkPresence').where('date','==',_bcDate).onSnapshot(function(snap){
       window._bcPresence=snap.docs.map(function(d){var x=d.data();x.id=d.id;return x;});
-      _bcRender();
+      _bcRender();try{_ccPaintPres();}catch(e){}
     },function(e){console.warn('checkPresence',e);});
   }catch(e){}
 }
@@ -3036,59 +3084,63 @@ function _bcRender(){
   var h='<button class="sch-dd-btn'+(waiting?' bc-blink':(act.length?' has':''))+'" onclick="event.stopPropagation();if(window._bcDragged)return;_schDdToggle(\'check\')">🔔 점검 받을 학생 ('+act.length+')'+(waiting?' <span class="bc-new">NEW</span>':'')+' <span style="font-size:9px">▼</span></button>'
     +'<div class="sch-dd-panel" style="display:'+(isOpen?'block':'none')+';min-width:340px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span></span>'
-    +'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_ccOpenPlans()">📋 레슨별 계획표</button> <button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 공통 항목</button></div>';
+    +''+(_ccCan('cc_plan')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_ccOpenPlans()">📋 레슨별 계획표</button> ':'')+(_ccCan('cc_common')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 공통 항목</button> ':'')+'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcSyncRoster(true)" title="학생 태블릿 로그인용 명단을 지금 갱신해요">🔄 명단 갱신</button> <button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcCopyTabletLink()" title="태블릿에서 열면 Firebase 설정이 자동으로 입력돼요">🔗 태블릿 링크 복사</button></div>';
   var pres=(window._bcPresence||[]).slice().sort(function(a,b){var ta=a.at&&a.at.toMillis?a.at.toMillis():0,tb=b.at&&b.at.toMillis?b.at.toMillis():0;return tb-ta;});
   var presMap={};pres.forEach(function(p){presMap[p.studentId]=p;});
-  if(pres.length){
-    h+='<div class="bc-pres">';
-    pres.forEach(function(p){
-      var tm=p.at&&p.at.toMillis?new Date(p.at.toMillis()):null;
-      var hm=tm?(('0'+tm.getHours()).slice(-2)+':'+('0'+tm.getMinutes()).slice(-2)):'';
-      h+='<span class="bc-pchip '+(p.status==='in'?'in':'out')+'"><i></i>'+_bcEsc(p.studentName)+' '+(p.status==='in'?'접속 중':'로그아웃 '+hm)+'</span>';
-    });
-    h+='</div>';
-  }
   if(!act.length)h+='<div style="padding:14px 6px;font-size:12px;color:var(--txt3);text-align:center">대기 중인 학생이 없어요</div>';
   act.forEach(function(x,i){
     var called=x.status==='called';
     h+='<div class="bc-row'+(called?' called':'')+'" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'
       +'<span class="bc-no">'+(i+1)+'</span>'
       +'<span class="bc-nm">'+_bcEsc(x.studentName)+'</span>'
+      +(x.sess===2?'<span class="bc-tag" style="color:#7c3aed;font-weight:800">2회차</span>':'')
       +'<span class="bc-it">'+(x.kind==='ask'?(x.item.indexOf('화장실')>=0?'🚻 ':'💧 '):'')+_bcEsc(x.item)+'</span>'
       +(x.kind==='ask'?'<span class="bc-tag" style="color:#b45309">학생 요청</span>':_bcCallTag(x))
       +((presMap[x.studentId]&&presMap[x.studentId].status==='out')?'<span class="bc-tag" style="color:#b45309">⚠ 로그아웃</span>':'')
       +'<span style="margin-left:auto;display:flex;gap:4px">'
       +'<button class="bc-b call" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcCall(this.dataset.id)">'+(x.kind==='ask'?(called?'다시 알림':'허락'):(called?'다시 호출':'호출'))+'</button>'
       +(x.kind==='ask'?'':'<button class="bc-b ok" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcDone(this.dataset.id)">완료</button>')
+      +((x.kind!=='ask'&&/스토리북/.test(x.item)&&!/1\s*$/.test(x.item))?'<button class="bc-b" style="background:#fef3c7;color:#92400e" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcPractice(this.dataset.id)" title="연습이 더 필요해요">연습</button>':'')
       +'<button class="bc-b x" data-id="'+_bcEsc(x.id)+'" onclick="event.stopPropagation();_bcRemove(this.dataset.id)" title="삭제">✕</button>'
       +'</span></div>';
   });
-  // 오늘 전체 점검을 마친 학생
-  var byStu={};dn.forEach(function(x){(byStu[x.studentId]=byStu[x.studentId]||[]).push(x);});
-  var finished=[],partial=[];
-  Object.keys(byStu).forEach(function(sid){
-    var s=students.find(function(z){return z.id===sid;});
-    var need=_bcItemsFor(s);var got=byStu[sid].map(function(x){return x.item;});
-    var nm=byStu[sid][0].studentName;
-    if(need.length&&need.every(function(n){return got.indexOf(n)>=0;}))finished.push(nm);
-    else partial.push(nm+' '+got.length+'/'+(need.length||got.length));
-  });
-  if(finished.length||partial.length||dn.length){
-    h+='<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:7px;font-size:11px;color:var(--txt2);line-height:1.7">';
-    if(finished.length)h+='🎉 <b>점검 마무리</b> ('+finished.length+'명): '+finished.map(_bcEsc).join(', ')+'<br>';
-    if(partial.length)h+='📝 <b>진행 중</b>: '+partial.map(_bcEsc).join(', ')+'<br>';
-    h+='<span style="color:var(--txt3)">완료 기록: </span>';
-    dn.sort(function(a,b){return _bcTs(b)-_bcTs(a);}).slice(0,12).forEach(function(x){
-      h+='<span class="bc-done-chip">'+_bcEsc(x.studentName)+'·'+_bcEsc(x.item)+'</span>';
-    });
-    h+='</div>';
-  }
   h+='</div>';
   box.innerHTML=h;
   if(isOpen)_schDdAlign('check');
 }
+// 오늘의 시간표 학생 카드: 체크콜 접속 상태 (이름 없이 '접속 중' / '로그아웃 00:00')
+function _ccPresHtml(sid){
+  var p=(window._bcPresence||[]).find(function(x){return x.studentId===sid;});
+  if(!p)return '';
+  var t=p.at&&p.at.toMillis?new Date(p.at.toMillis()):null;
+  var hm=t?(('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)):'';
+  var on=p.status==='in';
+  return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap;margin-left:2px;'+(on?'background:#ecfdf5;color:#047857;border:1px solid #a7f3d0':'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0')+'"><i style="width:5px;height:5px;border-radius:50%;background:'+(on?'#10b981':'#94a3b8')+'"></i>'+(on?'접속 중':'로그아웃 '+hm)+'</span>';
+}
+function _ccPaintPres(){
+  document.querySelectorAll('.cc-pres').forEach(function(el){el.innerHTML=_ccPresHtml(el.dataset.sid);});
+}
+// ── 2회차(특강) 지원: 하루에 수업이 두 번인 학생은 늦은 시간 수업을 2회차로 구분해요 ──
+var _CC_DN=['일','월','화','수','목','금','토'];
+function _ccTM(t){var m=String(t||'').match(/(\d{1,2}):(\d{2})/);return m?parseInt(m[1])*60+parseInt(m[2]):-1;}
+function _ccTimesDn(s,dn){
+  var a=[],seen={},p=(s.periods||{})[dn],sp=(s.specialPeriods||{})[dn];
+  if(p&&typeof p==='object'&&p.time)a.push(p.time);
+  if(sp&&sp.time)a.push(sp.time);
+  return a.filter(function(t){var k=_ccTM(t);if(k<0||seen[k])return false;seen[k]=1;return true;}).sort(function(x,y){return _ccTM(x)-_ccTM(y);});
+}
+function _ccSesMap(s){var o={};_CC_DN.forEach(function(dn){var a=_ccTimesDn(s,dn);if(a.length>=2)o[dn]=a.slice(0,2);});return o;}
+function _ccSess(s,dateStr,sessionTime){
+  if(!s||!dateStr)return 1;
+  var ts=_ccTimesDn(s,_CC_DN[new Date(dateStr+'T12:00:00').getDay()]);if(ts.length<2)return 1;
+  var m=_ccTM(sessionTime);return (m>=0&&m>=_ccTM(ts[1]))?2:1;
+}
+function _ccDocId(date,sid,sess){return date+'_'+sid+(sess===2?'_2':'');}
+function _ccKey(sid,sess){return sid+(sess===2?'#2':'');}
 function _bcCallTag(x){
-  var r=(typeof reports!=='undefined'&&reports||[]).find(function(z){return z.studentId===x.studentId&&z.date===x.date;});
+  var _st=(typeof students!=='undefined'&&students||[]).find(function(z){return z.id===x.studentId;}),_want=x.sess===2?2:1;
+  var _rl=(typeof reports!=='undefined'&&reports||[]).filter(function(z){return z.studentId===x.studentId&&z.date===x.date;});
+  var r=_rl.find(function(z){return !z.makeupId&&_ccSess(_st,z.date,z.sessionTime)===_want;})||_rl[0];
   var book=x.callTo==='book',nm=r?(book?r.teacherBook:(r.teacherTablet||r.teacher)):'';
   var mine=nm&&nm===_bcTeacher();
   return '<span class="bc-tag" style="'+(mine?'color:#0E7C5A;font-weight:800':'')+'">'+(book?'교재 교사':'태블릿 교사')+(nm?' · '+_bcEsc(nm):'')+'</span>';
@@ -3097,20 +3149,23 @@ function _bcCallTag(x){
 function _bcSyncProgress(){
   try{
     if(!db||!currentUser||typeof reports==='undefined'||!reports||!reports.length)return;
-    var d=todayISO(),best={};
+    var d=todayISO(),best={},stuMap={};
+    (typeof students!=='undefined'&&students||[]).forEach(function(z){stuMap[z.id]=z;});
     reports.forEach(function(r){
       if(r.date!==d||!r.studentId||r.absent)return;
       var lv=String(r.level||'').trim(),pg=String(r.progress||'').trim();
-      var cur=best[r.studentId],t=String(r.updatedAt||r.savedAt||r.createdAt||'');
-      if(!cur||(pg&&!cur.pg)||(!!pg===!!cur.pg&&t>cur.t))best[r.studentId]={lv:lv,pg:pg,t:t};
+      var sess=_ccSess(stuMap[r.studentId],d,r.sessionTime),key=_ccKey(r.studentId,sess);   // 2회차 일지는 2회차 기록에 따로 전달
+      var cur=best[key],t=String(r.updatedAt||r.savedAt||r.createdAt||'');
+      if(!cur||(pg&&!cur.pg)||(!!pg===!!cur.pg&&t>cur.t))best[key]={lv:lv,pg:pg,t:t,sid:r.studentId,sess:sess};
     });
-    Object.keys(best).forEach(function(sid){
-      var b=best[sid],sig=d+'|'+b.lv+'|'+b.pg;
-      if(_bcLastLv[sid]!==undefined&&_bcLastLv[sid]!==b.lv&&b.lv)_bcSyncSoon();
-      _bcLastLv[sid]=b.lv;
-      if(_bcLastProg[sid]===sig)return;
-      _bcLastProg[sid]=sig;
-      db.collection('checkLogs').doc(d+'_'+sid).set({date:d,studentId:sid,lv:b.lv,pg:b.pg},{merge:true}).catch(function(){_bcLastProg[sid]='';});
+    Object.keys(best).forEach(function(key){
+      var b=best[key],sid=b.sid,sig=d+'|'+b.lv+'|'+b.pg;
+      if(_bcLastLv[key]!==undefined&&_bcLastLv[key]!==b.lv&&b.lv)_bcSyncSoon();
+      _bcLastLv[key]=b.lv;
+      if(_bcLastProg[key]===sig)return;
+      _bcLastProg[key]=sig;
+      var u={date:d,studentId:sid,lv:b.lv,pg:b.pg};if(b.sess===2)u.sess=2;
+      db.collection('checkLogs').doc(_ccDocId(d,sid,b.sess)).set(u,{merge:true}).catch(function(){_bcLastProg[key]='';});
     });
   }catch(e){}
 }
@@ -3124,6 +3179,18 @@ function _bcDone(id){
   _bcRef(id).update({status:'done',doneBy:_bcTeacher(),doneAt:firebase.firestore.FieldValue.serverTimestamp()})
     .then(function(){toast('✅ 검사 완료');}).catch(function(e){toast('⚠️ 처리 실패');});
 }
+// 연습이 더 필요할 때: 학생 체크콜의 해당 '검사 받기' 아래에 '3번 읽기 연습하기'가 생기고, 검사 요청은 초기화돼요
+function _bcPractice(id){
+  var x=(window._bcChecks||[]).find(function(z){return z.id===id;});if(!x)return;
+  var sess=x.sess===2?2:1,lg=(window._ccLogs&&window._ccLogs[_ccKey(x.studentId,sess)])||{},xs=lg.x||{},n=0;
+  Object.keys(xs).forEach(function(k){if(xs[k]&&xs[k].after===x.item)n++;});
+  var xid='px'+Date.now().toString(36),o={};
+  o[xid]={after:x.item,l:'3번 읽기 연습하기'+(n?' '+(n+1):''),at:Date.now()};
+  var pu={date:x.date,studentId:x.studentId,studentName:x.studentName,x:o};if(sess===2)pu.sess=2;
+  db.collection('checkLogs').doc(_ccDocId(x.date,x.studentId,sess)).set(pu,{merge:true})
+    .then(function(){return _bcRef(id).delete();})
+    .then(function(){toast('📖 연습 항목을 보냈어요');}).catch(function(e){toast('⚠️ 연습 전달 실패');console.warn(e);});
+}
 function _bcUndo(id){
   _bcRef(id).update({status:'waiting',doneBy:firebase.firestore.FieldValue.delete(),doneAt:firebase.firestore.FieldValue.delete(),calledBy:firebase.firestore.FieldValue.delete(),calledAt:firebase.firestore.FieldValue.delete(),ackAt:firebase.firestore.FieldValue.delete()})
     .then(function(){toast('↩ 대기로 되돌렸어요');}).catch(function(){});
@@ -3136,7 +3203,17 @@ function _bcRemove(id){
 // ── 점검 항목 편집 모달 (단계별) ──
 var _bcEd=null;
 var _BCED_TYPES=[['check','체크'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)']];
+// 체크콜 편집 권한: 관리자는 항상 가능, 교사는 관리자가 메뉴 권한에서 허용한 경우만 가능
+function _ccCan(k){return !!currentUser&&(currentUser.role==='admin'||!!(currentUser.menuPerms&&currentUser.menuPerms[k]===true));}
+function _bcCopyTabletLink(){   // 태블릿이 Firebase 설정을 직접 입력하지 않아도 되는 링크
+  var cfg=getCfg();if(!cfg||!cfg.apiKey){toast('⚠️ Firebase 설정을 찾지 못했어요');return;}
+  var url=new URL('checkcall.html',location.href.split('#')[0]).href+'?cfg='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))));
+  var done=function(){toast('🔗 태블릿 링크를 복사했어요 (프로젝트 '+cfg.projectId+')');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(done).catch(function(){prompt('이 링크를 복사하세요',url);});}
+  else prompt('이 링크를 복사하세요',url);
+}
 function _bcOpenSettings(){
+  if(!_ccCan('cc_common')){toast('관리자만 편집할 수 있어요');return;}
   var old=document.getElementById('modal-bcset');if(old)old.remove();
   var cfg=window._bcConfig||{};
   _bcEd={key:'default',tpl:_bcClone(cfg.templates||{}),view:null,totalMin:cfg.totalMin||CC_DEFAULT_MINUTES};
@@ -3297,6 +3374,7 @@ function _ccShort(n){
   return n;
 }
 function _ccOpenPlans(){
+  if(!_ccCan('cc_plan')){toast('관리자만 편집할 수 있어요');return;}
   var old=document.getElementById('modal-ccplan');if(old)old.remove();
   _ccEd={key:Object.keys(CC_PLANS)[0],bi:0,sel:0,work:{},dirty:{}};
   var m=document.createElement('div');m.id='modal-ccplan';m.className='mo';m.dataset.dynamic='1';m.style.display='flex';
@@ -3412,8 +3490,11 @@ function _ccFillJournal(){
     }
     if(n&&!window._ccToasted){window._ccToasted=1;toast('📲 체크콜 기록을 일지에 불러왔어요');setTimeout(function(){window._ccToasted=0;},3000);}
   };
-  if(dt===_bcDate&&window._ccLogs&&window._ccLogs[sid])apply(window._ccLogs[sid]);
-  else if(dt!==_bcDate)db.collection('checkLogs').doc(dt+'_'+sid).get().then(function(d){if(d.exists)apply(d.data());}).catch(function(){});
+  // 열려 있는 일지가 몇 회차 수업인지(수업 시간 기준)에 맞는 체크콜 기록을 불러와요
+  var _stu=(typeof students!=='undefined'&&students||[]).find(function(z){return z.id===sid;});
+  var _ss=_ccSess(_stu,dt,window._currentSessionTime||''),_k=_ccKey(sid,_ss);
+  if(dt===_bcDate&&window._ccLogs&&window._ccLogs[_k])apply(window._ccLogs[_k]);
+  else if(dt!==_bcDate)db.collection('checkLogs').doc(_ccDocId(dt,sid,_ss)).get().then(function(d){if(d.exists)apply(d.data());}).catch(function(){});
 }
 (function(){
   var _orig=window.startReport;
@@ -7316,9 +7397,8 @@ function renderSchedule(){
           +(s._isSpecialClass?'<span style="position:absolute;top:-5px;right:-5px;width:24px;height:24px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2" title="특강">특</span>':'')
           +_mkBadge
           +'<span style="cursor:pointer;font-size:9px;padding:1px 5px;border-radius:8px;border:1px solid #fbbf24;background:'+(isObserved?'#fbbf24;color:#fff':'#fef9c3;color:#92400e')+'" onclick="event.stopPropagation();toggleObserve(\''+s.id+'\','+isJoy+')">관찰</span>'
-          +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #60a5fa;background:'+(isTablet?'#3b82f6;color:#fff':'#eff6ff;color:#1e40af')+'" onclick="event.stopPropagation();toggleCardTag(\'tbl_'+s.id+'\',this)">T</span>'
-          +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #a78bfa;background:'+(isBook?'#7c3aed;color:#fff':'#f3e8ff;color:#6b21a8')+'" onclick="event.stopPropagation();toggleCardTag(\'bk_'+s.id+'\',this)">B</span>'
           +'<span style="cursor:pointer;font-size:9px;padding:1px 4px;border-radius:8px;border:1px solid #94a3b8;background:#f1f5f9;color:#475569" title="메모 작성" onclick="event.stopPropagation();goToMemo(\''+s.id+'\')">M</span>'
+          +'<span class="cc-pres" data-sid="'+s.id+'">'+_ccPresHtml(s.id)+'</span>'
           +'</div>';
         html+='<div class="s-card-sub">'+((rep&&rep.level)?rep.level:getStudentLevel(s))+'</div>';
         html+='<div class="s-card-btns">';
@@ -22955,13 +23035,15 @@ async function saveUser(){
   loading(true);
   var data={name:name,engName:$('u-engname').value.trim(),role:$('u-role').value,loginId:loginId,phone:$('u-phone').value.trim(),address:$('u-address').value.trim(),startDate:$('u-startdate').value||null,endDate:$('u-enddate').value||null,updatedAt:new Date().toISOString()};
   var ssnVal=$('u-ssn').value;if(ssnVal&&ssnVal!=='******'){data.ssn=btoa(ssnVal);}
-  var pw=$('u-pw').value;if(pw)data.password=pw;
+  var pw=$('u-pw').value;
+  var _pm=pw?await _pwMake(pw):null;
+  if(pw){if(_pm){data.pwSalt=_pm.pwSalt;data.pwHash=_pm.pwHash;data.password=firebase.firestore.FieldValue.delete();}else data.password=pw;}
   var id=$('u-id-key').value;
   // 이름 변경 감지 — 기존 이름 저장
   var oldName='';
   if(id){var existingU=users.find(function(x){return x.id===id;});if(existingU)oldName=existingU.name||'';}
   if(id)await db.collection('users').doc(id).update(data);
-  else{data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}
+  else{var _pm2=pw?_pm:await _pwMake('1234');if(_pm2){data.pwSalt=_pm2.pwSalt;data.pwHash=_pm2.pwHash;delete data.password;}else data.password=pw||'1234';data.createdAt=new Date().toISOString();await db.collection('users').add(data);}
   // 이름이 바뀐 경우 학사일정 담당자 일괄 업데이트
   if(id&&oldName&&oldName!==name){
     await _syncManagerNameInAcal(oldName,name);
@@ -23017,6 +23099,8 @@ function openMenuPermModal(userId){
       }
     });
   });
+  secHTML+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin:14px 0 4px">체크콜 편집 (기본: 관리자만)</div>'
+    +[['cc_plan','📋 레슨별 계획표 편집'],['cc_common','⚙ 공통 항목 편집']].map(function(c){return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="perm-'+c[0]+'"'+(perms[c[0]]===true?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'+c[1]+'</label>';}).join('');
   overlay.innerHTML='<div class="ms" style="max-width:360px;max-height:90vh;overflow-y:auto">'
     +'<div class="mh"></div>'
     +'<div class="mt">메뉴 권한 — '+u.name+'</div>'
@@ -23029,7 +23113,7 @@ function openMenuPermModal(userId){
   document.body.appendChild(overlay);
   document.getElementById('perm-save-btn').onclick=async function(){saveMenuPerms(userId,overlay);};
 }
-async function saveMenuPerms(userId,overlay){loading(true);var perms={};_menuStruct.forEach(function(sec){sec.items.forEach(function(m){var el=document.getElementById('perm-'+m.id);perms[m.id]=el?el.checked:true;if(m.subs)m.subs.forEach(function(sub){var sel=document.getElementById('perm-'+sub.id);perms[sub.id]=sel?sel.checked:true;});});});await db.collection('userPerms').doc(userId).set({menuPerms:perms,updatedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===userId;});if(u)u.menuPerms=perms;if(overlay)overlay.remove();loading(false);toast('✅ 권한 저장됨');}
+async function saveMenuPerms(userId,overlay){loading(true);var perms={};_menuStruct.forEach(function(sec){sec.items.forEach(function(m){var el=document.getElementById('perm-'+m.id);perms[m.id]=el?el.checked:true;if(m.subs)m.subs.forEach(function(sub){var sel=document.getElementById('perm-'+sub.id);perms[sub.id]=sel?sel.checked:true;});});});['cc_plan','cc_common'].forEach(function(k){var e=document.getElementById('perm-'+k);perms[k]=!!(e&&e.checked);});await db.collection('userPerms').doc(userId).set({menuPerms:perms,updatedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===userId;});if(u)u.menuPerms=perms;if(overlay)overlay.remove();loading(false);toast('✅ 권한 저장됨');}
 
 // ══ SETTINGS ══
 function renderPeriodSettings(){
