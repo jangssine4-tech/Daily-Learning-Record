@@ -1608,7 +1608,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1022-b';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1022-c';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -20559,19 +20559,21 @@ function renderRevGoals(yr,moSel){
     });
     var totalRev=revs.reduce(function(s,r2){return s+(parseInt(r2.amount)||0);},0);
     // 신규·퇴원 집계
-    var newStu=students.filter(function(s){
+    var newList=students.filter(function(s){
       var d=new Date(s.startDate||s.createdAt||'');
       return d.getFullYear()===yr&&d.getMonth()+1===mo;
-    }).length;
-    var outStu=students.filter(function(s){
+    });
+    var outList=students.filter(function(s){
       if(s.status!=='퇴원')return false;
       var d=new Date(s.endDate||s.updatedAt||'');
       return d.getFullYear()===yr&&d.getMonth()+1===mo;
-    }).length;
+    });
+    var newStu=newList.length,outStu=outList.length;
+    var newNames=newList.map(function(s){return s.name;}).join(', '),outNames=outList.map(function(s){return s.name+(s.endDate?'':'(퇴원일 없음→수정일 기준)');}).join(', ');
     // 해당 월 기준 재원(재원+신규)/휴원 인원 스냅샷
     var activeCnt=students.filter(function(s){var st=getStudentStatusAtMonth(s,yr,mo);return st==='재원'||st==='신규';}).length;
     var holdCnt=students.filter(function(s){return getStudentStatusAtMonth(s,yr,mo)==='휴원';}).length;
-    return{mo:mo,totalRev:totalRev,hasData:revs.length>0,newStu:newStu,outStu:outStu,activeCnt:activeCnt,holdCnt:holdCnt,net:newStu-outStu};
+    return{mo:mo,totalRev:totalRev,hasData:revs.length>0,newStu:newStu,outStu:outStu,newNames:newNames,outNames:outNames,activeCnt:activeCnt,holdCnt:holdCnt,net:newStu-outStu};
   });
   // 재원 인원 과거월 보정: statusHistory가 기록되지 않은 과거 월은 현재 상태값으로 대체되어
   // 항상 같은 숫자로 표시되는 문제가 있어, 현재 월을 기준점 삼아 신규·퇴원 순증감을 거꾸로 적용해
@@ -20793,8 +20795,8 @@ function renderRevGoals(yr,moSel){
       +'<td style="text-align:center;font-weight:'+fw+';'+(isThisMo?'background:#eff6ff':'')+'">'+(moPct!==null?'<span style="font-size:11px;font-weight:'+fw+';color:'+moColor+'">'+moPct+'%</span>':'-')+'</td>'
       +'<td style="text-align:center;color:var(--navy);font-weight:'+fw+';border-left:2px solid #CBD5E1;'+stuBg+'">'+activeDisp+'</td>'
       +'<td style="text-align:center;color:#d97706;font-weight:'+fw+';'+stuBg+'">'+(d.holdCnt>0?d.holdCnt+'명':'–')+'</td>'
-      +'<td style="text-align:center;color:#16a34a;font-weight:'+fw+';'+stuBg+'">'+(d.newStu>0?'+'+d.newStu:'–')+'</td>'
-      +'<td style="text-align:center;color:#dc2626;font-weight:'+fw+';'+stuBg+'">'+(d.outStu>0?'-'+d.outStu:'–')+'</td>'
+      +'<td title="'+(d.newNames||'').replace(/"/g,'&quot;')+'" style="text-align:center;color:#16a34a;font-weight:'+fw+';'+stuBg+'">'+(d.newStu>0?'+'+d.newStu:'–')+'</td>'
+      +'<td title="'+(d.outNames||'').replace(/"/g,'&quot;')+'" style="text-align:center;color:#dc2626;font-weight:'+fw+';'+stuBg+'">'+(d.outStu>0?'-'+d.outStu:'–')+'</td>'
       +'<td style="text-align:center;font-weight:'+fw+';color:'+(net>0?'#16a34a':net<0?'#dc2626':'var(--txt3)')+';'+stuBg+'">'+(net>0?'+':'')+net+'</td>'
       +'</tr>';
   });
