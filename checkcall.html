@@ -228,7 +228,7 @@ var db=null;
 var S=null;               // {sid,name,items}
 var checks={};            // item -> doc data (+id)
 var unsub=null, pin='', busy=false;
-var AC=null, ringTimers=[], shownCall={};
+var AC=null, ringTimers=[], shownCall={}, unsubRoster=null;
 // 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
 //   to: tablet|book 호출 대상, link: hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
 var CC_DEFAULT_TEMPLATE={sections:[
@@ -456,7 +456,7 @@ async function switchSess(n){
   openSession(sid,data,n);
 }
 function closeSessListeners(){
-  if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}
+  if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}if(unsubRoster){unsubRoster();unsubRoster=null;}
   clearInterval(tickT);stopRing();$('call').classList.remove('on');
 }
 function normTpl(t){
@@ -489,13 +489,20 @@ function openSession(sid,data,sess){
     if(!snap.exists||!snap.data().startAt)u.startAt=Date.now();
     return logRef().set(u,{merge:true});
   }).catch(function(e){console.warn(e);});
+  // 선생님이 Study Plan을 저장하면 로그인 중인 태블릿에도 바로 반영돼요
+  if(unsubRoster){unsubRoster();unsubRoster=null;}
+  unsubRoster=db.collection('checkRoster').doc(sid).onSnapshot(function(d){
+    if(!S||!d.exists)return;var x=d.data();
+    S.data=x;S.plan=x.plan||null;S.lvl=x.lvl||x.level||'';S.fb=x.template||null;S.totalMin=x.totalMin||CC_DEFAULT_MINUTES;
+    render();
+  },function(e){console.warn(e);});
   setPresence('in');show('sMain');render();
   clearInterval(tickT);tickT=setInterval(paintBar,30000);
 }
 function logout(){
   if(S&&!LOG.endAt){try{logRef().set({endAt:Date.now()},{merge:true});}catch(e){}}
   setPresence('out');
-  if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}
+  if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}if(unsubRoster){unsubRoster();unsubRoster=null;}
   clearInterval(tickT);
   S=null;checks={};LOG={e:{},v:{}};stopRing();$('call').classList.remove('on');
   try{localStorage.removeItem('cc_sid');localStorage.removeItem('cc_sess');}catch(e){}

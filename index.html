@@ -3491,8 +3491,14 @@ async function _ccPlanSave(){
   if(!any){toast('바뀐 내용이 없어요');return;}
   try{
     await db.collection('config').doc('studyPlans').set({plans:upd},{merge:true});
+    // 저장 즉시 적용: 수정본을 바로 반영하고 태블릿 명단을 곧바로 갱신해요 (4초 기다리지 않아요)
+    window._ccPlanOv=window._ccPlanOv||{};
+    Object.keys(upd).forEach(function(k){if(_ccEd.dirty[k]==='reset')delete window._ccPlanOv[k];else window._ccPlanOv[k]=upd[k];});
+    _ccEd.dirty={};
+    await _bcSyncRoster();
     var m=document.getElementById('modal-ccplan');if(m)m.remove();
-    toast('✅ 저장 — 태블릿에 자동 반영돼요');
+    else if(document.getElementById('ccp-info')){try{_ccPlanDraw();}catch(e){}}
+    toast('✅ 저장했어요 — 태블릿에 반영됐어요 (로그인 중인 태블릿도 바로 바뀌어요)');
   }catch(e){toast('⚠️ 저장 실패');console.warn(e);}
 }
 
