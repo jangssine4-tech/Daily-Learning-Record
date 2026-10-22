@@ -411,8 +411,13 @@ async function tryLogin(){
   try{
     var snap=await db.collection('checkRoster').where('pin','==',pin).get();
     if(snap.empty){
-      var cnt='';try{var all=await db.collection('checkRoster').get();var pj='';try{pj=firebase.app().options.projectId;}catch(e3){}cnt=' (명단 '+all.size+'명 · '+pj+')';}catch(e2){cnt=' (명단을 읽지 못했어요)';}
+      // 번호를 틀릴 때마다 전체 명단을 읽으면 읽기 횟수가 늘어요. 연속 3번 실패했을 때만 1건만 읽어 점검해요.
+      var cnt='',fc=0;try{fc=(+sessionStorage.getItem('cc_fc')||0)+1;sessionStorage.setItem('cc_fc',String(fc));}catch(e4){}
+      if(fc>=3){
+        try{var one=await db.collection('checkRoster').limit(1).get();var pj='';try{pj=firebase.app().options.projectId;}catch(e3){}cnt=(one.empty?' (명단이 비어 있어요 · ':' (명단 확인됨 · ')+pj+')';}catch(e2){cnt=' (명단을 읽지 못했어요)';}
+      }
       fail('없는 번호예요. 다시 눌러 주세요'+cnt);return;}
+    try{sessionStorage.removeItem('cc_fc');}catch(e5){}
     var d=snap.docs[0];
     startSession(d.id,d.data());
   }catch(e){console.error(e);fail('연결이 불안정해요. 잠시 후 다시 눌러 주세요');}
