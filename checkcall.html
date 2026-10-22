@@ -358,6 +358,12 @@ async function ensureFirebase(){
 }
 async function boot(){
   if(!(await ensureFirebase())){document.body.innerHTML='<div style="padding:40px;text-align:center;font-size:19px;color:#334155;line-height:1.6">Firebase를 불러오지 못했어요.<br>인터넷 연결을 확인하고 새로고침해 주세요.<br><small style="color:#8B93A7">광고·콘텐츠 차단 설정이 gstatic.com을 막고 있을 수도 있어요.</small></div>';return;}
+  // 설정 링크(?cfg=...)로 열면 Firebase 설정을 자동으로 저장해요. ?reset=1 은 저장된 설정을 지워요
+  try{
+    var qp=new URLSearchParams(location.search),qc=qp.get('cfg');
+    if(qp.get('reset')){localStorage.removeItem('fb_cfg');localStorage.removeItem('cc_sid');history.replaceState(null,'',location.pathname);}
+    else if(qc){var nc=JSON.parse(decodeURIComponent(escape(atob(qc))));if(nc&&nc.apiKey&&nc.projectId){localStorage.setItem('fb_cfg',JSON.stringify(nc));localStorage.removeItem('cc_sid');}history.replaceState(null,'',location.pathname);}
+  }catch(e){}
   var cfg=null;try{cfg=JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){}
   if(!cfg||!cfg.apiKey||!cfg.projectId){show('sSetup');return;}
   try{firebase.app();}catch(e){firebase.initializeApp(cfg);}

@@ -3084,7 +3084,7 @@ function _bcRender(){
   var h='<button class="sch-dd-btn'+(waiting?' bc-blink':(act.length?' has':''))+'" onclick="event.stopPropagation();if(window._bcDragged)return;_schDdToggle(\'check\')">🔔 점검 받을 학생 ('+act.length+')'+(waiting?' <span class="bc-new">NEW</span>':'')+' <span style="font-size:9px">▼</span></button>'
     +'<div class="sch-dd-panel" style="display:'+(isOpen?'block':'none')+';min-width:340px">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span></span>'
-    +''+(_ccCan('cc_plan')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_ccOpenPlans()">📋 레슨별 계획표</button> ':'')+(_ccCan('cc_common')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 공통 항목</button> ':'')+'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcSyncRoster(true)" title="학생 태블릿 로그인용 명단을 지금 갱신해요">🔄 명단 갱신</button></div>';
+    +''+(_ccCan('cc_plan')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_ccOpenPlans()">📋 레슨별 계획표</button> ':'')+(_ccCan('cc_common')?'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcOpenSettings()">⚙ 공통 항목</button> ':'')+'<button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcSyncRoster(true)" title="학생 태블릿 로그인용 명단을 지금 갱신해요">🔄 명단 갱신</button> <button class="btn btn-outline btn-xs" style="white-space:nowrap;flex-shrink:0" onclick="event.stopPropagation();_bcCopyTabletLink()" title="태블릿에서 열면 Firebase 설정이 자동으로 입력돼요">🔗 태블릿 링크 복사</button></div>';
   var pres=(window._bcPresence||[]).slice().sort(function(a,b){var ta=a.at&&a.at.toMillis?a.at.toMillis():0,tb=b.at&&b.at.toMillis?b.at.toMillis():0;return tb-ta;});
   var presMap={};pres.forEach(function(p){presMap[p.studentId]=p;});
   if(!act.length)h+='<div style="padding:14px 6px;font-size:12px;color:var(--txt3);text-align:center">대기 중인 학생이 없어요</div>';
@@ -3205,6 +3205,13 @@ var _bcEd=null;
 var _BCED_TYPES=[['check','체크'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)']];
 // 체크콜 편집 권한: 관리자는 항상 가능, 교사는 관리자가 메뉴 권한에서 허용한 경우만 가능
 function _ccCan(k){return !!currentUser&&(currentUser.role==='admin'||!!(currentUser.menuPerms&&currentUser.menuPerms[k]===true));}
+function _bcCopyTabletLink(){   // 태블릿이 Firebase 설정을 직접 입력하지 않아도 되는 링크
+  var cfg=getCfg();if(!cfg||!cfg.apiKey){toast('⚠️ Firebase 설정을 찾지 못했어요');return;}
+  var url=new URL('checkcall.html',location.href.split('#')[0]).href+'?cfg='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))));
+  var done=function(){toast('🔗 태블릿 링크를 복사했어요 (프로젝트 '+cfg.projectId+')');};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(done).catch(function(){prompt('이 링크를 복사하세요',url);});}
+  else prompt('이 링크를 복사하세요',url);
+}
 function _bcOpenSettings(){
   if(!_ccCan('cc_common')){toast('관리자만 편집할 수 있어요');return;}
   var old=document.getElementById('modal-bcset');if(old)old.remove();
