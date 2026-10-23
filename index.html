@@ -1654,7 +1654,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1023-e';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1023-f';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3510,14 +3510,8 @@ function _ccOpenPlans(host){
   if(!host)document.body.appendChild(m);
   _ccEd.tab='edit';_ccPlanKey(_ccEd.key);
 }
-var _CCG_COL=[['#fbe9c0','#f6d37a'],['#dcebd0','#b9d9a3'],['#dbeafe','#a5c8f5'],['#fce7f3','#f4b6d6'],['#ede9fe','#c7b8f2'],['#cffafe','#8fdbe8']];
-function _ccGrpCol(b,g){
-  g=String(g||'');
-  if(/스마트/.test(g))return _CCG_COL[0];
-  if(/교재/.test(g))return _CCG_COL[1];
-  var gs=[];b.rows.forEach(function(r){var x=r.g||'';if(!/스마트|교재/.test(x)&&gs.indexOf(x)<0)gs.push(x);});
-  return _CCG_COL[2+Math.max(0,gs.indexOf(g))%4];
-}
+var _CCG_COL=[['#dbeafe','#1d4ed8'],['#fce7f3','#be185d'],['#dcfce7','#15803d'],['#fef3c7','#b45309'],['#ede9fe','#6d28d9'],['#cffafe','#0e7490']];
+function _ccGrpCol(b,g){var gs=[];b.rows.forEach(function(r){if(gs.indexOf(r.g||'')<0)gs.push(r.g||'');});return _CCG_COL[Math.max(0,gs.indexOf(g||''))%_CCG_COL.length];}
 function _ccPlanTab(t){
   _ccEd.tab=t;
   var e=document.getElementById('ccp-edit'),pv=document.getElementById('ccp-prev');if(!e||!pv)return;
@@ -3625,18 +3619,14 @@ function _ccPlanDraw(){
     +'<button class="btn btn-outline btn-xs" onclick="_ccLessonAdd()">＋ 레슨 추가</button><button class="btn btn-outline btn-xs" onclick="_ccLessonRename()">✎ 이름 변경</button><button class="btn btn-outline btn-xs" onclick="_ccLessonDel()">🗑 레슨 삭제</button>'
     +'<span style="margin-left:8px">범위 적용:</span> <select class="fi" id="ccp-from" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> <span>의 설정을</span> <select class="fi" id="ccp-a" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> ~ <select class="fi" id="ccp-z" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> <span>에 적용</span> <button class="btn btn-outline btn-xs" onclick="_ccPlanRange()">적용</button>';
   document.getElementById('ccp-from').value=sel;document.getElementById('ccp-a').value=Math.min(sel+1,ls.length-1);document.getElementById('ccp-z').value=ls.length-1;
-  var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:58px;border-bottom:1px solid var(--border)">구분</th><th style="position:sticky;left:58px;top:0;z-index:3;background:var(--surface2);padding:4px 6px;min-width:96px;border-bottom:1px solid var(--border)">구역</th><th style="position:sticky;left:154px;top:0;z-index:3;background:var(--surface2);padding:4px 6px;min-width:210px;border-bottom:1px solid var(--border)">항목</th>';
+  var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:230px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
   ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;"position:sticky;top:0;z-index:2;cursor:pointer;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+((_ccWork().ov&&_ccWork().ov[n])?' ✎':'')+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
+  var _pk=null,_ncol=ls.length+2;
   b.rows.forEach(function(r,ri){
-    var _gc=_ccGrpCol(b,r.g),_bd='1px solid #8a8a8a';
-    var _gs=(ri===0||b.rows[ri-1].g!==r.g),_ss=(ri===0||b.rows[ri-1].g!==r.g||b.rows[ri-1].s!==r.s);
-    h+='<tr>';
-    if(_gs){var gn=1;while(ri+gn<b.rows.length&&b.rows[ri+gn].g===r.g)gn++;
-      h+='<td rowspan="'+gn+'" style="position:sticky;left:0;z-index:1;background:'+_gc[0]+';width:58px;min-width:58px;text-align:center;font-weight:800;font-size:12px;color:#3f3f3f;border:'+_bd+';padding:2px 4px">'+_bcEsc(r.g||'').replace(/\s+/g,'<br>')+'</td>';}
-    if(_ss){var sn=1;while(ri+sn<b.rows.length&&b.rows[ri+sn].g===r.g&&b.rows[ri+sn].s===r.s)sn++;
-      h+='<td rowspan="'+sn+'" style="position:sticky;left:58px;z-index:1;background:'+_gc[1]+';width:96px;min-width:96px;text-align:center;font-weight:800;font-size:12px;color:#2b2b2b;border:'+_bd+';padding:2px 4px">'+_bcEsc(r.s||'')+'</td>';}
-    h+='<td style="position:sticky;left:154px;z-index:1;background:#fff;border:'+_bd+';padding:2px 6px;min-width:210px"><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px;text-align:center"></td>';
+    var _k=(r.g||'')+'|'+(r.s||''),_gc=_ccGrpCol(b,r.g);
+    if(_k!==_pk){_pk=_k;h+='<tr><td colspan="'+_ncol+'" style="background:'+_gc[0]+';color:'+_gc[1]+';font-weight:800;font-size:11px;padding:4px 8px;border-top:2px solid '+_gc[1]+'">'+_bcEsc(r.s||r.g||'')+(r.g&&r.s?' <span style="font-weight:600;opacity:.75;margin-left:4px">'+_bcEsc(r.g)+'</span>':'')+'</td></tr>';}
+    h+='<tr><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3)">'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
     for(var i=0;i<ls.length;i++){
       var ch=r.c.charAt(i),txt=ch==='c'?'□':(ch==='s'?'점':'×'),bg=ch==='c'?'#ecfdf5':(ch==='s'?'#fef9c3':'#f3f4f6'),col=ch==='x'?'#9ca3af':'#065f46';
       h+='<td style="text-align:center;border-bottom:1px solid var(--border);'+(i===sel?'background:#eff6ff;':'')+'"><button onclick="_ccPlanCell('+ri+','+i+')" title="'+_bcEsc(r.n&&r.n[i]?r.n[i]:'')+'" style="width:30px;height:24px;border:1px solid #d1d5db;border-radius:5px;background:'+bg+';color:'+col+';cursor:pointer;font-size:12px">'+txt+'</button></td>';
