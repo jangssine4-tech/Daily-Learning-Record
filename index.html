@@ -1753,7 +1753,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1025-m';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1025-n';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3596,13 +3596,13 @@ function _ccOpenPlans(host){
   m.onclick=function(e){if(e.target===m)m.remove();};}
   var opts=Object.keys(CC_PLANS).map(function(k){return '<option value="'+_bcEsc(k)+'">'+_bcEsc(k)+'</option>';}).join('');
   m.innerHTML=(host?'<div>':'<div class="ms" style="max-width:960px;width:96vw"><div class="mt">📋 레슨별 계획표 (Study Plan)</div>')
-    +'<div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:8px">학생의 <b>단계·진도</b>(일지에서 입력)에 맞는 항목만 체크콜에 나타납니다. 칸을 누르면 <b>□ 해야 함 → × 없음 → 점 점수</b>로 바뀌어요. 레슨 이름을 눌러 선택한 뒤 아래 버튼으로 복사할 수 있어요.</div>'
+    +'<div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:8px">학생의 <b>단계·진도</b>(일지에서 입력)에 맞는 항목만 체크콜에 나타납니다. <b>✅ 레슨별 항목 선택</b>에서는 레슨마다 어떤 항목을 할지 켜고 끄고, <b>👁 미리보기</b>에서는 학생에게 보이는 순서와 이름을 다듬어요.</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px"><select class="fi" id="ccp-key" onchange="_ccPlanKey(this.value)" style="width:170px">'+opts+'</select><span id="ccp-info" style="font-size:11px;color:var(--txt3)"></span><select class="fi" id="ccp-blk" onchange="_ccPlanBlk(+this.value)" style="width:150px;display:none"></select></div>'
-    +'<div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:8px"><button id="ccp-t-edit" class="btn btn-xs" onclick="_ccPlanTab(\'edit\')" style="border-radius:8px 8px 0 0">📋 계획표 편집</button><button id="ccp-t-prev" class="btn btn-xs" onclick="_ccPlanTab(\'prev\')" style="border-radius:8px 8px 0 0">👁 미리보기</button></div>'
+    +'<div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:8px"><button id="ccp-t-edit" class="btn btn-xs" onclick="_ccPlanTab(\'edit\')" style="border-radius:8px 8px 0 0">✅ 레슨별 항목 선택</button><button id="ccp-t-prev" class="btn btn-xs" onclick="_ccPlanTab(\'prev\')" style="border-radius:8px 8px 0 0">👁 화면 순서·이름 (미리보기)</button></div>'
     +'<div id="ccp-edit">'
     +'<div id="ccp-tools" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:11px"></div>'
     +'<div id="ccp-tbl" style="overflow:auto;max-height:58vh;border:1px solid var(--border);border-radius:8px"></div>'
-    +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_ccPlanAddRow()">＋ 항목 줄 추가</button><button class="btn btn-outline btn-xs" onclick="_ccPlanReset()">이 계획표를 엑셀 원본으로 되돌리기</button></div></div>'
+    +'</div>'
     +'<div id="ccp-prev" style="display:none"></div>'
     +'<div style="display:flex;gap:8px;margin-top:12px">'+(host?'':'<button class="btn btn-outline" style="flex:1;justify-content:center;padding:11px" onclick="document.getElementById(\'modal-ccplan\').remove()">닫기</button>')
     +'<button class="btn btn-navy" style="flex:2;justify-content:center;padding:11px" onclick="_ccPlanSave()">저장 (태블릿에 반영)</button></div></div>';
@@ -3712,12 +3712,21 @@ function _ccPlanDraw(){
   if(p.blocks.length>1){sb.style.display='';sb.innerHTML=p.blocks.map(function(x,i){return '<option value="'+i+'"'+(i===_ccEd.bi?' selected':'')+'>'+(i+1)+'번 표 ('+_bcEsc(_ccShort(x.lessons[0])+'~'+_ccShort(x.lessons[x.lessons.length-1]))+')</option>';}).join('');}else sb.style.display='none';
   var ls=b.lessons,sel=Math.min(_ccEd.sel,ls.length-1);_ccEd.sel=sel;
   var lopt=ls.map(function(n,i){return '<option value="'+i+'">'+_bcEsc(n)+'</option>';}).join('');
-  document.getElementById('ccp-tools').innerHTML=
-    '<b style="color:var(--navy)">선택한 레슨: '+_bcEsc(ls[sel])+'</b>'
-    +'<button class="btn btn-outline btn-xs" onclick="_ccPlanSame()"'+(sel===0?' disabled':'')+'>이전 레슨과 같게</button>'
+  var _full=document.getElementById('ccp-tools').innerHTML='';
+  var _mode=_ccEd.mode||'lesson';
+  var _rangeUi='<span>이 레슨 설정을</span> <select class="fi" id="ccp-a" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> ~ <select class="fi" id="ccp-z" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> <span>에 적용</span> <button class="btn btn-outline btn-xs" onclick="_ccPlanRange()">적용</button><select id="ccp-from" style="display:none">'+lopt+'</select>';
+  var _more='<details style="display:inline-block;position:relative"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
     +'<button class="btn btn-outline btn-xs" onclick="_ccLessonAdd()">＋ 레슨 추가</button><button class="btn btn-outline btn-xs" onclick="_ccLessonRename()">✎ 이름 변경</button><button class="btn btn-outline btn-xs" onclick="_ccLessonDel()">🗑 레슨 삭제</button>'
-    +'<span style="margin-left:8px">범위 적용:</span> <select class="fi" id="ccp-from" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> <span>의 설정을</span> <select class="fi" id="ccp-a" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> ~ <select class="fi" id="ccp-z" style="width:auto;padding:4px;font-size:11px">'+lopt+'</select> <span>에 적용</span> <button class="btn btn-outline btn-xs" onclick="_ccPlanRange()">적용</button>';
+    +'<button class="btn btn-outline btn-xs" onclick="_ccPlanAddRow()">＋ 항목 줄 추가</button><button class="btn btn-outline btn-xs" onclick="_ccPlanReset()">엑셀 원본으로 되돌리기</button>'
+    +'<button class="btn btn-outline btn-xs" onclick="_ccPlanMode(\''+(_mode==='lesson'?'grid':'lesson')+'\')">'+(_mode==='lesson'?'▦ 전체 표로 보기':'☰ 레슨별로 보기')+'</button></div></details>';
+  document.getElementById('ccp-tools').innerHTML=
+    '<button class="btn btn-outline btn-xs" onclick="_ccPlanSel('+(sel-1)+')"'+(sel===0?' disabled':'')+'>◀</button>'
+    +'<select class="fi" style="width:auto;padding:4px;font-size:12px;font-weight:700;color:var(--navy)" onchange="_ccPlanSel(+this.value)">'+ls.map(function(n,i2){return '<option value="'+i2+'"'+(i2===sel?' selected':'')+'>'+_bcEsc(n)+'</option>';}).join('')+'</select>'
+    +'<button class="btn btn-outline btn-xs" onclick="_ccPlanSel('+(sel+1)+')"'+(sel>=ls.length-1?' disabled':'')+'>▶</button>'
+    +'<button class="btn btn-outline btn-xs" onclick="_ccPlanSame()"'+(sel===0?' disabled':'')+'>이전 레슨과 같게</button>'
+    +_rangeUi+_more;
   document.getElementById('ccp-from').value=sel;document.getElementById('ccp-a').value=Math.min(sel+1,ls.length-1);document.getElementById('ccp-z').value=ls.length-1;
+  if(_mode==='lesson'){document.getElementById('ccp-tbl').innerHTML=_ccLessonView(b,sel);_ccPlanTab(_ccEd.tab||'edit');return;}
   var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:230px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
   ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;"position:sticky;top:0;z-index:2;cursor:pointer;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+((_ccWork().ov&&_ccWork().ov[n])?' ✎':'')+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
@@ -3734,6 +3743,34 @@ function _ccPlanDraw(){
   });
   document.getElementById('ccp-tbl').innerHTML=h+'</tbody></table>';
   _ccPlanTab(_ccEd.tab||'edit');
+}
+function _ccPlanMode(m){_ccEd.mode=m;_ccPlanDraw();}
+function _ccLessonView(b,sel){
+  var p=_ccWork(),own=!!(p.ov&&p.ov[b.lessons[sel]]);
+  var h='<div style="padding:8px 10px">';
+  if(own)h+='<div style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:6px 10px;margin-bottom:8px">✎ 이 레슨은 미리보기에서 직접 고친 내용을 써서, 여기서 켜고 끄는 것이 적용되지 않아요. <a href="#" onclick="_ccPlanTab(\'prev\');return false">미리보기에서 수정</a></div>';
+  var _pk=null;
+  b.rows.forEach(function(r,ri){
+    var _k=(r.g||'')+'|'+(r.s||''),_gc=_ccGrpCol(b,r.g);
+    if(_k!==_pk){_pk=_k;h+='<div style="background:'+_gc[0]+';color:'+_gc[1]+';font-weight:800;font-size:12px;padding:5px 10px;border-radius:6px;margin:10px 0 4px">'+_bcEsc(r.s||r.g||'')+(r.g&&r.s?' <span style="font-weight:600;opacity:.75;margin-left:4px">'+_bcEsc(r.g)+'</span>':'')+'</div>';}
+    var ch=r.c.charAt(sel),on=ch!=='x',hasS=r.c.indexOf('s')>=0;
+    h+='<div style="display:flex;gap:8px;align-items:center;padding:4px 2px;border-bottom:1px solid var(--border)">'
+      +'<button onclick="_ccPlanTog('+ri+','+sel+')" style="flex:0 0 auto;width:34px;height:30px;border-radius:7px;border:1.5px solid '+(on?'#10b981':'#d1d5db')+';background:'+(on?'#ecfdf5':'#f3f4f6')+';color:'+(on?'#065f46':'#9ca3af')+';font-size:16px;cursor:pointer">'+(on?'✓':'')+'</button>'
+      +'<input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="flex:1;min-width:0;padding:5px 7px;font-size:13px'+(on?'':';opacity:.45')+'">'
+      +(hasS&&on?'<button onclick="_ccPlanScore('+ri+','+sel+')" title="점수 입력형으로 바꾸기" style="flex:0 0 auto;font-size:11px;padding:4px 8px;border-radius:12px;cursor:pointer;border:1px solid '+(ch==='s'?'#f59e0b':'#d1d5db')+';background:'+(ch==='s'?'#fef9c3':'#fff')+';color:#92400e">점수</button>':'')
+      +'<button class="bc-b x" onclick="_ccPlanDelRow('+ri+')" title="이 항목 줄을 모든 레슨에서 삭제">✕</button></div>';
+  });
+  return h+'</div>';
+}
+function _ccPlanTog(ri,i){
+  var _pq=_ccWork();if(_pq.ov&&_pq.ov[_pq.blocks[_ccEd.bi].lessons[i]]){toast('이 레슨은 미리보기에서 직접 고친 내용을 써서, 켜고 끄기가 적용되지 않아요');return;}
+  var r=_ccWork().blocks[_ccEd.bi].rows[ri],ch=r.c.charAt(i);
+  r.c=r.c.slice(0,i)+(ch==='x'?'c':'x')+r.c.slice(i+1);_ccMark();_ccPlanDraw();
+}
+function _ccPlanScore(ri,i){
+  var _pq=_ccWork();if(_pq.ov&&_pq.ov[_pq.blocks[_ccEd.bi].lessons[i]]){toast('이 레슨은 미리보기에서 직접 고친 내용을 써서 적용되지 않아요');return;}
+  var r=_ccWork().blocks[_ccEd.bi].rows[ri],ch=r.c.charAt(i);
+  r.c=r.c.slice(0,i)+(ch==='s'?'c':'s')+r.c.slice(i+1);_ccMark();_ccPlanDraw();
 }
 function _ccMark(){_ccEd.dirty[_ccEd.key]=1;}
 function _ccPlanCell(ri,i){
