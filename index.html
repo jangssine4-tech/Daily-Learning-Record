@@ -1753,7 +1753,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1025-l';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1025-m';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4185,6 +4185,7 @@ function initYearSelects(which){
 
 // OPTIMIZED goto - ensures populate only when needed
 function goto(view){
+  var _prevView=window._curView;window._curView=view;
   // 학습일지(write)에서 다른 페이지로 이동 시 카메라 스트림 자동 종료
   if(view!=='write'&&typeof rrStopStream==='function'){
     rrStopStream();
@@ -4208,7 +4209,7 @@ function goto(view){
   else if(view==='meeting'){renderMeetingPage();}
   else if(view==='schedule'){
     // 보강 저장 직후 이동이 아닌 일반 진입이면 오늘로 리셋
-    if(!window._scheduleFromMakeup){
+    if(!window._scheduleFromMakeup&&_prevView!=='write'){   // 일지 화면에서 오면 날짜 유지(연동)
       _scheduleDate=null;
       var dp=$('schedule-date-pick');if(dp)dp.value=todayISO();
     }
@@ -4637,7 +4638,8 @@ function toggleCardTag(key,el){
 async function loadCardBadges(){
   try{var d=await db.collection('config').doc('cardBadges').get();window._cardBadges=d.exists?d.data():{};}catch(e){window._cardBadges={};}
 }
-function onScheduleDateChange(val){_scheduleDate=val||null;renderSchedule();renderScheduleNotes();_fixStickyPad();}
+function _linkWriteDate(d){var rd=document.getElementById('r-date');if(rd&&d)rd.value=d;}
+function onScheduleDateChange(val){_scheduleDate=val||null;_linkWriteDate(val||todayISO());renderSchedule();renderScheduleNotes();_fixStickyPad();}
 function _fixStickyPad(){
   // sticky 헤더가 flow 내에 있으므로 별도 padding 불필요
 }
@@ -4720,7 +4722,7 @@ function openSchRevModal(){
 }
 
 
-function resetScheduleToday(){_scheduleDate=null;$('schedule-date-pick').value=todayISO();renderSchedule();renderScheduleNotes();_fixStickyPad();}
+function resetScheduleToday(){_scheduleDate=null;_linkWriteDate(todayISO());$('schedule-date-pick').value=todayISO();renderSchedule();renderScheduleNotes();_fixStickyPad();}
 // ══════════════════════════════════════════════════════
 // 월간 시간표 전용 추가 슬롯 관리 (localStorage)
 // ══════════════════════════════════════════════════════
@@ -7911,7 +7913,11 @@ function renderSchedule(){
 }
 
 function _wKey(sid,mk,t){return (sid||'')+'|'+(mk||'')+'|'+(t||'');}
-function renderWriteReport(){_wSelBuild();}
+function renderWriteReport(){
+  var rd=$('r-date'),d=_scheduleDate||todayISO();
+  if(rd&&rd.value!==d){rd.value=d;if(($('r-student-id')||{}).value){try{onReportDateChange();return;}catch(e){}}}
+  _wSelBuild();
+}
 function _wStuLabel(e){
   var st=(students||[]).find(function(x){return x.id===e.sid;});
   if(!st)return e.name;
@@ -9015,6 +9021,7 @@ function refreshWriteFormIfNeeded(){
   toast('🔄 '+repTeacher+' 선생님이 일지를 업데이트했습니다');
 }
 function onReportDateChange(){
+  (function(){var d=($('r-date')||{}).value;if(!d)return;_scheduleDate=(d===todayISO())?null:d;var dp=$('schedule-date-pick');if(dp)dp.value=d;})();
   try{_wSelBuild();}catch(e){console.warn(e);}
   try{_dayTEnsure($('r-date').value);}catch(e){}
   try{_wlShow($('r-student-id').value);}catch(e){}
