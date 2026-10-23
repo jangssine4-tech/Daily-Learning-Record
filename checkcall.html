@@ -288,9 +288,21 @@ function ccSplitChecks(text){
 }
 // 단계·진도에 맞는 점검 항목 (템플릿 형태 {sections:[{title,grp,items}]}) 을 돌려줘요. 못 찾으면 null
 function ccResolve(plan,level,progress){
+  if(!plan)return null;
+  var p=ccNormProg(progress);
+  // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
+  if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length)return JSON.parse(JSON.stringify(plan.ov[p]));
+  var t=ccResolve0(plan,level,progress);
+  if(t&&plan.sorder&&plan.sorder.length){   // 모든 레슨에 적용한 구역 순서
+    var o=plan.sorder;
+    t.sections=t.sections.map(function(s,i){return{s:s,i:i,r:o.indexOf(s.k)};}).sort(function(a,b){var x=a.r<0?1e6:a.r,y=b.r<0?1e6:b.r;return x-y||a.i-b.i;}).map(function(z){return z.s;});
+  }
+  return t;
+}
+function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
   var p=ccNormProg(progress);if(!p)return null;
-  var hw={title:'숙제 했나요?',items:[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]};
+  var hw={k:'hw',title:'숙제 했나요?',items:[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]};
   // 레벨 테스트 / 포트폴리오 (레슨이 아닌 특별 진도)
   function special(text,title,withScore,idp){
     var its=[];
@@ -301,7 +313,7 @@ function ccResolve(plan,level,progress){
       else if(part)its.push({id:idp+i,t:'check',l:part});
     });
     if(withScore)its.push({id:idp+'sc',t:'number',l:title+' 점수',u:'점',link:'quiz'});
-    return {title:title,items:its};
+    return {k:'sp',title:title,items:its};
   }
   if(p==='Level Test'){
     if(!plan.lt)return null;
@@ -343,7 +355,7 @@ function ccResolve(plan,level,progress){
   });
   // 같은 이름의 구역이 둘이면 묶음 이름을 붙여 구분
   var cnt={};secs.forEach(function(s){cnt[s.title]=(cnt[s.title]||0)+1;});
-  secs.forEach(function(s){if(cnt[s.title]>1&&s.grp)s.title=s.grp.replace(/\s+/g,' ')+' '+s.title;delete s._k;});
+  secs.forEach(function(s){if(cnt[s.title]>1&&s.grp)s.title=s.grp.replace(/\s+/g,' ')+' '+s.title;s.k=s._k;delete s._k;});
   if(!secs.length)return null;
   return {sections:[hw].concat(secs)};
 }
@@ -466,7 +478,7 @@ function closeSessListeners(){
 }
 function normTpl(t){
   var src=(t&&t.sections&&t.sections.length)?t:CC_DEFAULT_TEMPLATE;
-  return src.sections.map(function(sec){return {title:sec.title||'',grp:sec.grp||'',items:(sec.items||[]).filter(function(i){return i&&i.l&&i.l!=='받아쓰기 검사 받기';})};}).filter(function(s){return s.items.length;});
+  return src.sections.map(function(sec){return {k:sec.k||'',title:sec.title||'',grp:sec.grp||'',items:(sec.items||[]).filter(function(i){return i&&i.l&&i.l!=='받아쓰기 검사 받기';})};}).filter(function(s){return s.items.length;});
 }
 async function startSession(sid,data){
   var n=await pickSess(sid,data);
