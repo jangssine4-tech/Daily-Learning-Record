@@ -1753,7 +1753,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1025-k';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1025-l';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -7920,8 +7920,12 @@ function _wStuLabel(e){
 }
 function _wSelBuild(){
   var sel=document.getElementById('w-stu-sel');if(!sel)return;
-  var date=_scheduleDate||todayISO();
-  if(window._schedEntriesDate!==date||!window._schedEntries){try{renderSchedule();}catch(e){console.warn(e);}}
+  var date=(($('r-date')||{}).value)||_scheduleDate||todayISO();
+  if(window._schedEntriesDate!==date||!window._schedEntries){
+    var _old=_scheduleDate;
+    try{_scheduleDate=(date===todayISO()&&!_old)?null:date;renderSchedule();}catch(e){console.warn(e);}
+    _scheduleDate=_old;window._schedEntriesDate=date;
+  }
   var ents=window._schedEntries||[];
   var order=[],groups={};
   ents.forEach(function(e,i){if(!groups[e.label]){groups[e.label]=[];order.push(e.label);}groups[e.label].push(i);});
@@ -9011,6 +9015,7 @@ function refreshWriteFormIfNeeded(){
   toast('🔄 '+repTeacher+' 선생님이 일지를 업데이트했습니다');
 }
 function onReportDateChange(){
+  try{_wSelBuild();}catch(e){console.warn(e);}
   try{_dayTEnsure($('r-date').value);}catch(e){}
   try{_wlShow($('r-student-id').value);}catch(e){}
   var sId=$('r-student-id').value;if(!sId)return;
