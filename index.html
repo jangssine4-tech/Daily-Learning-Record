@@ -1753,7 +1753,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1025-n';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1025-o';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3748,7 +3748,7 @@ function _ccPlanMode(m){_ccEd.mode=m;_ccPlanDraw();}
 function _ccLessonView(b,sel){
   var p=_ccWork(),own=!!(p.ov&&p.ov[b.lessons[sel]]);
   var h='<div style="padding:8px 10px">';
-  if(own)h+='<div style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:6px 10px;margin-bottom:8px">✎ 이 레슨은 미리보기에서 직접 고친 내용을 써서, 여기서 켜고 끄는 것이 적용되지 않아요. <a href="#" onclick="_ccPlanTab(\'prev\');return false">미리보기에서 수정</a></div>';
+  if(own)h+='<div style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:6px 10px;margin-bottom:8px">✎ 이 레슨은 미리보기에서 직접 고친 내용이 있어요. 켜고 끈 항목은 그 내용에도 함께 반영돼요. <a href="#" onclick="_ccPlanTab(\'prev\');return false">미리보기 열기</a></div>';
   var _pk=null;
   b.rows.forEach(function(r,ri){
     var _k=(r.g||'')+'|'+(r.s||''),_gc=_ccGrpCol(b,r.g);
@@ -3762,22 +3762,36 @@ function _ccLessonView(b,sel){
   });
   return h+'</div>';
 }
+// 미리보기에서 직접 고친 레슨(ov)이 있으면, 켜고 끈 항목을 그 내용에도 똑같이 반영
+function _ccOvSync(ri,i){
+  var p=_ccWork(),b=p.blocks[_ccEd.bi],ln=b.lessons[i];
+  if(!(p.ov&&p.ov[ln]&&p.ov[ln].sections))return;
+  var ov=p.ov[ln],id='b'+_ccEd.bi+'r'+ri,res=null;
+  try{res=ccResolve0(p,'',ln);}catch(e){}
+  var rItem=null,rSec=null;
+  if(res)res.sections.forEach(function(sec){sec.items.forEach(function(it){if(it.id===id){rItem=it;rSec=sec;}});});
+  var at=null;
+  ov.sections.forEach(function(sec){for(var k=sec.items.length-1;k>=0;k--){if(sec.items[k].id===id){at=at||{k:sec.k,title:sec.title};sec.items.splice(k,1);}}});
+  if(rItem){
+    var tgt=ov.sections.find(function(sc){return (rSec.k&&sc.k===rSec.k)||(at&&sc.k&&sc.k===at.k);});
+    if(!tgt){tgt={k:rSec.k,title:rSec.title,grp:rSec.grp,items:[]};ov.sections.push(tgt);}
+    tgt.items.push(JSON.parse(JSON.stringify(rItem)));
+  }
+  ov.sections=ov.sections.filter(function(sc){return sc.items.length||sc.k==='hw';});
+}
 function _ccPlanTog(ri,i){
-  var _pq=_ccWork();if(_pq.ov&&_pq.ov[_pq.blocks[_ccEd.bi].lessons[i]]){toast('이 레슨은 미리보기에서 직접 고친 내용을 써서, 켜고 끄기가 적용되지 않아요');return;}
   var r=_ccWork().blocks[_ccEd.bi].rows[ri],ch=r.c.charAt(i);
-  r.c=r.c.slice(0,i)+(ch==='x'?'c':'x')+r.c.slice(i+1);_ccMark();_ccPlanDraw();
+  r.c=r.c.slice(0,i)+(ch==='x'?'c':'x')+r.c.slice(i+1);_ccOvSync(ri,i);_ccMark();_ccPlanDraw();
 }
 function _ccPlanScore(ri,i){
-  var _pq=_ccWork();if(_pq.ov&&_pq.ov[_pq.blocks[_ccEd.bi].lessons[i]]){toast('이 레슨은 미리보기에서 직접 고친 내용을 써서 적용되지 않아요');return;}
   var r=_ccWork().blocks[_ccEd.bi].rows[ri],ch=r.c.charAt(i);
-  r.c=r.c.slice(0,i)+(ch==='s'?'c':'s')+r.c.slice(i+1);_ccMark();_ccPlanDraw();
+  r.c=r.c.slice(0,i)+(ch==='s'?'c':'s')+r.c.slice(i+1);_ccOvSync(ri,i);_ccMark();_ccPlanDraw();
 }
 function _ccMark(){_ccEd.dirty[_ccEd.key]=1;}
 function _ccPlanCell(ri,i){
-  var _pq=_ccWork();if(_pq.ov&&_pq.ov[_pq.blocks[_ccEd.bi].lessons[i]]){toast('이 레슨은 미리보기에서 직접 고친 내용을 써서, 칸 수정이 적용되지 않아요');return;}
   var r=_ccWork().blocks[_ccEd.bi].rows[ri],ch=r.c.charAt(i),hasS=r.c.indexOf('s')>=0;
   var nx=ch==='c'?'x':(ch==='x'?(hasS?'s':'c'):'c');
-  r.c=r.c.slice(0,i)+nx+r.c.slice(i+1);_ccMark();_ccPlanDraw();
+  r.c=r.c.slice(0,i)+nx+r.c.slice(i+1);_ccOvSync(ri,i);_ccMark();_ccPlanDraw();
 }
 // ── 레슨(열) 추가 · 이름 변경 · 삭제 ──
 function _ccLessonName(v){return ccNormProg(v);}
