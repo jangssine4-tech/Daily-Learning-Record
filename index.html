@@ -298,6 +298,15 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .btn-row>*{flex:1 1 0;min-width:0}
 .btn-row .btn-block{width:100%;white-space:nowrap}
 
+
+.ccx-help{font-size:11px;color:var(--txt3);margin-bottom:6px}
+.ccx-hd{display:flex;gap:8px;align-items:center;font-size:10px;color:var(--txt3);padding:2px 2px;border-bottom:1px solid var(--border)}
+.ccx-grip{flex:0 0 auto;width:16px;cursor:grab;color:var(--txt3);user-select:none;text-align:center}
+.ccx-cb{flex:0 0 auto;width:34px;height:26px;border-radius:6px;border:2px solid #2563eb;background:#fff;color:#fff;font-size:15px;cursor:pointer;padding:0}
+.ccx-cb.on{background:#2563eb}
+.ccx-line select,.ccx-line input.ccx-nm+input{border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:12px;background:#fff;flex:0 0 auto}
+.ccx-row.offrow .ccx-nm,.ccx-row.offrow select,.ccx-row.offrow input{opacity:.4}
+.ccx-row.offrow .ccx-nm{text-decoration:none}
 .ccx-sec{display:flex;align-items:center;gap:6px;border-radius:6px;padding:4px 8px;font-weight:800;font-size:12px}
 .ccx-sec input{flex:1;min-width:0;border:0;background:transparent;font-weight:800;font-size:12px;padding:3px 2px}
 .ccx-sec small{font-weight:600;opacity:.75;white-space:nowrap}
@@ -1771,7 +1780,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1025-r';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1025-s';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -2975,7 +2984,11 @@ function ccResolve(plan,level,progress){
   if(!plan)return null;
   var p=ccNormProg(progress);
   // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
-  if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length)return JSON.parse(JSON.stringify(plan.ov[p]));
+  if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
+    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));
+    _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off;});});
+    return _ot;
+  }
   var t=ccResolve0(plan,level,progress);
   if(t&&plan.sorder&&plan.sorder.length){   // 모든 레슨에 적용한 구역 순서
     var o=plan.sorder;
@@ -3394,7 +3407,7 @@ function _bcRemove(id){
 
 // ── 점검 항목 편집 모달 (단계별) ──
 var _bcEd=null;
-var _BCED_TYPES=[['check','체크'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)']];
+var _BCED_TYPES=[['check','체크칸'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)']];
 // 체크콜 편집 권한: 관리자는 항상 가능, 교사는 관리자가 메뉴 권한에서 허용한 경우만 가능
 function _ccCan(k){return !!currentUser&&(currentUser.role==='admin'||!!(currentUser.menuPerms&&currentUser.menuPerms[k]===true));}
 // ── 운영 매뉴얼 > Study Plan 설정 탭 ──
@@ -3642,7 +3655,18 @@ function _ccPvOwn(){
   if(!p.ov[_ccEd.pv]){var t=ccResolve(p,'',_ccEd.pv);p.ov[_ccEd.pv]=t?JSON.parse(JSON.stringify(t)):{sections:[]};}
   _ccMark();return p.ov[_ccEd.pv];
 }
+var _itDrag=null;
+function _ccItDrag(e,si,ii){_itDrag={si:si,ii:ii};_pvDrag=-1;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','i');}catch(x){}e.stopPropagation();}
+function _ccItDrop(e,si2,ii2){
+  e.preventDefault();e.stopPropagation();e.currentTarget.style.boxShadow='';
+  var f=_itDrag;_itDrag=null;if(!f)return;
+  var t=_ccPvOwn();if(!t.sections[f.si]||!t.sections[si2])return;
+  var it=t.sections[f.si].items.splice(f.ii,1)[0];if(!it)return;
+  if(f.si===si2&&f.ii<ii2)ii2--;
+  t.sections[si2].items.splice(Math.max(0,ii2),0,it);_ccPvRefresh();
+}
 function _ccPvOp(op,si,ii){
+  if(op==='tgl'){var tt=_ccPvOwn(),x=tt.sections[si]&&tt.sections[si].items[ii];if(x){if(x.off)delete x.off;else x.off=1;}_ccPvRefresh();return;}
   if(op==='del'){
     var p0=_ccWork(),cur=(p0.ov&&p0.ov[_ccEd.pv])||ccResolve(p0,'',_ccEd.pv);
     var it0=cur&&cur.sections[si]&&cur.sections[si].items[ii];
@@ -3847,47 +3871,53 @@ function _ccLessonView(b,sel){
   if(!t){try{t=ccResolve(p,'',ln);}catch(e){}}
   var h='<div style="padding:8px 10px">'
     +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">'
-    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨 전용으로 고친 내용이에요</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">계획표 그대로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로 · 순서·이름·종류를 고치면 이 레슨 전용 내용으로 저장돼요</span>')+'</div>';
+    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨 전용으로 고친 내용이에요</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">계획표 그대로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로 · 순서·이름·종류를 고치면 이 레슨 전용 내용으로 저장돼요</span>')+'</div>'
+    +'<div class="ccx-help">☑ 체크를 풀면 글씨가 흐려지고 체크콜 화면에서 빠져요 · ⠿ 을 끌어 구역·항목 순서를 바꿔요</div>'
+    +'<div class="ccx-hd"><span style="width:16px"></span><span style="width:34px;text-align:center">표시</span><span style="width:96px">종류</span><span style="flex:1">항목 이름</span><span style="width:122px">일지 연동</span></div>';
   if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 공통 항목이 나옵니다.</div>';t={sections:[]};}
-  t.sections.forEach(function(sec,si){
-    var gc=_CCG_COL[si%_CCG_COL.length];try{if(sec.grp)gc=_ccGrpCol(b,sec.grp);}catch(e){}
+  // 계획표에서 꺼진 항목을 해당 구역 안에 흐리게 함께 보여줌
+  var offBy={},li=spec?-1:sel;
+  if(li>=0)b.rows.forEach(function(r,ri){if(r.c.charAt(li)==='x'){var k=(r.g||'')+'|'+(r.s||'');(offBy[k]=offBy[k]||[]).push(ri);}});
+  var secs=t.sections.map(function(sc){return {sec:sc,real:true};});
+  Object.keys(offBy).forEach(function(k){
+    if(!secs.some(function(x){return x.sec.k===k;})){var r0=b.rows[offBy[k][0]];secs.push({sec:{k:k,title:r0.s||r0.g||'',grp:r0.g||'',items:[]},real:false});}
+  });
+  secs.forEach(function(e,si){
+    var sec=e.sec,gc=_CCG_COL[si%_CCG_COL.length];try{if(sec.grp)gc=_ccGrpCol(b,sec.grp);}catch(x){}
     h+='<div ondragover="_ccPvOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccPvDrop(event,'+si+')" style="margin-top:12px">'
       +'<div class="ccx-sec" style="background:'+gc[0]+';color:'+gc[1]+'"><span draggable="true" ondragstart="_ccPvDrag(event,'+si+')" ondragend="_pvDrag=-1" title="끌어서 구역 순서 변경" style="cursor:grab;user-select:none">⠿</span>'
-      +'<input value="'+_bcEsc(sec.title)+'" oninput="_ccPvSet(\'title\','+si+',0,this.value)" style="color:inherit"><small>'+_bcEsc(sec.grp||'')+'</small>'
-      +'<button class="mini" title="구역을 위로 (구역 전체 이동)" onclick="_ccPvOp(\'secup\','+si+')">▲</button><button class="mini" title="구역을 아래로 (구역 전체 이동)" onclick="_ccPvOp(\'secdown\','+si+')">▼</button>'
-      +'<button class="mini" onclick="_ccPvOp(\'add\','+si+')">＋ 항목</button><button class="mini" title="구역 삭제" onclick="_ccPvOp(\'secdel\','+si+')">✕</button></div>';
+      +'<input value="'+_bcEsc(sec.title)+'"'+(e.real?' oninput="_ccPvSet(\'title\','+si+',0,this.value)"':' readonly')+' style="color:inherit"><small>'+_bcEsc(sec.grp||'')+'</small>'
+      +(e.real?'<button class="mini" onclick="_ccPvOp(\'add\','+si+')">＋ 항목</button><button class="mini" title="이 구역을 이 레슨에서 삭제" onclick="_ccPvOp(\'secdel\','+si+')">✕</button>':'')+'</div>';
     sec.items.forEach(function(it,ii){
-      var d=si+','+ii,k=si+'_'+ii,open=!!(_ccEd.openIt&&_ccEd.openIt[k]),lk=[];
-      if(it.t==='check')lk=[['','일지 연동 없음'],['hwBook','→ 교재 숙제'],['hwVideo','→ 영상 숙제']];
-      if(it.t==='number')lk=[['','일지 연동 없음'],['quiz','→ Daily Quiz']];
-      if(it.t==='dict')lk=[['','일지 연동 없음'],['dict','→ 받아쓰기']];
-      h+='<div class="ccx-row'+(open?' open':'')+'"><div class="ccx-line">'
-        +'<button class="ccx-tg" title="이 레슨에서 끄기" onclick="_ccPvOp(\'del\','+d+')">✓</button>'
-        +'<input class="ccx-nm" value="'+_bcEsc(it.l)+'" oninput="_ccPvSet(\'l\','+d+',this.value)">'
-        +_ccChip(it)+'<button class="ccx-more" title="세부 설정" onclick="_ccOpenToggle(\''+k+'\')">⋯</button></div>';
-      if(open){
-        h+='<div class="ccx-panel"><span class="lab">종류</span><select onchange="_ccPvSet(\'t\','+d+',this.value)">'+_BCED_TYPES.map(function(x){return '<option value="'+x[0]+'"'+(it.t===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
-        if(it.t==='call')h+='<span class="lab">호출 대상</span><select onchange="_ccPvSet(\'to\','+d+',this.value);_ccPlanDraw()"><option value="tablet"'+(it.to!=='book'?' selected':'')+'>태블릿 교사</option><option value="book"'+(it.to==='book'?' selected':'')+'>교재 교사</option></select>';
-        if(it.t==='number')h+='<span class="lab">단위</span><input value="'+_bcEsc(it.u||'')+'" oninput="_ccPvSet(\'u\','+d+',this.value)" style="width:56px">';
-        if(lk.length)h+='<span class="lab">일지 연동</span><select onchange="_ccPvSet(\'lk\','+d+',this.value)">'+lk.map(function(x){return '<option value="'+x[0]+'"'+((it.link||'')===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
-        h+='<span style="flex:1"></span><button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'up\','+d+')">▲ 위로</button><button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'down\','+d+')">▼ 아래로</button><button class="btn btn-outline btn-xs" style="color:#dc2626" onclick="_ccPvOp(\'del\','+d+')">이 레슨에서 끄기</button></div>';
-      }
-      h+='</div>';
+      var d=si+','+ii,lk=[],off=!!it.off;
+      if(it.t==='check')lk=[['','연동 없음'],['hwBook','→ 교재 숙제'],['hwVideo','→ 영상 숙제']];
+      if(it.t==='number')lk=[['','연동 없음'],['quiz','→ Daily Quiz']];
+      if(it.t==='dict')lk=[['','연동 없음'],['dict','→ 받아쓰기']];
+      var isPlan=/^b(\d+)r(\d+)$/.test(it.id||'');
+      h+='<div class="ccx-row'+(off?' offrow':'')+'" ondragover="if(_itDrag){event.preventDefault();this.style.boxShadow=\'0 -2px 0 #2563eb\'}" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccItDrop(event,'+si+','+ii+')"><div class="ccx-line">'
+        +'<span class="ccx-grip" draggable="true" ondragstart="_ccItDrag(event,'+si+','+ii+')" ondragend="_itDrag=null" title="끌어서 순서 변경">⠿</span>'
+        +'<button class="ccx-cb on" title="체크콜에 표시 (풀면 이 레슨에서 빠져요)" onclick="_ccPvOp(\''+(isPlan?'del':'tgl')+'\','+d+')">✓</button>';
+      h+=_ccItemCtl(it,d,lk,off)+'</div></div>';
+    });
+    if(e.real){/* 구역 끝 */}
+    (offBy[sec.k]||[]).forEach(function(ri){
+      var r=b.rows[ri],lab=r.l||'',ty=/받아쓰기/.test(lab)?'dict':(/선생님/.test(lab)?'call':'check');
+      h+='<div class="ccx-row offrow"><div class="ccx-line"><span class="ccx-grip" style="visibility:hidden">⠿</span>'
+        +'<button class="ccx-cb" title="눌러서 체크콜에 다시 표시" onclick="_ccPlanTog('+ri+','+sel+')"></button>'
+        +'<select disabled style="width:96px"><option>'+(ty==='dict'?'받아쓰기':(ty==='call'?'검사 받기':'체크칸'))+'</option></select><input class="ccx-nm" value="'+_bcEsc(lab)+'" readonly></div></div>';
     });
     h+='</div>';
   });
   h+='<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button><button class="btn btn-outline btn-xs" onclick="_ccPvApplyOrder()" title="이 레슨의 구역 순서를 같은 계획표의 다른 레슨에도 적용">이 구역 순서를 모든 레슨에 적용</button></div>';
-  if(!spec){
-    var offs=[];
-    b.rows.forEach(function(r,ri){if(r.c.charAt(sel)==='x')offs.push(ri);});
-    if(offs.length){
-      h+='<details'+(_ccEd.offOpen?' open':'')+' ontoggle="_ccEd.offOpen=this.open" class="ccx-off"><summary>꺼진 항목 '+offs.length+'개 — 눌러서 다시 켜기</summary><div style="margin-top:6px">';
-      offs.forEach(function(ri){var r=b.rows[ri];
-        h+='<div class="ccx-line"><button onclick="_ccPlanTog('+ri+','+sel+')" class="btn btn-outline btn-xs">＋ 켜기</button><span style="font-size:12px">'+_bcEsc(r.l)+'</span><span class="lab">'+_bcEsc((r.s||'')+(r.g?' · '+r.g:''))+'</span></div>';});
-      h+='</div></details>';
-    }
-  }
   return h+'</div>';
+}
+function _ccItemCtl(it,d,lk,off){
+  var h='<select onchange="_ccPvSet(\'t\','+d+',this.value)" style="width:96px">'+_BCED_TYPES.map(function(x){return '<option value="'+x[0]+'"'+(it.t===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
+  if(it.t==='call')h+='<select onchange="_ccPvSet(\'to\','+d+',this.value)" style="width:92px"><option value="tablet"'+(it.to!=='book'?' selected':'')+'>태블릿 교사</option><option value="book"'+(it.to==='book'?' selected':'')+'>교재 교사</option></select>';
+  h+='<input class="ccx-nm" value="'+_bcEsc(it.l)+'" oninput="_ccPvSet(\'l\','+d+',this.value)">';
+  if(it.t==='number')h+='<input value="'+_bcEsc(it.u||'')+'" oninput="_ccPvSet(\'u\','+d+',this.value)" placeholder="단위" style="width:48px" title="단위">';
+  h+=lk.length?'<select onchange="_ccPvSet(\'lk\','+d+',this.value)" style="width:122px">'+lk.map(function(x){return '<option value="'+x[0]+'"'+((it.link||'')===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>':'<span style="width:122px"></span>';
+  return h;
 }
 // 미리보기에서 직접 고친 레슨(ov)이 있으면, 켜고 끈 항목을 그 내용에도 똑같이 반영
 function _ccOvSync(ri,i){
