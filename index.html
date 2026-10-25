@@ -1789,7 +1789,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1026-i';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1026-k';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3664,7 +3664,7 @@ function _ccOpenPlans(host){
   m.onclick=function(e){if(e.target===m)m.remove();};}
   var opts=Object.keys(CC_PLANS).map(function(k){return '<option value="'+_bcEsc(k)+'">'+_bcEsc(k)+'</option>';}).join('');
   m.innerHTML=(host?'<div>':'<div class="ms" style="max-width:960px;width:96vw"><div class="mt">📋 단계별 계획표 (Study Plan)</div>')
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px"><select class="fi" id="ccp-key" onchange="_ccPlanKey(this.value)" style="width:170px">'+opts+'</select><select class="fi" id="ccp-blk" onchange="_ccPlanBlk(+this.value)" style="width:150px;display:none"></select><span id="ccp-tabs"></span><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap;margin-left:6px">시간 막대 기준 <input class="fi" id="ccp-min" type="number" min="10" max="300" style="width:60px;padding:5px" onchange="_ccPlanMinSet(this.value)"> 분</span><button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="_ccHelp()">❓ 편집 방법</button></div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px"><select class="fi" id="ccp-key" onchange="_ccPlanKey(this.value)" style="width:170px">'+opts+'</select><select class="fi" id="ccp-blk" onchange="_ccPlanBlk(+this.value)" style="width:150px;display:none"></select><span id="ccp-tabs"></span><button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="_ccHelp()">❓ 편집 방법</button></div>'
     +'<div id="ccp-help" style="display:none"></div>'
     +'<div id="ccp-edit">'
     +'<div id="ccp-tools" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:11px"></div>'
@@ -3804,8 +3804,7 @@ function _ccPlanSel(i){_ccEd.spec=null;_ccEd.sel=i;_ccPlanDraw();}
 function _ccPlanPick(v){if(String(v).indexOf('s:')===0){_ccEd.spec=v.slice(2);}else{_ccEd.spec=null;_ccEd.sel=+v;}_ccPlanDraw();}
 function _ccPlanDraw(){
   var p=_ccWork(),b=p.blocks[_ccEd.bi],k=_ccEd.key;
-  var _mi=document.getElementById('ccp-min');if(_mi)_mi.value=_ccMinOf(k,p);
-  var sb=document.getElementById('ccp-blk');
+    var sb=document.getElementById('ccp-blk');
   if(p.blocks.length>1){sb.style.display='';sb.innerHTML=p.blocks.map(function(x,i){return '<option value="'+i+'"'+(i===_ccEd.bi?' selected':'')+'>'+(i+1)+'번 표 ('+_bcEsc(_ccShort(x.lessons[0])+'~'+_ccShort(x.lessons[x.lessons.length-1]))+')</option>';}).join('');}else sb.style.display='none';
   var ls=b.lessons,sel=Math.min(_ccEd.sel,ls.length-1);_ccEd.sel=sel;
   var lopt=ls.map(function(n,i){return '<option value="'+i+'">'+_bcEsc(n)+'</option>';}).join('');
@@ -4203,6 +4202,7 @@ function _ccSpCards(p){
   });
   return h;
 }
+function _ccMinHtml(){var p=_ccWork();return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap">시간 막대 기준 <input class="fi" id="ccp-min" type="number" min="10" max="300" value="'+_ccMinOf(_ccEd.key,p)+'" style="width:56px;padding:3px 5px" onchange="_ccPlanMinSet(this.value)"> 분</span>';}
 function _ccGridPre(p){
   var cu=Object.keys(p.ov||{}).filter(function(ln){return _ccCustom(p,ln);});
   var h='';
@@ -4218,8 +4218,9 @@ function _ccLessonView(b,sel){
   if(!t){try{t=ccResolve(p,'',ln);}catch(e){}}
   var h='<div style="padding:8px 10px">'
     +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">'
+    +_ccMinHtml()+'<span style="flex:1"></span>'
     +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨만 따로 고친 내용입니다</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">전체 계획표 내용으로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">전체 계획표와 같음</span>')
-    +'<span style="flex:1"></span><button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button></div>';
+    +'<button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button></div>';
   if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 기본 점검 항목이 나옵니다.</div>';t={sections:[]};}
   // 계획표에서 꺼진 항목을 해당 구역 안에 흐리게 함께 보여줌
   var offBy={},li=spec?-1:sel;
