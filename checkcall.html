@@ -290,6 +290,7 @@ function ccSplitChecks(text){
 function ccResolve(plan,level,progress){
   if(!plan)return null;
   var p=ccNormProg(progress);
+  if(/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim()))p='전체 Review';   // 전체 Review는 Review와 따로 편집
   // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
     var _ot=JSON.parse(JSON.stringify(plan.ov[p]));
@@ -306,8 +307,16 @@ function ccResolve(plan,level,progress){
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
   var p=ccNormProg(progress);if(!p)return null;
-  var hw={k:'hw',title:'숙제 했나요?',items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
+  var hw={k:'hw',title:(plan.hwTitle||'숙제 했나요?'),items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
   var HWS=hw.items.length?[hw]:[];   // 공통 구역(숙제)을 전부 지우면 이 구역은 나오지 않아요
+  // 특별 진도(Level Test · Portfolio · Review · 전체 Review): 전체 계획표에서 편집한 내용(plan.sp)이 있으면 그걸 써요
+  var _spk=/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim())?'전체 Review':(/^Review$/i.test(p)?'Review':((p==='Level Test'||p==='Portfolio')?p:''));
+  if(_spk&&plan.sp&&plan.sp[_spk]&&Array.isArray(plan.sp[_spk].sections)){
+    if(_spk==='Level Test'&&plan.ltSuf&&!new RegExp(plan.ltSuf+'$').test(String(level||'').trim()))return null;
+    var _ss=JSON.parse(JSON.stringify(plan.sp[_spk].sections)).filter(function(sc){return sc.items&&sc.items.length;});
+    _ss.forEach(function(sc,i){if(!sc.k)sc.k='sp'+i;});
+    if(_ss.length)return {sections:HWS.concat(_ss)};
+  }
   // 레벨 테스트 / 포트폴리오 (레슨이 아닌 특별 진도)
   function special(text,title,withScore,idp){
     var its=[];
