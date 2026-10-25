@@ -1789,7 +1789,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1025-x';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1025-y';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3008,7 +3008,7 @@ function ccResolve(plan,level,progress){
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
   var p=ccNormProg(progress);if(!p)return null;
-  var hw={k:'hw',title:'숙제 했나요?',items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
+  var hw={k:'hw',title:(plan.hwTitle||'숙제 했나요?'),items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
   var HWS=hw.items.length?[hw]:[];   // 공통 구역(숙제)을 전부 지우면 이 구역은 나오지 않아요
   // 레벨 테스트 / 포트폴리오 (레슨이 아닌 특별 진도)
   function special(text,title,withScore,idp){
@@ -4048,6 +4048,11 @@ function _ccOvClearAll(){
   cu.forEach(function(ln){delete p.ov[ln];if(p.ovDel)delete p.ovDel[ln];});
   _ccMark();_ccPlanDraw();
 }
+function _ccHwTitle(v){
+  var p=_ccWork();v=String(v||'').trim();if(!v){_ccPlanDraw();return;}
+  if(v===(p.hwTitle||'숙제 했나요?'))return;
+  _ccPruneOv(p);p.hwTitle=v;_ccMark();_ccPlanDraw();
+}
 function _ccHwInit(p){if(!Array.isArray(p.hw))p.hw=[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}];return p.hw;}
 function _ccHwSet(i,f,v){
   var p=_ccWork();_ccPruneOv(p);var a=_ccHwInit(p),it=a[i];if(!it)return;
@@ -4062,7 +4067,7 @@ function _ccGridPre(p){
   var h='<div style="padding:8px 10px 6px;font-size:11px;color:var(--txt2);line-height:1.6">이 계획표를 고치면, 이 표를 쓰는 모든 레슨이 한꺼번에 바뀝니다. 새 항목은 모든 레슨에 켜진 상태로 추가되며, 필요 없는 레슨은 칸을 눌러 끌 수 있습니다.</div>';
   if(cu.length)h+='<div style="margin:0 10px 8px;padding:8px 10px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">✎ 따로 고친 레슨 '+cu.length+'개('+cu.slice(0,5).map(_bcEsc).join(', ')+(cu.length>5?' 외':'')+')는 이 표를 고쳐도 바뀌지 않습니다.</span><button class="btn btn-outline btn-xs" onclick="_ccOvClearAll()">이 레슨들도 계획표 그대로 맞추기</button></div>';
   var hw=Array.isArray(p.hw)?p.hw:[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}];
-  h+='<div style="margin:0 10px 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden"><div style="background:#e0e7ff;color:#3730a3;padding:5px 9px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:8px">숙제 했나요? <small style="font-weight:600;opacity:.75">공통 구역 · 모든 레슨에 나옵니다</small><span style="flex:1"></span><button class="btn btn-outline btn-xs" onclick="_ccHwAdd()">＋ 항목 추가</button></div>';
+  h+='<div style="margin:0 10px 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden"><div style="background:#e0e7ff;color:#3730a3;padding:5px 9px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:8px"><input value="'+_bcEsc(p.hwTitle||'숙제 했나요?')+'" onchange="_ccHwTitle(this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px"> <small style="font-weight:600;opacity:.75">공통 구역 · 모든 레슨에 나옵니다</small><span style="flex:1"></span><button class="btn btn-outline btn-xs" onclick="_ccHwAdd()">＋ 항목 추가</button></div>';
   hw.forEach(function(it,i){
     h+='<div class="ccx-line" style="padding:4px 9px"><input class="ccx-nm" value="'+_bcEsc(it.l)+'" onchange="_ccHwSet('+i+',\'l\',this.value)" style="flex:1">'
       +'<select onchange="_ccHwSet('+i+',\'lk\',this.value)" style="width:122px"><option value=""'+(it.link?'':' selected')+'>연동 없음</option><option value="hwBook"'+(it.link==='hwBook'?' selected':'')+'>→ 교재 숙제</option><option value="hwVideo"'+(it.link==='hwVideo'?' selected':'')+'>→ 영상 숙제</option></select>'
