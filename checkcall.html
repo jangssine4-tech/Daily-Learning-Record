@@ -297,8 +297,8 @@ function ccResolve(plan,level,progress){
     return _ot;
   }
   var t=ccResolve0(plan,level,progress);
-  if(t&&plan.sorder&&plan.sorder.length){   // 모든 레슨에 적용한 구역 순서
-    var o=plan.sorder;
+  var o=(plan.lord&&plan.lord[p])||plan.sorder;
+  if(t&&o&&o.length){   // 레슨별/모든 레슨에 적용한 구역 순서
     t.sections=t.sections.map(function(s,i){return{s:s,i:i,r:o.indexOf(s.k)};}).sort(function(a,b){var x=a.r<0?1e6:a.r,y=b.r<0?1e6:b.r;return x-y||a.i-b.i;}).map(function(z){return z.s;});
   }
   return t;
@@ -306,7 +306,8 @@ function ccResolve(plan,level,progress){
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
   var p=ccNormProg(progress);if(!p)return null;
-  var hw={k:'hw',title:'숙제 했나요?',items:[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]};
+  var hw={k:'hw',title:'숙제 했나요?',items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
+  var HWS=hw.items.length?[hw]:[];   // 공통 구역(숙제)을 전부 지우면 이 구역은 나오지 않아요
   // 레벨 테스트 / 포트폴리오 (레슨이 아닌 특별 진도)
   function special(text,title,withScore,idp){
     var its=[];
@@ -322,11 +323,11 @@ function ccResolve0(plan,level,progress){
   if(p==='Level Test'){
     if(!plan.lt)return null;
     if(plan.ltSuf&&!new RegExp(plan.ltSuf+'$').test(String(level||'').trim()))return null;
-    return {sections:[hw,special(plan.lt,'Level Test',true,'lt')]};
+    return {sections:HWS.concat([special(plan.lt,'Level Test',true,'lt')])};
   }
   if(p==='Portfolio'){
     if(!plan.pf)return null;
-    return {sections:[hw,special(plan.pf,'Portfolio',false,'pf')]};
+    return {sections:HWS.concat([special(plan.pf,'Portfolio',false,'pf')])};
   }
   var bi=-1,li=-1;
   for(var b=0;b<plan.blocks.length&&bi<0;b++){var ix=plan.blocks[b].lessons.indexOf(p);if(ix>=0){bi=b;li=ix;}}
@@ -361,7 +362,7 @@ function ccResolve0(plan,level,progress){
   var cnt={};secs.forEach(function(s){cnt[s.title]=(cnt[s.title]||0)+1;});
   secs.forEach(function(s){if(cnt[s.title]>1&&s.grp)s.title=s.grp.replace(/\s+/g,' ')+' '+s.title;s.k=s._k;delete s._k;});
   if(!secs.length)return null;
-  return {sections:[hw].concat(secs)};
+  return {sections:HWS.concat(secs)};
 }
 
 
