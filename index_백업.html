@@ -312,7 +312,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .ccx-tabs{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
 .ccx-tab{border:0;background:#fff;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--txt2);font-weight:700}
 .ccx-tab.on{background:var(--navy);color:#fff}
-.ccx-q{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;padding:0;line-height:1}
+.ccx-q{height:100%;aspect-ratio:1/1;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--txt2);font-size:10px;font-weight:800;cursor:pointer;padding:0;line-height:1}
 .ccx-tip{position:absolute;left:0;top:30px;z-index:30;width:262px;background:#1f2937;color:#fff;border-radius:10px;padding:9px 11px;font-size:11px;line-height:1.6;box-shadow:0 6px 18px rgba(0,0,0,.25);font-weight:500}
 .ccx-tip:before{content:'';position:absolute;top:-6px;left:7px;border:6px solid transparent;border-top:0;border-bottom-color:#1f2937}
 .ccx-row.offrow .ccx-nm{text-decoration:none}
@@ -1789,7 +1789,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1026-b';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1026-l';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3139,7 +3139,7 @@ async function _bcSyncRoster(manual){
     students.forEach(function(s){
       var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
       var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return;
-      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:(window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES,level:getStudentLevel(s),lvl:_inf.lvl,ses:_ccSesMap(s)};
+      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:_ccMinOf(ccPlanKey(_inf.lvl,s.grade),_ccEffPlan(ccPlanKey(_inf.lvl,s.grade))),level:getStudentLevel(s),lvl:_inf.lvl,ses:_ccSesMap(s)};
     });
     var ops=[];
     if(!Object.keys(want).length){   // 명단에 넣을 학생이 하나도 없으면 기존 명단을 지우지 않아요
@@ -3438,19 +3438,21 @@ function _ccRostHelp(){var b=document.getElementById('ccrost-help');if(b)b.style
 function _ccPaneGo(k){_ccPaneCur=k;renderCcSet();}
 function _ccTabletHtml(){
   return '<div style="max-width:640px;font-size:13px;line-height:1.7;color:var(--txt2)">'
-    +'<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:6px">📱 학생 태블릿 연결</div>'
-    +'새 태블릿(또는 설정이 꼬인 태블릿)에서 <b>링크를 한 번 열면</b> Firebase 설정이 자동으로 입력돼요. 직접 apiKey 등을 입력하지 않아도 돼요.'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn btn-navy btn-sm" onclick="_bcCopyTabletLink()">🔗 태블릿 링크 복사</button><span style="position:relative;display:inline-flex;gap:4px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_bcSyncRoster(true)">🔄 체크콜 명단 갱신</button><button type="button" onclick="event.stopPropagation();_ccRostHelp()" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--txt2);font-weight:800;font-size:13px;cursor:pointer;padding:0" aria-label="도움말">?</button>'
     +'<div id="ccrost-help" onclick="event.stopPropagation()" style="display:none;position:absolute;left:0;top:36px;z-index:20;width:320px;max-width:80vw;background:#1f2433;color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;box-shadow:0 10px 24px rgba(0,0,0,.3)"><b style="color:#7cdfb5">언제 쓰는 버튼인가요?</b><br>평소에는 누를 필요가 없어요. 선생님 앱이 켜져 있으면 학생을 등록하거나 정보를 바꿀 때 명단이 자동으로 갱신돼요.<br><br>학생이 태블릿에서 <b>"없는 번호예요"</b>가 계속 나올 때만 누르세요. 학생번호(5자리)와 재원·신규 상태를 확인한 뒤, 이 버튼으로 명단을 다시 저장하면 돼요.</div></span></div>'
     +'<ol style="padding-left:18px;margin:0">'
     +'<li>🔗 <b>태블릿 링크 복사</b>를 누르면 링크가 복사돼요. 카카오톡 "나에게 보내기" 등으로 태블릿에 옮기세요.</li>'
     +'<li>태블릿 브라우저에서 그 링크를 열면 설정이 저장되고 로그인 화면이 나와요.</li>'
+    +'<li>핸드폰 바탕 화면에 바로가기 아이콘을 만들어 주세요.<ul style="padding-left:18px;margin:4px 0 4px">'
+    +'<li><b>안드로이드(크롬)</b>: 링크를 열고 오른쪽 위 ⋮ 메뉴에서 "홈 화면에 추가" 또는 "앱 설치"를 누릅니다. 홈 화면에 체크콜 아이콘이 생깁니다.</li>'
+    +'<li><b>아이폰(사파리)</b>: 반드시 사파리로 링크를 열고, 아래쪽 공유 버튼에서 "홈 화면에 추가"를 누릅니다. 크롬 앱에서는 이 메뉴가 안 나옵니다.</li></ul></li>'
     +'<li>번호를 눌러도 "없는 번호예요"가 계속 나오면 🔄 <b>체크콜 명단 갱신</b>을 누른 뒤 다시 해 보세요.</li>'
-    +'<li>태블릿 설정을 지우고 싶으면 주소 끝에 <code>?reset=1</code>을 붙여서 여세요.</li></ol></div>';
+    +'<li>태블릿 설정을 지우고 싶으면 주소 끝에 <code>?reset=1</code>을 붙여서 여세요.</li>'
+    +'<li>보안 문제로 학생들에게 링크는 학생 폰에만 보내고 단체방에는 올리지 말라고 안내해 주세요.</li></ol></div>';
 }
 function renderCcSet(){
   var host=document.getElementById('ref-panel-ccset');if(!host)return;
-  var panes=[['plan','📋 단계별 계획표','cc_plan'],['common','⚙ 공통 항목','cc_common'],['tablet','📱 태블릿 연결','cc_common']].filter(function(c){return _ccCan(c[2]);});
+  var panes=[['plan','📋 단계별 계획표','cc_plan'],['common','⚙ 기본 점검 항목','cc_common'],['tablet','📱 태블릿 & 핸드폰 연결 방법','cc_common']].filter(function(c){return _ccCan(c[2]);});
   if(!panes.length){host.innerHTML='<div class="empty"><div class="et">관리자만 볼 수 있어요</div></div>';return;}
   if(!panes.some(function(c){return c[0]===_ccPaneCur;}))_ccPaneCur=panes[0][0];
   host.innerHTML='<div style="display:flex;gap:6px;padding:12px 16px 0;flex-wrap:wrap">'+panes.map(function(c){return '<button class="btn '+(c[0]===_ccPaneCur?'btn-navy':'btn-outline')+' btn-sm" onclick="_ccPaneGo(\''+c[0]+'\')">'+c[1]+'</button>';}).join('')+'</div><div id="ccset-body" style="padding:12px 16px 24px"></div>';
@@ -3474,18 +3476,18 @@ function _bcOpenSettings(host){
   var m=host||document.createElement('div');
   if(!host){m.id='modal-bcset';m.className='mo';m.dataset.dynamic='1';m.style.display='flex';
   m.onclick=function(e){if(e.target===m)m.remove();};}
-  var opts='<option value="default">공통 (단계별 설정이 없을 때)</option>';
+  var opts='<option value="default">기본 (단계별 설정이 없을 때)</option>';
   Object.keys(EVAL_MODULES).forEach(function(k){opts+='<option value="'+_bcEsc(k)+'">'+_bcEsc(EVAL_MODULES[k].label||k)+'</option>';});
   m.innerHTML=(host?'<div style="max-width:760px">':'<div class="ms" style="max-width:680px"><div class="mt">⚙ 점검 항목 편집</div>')
-    +'<div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:10px">학생 태블릿(체크콜)에 보이는 점검 항목을 <b>단계(평가 모듈)별</b>로 정합니다. 단계별 설정이 없으면 <b>공통</b> 설정을 따릅니다. 저장하면 태블릿에 자동 반영돼요.</div>'
+    +'<div style="font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:10px">학생 태블릿(체크콜)에 보이는 점검 항목을 <b>단계(평가 모듈)별</b>로 정합니다. 단계별 설정이 없으면 <b>기본</b> 설정을 따릅니다. 저장하면 태블릿에 자동 반영돼요.</div>'
     +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><select class="fi" id="bced-key" onchange="_bcEdKey(this.value)" style="flex:1">'+opts+'</select>'
-    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap">시간 막대 기준 <input class="fi" id="bced-min" type="number" min="10" max="300" value="'+_bcEd.totalMin+'" style="width:64px;padding:6px"> 분</div></div>'
+    +'<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap">시간 막대 기준 <small>(단계별 계획표가 없는 학생)</small> <input class="fi" id="bced-min" type="number" min="10" max="300" value="'+_bcEd.totalMin+'" style="width:64px;padding:6px"> 분</div></div>'
     +'<div id="bced-note" style="font-size:11px;color:var(--txt3);margin-bottom:6px"></div>'
     +'<div id="bced-body" oninput="_bcEdTouch()"></div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center">'
     +'<button class="btn btn-outline btn-xs" onclick="_bcEdOp(\'secadd\')">＋ 구역 추가</button>'
     +'<button class="btn btn-outline btn-xs" onclick="_bcEdReset()">기본 구성으로</button>'
-    +'<button class="btn btn-outline btn-xs" id="bced-clear" onclick="_bcEdClear()">이 단계 설정 지우기(공통 따르기)</button>'
+    +'<button class="btn btn-outline btn-xs" id="bced-clear" onclick="_bcEdClear()">이 단계 설정 지우기(기본 따르기)</button>'
     +'<span style="margin-left:auto;display:flex;gap:4px;align-items:center"><select class="fi" id="bced-copy" style="font-size:11px;padding:5px">'+opts+'</select><button class="btn btn-outline btn-xs" onclick="_bcEdCopy()">여기에 복사</button></span></div>'
     +'<div style="display:flex;gap:8px;margin-top:14px">'+(host?'':'<button class="btn btn-outline" style="flex:1;justify-content:center;padding:11px" onclick="document.getElementById(\'modal-bcset\').remove()">취소</button>')
     +'<button class="btn btn-navy" style="flex:2;justify-content:center;padding:11px" onclick="_bcSaveSettings()">저장</button></div></div>';
@@ -3502,7 +3504,7 @@ function _bcEdKey(k,first){
 function _bcEdTouch(){if(_bcEd&&!_bcEd.tpl[_bcEd.key])_bcEd.tpl[_bcEd.key]=_bcEd.view;}
 function _bcEdDraw(){
   var v=_bcEd.view,k=_bcEd.key,own=!!_bcEd.tpl[k];
-  document.getElementById('bced-note').textContent=k==='default'?'모든 단계에 공통으로 쓰는 항목입니다.':(own?'이 단계 전용 설정을 쓰고 있어요.':'아직 이 단계 전용 설정이 없어 공통 설정을 따르고 있어요. 항목을 고치면 이 단계 전용으로 저장됩니다.');
+  document.getElementById('bced-note').textContent=k==='default'?'모든 단계에 기본으로 쓰는 항목입니다.':(own?'이 단계 전용 설정을 쓰고 있어요.':'아직 이 단계 전용 설정이 없어 기본 설정을 따르고 있어요. 항목을 고치면 이 단계 전용으로 저장됩니다.');
   document.getElementById('bced-clear').style.display=(k!=='default'&&own)?'':'none';
   var h='';
   v.sections.forEach(function(sec,si){
@@ -3637,6 +3639,22 @@ function _ccShort(n){
   if((m=n.match(/^Wrap-Up (\d)$/)))return 'W'+m[1];
   return n;
 }
+// 시간 막대 기준(분): 단계별 계획표마다 정함 (Phonics 50 · Basic/Grammar 60 · Prime/Advanced 90, 직접 수정 가능)
+function _ccMinDefault(key){
+  key=String(key||'');
+  if(/^(Phonics|Master Phonics)/.test(key))return 50;
+  if(/^(Basic|First Grammar|Grammar Plus)/.test(key))return 60;
+  if(/^(Prime|Advanced)/.test(key))return 90;
+  return 0;
+}
+function _ccMinOf(key,plan){var m=plan&&+plan.min;if(m>0)return m;return _ccMinDefault(key)||((window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES);}
+function _ccPlanMinSet(v){
+  var p=_ccWork(),k=_ccEd.key,n=Math.max(10,Math.min(300,parseInt(v,10)||0)),box=document.getElementById('ccp-min');
+  if(!parseInt(v,10)){if(box)box.value=_ccMinOf(k,p);return;}
+  var d=_ccMinDefault(k)||((window._bcConfig&&window._bcConfig.totalMin)||CC_DEFAULT_MINUTES);
+  if(n===d)delete p.min;else p.min=n;
+  if(box)box.value=n;_ccMark();
+}
 function _ccOpenPlans(host){
   if(!_ccCan('cc_plan')){toast('관리자만 편집할 수 있어요');return;}
   var old=document.getElementById('modal-ccplan');if(old)old.remove();
@@ -3727,7 +3745,7 @@ function _ccPvDrop(e,to){
 }
 function _ccPvReset(){
   var p=_ccWork();if(!p.ov||!p.ov[_ccEd.pv])return;
-  if(!confirm('"'+_ccEd.pv+'" 레슨을 계획표 그대로로 되돌릴까요? 미리보기에서 고친 내용이 사라져요.'))return;
+  if(!confirm('"'+_ccEd.pv+'" 레슨을 전체 계획표 내용으로 되돌릴까요?\n이 레슨에서 따로 고친 내용이 사라집니다.'))return;
   delete p.ov[_ccEd.pv];if(p.ovDel)delete p.ovDel[_ccEd.pv];_ccMark();_ccPvRefresh();
 }
 function _ccPvApplyOrder(){
@@ -3747,14 +3765,14 @@ function _ccPlanPrev(reset,target){
   var h;
   if(target){
     h='<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">'
-      +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨 전용으로 고친 내용이에요</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">계획표 그대로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로 · 순서·이름·종류를 고치면 이 레슨 전용 내용으로 저장돼요</span>')+'</div>'
+      +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨 전용으로 고친 내용이에요</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">전체 계획표 내용으로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로 · 순서·이름·종류를 고치면 이 레슨 전용 내용으로 저장돼요</span>')+'</div>'
       +'<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">체크콜에서 학생이 보게 될 순서 그대로예요. ⠿ 을 끌거나 ▲▼ 로 구역·항목 순서를 바꾸고, ✕ 는 이 레슨에서 항목을 끄는 버튼이에요(아래 "꺼진 항목"에서 다시 켤 수 있어요).</div>';
   }else{
     h='<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap"><b style="font-size:12px">'+_bcEsc(_ccEd.key)+'</b><select class="fi" style="width:auto;font-size:12px" onchange="_ccEd.pv=this.value;_ccPlanPrev()">'+all.map(function(n){return '<option value="'+_bcEsc(n)+'"'+(n===_ccEd.pv?' selected':'')+'>'+_bcEsc(n)+((p.ov&&p.ov[n])?' ✎':'')+'</option>';}).join('')+'</select>'
-    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨은 직접 고친 내용을 사용해요</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">계획표 그대로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로 · 아래에서 고치면 이 레슨 전용 내용으로 저장돼요</span>')+'</div>'
+    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨은 직접 고친 내용을 사용해요</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">전체 계획표 내용으로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로 · 아래에서 고치면 이 레슨 전용 내용으로 저장돼요</span>')+'</div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">체크콜에서 학생이 보게 될 화면입니다. 위에서 아래 순서가 화면 순서예요. 구역 왼쪽 ⠿ 을 끌거나 ▲▼ 로 순서를 바꾸고, 저장하면 태블릿에 반영돼요.</div>';
   }
-  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 공통 항목이 나옵니다.</div>';t={sections:[]};}
+  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 기본 점검 항목이 나옵니다.</div>';t={sections:[]};}
   t.sections.forEach(function(sec,si){
     h+='<div ondragover="_ccPvOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccPvDrop(event,'+si+')" style="border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--surface2)">'
       +'<div style="display:flex;gap:4px;align-items:center;margin-bottom:6px"><span draggable="true" ondragstart="_ccPvDrag(event,'+si+')" ondragend="_pvDrag=-1" title="끌어서 순서 변경" style="cursor:grab;padding:2px 6px;font-size:16px;color:var(--txt3);user-select:none">⠿</span>'
@@ -3786,18 +3804,18 @@ function _ccPlanSel(i){_ccEd.spec=null;_ccEd.sel=i;_ccPlanDraw();}
 function _ccPlanPick(v){if(String(v).indexOf('s:')===0){_ccEd.spec=v.slice(2);}else{_ccEd.spec=null;_ccEd.sel=+v;}_ccPlanDraw();}
 function _ccPlanDraw(){
   var p=_ccWork(),b=p.blocks[_ccEd.bi],k=_ccEd.key;
-  var sb=document.getElementById('ccp-blk');
+    var sb=document.getElementById('ccp-blk');
   if(p.blocks.length>1){sb.style.display='';sb.innerHTML=p.blocks.map(function(x,i){return '<option value="'+i+'"'+(i===_ccEd.bi?' selected':'')+'>'+(i+1)+'번 표 ('+_bcEsc(_ccShort(x.lessons[0])+'~'+_ccShort(x.lessons[x.lessons.length-1]))+')</option>';}).join('');}else sb.style.display='none';
   var ls=b.lessons,sel=Math.min(_ccEd.sel,ls.length-1);_ccEd.sel=sel;
   var lopt=ls.map(function(n,i){return '<option value="'+i+'">'+_bcEsc(n)+'</option>';}).join('');
   var _mode=_ccEd.mode||'lesson';
   _ccEd.pr=_ccEd.pr||{};if(!_ccEd.pr[k]){_ccEd.pr[k]=1;if(_ccPruneOv(p))_ccMark();}
-  var _more='<details style="display:inline-block;position:relative"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
+  var _more='<details style="display:inline-block;position:relative;margin-left:12px"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
     +'<button class="btn btn-outline btn-xs" onclick="_ccLessonAdd()">＋ 레슨 추가</button><button class="btn btn-outline btn-xs" onclick="_ccLessonRename()">✎ 이름 변경</button><button class="btn btn-outline btn-xs" onclick="_ccLessonDel()">🗑 레슨 삭제</button>'
     +'<button class="btn btn-outline btn-xs" onclick="_ccPlanReset()">엑셀 원본으로 되돌리기</button></div></details>';
   var _tabs='<span class="ccx-tabs"><button class="ccx-tab'+(_mode==='lesson'?' on':'')+'" onclick="_ccPlanMode(\'lesson\')">레슨별 계획표</button><button class="ccx-tab'+(_mode==='grid'?' on':'')+'" onclick="_ccPlanMode(\'grid\')">전체 계획표</button></span>';
   var _tabHost=document.getElementById('ccp-tabs');if(_tabHost)_tabHost.innerHTML=_tabs;
-  var _apply=(_ccEd.spec||_mode!=='lesson')?'':'<button class="btn btn-navy btn-xs" onclick="_ccApplyOpen()" title="이 레슨의 설정을 다른 레슨에 적용">적용</button><span style="position:relative;display:inline-block"><button class="ccx-q" onclick="_ccApplyTip(event)" title="안내">?</button><div id="ccx-tip" class="ccx-tip" style="display:none" onclick="event.stopPropagation()">이 레슨의 설정을 다른 레슨에 복사합니다.<br>적용 후에는 맨 아래 <b>"저장 (태블릿에 반영)"</b>을 눌러야 학생 화면에 반영됩니다.</div></span>';
+  var _apply=(_ccEd.spec||_mode!=='lesson')?'':'<span style="display:inline-flex;align-items:stretch;gap:3px"><button class="btn btn-navy btn-xs" onclick="_ccApplyOpen()" title="이 레슨의 설정을 다른 레슨에 적용">적용</button><span style="position:relative;display:inline-flex"><button class="ccx-q" onclick="_ccApplyTip(event)" title="안내">?</button><div id="ccx-tip" class="ccx-tip" style="display:none" onclick="event.stopPropagation()">이 레슨의 설정을 다른 레슨에 복사합니다.<br>적용 후에는 맨 아래 <b>"저장 (태블릿에 반영)"</b>을 눌러야 학생 화면에 반영됩니다.</div></span></span>';
   var _tl=document.getElementById('ccp-tools');_tl.style.display=_mode==='grid'?'none':'flex';
   _tl.innerHTML=''
     +'<button class="btn btn-outline btn-xs" onclick="_ccPlanSel('+(sel-1)+')"'+(sel===0?' disabled':'')+'>◀</button>'
@@ -3891,12 +3909,13 @@ function _ccHelp(){
    +'<li><b>순서 변경</b>: 구역 제목 앞 ⠿ 을 끌면 구역 순서, 항목 앞 ⠿ 을 끌면 항목 순서가 바뀝니다.</li>'
    +'<li><b>종류</b>: 체크칸(학생이 체크) / 숫자 입력 / 받아쓰기(맞은 개수/전체) / 검사 받기(선생님 호출 — 태블릿 교사 또는 교재 교사)</li>'
    +'<li><b>일지 연동</b>: 학생이 체크콜에 입력하면 학습 일지의 해당 칸에 자동으로 들어갑니다. 예) "→ 교재 숙제"는 일지의 교재 숙제 칸, "→ Daily Quiz"는 Daily Quiz 칸, "→ 받아쓰기"는 받아쓰기 칸입니다. (일지에서 옅은 회색으로 표시되는 칸)</li>'
-   +'<li><b>항목 이름</b>은 칸에서 바로 고칩니다. 이름·종류·순서를 고치면 그 레슨 전용 내용(✎)으로 저장됩니다. 맨 위 "계획표 그대로 되돌리기"로 되돌립니다.</li>'
+   +'<li><b>항목 이름</b>은 칸에서 바로 고칩니다. 이름·종류·순서를 고치면 그 레슨 전용 내용(✎)으로 저장됩니다. 맨 위 "전체 계획표 내용으로 되돌리기"로 되돌립니다.</li>'
    +'<li><b>항목 삭제</b>: 항목 오른쪽 "삭제" 버튼을 누르면 그 항목이 흐리게 바뀌어 이 레슨의 체크콜에서 빠집니다. 같은 자리의 "복원" 버튼을 누르면 바로 되돌아옵니다.</li>'
    +'<li><b>구역</b>: "＋ 구역 추가"는 새 구역을 만들고, 구역 제목 오른쪽의 "＋ 항목 추가"는 그 구역에 항목을 더하며, "구역 삭제"는 이 레슨에서 그 구역을 지웁니다.</li>'
    +'<li><b>이 구역 순서를 모든 레슨에 적용</b>: 지금 레슨의 구역 순서를 같은 계획표의 다른 레슨에도 똑같이 적용합니다(직접 고친 레슨 제외).</li>'
    +'<li><b>적용</b>: 이 레슨의 설정을 다른 레슨에 복사합니다. 누르면 레슨 목록이 나오고, 체크한 레슨에 적용됩니다. \"같은 번호 레슨만\", \"이 Unit 전체\" 같은 빠른 선택도 있습니다. \"구역 순서만\"을 고르면 항목은 그대로 두고 순서만 복사합니다.</li>'
    +'<li><b>전체 계획표</b>: 위쪽 \"전체 계획표\" 탭에서 모든 레슨에 공통인 구역과 항목을 추가·이름 변경·삭제합니다. 이 레슨만 따로 고친 내용(✎)은 전체 계획표를 고치면 계획표 기준으로 되돌아갑니다(고치기 전에 확인을 묻습니다). 아래쪽 \"특별 진도\"에서 Level Test · Portfolio · Review · 전체 Review 항목도 편집합니다.</li>'
+   +'<li><b>시간 막대 기준</b>: 학생 태블릿 위쪽 시간 막대가 가득 차는 시간(분)입니다. 단계마다 정하며, 기본값은 Phonics 50분 · Basic/Grammar 60분 · Prime/Advanced 90분입니다.</li>'
    +'<li><b>저장</b>: 아래 "저장 (태블릿에 반영)"을 눌러야 체크콜에 반영됩니다.</li>'
    +'</ul></div>';
   h.style.display='';
@@ -4183,10 +4202,11 @@ function _ccSpCards(p){
   });
   return h;
 }
+function _ccMinHtml(){var p=_ccWork();return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap">시간 막대 기준 <input class="fi" id="ccp-min" type="number" min="10" max="300" value="'+_ccMinOf(_ccEd.key,p)+'" style="width:56px;padding:3px 5px" onchange="_ccPlanMinSet(this.value)"> 분</span>';}
 function _ccGridPre(p){
   var cu=Object.keys(p.ov||{}).filter(function(ln){return _ccCustom(p,ln);});
   var h='';
-  if(cu.length)h+='<div style="margin:0 10px 8px;padding:8px 10px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">✎ 따로 고친 레슨 '+cu.length+'개('+cu.slice(0,5).map(_bcEsc).join(', ')+(cu.length>5?' 외':'')+')는 이 표를 고치면 계획표 기준으로 되돌아갑니다.</span><button class="btn btn-outline btn-xs" onclick="_ccOvClearAll()">지금 계획표 기준으로 되돌리기</button></div>';
+  if(cu.length)h+='<div style="margin:0 10px 8px;padding:8px 10px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">✎ 따로 고친 레슨 '+cu.length+'개('+cu.slice(0,5).map(_bcEsc).join(', ')+(cu.length>5?' 외':'')+')는 이 표를 고치면 계획표 기준으로 되돌아갑니다.</span></div>';
   h+='<div style="margin:0 10px 8px"><button class="btn btn-outline btn-xs" onclick="_ccSecAdd()">＋ 구역 추가</button></div>';
   return h;
 }
@@ -4198,9 +4218,10 @@ function _ccLessonView(b,sel){
   if(!t){try{t=ccResolve(p,'',ln);}catch(e){}}
   var h='<div style="padding:8px 10px">'
     +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">'
-    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨만 따로 고친 내용입니다</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">계획표 그대로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로</span>')
-    +'<span style="flex:1"></span><button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button></div>';
-  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 공통 항목이 나옵니다.</div>';t={sections:[]};}
+    +_ccMinHtml()+'<span style="flex:1"></span>'
+    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨만 따로 고친 내용입니다</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">전체 계획표 내용으로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">전체 계획표와 같음</span>')
+    +'<button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button></div>';
+  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 기본 점검 항목이 나옵니다.</div>';t={sections:[]};}
   // 계획표에서 꺼진 항목을 해당 구역 안에 흐리게 함께 보여줌
   var offBy={},li=spec?-1:sel;
   if(li>=0)b.rows.forEach(function(r,ri){if(r.c.charAt(li)==='x'){var k=(r.g||'')+'|'+(r.s||'');(offBy[k]=offBy[k]||[]).push(ri);}});
@@ -24305,7 +24326,7 @@ function openMenuPermModal(userId){
     });
   });
   secHTML+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin:14px 0 4px">체크콜 편집 (기본: 관리자만)</div>'
-    +[['cc_plan','📋 Study Plan 설정 (단계별 계획표)'],['cc_common','⚙ 공통 항목 · 📱 태블릿 연결']].map(function(c){return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="perm-'+c[0]+'"'+(perms[c[0]]===true?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'+c[1]+'</label>';}).join('');
+    +[['cc_plan','📋 Study Plan 설정 (단계별 계획표)'],['cc_common','⚙ 기본 점검 항목 · 📱 태블릿 & 핸드폰 연결 방법']].map(function(c){return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="perm-'+c[0]+'"'+(perms[c[0]]===true?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'+c[1]+'</label>';}).join('');
   overlay.innerHTML='<div class="ms" style="max-width:360px;max-height:90vh;overflow-y:auto">'
     +'<div class="mh"></div>'
     +'<div class="mt">메뉴 권한 — '+u.name+'</div>'
