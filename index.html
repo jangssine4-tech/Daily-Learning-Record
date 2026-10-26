@@ -1789,7 +1789,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1026-m';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1026-n';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3843,7 +3843,7 @@ function _ccPlanDraw(){
     +_apply+_more;
   if(_mode==='lesson'){var _tb=document.getElementById('ccp-tbl'),_st=_tb.scrollTop;_tb.innerHTML=_ccLessonView(b,sel);_tb.scrollTop=_st;_ccPlanTab(_ccEd.tab||'edit');return;}
   var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:230px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
-  ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;"position:sticky;top:0;z-index:2;cursor:pointer;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+((_ccWork().ov&&_ccWork().ov[n])?' ✎':'')+'</th>';});
+  ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+(_ccCustom(_ccWork(),n)?' ✎':'')+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
   var _pk=null,_ncol=ls.length+2;
   b.rows.forEach(function(r,ri){
@@ -4222,11 +4222,22 @@ function _ccSpCards(p){
   return h;
 }
 function _ccMinHtml(){var p=_ccWork();return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap">시간 막대 기준 <input class="fi" id="ccp-min" type="number" min="10" max="300" value="'+_ccMinOf(_ccEd.key,p)+'" style="width:56px;padding:3px 5px" onchange="_ccPlanMinSet(this.value)"> 분</span>';}
+function _ccColMove(d){var b=_ccWork().blocks[_ccEd.bi],sel=_ccEd.sel,to=sel+d;if(to<0||to>=b.lessons.length)return;_ccLessonMove(sel,to);_ccEd.sel=to;_ccPlanDraw();}
+function _ccColBar(p){
+  var b=p.blocks[_ccEd.bi],sel=_ccEd.sel,n=b.lessons.length;
+  var bt=function(t,f,dis){return '<button class="btn btn-outline btn-xs" onclick="'+f+'"'+(dis?' disabled':'')+'>'+t+'</button>';};
+  return '<div style="margin:0 10px 8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px">'
+    +'<span style="color:var(--txt2)">선택한 열(레슨): <b style="color:var(--navy)">'+_bcEsc(b.lessons[sel])+'</b></span>'
+    +bt('◀ 앞으로','_ccColMove(-1)',sel===0)+bt('뒤로 ▶','_ccColMove(1)',sel>=n-1)
+    +bt('＋ 앞에 삽입','_ccLessonAdd(\'before\')')+bt('＋ 뒤에 삽입','_ccLessonAdd(\'after\')')
+    +bt('✎ 이름 변경','_ccLessonRename()')+bt('🗑 삭제','_ccLessonDel()',n<=1)
+    +'<span style="color:var(--txt3)">머리글(레슨 이름)을 눌러 열을 고르고, 끌어서 순서를 바꿀 수도 있습니다.</span></div>';
+}
 function _ccGridPre(p){
   var cu=Object.keys(p.ov||{}).filter(function(ln){return _ccCustom(p,ln);});
   var h='';
   if(cu.length)h+='<div style="margin:0 10px 8px;padding:8px 10px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">✎ 따로 고친 레슨 '+cu.length+'개('+cu.slice(0,5).map(_bcEsc).join(', ')+(cu.length>5?' 외':'')+')는 이 표를 고치면 계획표 기준으로 되돌아갑니다.</span></div>';
-  h+='<div style="margin:0 10px 8px"><button class="btn btn-outline btn-xs" onclick="_ccSecAdd()">＋ 구역 추가</button></div>';
+  h+=_ccColBar(p)+'<div style="margin:0 10px 8px"><button class="btn btn-outline btn-xs" onclick="_ccSecAdd()">＋ 구역 추가</button></div>';
   return h;
 }
 function _ccLessonView(b,sel){
@@ -4349,12 +4360,12 @@ function _ccShiftNotes(b,at,delta){
     });r.n=nn;
   });
 }
-function _ccLessonAdd(){
-  var b=_ccWork().blocks[_ccEd.bi],sel=_ccEd.sel;
-  var nm=prompt('새 레슨 이름 (일지 진도와 똑같이 입력하세요. 예: Lesson 9, Unit 5 Lesson 1)\n\n"'+b.lessons[sel]+'" 바로 뒤에 추가하고, 그 레슨의 설정을 복사해요.','');
+function _ccLessonAdd(where){
+  var b=_ccWork().blocks[_ccEd.bi],sel=_ccEd.sel,bef=where==='before';
+  var nm=prompt('새 레슨 이름 (일지 진도와 똑같이 입력하세요. 예: Lesson 9, Unit 5 Lesson 1)\n\n"'+b.lessons[sel]+'" 바로 '+(bef?'앞':'뒤')+'에 추가하고, 그 레슨의 설정을 복사해요.','');
   if(nm===null)return;nm=_ccLessonName(nm);if(!nm)return;
   if(b.lessons.indexOf(nm)>=0){toast('이미 있는 레슨 이름이에요');return;}
-  var at=sel+1;
+  var at=bef?sel:sel+1;
   b.lessons.splice(at,0,nm);
   _ccShiftNotes(b,at,1);
   b.rows.forEach(function(r){var ch=r.c.charAt(sel)||'c';r.c=r.c.slice(0,at)+ch+r.c.slice(at);});
