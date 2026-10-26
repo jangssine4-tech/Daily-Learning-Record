@@ -308,6 +308,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .ccx-cb.on{background:#2563eb}
 .ccx-line select,.ccx-line input.ccx-nm+input{border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:12px;background:#fff;flex:0 0 auto}
 .ccx-row.offrow .ccx-nm,.ccx-row.offrow select,.ccx-row.offrow input{opacity:.4}
+.ccx-ap{flex:0 0 auto;border:1px solid #bfdbfe;background:#fff;color:#1d4ed8;border-radius:6px;font-size:11px;padding:4px 7px;cursor:pointer;width:44px}
 .ccx-del.rs{border-color:#bfdbfe;color:#2563eb}
 .ccx-tabs{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
 .ccx-tab{border:0;background:#fff;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--txt2);font-weight:700}
@@ -1789,7 +1790,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1026-o';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1026-p';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4307,6 +4308,54 @@ function _ccItemRestore(i){
   if(!sec){sec={k:d.sk||('n_'+_bcNewId()),title:d.st||'복원된 항목',items:[]};t.sections.push(sec);}
   sec.items.push(d.it);L.splice(i,1);_ccMark();_ccPvRefresh();
 }
+// ── 항목 하나를 다른 레슨에 적용 ──
+function _ccItSrc(si,ii){var p=_ccWork(),cur=(p.ov&&p.ov[_ccEd.pv])||ccResolve(p,'',_ccEd.pv),sec=cur&&cur.sections[si],it=sec&&sec.items[ii];return it?{p:p,sec:sec,it:it}:null;}
+function _ccItTargets(scope){
+  var p=_ccWork(),name=_ccEd.pv,sk=_ccKeyOf(name),su=_ccUnitOf(name);
+  return _ccAllLessons(p).filter(function(x){
+    if(x.name===name)return false;
+    if(scope==='key')return _ccKeyOf(x.name)===sk;
+    if(scope==='unit')return !!su&&_ccUnitOf(x.name)===su;
+    return true;
+  });
+}
+function _ccItApplyOpen(si,ii){
+  var r=_ccItSrc(si,ii);if(!r)return;
+  var name=_ccEd.pv,su=_ccUnitOf(name),cnt={all:_ccItTargets('all').length,key:_ccItTargets('key').length,unit:su?_ccItTargets('unit').length:0};
+  var old=document.getElementById('modal-ccit');if(old)old.remove();
+  var m=document.createElement('div');m.id='modal-ccit';m.className='mo';m.dataset.dynamic='1';m.style.display='flex';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  var rad=function(v,t,n,chk){return '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px"><input type="radio" name="ccx-it" value="'+v+'"'+(chk?' checked':'')+(n?'':' disabled')+'><span style="flex:1">'+t+'</span><span style="color:var(--txt3);font-size:11px">'+n+'개 레슨</span></label>';};
+  m.innerHTML='<div class="ms" style="max-width:460px;width:94vw"><div class="mt">이 항목을 다른 레슨에 적용</div>'
+    +'<div style="font-size:12px;color:var(--txt2);margin:0 0 10px">구역 <b>'+_bcEsc(r.sec.title||'')+'</b> · 항목 <b>'+_bcEsc(r.it.l||'')+'</b><br>이름·종류·일지 연동을 그대로 복사합니다. 대상 레슨에 같은 항목이 있으면 이 내용으로 바꾸고, 없으면 같은 구역에 새로 추가합니다.</div>'
+    +rad('all','이 단계의 모든 레슨',cnt.all,true)
+    +rad('key','같은 레슨 번호만 ('+_bcEsc(_ccKeyOf(name))+')',cnt.key,false)
+    +rad('unit',su?('같은 Unit만 ('+_bcEsc(su)+')'):'같은 Unit만 (Unit 구분이 없는 단계)',cnt.unit,false)
+    +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById(\'modal-ccit\').remove()">취소</button><button class="btn btn-navy" style="flex:1" onclick="_ccItApplyDo('+si+','+ii+')">적용</button></div></div>';
+  document.body.appendChild(m);
+}
+function _ccItApplyDo(si,ii){
+  var m=document.getElementById('modal-ccit');if(!m)return;
+  var r=_ccItSrc(si,ii);if(!r)return;
+  var scope=(m.querySelector('input[name=ccx-it]:checked')||{}).value||'all',tg=_ccItTargets(scope);
+  if(!tg.length){toast('적용할 레슨이 없습니다');return;}
+  var p=r.p,sec=r.sec,src=r.it,srcPlan=/^b(\d+)r(\d+)$/.exec(src.id||''),n=0;
+  var F=['t','l','to','u','link','hint'];
+  tg.forEach(function(x){
+    if(!p.ov)p.ov={};
+    if(!p.ov[x.name]){var t0=null;try{t0=ccResolve(p,'',x.name);}catch(e){}p.ov[x.name]=t0?JSON.parse(JSON.stringify(t0)):{sections:[]};}
+    var t=p.ov[x.name];
+    var ts=t.sections.find(function(z){return sec.k&&z.k===sec.k;})||t.sections.find(function(z){return z.title===sec.title;});
+    if(!ts){ts={k:sec.k||('n_'+_bcNewId()),title:sec.title,items:[]};if(sec.grp)ts.grp=sec.grp;t.sections.push(ts);}
+    var sameBlock=!srcPlan||+srcPlan[1]===x.bi;
+    var hit=ts.items.find(function(z){return sameBlock&&z.id===src.id;})||(srcPlan&&!sameBlock?ts.items.find(function(z){return z.l===src.l;}):null);
+    if(hit){F.forEach(function(f){if(src[f]!==undefined&&src[f]!=='')hit[f]=src[f];else delete hit[f];});delete hit.off;delete hit.del;}
+    else{var c={id:(srcPlan&&!sameBlock)?_bcNewId():src.id};F.forEach(function(f){if(src[f]!==undefined&&src[f]!=='')c[f]=src[f];});ts.items.push(c);}
+    n++;
+  });
+  _ccMark();m.remove();_ccPlanDraw();
+  toast(n+'개 레슨에 이 항목을 적용했습니다. 맨 아래 "저장 (태블릿에 반영)"을 눌러야 학생 화면에 반영됩니다');
+}
 function _ccItemCtl(it,d,lk,off,dl){
   var dis=dl?' disabled':'';
   var h='<select'+dis+' onchange="_ccPvSet(\'t\','+d+',this.value)" style="width:96px">'+_BCED_TYPES.map(function(x){return '<option value="'+x[0]+'"'+(it.t===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
@@ -4314,6 +4363,7 @@ function _ccItemCtl(it,d,lk,off,dl){
   h+='<input class="ccx-nm"'+(dl?' readonly':'')+' value="'+_bcEsc(it.l)+'" oninput="_ccPvSet(\'l\','+d+',this.value)">';
   if(it.t==='number')h+='<input value="'+_bcEsc(it.u||'')+'" oninput="_ccPvSet(\'u\','+d+',this.value)" placeholder="단위" style="width:48px" title="단위">';
   h+=lk.length?'<select'+dis+' onchange="_ccPvSet(\'lk\','+d+',this.value)" style="width:168px">'+lk.map(function(x){return '<option value="'+x[0]+'"'+((it.link||'')===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>':'<span style="width:168px"></span>';
+  h+=dl?'':'<button class="ccx-ap" title="이 항목을 다른 레슨에도 적용" onclick="_ccItApplyOpen('+d+')">적용</button>';
   h+=dl?'<button class="ccx-del rs" title="이 항목을 다시 사용합니다" onclick="_ccItemUndel('+d+')">복원</button>':'<button class="ccx-del" title="이 레슨에서 항목 삭제 (바로 복원할 수 있습니다)" onclick="_ccItemDel('+d+')">삭제</button>';
   return h;
 }
