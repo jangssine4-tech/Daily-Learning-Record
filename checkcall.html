@@ -230,7 +230,7 @@ var checks={};            // item -> doc data (+id)
 var unsub=null, pin='', busy=false;
 var AC=null, ringTimers=[], shownCall={}, unsubRoster=null;
 // 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
-//   to: tablet|book 호출 대상, link: hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
+//   to: tablet|book 호출 대상, link: hwPrep|hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
 var CC_DEFAULT_TEMPLATE={sections:[
  {title:'숙제 했나요?',items:[
   {id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},
@@ -558,11 +558,12 @@ function secProg(sec){
 function secOk(sec){var p=secProg(sec);return p.n>0&&p.d===p.n;}
 // 학습 일지로 넘길 값 (교재/영상 숙제, Daily Quiz, 받아쓰기)
 function calcJ(){
-  var del=firebase.firestore.FieldValue.delete(),j={hwBook:del,hwVideo:del,quiz:del,dict:del};
+  var del=firebase.firestore.FieldValue.delete(),j={hwPrep:del,hwBook:del,hwVideo:del,quiz:del,dict:del};
   S.secs.forEach(function(sec){sec.items.forEach(function(it){
     if(!it.link)return;
     var v=LOG.v[it.id];
-    if(it.link==='hwBook'&&it.t==='check')j.hwBook=LOG.e[it.id]?'완료':'미완료';
+    if(it.link==='hwPrep'&&it.t==='check')j.hwPrep=LOG.e[it.id]?'준비':'미준비';
+    else if(it.link==='hwBook'&&it.t==='check')j.hwBook=LOG.e[it.id]?'완료':'미완료';
     else if(it.link==='hwVideo'&&it.t==='check')j.hwVideo=LOG.e[it.id]?'제출':'미제출';
     else if(it.link==='quiz'&&it.t==='number'&&v!==undefined&&v!=='')j.quiz=String(v);
     else if(it.link==='dict'&&it.t==='dict'&&v&&v.c!==undefined&&v.c!==''&&v.t!==undefined&&v.t!=='')j.dict=v.c+'/'+v.t;
