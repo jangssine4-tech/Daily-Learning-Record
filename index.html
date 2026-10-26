@@ -1789,7 +1789,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1026-l';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1026-m';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3664,9 +3664,10 @@ function _ccOpenPlans(host){
   m.onclick=function(e){if(e.target===m)m.remove();};}
   var opts=Object.keys(CC_PLANS).map(function(k){return '<option value="'+_bcEsc(k)+'">'+_bcEsc(k)+'</option>';}).join('');
   m.innerHTML=(host?'<div>':'<div class="ms" style="max-width:960px;width:96vw"><div class="mt">📋 단계별 계획표 (Study Plan)</div>')
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px"><select class="fi" id="ccp-key" onchange="_ccPlanKey(this.value)" style="width:170px">'+opts+'</select><select class="fi" id="ccp-blk" onchange="_ccPlanBlk(+this.value)" style="width:150px;display:none"></select><span id="ccp-tabs"></span><button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="_ccHelp()">❓ 편집 방법</button></div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px"><select class="fi" id="ccp-key" onchange="_ccPlanKey(this.value)" style="width:200px">'+opts+'</select><select class="fi" id="ccp-blk" onchange="_ccPlanBlk(+this.value)" style="width:150px;display:none"></select><span id="ccp-tabs"></span><button class="btn btn-outline btn-xs" style="margin-left:auto" onclick="_ccHelp()">❓ 편집 방법</button></div>'
     +'<div id="ccp-help" style="display:none"></div>'
     +'<div id="ccp-edit">'
+    +'<div id="ccp-sum"></div>'
     +'<div id="ccp-tools" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:11px"></div>'
     +'<div id="ccp-tbl" style="overflow:auto;max-height:58vh;border:1px solid var(--border);border-radius:8px"></div>'
     +'</div>'
@@ -3797,6 +3798,23 @@ function _ccPlanPrev(reset,target){
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"><button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button><button class="btn btn-outline btn-xs" onclick="_ccPvApplyOrder()" title="이 레슨의 구역 순서를 같은 계획표의 다른 레슨에도 적용">이 구역 순서를 모든 레슨에 적용</button></div>';
   host.innerHTML=h;return h;
 }
+function _ccCustomList(p){return Object.keys((p&&p.ov)||{}).filter(function(ln){return _ccCustom(p,ln);});}
+function _ccJump(name){var p=_ccWork();for(var bi=0;bi<p.blocks.length;bi++){var li=p.blocks[bi].lessons.indexOf(name);if(li>=0){_ccEd.bi=bi;_ccEd.sel=li;_ccEd.spec=null;_ccEd.mode='lesson';_ccPlanDraw();return;}}}
+function _ccStatusDraw(p){
+  var host=document.getElementById('ccp-sum');if(!host)return;
+  var cu=_ccCustomList(p),tot=p.blocks.reduce(function(a,b){return a+b.lessons.length;},0);
+  if(!cu.length){host.innerHTML='<div style="margin-bottom:8px;padding:6px 10px;border-radius:8px;background:#ecfdf5;color:#047857;font-size:11px">✓ 이 단계의 모든 레슨('+tot+'개)이 전체 계획표와 같습니다. 체크콜에도 같은 내용이 나옵니다.</div>';return;}
+  host.innerHTML='<div style="margin-bottom:8px;padding:6px 10px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:11px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:220px">✎ 이 단계 '+tot+'개 레슨 중 <b>'+cu.length+'개</b>가 전체 계획표와 다릅니다: '
+    +cu.slice(0,8).map(function(n){return '<a href="#" onclick="_ccJump(\''+_bcEsc(n).replace(/'/g,"\\'")+'\');return false" style="color:#92400e;text-decoration:underline">'+_bcEsc(n)+'</a>';}).join(', ')+(cu.length>8?' 외 '+(cu.length-8)+'개':'')
+    +'</span><button class="btn btn-outline btn-xs" onclick="_ccOvClearAll()">모두 전체 계획표대로 되돌리기</button></div>';
+}
+function _ccKeyOptsDraw(){
+  var sel=document.getElementById('ccp-key');if(!sel)return;
+  Array.prototype.forEach.call(sel.options,function(op){
+    var k=op.value,pl=(_ccEd.work&&_ccEd.work[k])||_ccEffPlan(k),n=0;try{n=_ccCustomList(pl).length;}catch(e){}
+    op.textContent=k+(n?'  ✎ '+n:'  ✓');
+  });
+}
 function _ccWork(){var k=_ccEd.key;if(!_ccEd.work[k])_ccEd.work[k]=JSON.parse(JSON.stringify(_ccEffPlan(k)));return _ccEd.work[k];}
 function _ccPlanKey(k){_ccEd.spec=null;_ccEd.key=k;_ccEd.bi=0;_ccEd.sel=0;document.getElementById('ccp-key').value=k;_ccPlanDraw();}
 function _ccPlanBlk(i){_ccEd.spec=null;_ccEd.bi=i;_ccEd.sel=0;_ccPlanDraw();}
@@ -3804,7 +3822,8 @@ function _ccPlanSel(i){_ccEd.spec=null;_ccEd.sel=i;_ccPlanDraw();}
 function _ccPlanPick(v){if(String(v).indexOf('s:')===0){_ccEd.spec=v.slice(2);}else{_ccEd.spec=null;_ccEd.sel=+v;}_ccPlanDraw();}
 function _ccPlanDraw(){
   var p=_ccWork(),b=p.blocks[_ccEd.bi],k=_ccEd.key;
-    var sb=document.getElementById('ccp-blk');
+    _ccStatusDraw(p);_ccKeyOptsDraw();
+  var sb=document.getElementById('ccp-blk');
   if(p.blocks.length>1){sb.style.display='';sb.innerHTML=p.blocks.map(function(x,i){return '<option value="'+i+'"'+(i===_ccEd.bi?' selected':'')+'>'+(i+1)+'번 표 ('+_bcEsc(_ccShort(x.lessons[0])+'~'+_ccShort(x.lessons[x.lessons.length-1]))+')</option>';}).join('');}else sb.style.display='none';
   var ls=b.lessons,sel=Math.min(_ccEd.sel,ls.length-1);_ccEd.sel=sel;
   var lopt=ls.map(function(n,i){return '<option value="'+i+'">'+_bcEsc(n)+'</option>';}).join('');
