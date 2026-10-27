@@ -1608,6 +1608,17 @@ function saveStorageBucket(){
 }
 
 function getCfg(){try{return JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){return null;}}
+// ── 아이디·비밀번호만으로 접속하기 ──
+// ① 연결 링크(?cfg=...)로 열면 Firebase 설정이 자동 저장돼요 (운영: 로고를 눌러 '연결 링크 복사')
+// ② 아래 FB_DEFAULT_CFG 에 설정을 붙여 넣으면 모든 기기가 입력 없이 접속해요. 예: var FB_DEFAULT_CFG={"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"..."};
+var FB_DEFAULT_CFG=null;
+function _cfgBoot(){
+  try{
+    var qc=new URLSearchParams(location.search).get('cfg');
+    if(qc){var nc=JSON.parse(decodeURIComponent(escape(atob(qc))));if(nc&&nc.apiKey&&nc.projectId){var o=localStorage.getItem('fb_cfg'),n=JSON.stringify(nc);if(o!==n)localStorage.setItem('fb_cfg',n);return;}}
+    if(!getCfg()&&FB_DEFAULT_CFG&&FB_DEFAULT_CFG.apiKey&&FB_DEFAULT_CFG.projectId)localStorage.setItem('fb_cfg',JSON.stringify(FB_DEFAULT_CFG));
+  }catch(e){}
+}
 // ── 비밀번호 암호화(SHA-256 + 사람마다 다른 salt). 기존 평문 비밀번호는 로그인할 때 자동으로 바뀌어요 ──
 async function _pwHash(pw,salt){
   var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));
@@ -1793,7 +1804,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-m';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-n';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3469,10 +3480,10 @@ function renderCcSet(){
 }
 function _bcTabletUrl(page){
   var cfg=getCfg();if(!cfg||!cfg.apiKey)return null;
-  return new URL(page||'checkcall.html',location.href.split('#')[0]).href+'?cfg='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))));
+  return (page==='self'?location.href.split('#')[0].split('?')[0]:new URL(page||'checkcall.html',location.href.split('#')[0]).href)+'?cfg='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))));
 }
 function _bcShowQR(page,title){
-  page=page||'checkcall.html';title=title||'체크콜 연결 QR 코드';var nm=page==='homecheck.html'?'홈체크':'체크콜';
+  page=page||'checkcall.html';title=title||'체크콜 연결 QR 코드';var nm=page==='homecheck.html'?'홈체크':(page==='self'?'Nexall':'체크콜');
   var url=_bcTabletUrl(page);if(!url){toast('⚠️ Firebase 설정을 찾지 못했어요');return;}
   var svg='';
   try{var q=qrcode(0,'L');q.addData(url,'Byte');q.make();svg=q.createSvgTag({cellSize:4,margin:4,scalable:true});}catch(e){toast('QR 코드를 만들지 못했어요');return;}
@@ -24573,10 +24584,11 @@ function deletePeriodRow(idx){
 
 function _initApp(){
   // 초기 진입 시 현재 화면을 history에 등록 (뒤로가기 기준점)
+  _cfgBoot();
   var _initView='schedule';
   var _hash=window.location.hash.replace('#','');
   if(_hash)_initView=_hash;
-  window.history.replaceState({view:_initView},'',window.location.pathname+'#'+_initView);
+  window.history.replaceState({view:_initView},'',window.location.pathname+window.location.search+'#'+_initView);   // 연결 링크(?cfg)는 유지해요: 아이폰 홈 화면 앱은 저장 공간이 따로라서 링크에 설정이 남아 있어야 해요
   bootProgress(5, 'Firebase 확인 중...');
   var cfg=getCfg();
   // Year/month selects
@@ -27851,12 +27863,18 @@ function _brandRedraw(){
     +'<div style="font-size:11px;color:var(--txt3);margin-top:4px">가로로 긴 PNG 권장 · 배경이 투명한 PNG는 그대로 보입니다</div>'
     +'<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;cursor:pointer"><input type="checkbox" '+(b.box?'checked ':'')+'onchange="_brandBox(this.checked)"> 로고 뒤에 흰 상자 넣기 (어두운 색 로고가 안 보일 때)</label></div>'
     +'<div class="field"><div class="fl">글자 로고 (이미지가 없을 때)</div><input class="fi" id="brand-name" value="'+_bcEsc(b.name||'')+'" placeholder="예: 우리학원" oninput="_brandName(this.value)" style="max-width:280px"></div>'
-    +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-navy" onclick="_brandSave()">저장</button><button class="btn btn-outline" onclick="_brandReset()">기본 로고로 되돌리기</button>'+(inModal?'<button class="btn btn-outline" onclick="_brandClose()">닫기</button>':'')+'</div></div>';
+    +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-navy" onclick="_brandSave()">저장</button><button class="btn btn-outline" onclick="_brandReset()">기본 로고로 되돌리기</button>'+(inModal?'<button class="btn btn-outline" onclick="_brandClose()">닫기</button>':'')+'</div>'
+    +(inModal?'<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:13px;margin-bottom:6px">📱 다른 기기에서 아이디·비밀번호만으로 접속</div><div style="font-size:12px;color:var(--txt2);line-height:1.7;margin-bottom:8px">연결 링크로 한 번 열면 그 기기에는 Firebase 정보를 다시 입력하지 않아도 됩니다. 이후에는 아이디·비밀번호만 입력합니다. 링크에는 학원 데이터베이스 연결 정보가 들어 있으니 선생님께만 보내 주세요.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="_brandCopyLink()">🔗 연결 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR(\'self\',\'선생님 앱 연결 QR 코드\')">📷 QR 코드</button></div></div>':'')+'</div>';
   _brandPrev();
 }
 function _brandPrev(){
   var el=document.getElementById('brand-prev');if(!el)return;var b=_brandDraft||{};
   var L=b.logo||(b.name?'':_BRAND_DEF);el.innerHTML=L?'<img src="'+L+'" style="max-height:48px;max-width:260px;object-fit:contain;'+(b.box?'background:#fff;border-radius:8px;padding:4px 8px':'')+'">':'<span style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.5px">'+(b.name?_bcEsc(b.name):'english<em style="color:var(--mint);font-style:normal">eye</em>')+'</span>';
+}
+function _brandCopyLink(){
+  var u=_bcTabletUrl('self');if(!u){toast('⚠️ Firebase 설정을 찾지 못했어요');return;}
+  var ok=function(){toast('🔗 연결 링크를 복사했어요');};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(ok).catch(function(){prompt('이 링크를 복사하세요',u);});else prompt('이 링크를 복사하세요',u);
 }
 function _brandBox(v){_brandDraft.box=!!v;window._brandDirty=true;_brandPrev();}
 function _brandName(v){_brandDraft.name=v;window._brandDirty=true;_brandPrev();}
