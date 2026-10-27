@@ -40,6 +40,11 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .pad button{font-size:clamp(22px,5.4vw,28px);font-weight:700;padding:clamp(12px,3vw,17px) 0;border-radius:16px;background:var(--line2);transition:background .08s,transform .08s}
 .pad button:active{background:#DCE4FA;transform:scale(.96)}
 .pad .fn{font-size:clamp(14px,3.4vw,16px);font-weight:600;color:var(--ink2);background:transparent}
+.inst{margin-top:16px;padding:12px 14px;border-radius:16px;background:#EEF3FF;color:#1F2B4D;font-size:clamp(13px,3.2vw,15px);line-height:1.55;text-align:left;display:none}
+.inst b{display:block;margin-bottom:2px}
+.inst .ib{display:flex;gap:8px;margin-top:8px}
+.inst button{border:0;border-radius:10px;padding:9px 14px;font-size:clamp(13px,3.2vw,15px);font-weight:700;background:#fff;color:#1F2B4D;box-shadow:0 0 0 1px #C9D3F0}
+.inst button.pri{background:#2A4BC9;color:#fff;box-shadow:none}
 .hq{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;border:2px solid #A59E8E;background:#fff;color:#4A4F5E;font-size:18px;font-weight:800;padding:0;line-height:1}
 .hb{display:none;position:absolute;top:56px;right:10px;left:10px;z-index:5;text-align:left;background:#1F2433;color:#fff;border-radius:16px;padding:16px 18px;font-size:clamp(13px,3vw,15px);line-height:1.55;box-shadow:0 14px 30px -10px rgba(0,0,0,.45)}
 .hb.on{display:block}.hb::before{content:'';position:absolute;top:-8px;right:22px;border:8px solid transparent;border-top:0;border-bottom-color:#1F2433}
@@ -183,6 +188,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="dots" id="dots"></div>
     <div class="pad" id="pad"></div>
     <div class="err" id="err" role="alert"></div>
+    <div class="inst" id="inst"></div>
   </div>
 </div>
 
@@ -399,7 +405,7 @@ async function boot(){
   try{
     var qp=new URLSearchParams(location.search),qc=qp.get('cfg');
     if(qp.get('reset')){localStorage.removeItem('fb_cfg');localStorage.removeItem('cc_sid');history.replaceState(null,'',location.pathname);}
-    else if(qc){var nc=JSON.parse(decodeURIComponent(escape(atob(qc))));if(nc&&nc.apiKey&&nc.projectId){localStorage.setItem('fb_cfg',JSON.stringify(nc));localStorage.removeItem('cc_sid');}history.replaceState(null,'',location.pathname);}
+    else if(qc){var nc=JSON.parse(decodeURIComponent(escape(atob(qc))));if(nc&&nc.apiKey&&nc.projectId){var _old=localStorage.getItem('fb_cfg'),_new=JSON.stringify(nc);if(_old!==_new){localStorage.setItem('fb_cfg',_new);localStorage.removeItem('cc_sid');}}}   /* 주소의 ?cfg는 그대로 둡니다: 아이폰 '홈 화면에 추가'가 이 주소를 기억해 설정이 유지돼요 */
   }catch(e){}
   var cfg=null;try{cfg=JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){}
   if(!cfg||!cfg.apiKey||!cfg.projectId){show('sSetup');return;}
@@ -829,6 +835,29 @@ function openCall(c){
 function stopRing(){ringTimers.forEach(clearTimeout);ringTimers=[];}
 function closeCall(){stopRing();$('call').classList.remove('on');}
 window.addEventListener('load',boot);
+/* ── 홈 화면에 추가 안내 ── */
+var _dp=null;
+function _standalone(){try{return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;}catch(e){return false;}}
+function _instClose(){try{localStorage.setItem('cc_inst','1');}catch(e){}var b=$('inst');if(b)b.style.display='none';}
+function _instDo(){if(!_dp)return;_dp.prompt();try{_dp.userChoice.then(function(){_dp=null;_instClose();});}catch(e){}}
+function showInst(){
+  var box=$('inst');if(!box||_standalone())return;
+  try{if(localStorage.getItem('cc_inst')==='1')return;}catch(e){}
+  var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),android=/Android/.test(ua);
+  if(!ios&&!android&&!_dp)return;
+  var t='',btn='';
+  if(_dp){t='<b>📲 체크콜을 앱처럼 설치할 수 있어요</b>홈 화면에 아이콘이 생겨서 링크를 다시 찾지 않아도 돼요.';btn='<button class="pri" onclick="_instDo()">설치하기</button>';}
+  else if(ios){
+    if(/CriOS|FxiOS|EdgiOS|KAKAOTALK|Line\/|NAVER|Instagram/i.test(ua))t='<b>📲 홈 화면에 추가하려면</b>이 링크를 <b style="display:inline">사파리</b>로 열어 주세요. 크롬이나 카카오톡 안에서는 "홈 화면에 추가"가 나오지 않아요.';
+    else t='<b>📲 홈 화면에 추가하세요</b>화면 아래쪽 <b style="display:inline">공유 버튼(네모에 위쪽 화살표)</b>을 누르고 <b style="display:inline">"홈 화면에 추가"</b>를 눌러 주세요.';
+  }
+  else t='<b>📲 홈 화면에 추가하세요</b>브라우저 오른쪽 위 <b style="display:inline">⋮ 메뉴</b>에서 <b style="display:inline">"홈 화면에 추가"</b> 또는 <b style="display:inline">"앱 설치"</b>를 눌러 주세요.';
+  box.innerHTML=t+'<div class="ib">'+btn+'<button onclick="_instClose()">닫기</button></div>';
+  box.style.display='block';
+}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();_dp=e;showInst();});
+window.addEventListener('appinstalled',function(){_instClose();});
+window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 </body>
 </html>
