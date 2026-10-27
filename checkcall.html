@@ -523,7 +523,7 @@ function openSession(sid,data,sess){
   },function(e){console.error(e);});
   // 시작 시간 = 오늘 처음 로그인한 순간 (이미 있으면 유지), 끝 시간은 다시 비움
   logRef().get().then(function(snap){
-    var u={date:S.date,studentId:sid,studentName:S.name,endAt:firebase.firestore.FieldValue.delete()};
+    var u={date:S.date,studentId:sid,studentName:S.name,endAt:firebase.firestore.FieldValue.delete(),fl:{out:false,inc:[],sig:''}};
     if(S.sess===2)u.sess=2;
     if(!snap.exists||!snap.data().startAt)u.startAt=Date.now();
     return logRef().set(u,{merge:true});
@@ -539,7 +539,7 @@ function openSession(sid,data,sess){
   clearInterval(tickT);tickT=setInterval(paintBar,30000);
 }
 function logout(){
-  if(S&&!LOG.endAt){try{logRef().set({endAt:Date.now()},{merge:true});}catch(e){}}
+  if(S){try{var lu={fl:flagsDoc(true)};if(!LOG.endAt)lu.endAt=Date.now();logRef().set(lu,{merge:true});}catch(e){}}
   setPresence('out');
   if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}if(unsubRoster){unsubRoster();unsubRoster=null;}
   clearInterval(tickT);
@@ -589,6 +589,7 @@ function commit(ePatch,vPatch){
   if(Object.keys(ikU).length){u.ik=ikU;LOG.ik=Object.assign({},LOG.ik||{},ikU);if(S.ikSent)Object.keys(ikU).forEach(function(k){S.ikSent[k]=ikU[k];});}
   if(Object.keys(ue).length)u.e=ue;
   if(Object.keys(uv).length)u.v=uv;
+  var fd=flagsDoc(false);if(!LOG.fl||LOG.fl.sig!==fd.sig||LOG.fl.out){u.fl=fd;LOG.fl=fd;}
   u.j=calcJ();u.tl=calcTL();
   logRef().set(u,{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
@@ -822,6 +823,26 @@ function dictIn(el,now){
   };
   if(now)go();else saveT[id]=setTimeout(go,500);
 }
+// 선생님이 확인할 학생: 순서를 건너뛰었거나(skip) 섞어서(mix) 한 구역, 나가기를 눌렀는데 끝내지 못한 구역(inc)
+function calcFlags(){
+  var secs=S.secs||[],ord=[],inc=[],f=[],l=[],has=[];
+  secs.forEach(function(sec,i){
+    var its=sec.items.filter(function(it){return it.t!=='call';}),ts=its.map(function(it){return LOG.e[it.id];}).filter(Boolean);
+    has[i]=its.length>0;f[i]=ts.length?Math.min.apply(null,ts):0;l[i]=ts.length?Math.max.apply(null,ts):0;
+    if(!secOk(sec))inc.push(sec.title);
+  });
+  for(var j=1;j<secs.length&&ord.length<3;j++){
+    if(!f[j])continue;
+    for(var i=0;i<j;i++){
+      if(!has[i])continue;
+      var its2=secs[i].items.filter(function(it){return it.t!=='call';}),done=its2.every(function(it){return LOG.e[it.id];});
+      if(!done){ord.push({k:'skip',a:secs[i].title,b:secs[j].title});break;}
+      if(f[j]<l[i]){ord.push({k:'mix',a:secs[i].title,b:secs[j].title});break;}
+    }
+  }
+  return {ord:ord,inc:inc};
+}
+function flagsDoc(out){var c=calcFlags(),inc=out?c.inc:[];return {ord:c.ord,inc:inc,out:!!out,sig:JSON.stringify([c.ord,inc]),at:Date.now()};}
 function finishAll(){
   $('dName').textContent=S.name+', 수고했어요';
   if(!LOG.endAt){LOG.endAt=Date.now();}

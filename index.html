@@ -104,7 +104,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 @media(min-width:600px){.ms{border-radius:var(--r-xl);max-width:540px;max-height:88vh}}
 
 /* ── 모든 페이지에 떠 있는 '점검 받을 학생' ── */
-.bc-global{position:fixed;right:18px;bottom:18px;z-index:10000;touch-action:none}
+.bc-global{position:fixed;right:18px;bottom:18px;z-index:10000;touch-action:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .bc-global .sch-dd-btn{box-shadow:0 8px 24px rgba(11,44,92,.28);padding:10px 15px;font-size:12px;cursor:grab}
 .bc-global .sch-dd-panel{z-index:10001;max-height:70vh}
 /* ── 시간표 상단 드롭다운 (성적표·상장 / 수업 없는 학생 / 점검 받을 학생) ── */
@@ -1792,7 +1792,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-g';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-h';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3169,7 +3169,7 @@ async function _bcSyncRoster(manual){
 function _bcInitGlobal(){
   if(document.getElementById('bc-global'))return;
   var g=document.createElement('div');g.id='bc-global';g.className='bc-global';
-  g.innerHTML='<div class="sch-dd" id="sch-dd-check"></div>';
+  g.innerHTML='<div class="sch-dd" id="sch-dd-flag" style="display:none"></div><div class="sch-dd" id="sch-dd-check"></div>';
   document.body.appendChild(g);
   try{var pos=JSON.parse(localStorage.getItem('bc_fab_pos')||'null');if(pos){g.style.left=pos.l+'px';g.style.top=pos.t+'px';g.style.right='auto';g.style.bottom='auto';}}catch(e){}
   var sx,sy,ox,oy,drag=false,down=false;
@@ -3228,6 +3228,7 @@ function _bcSubscribeToday(){
       var m={};snap.forEach(function(d){var x=d.data();m[_ccKey(x.studentId,x.sess===2?2:1)]=x;});
       window._ccLogs=m;
       try{_ccFillJournal();}catch(e){}
+      try{_ccFlagRender();_ccPaintPres();}catch(e){}
     },function(e){console.warn('checkLogs',e);});
   }catch(e){}
   // 학생 태블릿 접속/로그아웃 상태
@@ -3255,7 +3256,7 @@ function _bcBeep(){
 function _schDdAlign(key){
   var box=document.getElementById('sch-dd-'+key);if(!box)return;
   var p=box.querySelector('.sch-dd-panel');if(!p||p.style.display==='none')return;
-  if(key==='check'){   // 떠 있는 버튼: 화면 위/아래·좌/우 어느 쪽이든 안 잘리게
+  if(key==='check'||key==='flag'){   // 떠 있는 버튼: 화면 위/아래·좌/우 어느 쪽이든 안 잘리게
     var g=document.getElementById('bc-global');var r0=g?g.getBoundingClientRect():box.getBoundingClientRect();
     var up=r0.top>window.innerHeight/2,rt=(r0.left+r0.width/2)>window.innerWidth/2;
     p.style.top=up?'auto':'calc(100% + 8px)';p.style.bottom=up?'calc(100% + 8px)':'auto';
@@ -3269,7 +3270,7 @@ function _schDdAlign(key){
 function _schDdToggle(key){
   var o=window._schDdOpen||{};var was=!!o[key];
   window._schDdOpen=o={};if(!was)o[key]=true;
-  ['award','noclass','check'].forEach(function(k){
+  ['award','noclass','check','flag'].forEach(function(k){
     var box=document.getElementById('sch-dd-'+k);if(!box)return;
     var p=box.querySelector('.sch-dd-panel');if(!p)return;
     p.style.display=o[k]?'block':'none';
@@ -3319,7 +3320,7 @@ function _bcRender(){
   if(isOpen)_schDdAlign('check');
 }
 // 오늘의 시간표 학생 카드: 체크콜 접속 상태 (이름 없이 '접속 중' / '로그아웃 00:00')
-function _ccPresHtml(sid){
+function _ccPresHtml0(sid){
   var p=(window._bcPresence||[]).find(function(x){return x.studentId===sid;});
   if(!p)return '';
   var t=p.at&&p.at.toMillis?new Date(p.at.toMillis()):null;
@@ -27730,6 +27731,69 @@ function _hcCopyLink(){
   var done=function(){toast('🔗 홈체크 링크를 복사했어요');};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(done).catch(function(){prompt('이 링크를 복사하세요',u);});else prompt('이 링크를 복사하세요',u);
 }
+
+</script>
+<script>
+/* ═══════════ 체크콜 확인할 학생 (순서 건너뜀·섞임 / 나가기 후 미완료) ═══════════ */
+function _ccFlagList(){
+  var out=[],logs=window._ccLogs||{};
+  Object.keys(logs).forEach(function(key){
+    var x=logs[key],fl=x&&x.fl;if(!fl)return;
+    var ord=fl.ord||[],inc=(fl.out&&fl.inc)||[];
+    if(!ord.length&&!inc.length)return;
+    if(fl.sig!==undefined&&fl.sig===x.ackSig)return;
+    var rs=[];
+    ord.forEach(function(o){rs.push(o.k==='mix'?('순서 섞임: '+o.a+' 끝나기 전에 '+o.b+' 먼저 시작'):('순서 건너뜀: '+o.a+' 미완료 상태에서 '+o.b+' 시작'));});
+    if(inc.length){
+      var t=x.endAt?new Date(x.endAt):null,hm=t?(('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)):'';
+      rs.push('나가기'+(hm?' '+hm:'')+' · 미완료: '+inc.join(', '));
+    }
+    out.push({key:key,sid:x.studentId,sess:x.sess===2?2:1,date:x.date,name:x.studentName||((students||[]).find(function(s){return s.id===x.studentId;})||{}).name||'',reasons:rs,sig:fl.sig||'',inc:inc.length>0,ord:ord.length>0});
+  });
+  return out.sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
+}
+function _ccFlagBadge(sid){
+  var l=_ccFlagList().filter(function(f){return f.sid===sid;});
+  if(!l.length)return '';
+  var tip=l.map(function(f){return (f.sess===2?'[2회차] ':'')+f.reasons.join(' / ');}).join('\n');
+  return '<span title="'+_bcEsc(tip)+'" onclick="event.stopPropagation();_ccFlagOpen(\''+_bcEsc(l[0].key)+'\')" style="cursor:pointer;display:inline-flex;align-items:center;font-size:9px;font-weight:800;padding:1px 6px;border-radius:8px;white-space:nowrap;margin-left:2px;background:#fff7ed;color:#c2410c;border:1px solid #fdba74">⚠ 확인</span>';
+}
+function _ccFlagRender(){
+  var box=document.getElementById('sch-dd-flag');if(!box)return;
+  var l=_ccFlagList(),isOpen=!!(window._schDdOpen&&window._schDdOpen.flag);
+  if(!l.length){box.innerHTML='';box.style.display='none';return;}
+  box.style.display='';
+  var h='<button class="sch-dd-btn" style="background:#fff7ed;border-color:#fb923c;color:#c2410c" onclick="event.stopPropagation();if(window._bcDragged)return;_schDdToggle(\'flag\')">⚠ 확인할 학생 ('+l.length+') <span style="font-size:9px">▼</span></button>'
+    +'<div class="sch-dd-panel" style="display:'+(isOpen?'block':'none')+';min-width:360px;max-width:92vw">';
+  l.forEach(function(f){
+    h+='<div class="bc-row" data-key="'+_bcEsc(f.key)+'" onclick="event.stopPropagation();_ccFlagOpen(this.dataset.key)" style="align-items:flex-start">'
+      +'<span class="bc-nm">'+_bcEsc(f.name)+'</span>'+(f.sess===2?'<span class="bc-tag" style="color:#7c3aed;font-weight:800">2회차</span>':'')
+      +'<span class="bc-it" style="white-space:normal;font-size:11px;line-height:1.5">'+f.reasons.map(_bcEsc).join('<br>')+'</span></div>';
+  });
+  box.innerHTML=h+'</div>';
+  if(isOpen)_schDdAlign('flag');
+}
+function _ccFlagOpen(key){
+  var f=_ccFlagList().filter(function(z){return z.key===key;})[0];if(!f)return;
+  var old=document.getElementById('modal-ccflag');if(old)old.remove();
+  var m=document.createElement('div');m.id='modal-ccflag';m.className='mo';m.dataset.dynamic='1';m.style.display='flex';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.innerHTML='<div class="ms" style="max-width:440px;width:94vw"><div class="mt">⚠ '+_bcEsc(f.name)+(f.sess===2?' (2회차)':'')+' · 체크콜 확인</div>'
+    +'<div style="font-size:13px;line-height:1.8;margin-bottom:12px">'+f.reasons.map(function(r){return '• '+_bcEsc(r);}).join('<br>')+'</div>'
+    +'<div style="display:flex;gap:8px"><button class="btn btn-outline" style="flex:1" onclick="document.getElementById(\'modal-ccflag\').remove()">닫기</button>'
+    +'<button class="btn btn-outline" style="flex:1" data-key="'+_bcEsc(key)+'" onclick="_ccFlagAck(this.dataset.key)">확인함</button>'
+    +'<button class="btn btn-navy" style="flex:1" data-key="'+_bcEsc(key)+'" onclick="_ccFlagAck(this.dataset.key,true)">확인함 + 일지 쓰기</button></div></div>';
+  document.body.appendChild(m);
+}
+function _ccFlagAck(key,goJournal){
+  var f=_ccFlagList().filter(function(z){return z.key===key;})[0],m=document.getElementById('modal-ccflag');if(m)m.remove();
+  if(!f)return;
+  try{db.collection('checkLogs').doc(_ccDocId(f.date,f.sid,f.sess)).set({ackSig:f.sig},{merge:true});}catch(e){}
+  if(window._ccLogs&&window._ccLogs[key]){window._ccLogs[key].ackSig=f.sig;}
+  try{_ccFlagRender();_ccPaintPres();}catch(e){}
+  if(goJournal&&typeof startReport==='function'){try{startReport(f.sid);}catch(e){}}
+}
+function _ccPresHtml(sid){return _ccPresHtml0(sid)+_ccFlagBadge(sid);}
 
 </script>
 <script>/* qrcode-generator 1.4.4 (c) Kazuhiko Arase, MIT License */
