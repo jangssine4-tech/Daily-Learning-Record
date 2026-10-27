@@ -577,11 +577,14 @@ function calcJ(){
   return j;
 }
 function commit(ePatch,vPatch){
+  ePatch=ePatch||{};vPatch=vPatch||{};
   // 주의: set(merge) 에서 빈 객체({})는 기존 map 을 통째로 덮어써요 → 바뀐 항목이 있을 때만 e / v 를 보냅니다
   var del=firebase.firestore.FieldValue.delete(),u={date:S.date,studentId:S.sid,studentName:S.name},ue={},uv={};
   if(S.sess===2)u.sess=2;
   Object.keys(ePatch||{}).forEach(function(k){if(ePatch[k]){LOG.e[k]=ePatch[k];ue[k]=ePatch[k];}else{delete LOG.e[k];ue[k]=del;}});
   Object.keys(vPatch||{}).forEach(function(k){var x=vPatch[k];if(x===null){delete LOG.v[k];uv[k]=del;}else{LOG.v[k]=x;uv[k]=x;}});
+  var ikU={};(S.secs||[]).forEach(function(sec){sec.items.forEach(function(it){if((ue[it.id]!==undefined&&ePatch[it.id])||(uv[it.id]!==undefined&&vPatch[it.id]!==null))ikU[it.id]=_ck(sec,it);});});
+  if(Object.keys(ikU).length){u.ik=ikU;LOG.ik=Object.assign({},LOG.ik||{},ikU);if(S.ikSent)Object.keys(ikU).forEach(function(k){S.ikSent[k]=ikU[k];});}
   if(Object.keys(ue).length)u.e=ue;
   if(Object.keys(uv).length)u.v=uv;
   u.j=calcJ();
@@ -658,8 +661,33 @@ function applySecs(){
     if(v!==undefined&&v!==''&&Number(v)>=100)sec.items=sec.items.filter(function(i){return !/오답\s*노트/.test(i.l);});
   });
   secs=secs.filter(function(s){return s.items.length;});
+  _aliasIds(secs);
   var sig=JSON.stringify(secs);
   if(sig!==S.secSig){S.secSig=sig;S.secs=secs;if(curSec>=secs.length)curSec=0;}
+}
+// 선생님이 일지에서 단계·진도를 바꿔도 구역·항목 이름이 같으면 이미 체크한 내용을 그대로 이어서 써요.
+// 항목 번호(id)는 계획표 위치에 따라 달라질 수 있어서, 구역 제목+항목 이름이 같은 옛 항목의 번호를 그대로 빌려 써요. (checkLogs.ik 에 번호↔이름을 기억해요)
+function _ck(sec,it){return String(sec.title||'').replace(/\s+/g,' ').trim()+'|'+String(it.l||'').replace(/\s+/g,' ').trim();}
+function _aliasIds(secs){
+  var ik=LOG.ik||{},byCk={},used={},has=function(id){return LOG.e[id]!==undefined||LOG.v[id]!==undefined;};
+  Object.keys(ik).forEach(function(id){if(has(id)){(byCk[ik[id]]=byCk[ik[id]]||[]).push(id);}});
+  secs.forEach(function(sec){sec.items.forEach(function(it){if(it.t!=='call')used[it.id]=1;});});
+  var seen={},rec={};
+  secs.forEach(function(sec){sec.items.forEach(function(it){
+    if(it.t==='call')return;
+    var ck=_ck(sec,it);seen[ck]=(seen[ck]||0)+1;
+    if(!has(it.id)){
+      var c=(byCk[ck]||[]).filter(function(id){return !used[id];})[0];
+      if(c){delete used[it.id];used[c]=1;it.id=c;}
+    }
+    if(has(it.id)&&ik[it.id]!==ck)rec[it.id]=ck;
+  });});
+  // 체크한 항목의 이름 표를 한 번만 저장해요
+  var n=Object.keys(rec).filter(function(id){return !(S.ikSent&&S.ikSent[id]===rec[id]);});
+  if(n.length&&S&&S.gotLog){
+    S.ikSent=S.ikSent||{};var u={ik:{}};n.forEach(function(id){u.ik[id]=rec[id];S.ikSent[id]=rec[id];});
+    try{logRef().set(u,{merge:true}).catch(function(){n.forEach(function(id){delete S.ikSent[id];});});}catch(e){}
+  }
 }
 function itemHtml(it,si,ii){
   var chk='<svg viewBox="0 0 24 24"><use href="#i-check"/></svg>',tm=LOG.e[it.id]?hm(LOG.e[it.id]):'';
