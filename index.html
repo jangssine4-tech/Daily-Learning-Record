@@ -1792,7 +1792,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-d';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-e';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4062,14 +4062,12 @@ function _ccApplyDo(){
 }
 // ── 전체 계획표 편집 (구역·항목·공통 구역) ──
 // 전체 계획표를 고치기 전에: 따로 고친 레슨(✎)은 계획표 기준으로 되돌립니다 (전체 계획표 우선)
-function _ccTblGuard(){
-  var p=_ccWork();_ccPruneOv(p);
-  var cu=Object.keys(p.ov||{});
-  if(!cu.length)return true;
-  if(!confirm('따로 고친 레슨 '+cu.length+'개('+cu.slice(0,4).join(', ')+(cu.length>4?' 외':'')+')는 전체 계획표를 고치면 계획표 기준으로 되돌아갑니다.\n그 레슨에서 직접 고친 내용은 사라집니다. 계속할까요?'))return false;
-  cu.forEach(function(ln){delete p.ov[ln];if(p.ovDel)delete p.ovDel[ln];});
-  return true;
-}
+// 전체 계획표를 고쳐도 "직접 관련 없는" 레슨별 수정(예: 숙제 했나요? 구역의 교재 준비)은 그대로 둡니다.
+// 고친 항목과 관련된 내용만 각 함수에서 레슨별 수정(ov)에도 똑같이 반영합니다.
+function _ccTblGuard(){var p=_ccWork();_ccPruneOv(p);return true;}
+function _ccOvSyncRow(ri){var p=_ccWork(),b=p.blocks[_ccEd.bi];b.lessons.forEach(function(ln,i){if(p.ov&&p.ov[ln])_ccOvSync(ri,i);});}
+function _ccOvDropSec(p,k){Object.keys(p.ov||{}).forEach(function(ln){p.ov[ln].sections=(p.ov[ln].sections||[]).filter(function(sc){return sc.k!==k;});});}
+function _ccOvPruneEmpty(p){Object.keys(p.ov||{}).forEach(function(ln){p.ov[ln].sections=(p.ov[ln].sections||[]).filter(function(sc){return (sc.items&&sc.items.length)||sc.k==='hw';});});}
 function _ccRowsShift(p,bi,idx,delta){
   var re=/^b(\d+)r(\d+)$/;
   if(!p.ov)return;
@@ -4108,6 +4106,7 @@ function _ccSecRowAdd(ri){
   var c='';for(var i=0;i<b.lessons.length;i++)c+='c';
   _ccRowsShift(p,_ccEd.bi,at+1,1);
   b.rows.splice(at+1,0,{g:r0.g||'',s:r0.s||'',l:'새 항목',c:c});
+  _ccOvSyncRow(at+1);
   _ccMark();_ccPlanDraw();toast('새 항목을 추가했습니다. 이름을 고쳐 주세요 (모든 레슨에 켜져 있으니 필요 없는 레슨은 칸을 눌러 끄세요)');
 }
 function _ccSecDel(ri){
@@ -4117,6 +4116,7 @@ function _ccSecDel(ri){
   for(var j=b.rows.length-1;j>=0;j--){
     if((b.rows[j].g||'')===(r0.g||'')&&(b.rows[j].s||'')===(r0.s||'')){_ccRowsShift(p,_ccEd.bi,j,-1);b.rows.splice(j,1);}
   }
+  _ccOvDropSec(p,(r0.g||'')+'|'+(r0.s||''));_ccOvPruneEmpty(p);
   _ccMark();_ccPlanDraw();
 }
 function _ccSecAdd(){
@@ -4125,6 +4125,7 @@ function _ccSecAdd(){
   while(b.rows.some(function(r){return (r.g||'')===(last.g||'')&&(r.s||'')===nm;})){n++;nm=base+' '+n;}
   var c='';for(var i=0;i<b.lessons.length;i++)c+='c';
   b.rows.push({g:last.g||'교재 학습',s:nm,l:'새 항목',c:c});
+  _ccOvSyncRow(b.rows.length-1);
   _ccMark();_ccPlanDraw();toast('새 구역을 맨 아래에 추가했습니다. 구역 이름과 항목 이름을 고쳐 주세요');
   var t=document.getElementById('ccp-tbl');if(t)t.scrollTop=t.scrollHeight;
 }
@@ -4503,8 +4504,9 @@ function _ccPlanRange(){
   for(var i=a;i<=z;i++){if(i!==f)_ccCopyCol(b,f,i);}
   _ccMark();_ccPlanDraw();toast(b.lessons[f]+' 설정을 '+(z-a+1)+'개 레슨에 적용했어요');
 }
-function _ccPlanLabel(ri,v){v=String(v||'').trim();if(!v)return;if(!_ccTblGuard()){_ccPlanDraw();return;}_ccWork().blocks[_ccEd.bi].rows[ri].l=v;_ccMark();}
-function _ccPlanDelRow(ri){if(!confirm('이 항목 줄을 모든 레슨에서 삭제할까요?'))return;if(!_ccTblGuard())return;var p=_ccWork();_ccRowsShift(p,_ccEd.bi,ri,-1);p.blocks[_ccEd.bi].rows.splice(ri,1);_ccMark();_ccPlanDraw();}
+function _ccPlanLabel(ri,v){v=String(v||'').trim();if(!v)return;if(!_ccTblGuard()){_ccPlanDraw();return;}var p=_ccWork(),r=p.blocks[_ccEd.bi].rows[ri],old=r.l,id='b'+_ccEd.bi+'r'+ri;r.l=v;
+  Object.keys(p.ov||{}).forEach(function(ln){(p.ov[ln].sections||[]).forEach(function(sc){(sc.items||[]).forEach(function(it){if(it.id===id&&it.l===old)it.l=v;});});});_ccMark();}
+function _ccPlanDelRow(ri){if(!confirm('이 항목 줄을 모든 레슨에서 삭제할까요?'))return;if(!_ccTblGuard())return;var p=_ccWork();_ccRowsShift(p,_ccEd.bi,ri,-1);p.blocks[_ccEd.bi].rows.splice(ri,1);_ccOvPruneEmpty(p);_ccMark();_ccPlanDraw();}
 function _ccPlanAddRow(){
   var b=_ccWork().blocks[_ccEd.bi],last=b.rows[b.rows.length-1]||{g:'교재 학습',s:''};
   var s=prompt('구역 이름 (예: Voca, Workbook)',last.s||'');if(s===null)return;
@@ -27435,15 +27437,15 @@ function _hcRows(p){
   secs.forEach(function(S){var ro=p.rowOrder&&p.rowOrder[S.title];if(ro)S.items=S.items.map(function(s,i){return {s:s,i:i};}).sort(function(a,b){var d=rank(ro,function(z){return z.l;})(a.s,b.s);return d||a.i-b.i;}).map(function(o){return o.s;});});
   return secs;
 }
-function _hcSortAll(p){
+function _hcSortAll(p,mode,title){
   var rows=_hcRows(p),si={};
   p.secOrder=rows.map(function(s){return s.title;});p.rowOrder={};
   rows.forEach(function(s,i){si[s.title]=i;p.rowOrder[s.title]=s.items.map(function(x){return x.l;});});
   var num=function(v){return v===undefined?1e6:v;};
   p.order.forEach(function(ln){var L=p.lessons[ln];if(!L)return;
-    var tmp=L.map(function(s,i){return {s:s,i:i};}).sort(function(a,b){return (num(si[a.s.title])-num(si[b.s.title]))||(a.i-b.i);}).map(function(o){return o.s;});
-    L.length=0;tmp.forEach(function(s){L.push(s);});
-    L.forEach(function(sec){var r=rows[si[sec.title]];if(!r)return;var ix={};r.items.forEach(function(x,i){ix[x.l]=i;});
+    if(mode==='secs'){var tmp=L.map(function(s,i){return {s:s,i:i};}).sort(function(a,b){return (num(si[a.s.title])-num(si[b.s.title]))||(a.i-b.i);}).map(function(o){return o.s;});
+    L.length=0;tmp.forEach(function(s){L.push(s);});}
+    if(mode==='items')L.forEach(function(sec){if(sec.title!==title)return;var r=rows[si[sec.title]];if(!r)return;var ix={};r.items.forEach(function(x,i){ix[x.l]=i;});
       sec.items=sec.items.map(function(s,i){return {s:s,i:i};}).sort(function(a,b){return (num(ix[a.s.l])-num(ix[b.s.l]))||(a.i-b.i);}).map(function(o){return o.s;});});
   });
 }
@@ -27495,12 +27497,23 @@ function _hcCell(si,ri,li){
   var p=_hcWork(),rows=_hcRows(p),S=rows[si],R=S&&S.items[ri],ln=p.order[li];if(!R)return;
   var L=p.lessons[ln]||(p.lessons[ln]=[]),sec=L.find(function(z){return z.title===S.title;});
   var has=sec&&sec.items.some(function(x){return x.l===R.l;});
-  if(has){sec.items=sec.items.filter(function(x){return x.l!==R.l;});_hcDropEmpty(L);}
+  if(has){sec.items=sec.items.filter(function(x){return x.l!==R.l;});if(!sec.items.length)L.splice(L.indexOf(sec),1);}
   else{
-    if(!sec){sec={k:'n_'+_bcNewId(),title:S.title,items:[]};if(S.sub)sec.sub=S.sub;if(S.grp)sec.grp=S.grp;L.push(sec);}
-    var it={id:'g'+_bcNewId(),l:R.l};if(R.link)it.link=R.link;if(R.hint)it.hint=R.hint;sec.items.push(it);
+    if(!sec){sec={k:'n_'+_bcNewId(),title:S.title,items:[]};if(S.sub)sec.sub=S.sub;if(S.grp)sec.grp=S.grp;_hcPlaceSec(L,sec,rows);}
+    var it={id:'g'+_bcNewId(),l:R.l};if(R.link)it.link=R.link;if(R.hint)it.hint=R.hint;_hcPlaceItem(sec,it,S);
   }
-  _hcSortAll(p);_hcMark();_hcDraw();
+  _hcMark();_hcDraw();
+}
+// 새 항목·구역은 표의 순서에 맞는 자리에 넣고, 그 밖의 항목 순서는 건드리지 않습니다
+function _hcPlaceItem(sec,it,S){
+  var ix={};S.items.forEach(function(x,i){ix[x.l]=i;});var my=ix[it.l];if(my===undefined){sec.items.push(it);return;}
+  for(var i=0;i<sec.items.length;i++){var o=ix[sec.items[i].l];if(o!==undefined&&o>my){sec.items.splice(i,0,it);return;}}
+  sec.items.push(it);
+}
+function _hcPlaceSec(L,sec,rows){
+  var ix={};rows.forEach(function(r,i){ix[r.title]=i;});var my=ix[sec.title];if(my===undefined){L.push(sec);return;}
+  for(var i=0;i<L.length;i++){var o=ix[L[i].title];if(o!==undefined&&o>my){L.splice(i,0,sec);return;}}
+  L.push(sec);
 }
 function _hcRowSet(si,ri,f,v){
   var p=_hcWork(),S=_hcRows(p)[si],R=S&&S.items[ri];if(!R)return;
@@ -27511,16 +27524,16 @@ function _hcRowSet(si,ri,f,v){
 }
 function _hcSortAllKeep(p,title,oldL,newL){var ro=p.rowOrder&&p.rowOrder[title];if(ro){var i=ro.indexOf(oldL);if(i>=0)ro[i]=newL;}}
 function _hcRowMove(si,ri,d){
-  var p=_hcWork(),rows=_hcRows(p),S=rows[si],j=ri+d;if(!S||j<0||j>=S.items.length)return;
+  var p=_hcWork(),rows=_hcRows(p),S=rows[si],j=ri+d;if(!S||j<0||j>=S.items.length)return;var ttl=S.title;
   var x=S.items[ri];S.items[ri]=S.items[j];S.items[j]=x;
   p.secOrder=rows.map(function(s){return s.title;});p.rowOrder=p.rowOrder||{};rows.forEach(function(s){p.rowOrder[s.title]=s.items.map(function(z){return z.l;});});
-  _hcSortAll(p);_hcMark();_hcDraw();
+  _hcSortAll(p,'items',ttl);_hcMark();_hcDraw();
 }
 function _hcSecMove(si,d){
   var p=_hcWork(),rows=_hcRows(p),j=si+d;if(j<0||j>=rows.length)return;
   var x=rows[si];rows[si]=rows[j];rows[j]=x;
   p.secOrder=rows.map(function(s){return s.title;});p.rowOrder=p.rowOrder||{};rows.forEach(function(s){p.rowOrder[s.title]=s.items.map(function(z){return z.l;});});
-  _hcSortAll(p);_hcMark();_hcDraw();
+  _hcSortAll(p,'secs');_hcMark();_hcDraw();
 }
 function _hcSecRename(si,v){
   var p=_hcWork(),rows=_hcRows(p),S=rows[si];v=String(v||'').trim();if(!S||v===S.title)return;
@@ -27533,24 +27546,24 @@ function _hcSecRename(si,v){
 function _hcRowAdd(si){
   var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;
   _hcFor(p,function(L){L.forEach(function(sec){if(sec.title===S.title&&!sec.items.some(function(x){return x.l==='새 항목';}))sec.items.push({id:'g'+_bcNewId(),l:'새 항목',link:'hwBook'});});});
-  _hcSortAll(p);_hcMark();_hcDraw();toast('이 구역이 있는 모든 레슨에 "새 항목"을 넣었습니다. 이름을 고치고 필요 없는 칸은 ×로 바꿔 주세요');
+  _hcMark();_hcDraw();toast('이 구역이 있는 모든 레슨에 "새 항목"을 넣었습니다. 이름을 고치고 필요 없는 칸은 ×로 바꿔 주세요');
 }
 function _hcRowDel(si,ri){
   var p=_hcWork(),S=_hcRows(p)[si],R=S&&S.items[ri];if(!R)return;
   if(!confirm('"'+R.l+'" 항목을 모든 레슨에서 삭제할까요?'))return;
-  _hcFor(p,function(L){L.forEach(function(sec){if(sec.title===S.title)sec.items=sec.items.filter(function(x){return x.l!==R.l;});});_hcDropEmpty(L);});
-  _hcSortAll(p);_hcMark();_hcDraw();
+  _hcFor(p,function(L){for(var i=L.length-1;i>=0;i--){if(L[i].title!==S.title)continue;L[i].items=L[i].items.filter(function(x){return x.l!==R.l;});if(!L[i].items.length)L.splice(i,1);}});
+  _hcMark();_hcDraw();
 }
 function _hcSecDel(si){
   var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;
   if(!confirm('"'+S.title+'" 구역을 모든 레슨에서 삭제할까요?'))return;
   _hcFor(p,function(L){for(var i=L.length-1;i>=0;i--)if(L[i].title===S.title)L.splice(i,1);});
-  _hcSortAll(p);_hcMark();_hcDraw();
+  _hcMark();_hcDraw();
 }
 function _hcSecAdd(){
   var p=_hcWork(),rows=_hcRows(p),t='새 구역',n=1;while(rows.some(function(s){return s.title===t;})){n++;t='새 구역 '+n;}
   _hcFor(p,function(L){L.push({k:'n_'+_bcNewId(),title:t,items:[{id:'g'+_bcNewId(),l:'새 항목',link:'hwBook'}]});});
-  _hcSortAll(p);_hcMark();_hcDraw();
+  _hcMark();_hcDraw();
 }
 function _hcSaveBar(){
   var el=document.getElementById('hc-save');if(!el)return;
