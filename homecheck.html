@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="홈체크">
+<meta name="theme-color" content="#0F5C4D">
+<link rel="manifest" href="homecheck.webmanifest">
+<link rel="icon" href="homecheck-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="homecheck-icon-192.png">
+<title>홈체크</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{--ink:#14302B;--ink2:#51675F;--ink3:#8A9C95;--bg:#EEF4F0;--card:#fff;--line:#D8E4DD;--line2:#EAF1EC;--g:#0F9D7A;--g2:#0F5C4D;--amber:#E5960B;--red:#E5484D;
+--font:'Pretendard Variable','Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font-family:var(--font);color:var(--ink);background:var(--bg);user-select:none;-webkit-user-select:none;touch-action:manipulation;overscroll-behavior:none;letter-spacing:-.01em}
+button{font-family:inherit;cursor:pointer;border:none;color:inherit}
+.screen{display:none;min-height:100%;padding:clamp(14px,4vw,32px);align-items:center;justify-content:center;flex-direction:column}
+.screen.on{display:flex}
+.mark{width:clamp(48px,11vw,60px);height:clamp(48px,11vw,60px);display:block}
+.wm{font-size:clamp(26px,7vw,34px);font-weight:800;letter-spacing:-.04em;margin:10px 0 4px}
+.sub{margin:0;color:var(--ink2);font-size:clamp(14px,3.6vw,16px)}
+.card{background:var(--card);border-radius:28px;padding:clamp(22px,5vw,36px) clamp(18px,5vw,34px);width:100%;max-width:440px;box-shadow:0 24px 48px -24px rgba(15,60,50,.3);text-align:center}
+.card.setup input{display:block;width:100%;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:15px;font-family:inherit;user-select:text;-webkit-user-select:text}
+.card.setup button{width:100%;margin-top:8px;padding:14px;border-radius:14px;background:var(--g2);color:#fff;font-weight:700;font-size:16px}
+.dots{display:flex;gap:clamp(10px,3vw,16px);justify-content:center;margin:clamp(16px,4vw,24px) 0}
+.dots i{width:clamp(14px,3.4vw,18px);height:clamp(14px,3.4vw,18px);border-radius:50%;background:var(--line);transition:.12s}
+.dots i.f{background:var(--g2);transform:scale(1.15)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,2vw,12px)}
+.pad button{font-size:clamp(22px,5.4vw,28px);font-weight:700;padding:clamp(12px,3vw,17px) 0;border-radius:16px;background:var(--line2)}
+.pad button:active{background:#CDE8DD;transform:scale(.96)}
+.pad .fn{font-size:clamp(14px,3.4vw,16px);font-weight:600;color:var(--ink2);background:transparent}
+.err{min-height:22px;margin-top:12px;color:var(--red);font-weight:700;font-size:15px}
+.shake{animation:shake .38s}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.inst{margin-top:16px;padding:12px 14px;border-radius:16px;background:#E6F5EE;color:#0F3D33;font-size:clamp(13px,3.2vw,15px);line-height:1.55;text-align:left;display:none}
+.inst b{display:block;margin-bottom:2px}
+.inst .ib{display:flex;gap:8px;margin-top:8px}
+.inst button{border-radius:10px;padding:9px 14px;font-size:clamp(13px,3.2vw,15px);font-weight:700;background:#fff;color:#0F3D33;box-shadow:0 0 0 1px #B5DCCB}
+.inst button.pri{background:var(--g2);color:#fff;box-shadow:none}
+/* 체크 화면 */
+#sMain{justify-content:flex-start;align-items:center}
+.wrap{width:100%;max-width:640px;padding-bottom:40px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.top>div{flex:1;min-width:0}
+.hello{font-size:clamp(26px,6.4vw,34px);font-weight:900;letter-spacing:-.045em;line-height:1.1}
+.dt{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:14px;color:var(--ink2)}
+.lv{background:var(--g2);color:#fff;border-radius:8px;padding:2px 9px;font-weight:700;font-size:13px}
+.out{background:#fff;border-radius:12px;padding:9px 14px;font-weight:700;font-size:14px;color:var(--ink2);box-shadow:0 0 0 1px var(--line)}
+.prog{background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+.prog .t{display:flex;justify-content:space-between;font-weight:800;font-size:15px;margin-bottom:8px}
+.bar{height:12px;background:var(--line2);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#34D3A6,var(--g));border-radius:99px;transition:width .3s}
+.notice{background:#FFF6E0;border-radius:16px;margin-bottom:12px;overflow:hidden}
+.notice summary{padding:12px 16px;font-weight:800;font-size:15px;color:#7A4B00;cursor:pointer;list-style:none}
+.notice summary::-webkit-details-marker{display:none}
+.notice div{padding:0 16px 14px;font-size:14px;line-height:1.7;color:#5C4510;white-space:pre-wrap}
+.sec{background:#fff;border-radius:20px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+.sh{padding:12px 16px;background:var(--g2);color:#fff;font-weight:800;font-size:16px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.sh small{font-weight:600;opacity:.85;font-size:13px}
+.sh .cn{font-size:13px;font-weight:700;opacity:.9;white-space:nowrap}
+.it{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:15px 16px;background:#fff;border-top:1px solid var(--line2);font-size:clamp(16px,4.2vw,18px);font-weight:600;line-height:1.35}
+.it:first-of-type{border-top:0}
+.it:active{background:#F2F8F5}
+.cb{flex:none;width:30px;height:30px;border-radius:9px;border:2.5px solid #B9CBC2;display:flex;align-items:center;justify-content:center;color:#fff;transition:.12s}
+.cb svg{width:20px;height:20px;opacity:0}
+.it.on .cb{background:var(--g);border-color:var(--g)}.it.on .cb svg{opacity:1}
+.it.on .tx{color:var(--ink3);text-decoration:line-through;text-decoration-color:#B9CBC2}
+.tx{flex:1;min-width:0}.tx em{display:block;font-style:normal;font-weight:500;font-size:13px;color:var(--ink3);margin-top:2px;text-decoration:none}
+.vd{flex:none;font-size:11px;font-weight:800;border-radius:6px;padding:2px 6px;background:#E8EEFC;color:#3E63DD}
+.empty{background:#fff;border-radius:20px;padding:36px 20px;text-align:center;color:var(--ink2);line-height:1.8;font-size:16px}
+.allok{background:var(--g2);color:#fff;border-radius:18px;padding:16px;text-align:center;font-weight:800;font-size:17px;margin-bottom:12px;display:none}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#14302B;color:#fff;border-radius:12px;padding:11px 18px;font-size:14px;font-weight:600;display:none;z-index:9;max-width:90vw}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-mark" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0F5C4D"/><path d="M256 118 112 238h40v156h80V300h48v94h80V238h40z" fill="#fff"/><path d="m206 262 38 38 66-76" fill="none" stroke="#0F9D7A" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="screen" id="sSetup"><div class="card setup">
+  <svg class="mark" style="margin:0 auto"><use href="#i-mark"/></svg><div class="wm">처음 한 번만 설정</div><p class="sub">선생님께 받은 링크로 다시 열어 주세요</p>
+  <input id="c-apiKey" placeholder="apiKey"><input id="c-authDomain" placeholder="authDomain"><input id="c-projectId" placeholder="projectId"><input id="c-storageBucket" placeholder="storageBucket">
+  <button onclick="saveCfg()">저장하고 시작</button></div></div>
+
+<div class="screen" id="sLogin"><div class="card" id="loginCard">
+  <svg class="mark" style="margin:0 auto"><use href="#i-mark"/></svg>
+  <div class="wm">홈체크</div>
+  <p class="sub">내 번호 5자리를 눌러 주세요</p>
+  <div class="dots" id="dots"></div><div class="pad" id="pad"></div>
+  <div class="err" id="err" role="alert"></div>
+  <div class="inst" id="inst"></div>
+</div></div>
+
+<div class="screen" id="sMain"><div class="wrap">
+  <div class="top"><div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span></div></div><button class="out" onclick="logout()">나가기</button></div>
+  <div id="body"></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+var $=function(i){return document.getElementById(i);};
+var db=null,S=null,R=null,LOG={e:{}},pin='',busy=false,unsubR=null,unsubL=null,logKey='',saveT=null,pendingE=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function show(id){['sSetup','sLogin','sMain'].forEach(function(s){$(s).classList.toggle('on',s===id);});}
+var _tt=null;function toast(m){var t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(_tt);_tt=setTimeout(function(){t.style.display='none';},2600);}
+function safe(s){return String(s||'').replace(/[^\w가-힣]/g,'_');}
+
+function ensureFirebase(){return Promise.resolve(typeof firebase!=='undefined');}
+async function boot(){
+  if(!(await ensureFirebase())){document.body.innerHTML='<div style="padding:40px;text-align:center;font-size:19px;line-height:1.6">인터넷 연결을 확인하고 새로고침해 주세요.</div>';return;}
+  try{
+    var qp=new URLSearchParams(location.search),qc=qp.get('cfg');
+    if(qp.get('reset')){localStorage.removeItem('fb_cfg');localStorage.removeItem('hc_sid');history.replaceState(null,'',location.pathname);}
+    else if(qc){var nc=JSON.parse(decodeURIComponent(escape(atob(qc))));if(nc&&nc.apiKey&&nc.projectId){var o=localStorage.getItem('fb_cfg'),n=JSON.stringify(nc);if(o!==n){localStorage.setItem('fb_cfg',n);localStorage.removeItem('hc_sid');}}}
+  }catch(e){}
+  var cfg=null;try{cfg=JSON.parse(localStorage.getItem('fb_cfg'));}catch(e){}
+  if(!cfg||!cfg.apiKey||!cfg.projectId){show('sSetup');return;}
+  try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
+  db=firebase.firestore();
+  buildPad();paintDots();
+  var sid=null;try{sid=localStorage.getItem('hc_sid');}catch(e){}
+  if(sid)resume(sid);else show('sLogin');
+}
+function saveCfg(){
+  var cfg={apiKey:$('c-apiKey').value.trim(),authDomain:$('c-authDomain').value.trim(),projectId:$('c-projectId').value.trim(),storageBucket:$('c-storageBucket').value.trim()};
+  if(!cfg.apiKey||!cfg.projectId){toast('apiKey와 projectId를 입력하세요');return;}
+  localStorage.setItem('fb_cfg',JSON.stringify(cfg));location.reload();
+}
+function buildPad(){
+  var h='';[1,2,3,4,5,6,7,8,9].forEach(function(n){h+='<button onclick="key('+n+')">'+n+'</button>';});
+  h+='<button class="fn" onclick="clr()">지우기</button><button onclick="key(0)">0</button><button class="fn" onclick="back()" aria-label="한 칸 지우기">←</button>';
+  $('pad').innerHTML=h;
+}
+function paintDots(){var h='';for(var i=0;i<5;i++)h+='<i class="'+(i<pin.length?'f':'')+'"></i>';$('dots').innerHTML=h;}
+function key(n){if(busy)return;if(pin.length<5){pin+=n;paintDots();}if(pin.length===5)tryLogin();}
+function back(){pin=pin.slice(0,-1);paintDots();$('err').textContent='';}
+function clr(){pin='';paintDots();$('err').textContent='';}
+function fail(msg){$('err').textContent=msg;var c=$('loginCard');c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake');pin='';paintDots();busy=false;}
+async function tryLogin(){
+  busy=true;$('err').textContent='';
+  try{
+    var snap=await db.collection('homeRoster').where('pin','==',pin).get();
+    if(snap.empty){fail('없는 번호예요. 다시 눌러 주세요');return;}
+    var d=snap.docs[0];start(d.id);
+  }catch(e){console.error(e);fail('연결이 불안정해요. 잠시 후 다시 눌러 주세요');}
+  busy=false;
+}
+async function resume(sid){
+  try{var d=await db.collection('homeRoster').doc(sid).get();
+    if(d.exists){start(sid);return;}
+    try{localStorage.removeItem('hc_sid');}catch(e){}show('sLogin');
+  }catch(e){show('sLogin');toast('다시 연결하는 중이에요');setTimeout(function(){resume(sid);},3000);}
+}
+function start(sid){
+  S=sid;try{localStorage.setItem('hc_sid',sid);}catch(e){}
+  pin='';paintDots();LOG={e:{}};logKey='';
+  if(unsubR)unsubR();
+  unsubR=db.collection('homeRoster').doc(sid).onSnapshot(function(d){
+    if(!d.exists){logout();return;}
+    R=d.data();watchLog();render();
+  },function(){toast('연결이 불안정해요');});
+  show('sMain');
+}
+function watchLog(){
+  var k=R&&R.les?S+'__'+safe(R.key)+'__'+safe(R.les):'';
+  if(k===logKey)return;
+  logKey=k;if(unsubL){unsubL();unsubL=null;}LOG={e:{}};
+  if(!k)return;
+  unsubL=db.collection('homeLogs').doc(k).onSnapshot(function(d){
+    if(logKey!==k)return;
+    var data=d.exists?d.data():{};LOG={e:(pendingE&&pendingE.k===k)?pendingE.e:(data.e||{})};render();
+  },function(){});
+}
+function logout(){
+  if(unsubR){unsubR();unsubR=null;}if(unsubL){unsubL();unsubL=null;}
+  try{localStorage.removeItem('hc_sid');}catch(e){}
+  S=null;R=null;LOG={e:{}};logKey='';pin='';paintDots();$('err').textContent='';show('sLogin');
+}
+function counts(){
+  var n=0,d=0,L={hwBook:{n:0,d:0},hwVideo:{n:0,d:0}};
+  ((R&&R.secs)||[]).forEach(function(s){(s.items||[]).forEach(function(it){
+    n++;var ok=!!LOG.e[it.id];if(ok)d++;
+    if(it.link&&L[it.link]){L[it.link].n++;if(ok)L[it.link].d++;}
+  });});
+  return {n:n,d:d,L:L};
+}
+function render(){
+  if(!R)return;
+  $('hName').textContent=R.name+' 학생';
+  var dd=new Date(),wk=['일','월','화','수','목','금','토'][dd.getDay()];
+  $('hDate').textContent=(dd.getMonth()+1)+'월 '+dd.getDate()+'일 ('+wk+')';
+  var lv=$('hLv');lv.textContent=R.les||R.lv||'';lv.style.display=lv.textContent?'':'none';
+  var h='';
+  if(!R.secs||!R.secs.length){
+    h='<div class="empty">'+(R.les?'이번 레슨에는 집에서 할 숙제가 없어요 👍':'아직 숙제가 정해지지 않았어요.<br>수업을 하고 나면 숙제가 나와요.')+'</div>';
+    $('body').innerHTML=h;return;
+  }
+  var c=counts(),pc=c.n?Math.round(c.d*100/c.n):0;
+  h+='<div class="prog"><div class="t"><span>오늘의 숙제</span><span>'+c.d+' / '+c.n+'</span></div><div class="bar"><i style="width:'+pc+'%"></i></div></div>';
+  if(c.n&&c.d===c.n)h+='<div class="allok" style="display:block">🎉 숙제를 모두 했어요! 잘했어요</div>';
+  if(R.notice)h+='<details class="notice"><summary>📌 학습 유의사항 보기</summary><div>'+esc(R.notice)+'</div></details>';
+  R.secs.forEach(function(s,si){
+    var d=0;s.items.forEach(function(it){if(LOG.e[it.id])d++;});
+    h+='<div class="sec"><div class="sh"><span>'+esc(s.title)+(s.sub?' <small>'+esc(s.sub)+'</small>':'')+'</span><span class="cn">'+d+'/'+s.items.length+'</span></div>';
+    s.items.forEach(function(it){
+      h+='<button class="it'+(LOG.e[it.id]?' on':'')+'" onclick="tog(\''+esc(it.id)+'\')"><span class="cb"><svg><use href="#i-check"/></svg></span><span class="tx">'+esc(it.l)+(it.hint?'<em>'+esc(it.hint)+'</em>':'')+'</span>'+(it.link==='hwVideo'?'<span class="vd">영상</span>':'')+'</button>';
+    });
+    h+='</div>';
+  });
+  $('body').innerHTML=h;
+}
+function tog(id){
+  if(!R||!R.les)return;
+  var e=Object.assign({},LOG.e);
+  if(e[id])delete e[id];else e[id]=Date.now();
+  LOG.e=e;pendingE={k:logKey,e:e};render();
+  clearTimeout(saveT);saveT=setTimeout(saveLog,350);
+}
+async function saveLog(){
+  if(!R||!R.les||!pendingE)return;
+  var c=counts(),e=pendingE.e,k=pendingE.k;
+  var n={},j={};
+  if(c.L.hwBook.n){n.hwBook=c.L.hwBook;j.hwBook=c.L.hwBook.d===c.L.hwBook.n?'완료':'미완료';}
+  if(c.L.hwVideo.n){n.hwVideo=c.L.hwVideo;j.hwVideo=c.L.hwVideo.d===c.L.hwVideo.n?'제출':'미제출';}
+  try{
+    await db.collection('homeLogs').doc(k).set({sid:S,key:R.key||'',les:R.les,e:e,j:j,n:n,upd:Date.now()});
+    if(pendingE&&pendingE.k===k&&pendingE.e===e)pendingE=null;
+  }catch(err){console.error(err);toast('저장하지 못했어요. 인터넷을 확인해 주세요');saveT=setTimeout(saveLog,4000);}
+}
+window.addEventListener('load',boot);
+/* ── 홈 화면에 추가 안내 ── */
+var _dp=null;
+function _standalone(){try{return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;}catch(e){return false;}}
+function _instClose(){try{localStorage.setItem('hc_inst','1');}catch(e){}var b=$('inst');if(b)b.style.display='none';}
+function _instDo(){if(!_dp)return;_dp.prompt();try{_dp.userChoice.then(function(){_dp=null;_instClose();});}catch(e){}}
+function showInst(){
+  var box=$('inst');if(!box||_standalone())return;
+  try{if(localStorage.getItem('hc_inst')==='1')return;}catch(e){}
+  var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),android=/Android/.test(ua);
+  if(!ios&&!android&&!_dp)return;
+  var t='',btn='';
+  if(_dp){t='<b>📲 홈체크를 앱처럼 설치할 수 있어요</b>홈 화면에 아이콘이 생겨서 링크를 다시 찾지 않아도 돼요.';btn='<button class="pri" onclick="_instDo()">설치하기</button>';}
+  else if(ios){
+    if(/CriOS|FxiOS|EdgiOS|KAKAOTALK|Line\/|NAVER|Instagram/i.test(ua))t='<b>📲 홈 화면에 추가하려면</b>이 링크를 <b style="display:inline">사파리</b>로 열어 주세요. 크롬이나 카카오톡 안에서는 "홈 화면에 추가"가 나오지 않아요.';
+    else t='<b>📲 홈 화면에 추가하세요</b>화면 아래쪽 <b style="display:inline">공유 버튼(네모에 위쪽 화살표)</b>을 누르고 <b style="display:inline">"홈 화면에 추가"</b>를 눌러 주세요.';
+  }else t='<b>📲 홈 화면에 추가하세요</b>브라우저 오른쪽 위 <b style="display:inline">⋮ 메뉴</b>에서 <b style="display:inline">"홈 화면에 추가"</b> 또는 <b style="display:inline">"앱 설치"</b>를 눌러 주세요.';
+  box.innerHTML=t+'<div class="ib">'+btn+'<button onclick="_instClose()">닫기</button></div>';box.style.display='block';
+}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();_dp=e;showInst();});
+window.addEventListener('appinstalled',function(){_instClose();});
+window.addEventListener('load',function(){setTimeout(showInst,400);});
+</script>
+</body>
+</html>
