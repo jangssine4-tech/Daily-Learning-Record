@@ -693,12 +693,15 @@ function _aliasIds(secs){
   }
 }
 // ── 구역별 공부 시간 (시작 항목 ~ 끝 항목) ──
-var TM_RE=/^(?:(?:교재 학습|스마트 학습|복습)\s+)?(daily study|daily quiz|voca|student ?book|workbook|main ?book|storybook|guide ?book)(?:\s*\(.*\))?$/i;
+var TM_RE=/^(?:(?:교재 학습|스마트 학습|복습)\s+)?(daily study|daily quiz|study|quiz|voca|student ?book|workbook|main ?book|storybook|guide ?book)(?:\s*\(.*\))?$/i;
 function _addTimers(secs){secs.forEach(function(sec){
   if(!TM_RE.test(String(sec.title||'').trim())||!sec.items.length||sec.items.some(function(i){return i.role;}))return;
   var sl=String((sec.grp||'')+'_'+sec.title).replace(/[^\w가-힣]/g,'_');
-  sec.items.unshift({id:'ts_'+sl,t:'check',l:'시작',role:'ts',hint:'공부를 시작할 때 눌러요'});
-  sec.items.push({id:'te_'+sl,t:'check',l:'끝',role:'te',hint:'공부를 마치면 눌러요'});
+  var nm=String(sec.title||'').trim(),ci=-1;
+  sec.items.forEach(function(i,ix){if(ci<0&&i.t==='call')ci=ix;});   // 검사 받기 버튼이 있으면 그보다 앞에서 끝내요 (검사 받는 시간은 공부 시간에 넣지 않아요)
+  sec.items.unshift({id:'ts_'+sl,t:'check',l:'시작',role:'ts',hint:nm+' 시작할 때 눌러요'});
+  var endItem={id:'te_'+sl,t:'check',l:'끝',role:'te',hint:nm+' 마치면 눌러요'};
+  if(ci<0)sec.items.push(endItem);else sec.items.splice(ci+1,0,endItem);
   sec.tm=1;
 });}
 function _hk(ms){var d=new Date(ms),p=function(n){return String(n).padStart(2,'0');};return p(d.getHours())+'시 '+p(d.getMinutes())+'분';}
