@@ -78,6 +78,8 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .tab.next{border-color:#E4572E;color:#B83A14;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(228,87,46,.55)}50%{box-shadow:0 0 0 8px rgba(228,87,46,0)}}
 .now{margin:0 4px 2px;font-size:15px;font-weight:700;color:#E4572E}
+.sttw{display:flex;align-items:baseline;justify-content:space-between;gap:6px 14px;flex-wrap:wrap;margin:0 4px 14px}.sttw .stt{margin:0}
+.tmr{font-size:clamp(13px,3.3vw,16px);font-weight:800;color:#0F766E;background:#E3F6F1;border-radius:999px;padding:4px 12px;white-space:nowrap}.tmr.run{background:#FFF1D6;color:#9A5B00}
 .stt{margin:0 4px 14px;font-size:clamp(21px,4.4vw,27px);font-weight:900;color:#1F2433;letter-spacing:-.04em}
 .bi{display:flex;align-items:center;gap:14px;min-height:clamp(56px,10.5vw,68px);background:#fff;border-radius:18px;padding:0 clamp(14px,3vw,22px);margin-bottom:10px;font-size:clamp(15px,3.1vw,19px);font-weight:700;color:#1F2433;letter-spacing:-.02em}
 .bi .lb{flex:1;min-width:0;line-height:1.25}
@@ -587,7 +589,7 @@ function commit(ePatch,vPatch){
   if(Object.keys(ikU).length){u.ik=ikU;LOG.ik=Object.assign({},LOG.ik||{},ikU);if(S.ikSent)Object.keys(ikU).forEach(function(k){S.ikSent[k]=ikU[k];});}
   if(Object.keys(ue).length)u.e=ue;
   if(Object.keys(uv).length)u.v=uv;
-  u.j=calcJ();
+  u.j=calcJ();u.tl=calcTL();
   logRef().set(u,{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
 
@@ -617,7 +619,7 @@ function render(){
   // 항목
   var sec=S.secs[curSec],h='';
   if(sec){
-    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="stt">'+esc(sec.title)+'</div>';
+    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="sttw"><div class="stt">'+esc(sec.title)+'</div><div class="tmr" id="tmr" style="display:none"></div></div>';
     sec.items.forEach(function(it,ii){h+=itemHtml(it,curSec,ii);});
   }
   $('list').innerHTML=h;
@@ -661,6 +663,7 @@ function applySecs(){
     if(v!==undefined&&v!==''&&Number(v)>=100)sec.items=sec.items.filter(function(i){return !/오답\s*노트/.test(i.l);});
   });
   secs=secs.filter(function(s){return s.items.length;});
+  _addTimers(secs);
   _aliasIds(secs);
   var sig=JSON.stringify(secs);
   if(sig!==S.secSig){S.secSig=sig;S.secs=secs;if(curSec>=secs.length)curSec=0;}
@@ -689,6 +692,32 @@ function _aliasIds(secs){
     try{logRef().set(u,{merge:true}).catch(function(){n.forEach(function(id){delete S.ikSent[id];});});}catch(e){}
   }
 }
+// ── 구역별 공부 시간 (시작 항목 ~ 끝 항목) ──
+var TM_RE=/^(?:(?:교재 학습|스마트 학습|복습)\s+)?(daily study|daily quiz|voca|student ?book|workbook|main ?book|storybook|guide ?book)(?:\s*\(.*\))?$/i;
+function _addTimers(secs){secs.forEach(function(sec){
+  if(!TM_RE.test(String(sec.title||'').trim())||!sec.items.length||sec.items.some(function(i){return i.role;}))return;
+  var sl=String((sec.grp||'')+'_'+sec.title).replace(/[^\w가-힣]/g,'_');
+  sec.items.unshift({id:'ts_'+sl,t:'check',l:'시작',role:'ts',hint:'공부를 시작할 때 눌러요'});
+  sec.items.push({id:'te_'+sl,t:'check',l:'끝',role:'te',hint:'공부를 마치면 눌러요'});
+  sec.tm=1;
+});}
+function _hk(ms){var d=new Date(ms),p=function(n){return String(n).padStart(2,'0');};return p(d.getHours())+'시 '+p(d.getMinutes())+'분';}
+function _tmOf(sec){
+  if(!sec||!sec.tm)return null;
+  var a=sec.items.filter(function(i){return i.role==='ts';})[0],b=sec.items.filter(function(i){return i.role==='te';})[0];
+  var s=a&&LOG.e[a.id],e=b&&LOG.e[b.id];
+  return s?{n:sec.title,s:s,e:e||0}:null;
+}
+function _tmText(sec){
+  var x=_tmOf(sec);if(!x)return '';
+  if(x.e)return _hk(x.s)+'~'+_hk(x.e)+', '+Math.max(0,Math.round((x.e-x.s)/60000))+'분 공부';
+  return _hk(x.s)+'~ 공부 중 ('+Math.max(0,Math.floor((Date.now()-x.s)/60000))+'분째)';
+}
+function paintTmr(){
+  var el=$('tmr');if(!el||!S)return;var sec=S.secs[curSec],x=_tmOf(sec);
+  el.textContent=x?_tmText(sec):'';el.style.display=x?'':'none';el.className='tmr'+(x&&!x.e?' run':'');
+}
+function calcTL(){var o=[];S.secs.forEach(function(sec){var x=_tmOf(sec);if(x)o.push(x);});return o;}
 function itemHtml(it,si,ii){
   var chk='<svg viewBox="0 0 24 24"><use href="#i-check"/></svg>',tm=LOG.e[it.id]?hm(LOG.e[it.id]):'';
   if(it.t==='check'){
@@ -712,6 +741,7 @@ function itemHtml(it,si,ii){
 }
 function paintBar(){
   if(!S)return;
+  paintTmr();
   var sw=$('hSess');
   if(sw){
     if(S.ses&&S.ses.length>=2){
@@ -760,7 +790,10 @@ document.addEventListener('focusout',function(e){if(e.target&&e.target.tagName==
 
 /* ── 입력 ── */
 function toggle(si,ii){
-  initAudio();var it=S.secs[si].items[ii],o={};o[it.id]=LOG.e[it.id]?0:Date.now();commit(o,null);render();
+  initAudio();var sec=S.secs[si],it=sec.items[ii],o={};
+  if(it.role==='te'&&!LOG.e[it.id]){var st0=sec.items.filter(function(i){return i.role==='ts';})[0];if(st0&&!LOG.e[st0.id]){toast('먼저 "시작"을 눌러 주세요');return;}}
+  if(it.role==='ts'&&LOG.e[it.id]){var en0=sec.items.filter(function(i){return i.role==='te';})[0];if(en0&&LOG.e[en0.id])o[en0.id]=0;}
+  o[it.id]=LOG.e[it.id]?0:Date.now();commit(o,null);render();
 }
 function numIn(el,now){
   var id=el.dataset.id,val=el.value.replace(/\D/g,'');el.value=val;
