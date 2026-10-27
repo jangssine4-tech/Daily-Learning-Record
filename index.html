@@ -1792,7 +1792,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-e';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-f';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -27249,6 +27249,9 @@ function _hcLatest(s,beforeDate){
     var t=String(r.updatedAt||r.savedAt||r.createdAt||'');
     if(!best||r.date>best.date||(r.date===best.date&&t>best._t)){best=r;best._t=t;}
   });
+  // 일지 입력창에서 방금 고른 단계·진도 (저장 전이라도 바로 홈체크에 보여 줘요)
+  var lv=!beforeDate&&window._hcLive&&window._hcLive[s.id];
+  if(lv&&lv.progress&&(!best||lv.date>=best.date))return {studentId:s.id,date:lv.date,level:lv.level,progress:lv.progress,_t:''};
   return best;
 }
 function _hcClean(secs){
@@ -27314,6 +27317,26 @@ function _hcStart(){
   setInterval(function(){if(db&&currentUser&&students.length)_hcSyncRoster(false);},20000);
 }
 
+/* ── 일지 입력창에서 단계·진도를 고르면 저장 전에도 바로 홈체크에 전달 (오늘 날짜 일지만) ── */
+window._hcLive={};
+function _hcPushForm(){
+  try{
+    var g=function(i){return document.getElementById(i);};
+    var sid=g('r-student-id')&&g('r-student-id').value,dt=g('r-date')&&g('r-date').value;
+    if(!db||!currentUser||!sid||!dt||dt!==todayISO())return;
+    var st=(students||[]).find(function(z){return z.id===sid;});if(!st)return;
+    var lv=String((g('r-level')||{}).value||'').trim(),pg=String((g('r-progress')||{}).value||'').trim();
+    if(!pg)return;
+    window._hcLive[sid]={date:dt,level:lv||getStudentLevel(st),progress:pg};
+    var d=_hcDocFor(st);if(!d)return;
+    var c=_hcCanon(d);if(_hcLast&&_hcLast[sid]===c)return;
+    db.collection('homeRoster').doc(sid).set(d).then(function(){if(_hcLast)_hcLast[sid]=c;}).catch(function(){});
+  }catch(e){}
+}
+['input','change'].forEach(function(ev){document.addEventListener(ev,function(e){
+  var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;
+  clearTimeout(window._hcPgT);window._hcPgT=setTimeout(_hcPushForm,800);
+});});
 /* ── 학습 일지: 지난 수업 숙제의 홈체크 결과 ── */
 async function _hcJournal(){
   try{
