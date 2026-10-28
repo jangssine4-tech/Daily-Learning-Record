@@ -1240,6 +1240,7 @@ function saveCacheDebounced() {
 // PERFORMANCE FIX: Lazy CURRICULUM (only built when needed)
 // ═══════════════════════════════════════════════════
 var _CURRICULUM = null;
+var _levelOrder = null;
 function getCURRICULUM() {
   if (_CURRICULUM) return _CURRICULUM;
   _CURRICULUM = _buildCurriculum();
@@ -1804,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-n';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-r';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -23255,12 +23256,12 @@ function renderRefFees(){
     });
   }catch(e){console.error('renderRefFees 오류:',e);var _ea=document.getElementById('ref-panel-fees');if(_ea)_ea.innerHTML='<div style="padding:20px;color:red">오류: '+e.message+'</div>';}
 }
-async function getLevelOrder(){
+function getLevelOrder(){
   if(_levelOrder&&_levelOrder.length)return _levelOrder;
-  _levelOrder=Object.keys(_CURRICULUM||getCurriculum());
+  _levelOrder=Object.keys(_CURRICULUM||getCURRICULUM());
   return _levelOrder;
 }
-async function getNextLevel(currentLevel){
+function getNextLevel(currentLevel){
   var order=getLevelOrder();
   var idx=order.indexOf(currentLevel);
   if(idx<0||idx>=order.length-1)return null;
@@ -27818,7 +27819,7 @@ function _brandApply(b){
   b=b||{};var L=b.logo||(b.name?'':_BRAND_DEF);
   var img=function(h){return '<img src="'+L+'" alt="" style="max-height:'+h+'px;max-width:100%;object-fit:contain;display:block;'+(b.box?'background:#fff;border-radius:8px;padding:4px 8px;box-sizing:content-box;':'')+'margin:0 auto">';};
   var txt=b.name?_bcEsc(b.name):'english<em>eye</em>';
-  var a=document.querySelector('.sb-logo span');if(a)a.innerHTML=L?img(36):txt;
+  var a=document.querySelector('.sb-logo span');if(a){a.style.flex='1';a.style.minWidth='0';a.innerHTML=L?img(36):txt;}
   var c=document.querySelector('#boot-overlay .boot-logo');if(c)c.innerHTML=L?img(56):txt;
   var d=document.querySelector('#login-screen h1');if(d)d.innerHTML=L?img(64):txt;
 }
@@ -27864,7 +27865,7 @@ function _brandRedraw(){
     +'<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;cursor:pointer"><input type="checkbox" '+(b.box?'checked ':'')+'onchange="_brandBox(this.checked)"> 로고 뒤에 흰 상자 넣기 (어두운 색 로고가 안 보일 때)</label></div>'
     +'<div class="field"><div class="fl">글자 로고 (이미지가 없을 때)</div><input class="fi" id="brand-name" value="'+_bcEsc(b.name||'')+'" placeholder="예: 우리학원" oninput="_brandName(this.value)" style="max-width:280px"></div>'
     +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-navy" onclick="_brandSave()">저장</button><button class="btn btn-outline" onclick="_brandReset()">기본 로고로 되돌리기</button>'+(inModal?'<button class="btn btn-outline" onclick="_brandClose()">닫기</button>':'')+'</div>'
-    +(inModal?'<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:13px;margin-bottom:6px">📱 다른 기기에서 아이디·비밀번호만으로 접속</div><div style="font-size:12px;color:var(--txt2);line-height:1.7;margin-bottom:8px">연결 링크로 한 번 열면 그 기기에는 Firebase 정보를 다시 입력하지 않아도 됩니다. 이후에는 아이디·비밀번호만 입력합니다. 링크에는 학원 데이터베이스 연결 정보가 들어 있으니 선생님께만 보내 주세요.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="_brandCopyLink()">🔗 연결 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR(\'self\',\'선생님 앱 연결 QR 코드\')">📷 QR 코드</button></div></div>':'')+'</div>';
+    +(inModal?'<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:13px;margin-bottom:6px">📱 다른 기기에서 아이디·비밀번호만으로 접속</div><div style="font-size:12px;color:var(--txt2);line-height:1.7;margin-bottom:8px">연결 링크로 한 번 열면 그 기기에는 Firebase 정보를 다시 입력하지 않아도 됩니다. 이후에는 아이디·비밀번호만 입력합니다. 링크에는 학원 데이터베이스 연결 정보가 들어 있으니 선생님께만 보내 주세요.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="_brandCopyLink()">🔗 연결 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR(\'self\',\'선생님 앱 연결 QR 코드\')">📷 QR 코드</button><button class="btn btn-outline btn-sm" onclick="_brandCopyFix()" title="index.html 파일에 붙여 넣으면 모든 기기가 입력 없이 접속해요">📋 파일 고정용 코드 복사</button></div></div>':'')+'</div>';
   _brandPrev();
 }
 function _brandPrev(){
@@ -27875,6 +27876,12 @@ function _brandCopyLink(){
   var u=_bcTabletUrl('self');if(!u){toast('⚠️ Firebase 설정을 찾지 못했어요');return;}
   var ok=function(){toast('🔗 연결 링크를 복사했어요');};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(ok).catch(function(){prompt('이 링크를 복사하세요',u);});else prompt('이 링크를 복사하세요',u);
+}
+function _brandCopyFix(){
+  var c=getCfg();if(!c||!c.apiKey){toast('⚠️ Firebase 설정을 찾지 못했어요');return;}
+  var t='var FB_DEFAULT_CFG='+JSON.stringify({apiKey:c.apiKey,authDomain:c.authDomain||'',projectId:c.projectId,storageBucket:c.storageBucket||''})+';';
+  var ok=function(){toast('📋 코드를 복사했어요. index.html의 var FB_DEFAULT_CFG=null; 줄과 바꿔 붙여 넣으세요');};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok).catch(function(){prompt('이 줄을 복사하세요',t);});else prompt('이 줄을 복사하세요',t);
 }
 function _brandBox(v){_brandDraft.box=!!v;window._brandDirty=true;_brandPrev();}
 function _brandName(v){_brandDraft.name=v;window._brandDirty=true;_brandPrev();}
