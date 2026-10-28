@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-r';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-s';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -23341,6 +23341,49 @@ function _curRenameLesson(level, idx) {
   renderRefCurriculum();
 }
 
+var _curDrag=null;
+function _curMoveLesson(fl,fi,tl,ti){
+  var src=_CURRICULUM[fl],dst=_CURRICULUM[tl];if(!src||!dst)return;
+  var it=src.splice(fi,1)[0];
+  if(fl===tl&&ti>fi)ti--;
+  if(ti==null||ti>dst.length)ti=dst.length;
+  dst.splice(ti,0,it);
+  renderRefCurriculum();
+}
+function _curMoveLevel(from,to,after){
+  var o=getLevelOrder();var fi=o.indexOf(from);if(fi<0||from===to)return;
+  o.splice(fi,1);var ti=o.indexOf(to);if(ti<0)ti=o.length;
+  o.splice(after?ti+1:ti,0,from);
+  renderRefCurriculum();
+}
+(function(){
+  function dec(x){return decodeURIComponent(x||'');}
+  function half(e,el){var r=el.getBoundingClientRect();return e.clientX>r.left+r.width/2;}
+  function clr(){document.querySelectorAll('.cur-over').forEach(function(x){x.classList.remove('cur-over');x.style.outline='';});}
+  document.addEventListener('dragstart',function(e){
+    if(!_curEditMode)return;var t=e.target;if(!t||!t.closest)return;
+    var ch=t.closest('.cur-chip');
+    if(ch){_curDrag={t:'les',lv:dec(ch.dataset.lv),i:+ch.dataset.idx};}
+    else{var h=t.closest('.cur-lvh');if(h){_curDrag={t:'lv',lv:dec(h.closest('.cur-card').dataset.lv)};}else return;}
+    try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','x');}catch(_){}
+  });
+  document.addEventListener('dragover',function(e){
+    if(!_curDrag||!e.target.closest)return;
+    var ch=e.target.closest('.cur-chip'),les=e.target.closest('.cur-les'),card=e.target.closest('.cur-card');
+    if(_curDrag.t==='les'&&(ch||les)){e.preventDefault();clr();var el=ch||les;el.classList.add('cur-over');el.style.outline='2px solid var(--blue)';}
+    else if(_curDrag.t==='lv'&&card){e.preventDefault();clr();card.classList.add('cur-over');card.style.outline='2px solid var(--blue)';}
+  });
+  document.addEventListener('drop',function(e){
+    if(!_curDrag||!e.target.closest)return;
+    var d=_curDrag;_curDrag=null;clr();
+    var ch=e.target.closest('.cur-chip'),les=e.target.closest('.cur-les'),card=e.target.closest('.cur-card');
+    if(d.t==='les'){
+      if(ch){e.preventDefault();var ti=+ch.dataset.idx+(half(e,ch)?1:0);_curMoveLesson(d.lv,d.i,dec(ch.dataset.lv),ti);}
+      else if(les){e.preventDefault();_curMoveLesson(d.lv,d.i,dec(les.dataset.lv),null);}
+    }else if(d.t==='lv'&&card){e.preventDefault();_curMoveLevel(d.lv,dec(card.dataset.lv),half(e,card));}
+  });
+  document.addEventListener('dragend',function(){_curDrag=null;clr();});
+})();
 function renderRefCurriculum() {
   var el = $('ref-curriculum-area'); if (!el) return;
   var q = ($('ref-cur-search') ? $('ref-cur-search').value : '').toLowerCase();
@@ -23367,11 +23410,11 @@ function renderRefCurriculum() {
 
   entries.forEach(function(e) {
     var level = e[0], lessons = e[1];
-    html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px">';
+    html += '<div class="cur-card" data-lv="' + encodeURIComponent(level) + '" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px">';
 
     // 레벨 헤더
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-      + '<div style="font-size:13px;font-weight:700;color:var(--navy)">' + level + '</div>'
+    html += '<div class="cur-lvh" ' + (_curEditMode ? 'draggable="true" style="cursor:grab;' : 'style="') + 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"' + (_curEditMode ? ' title="드래그해서 레벨 순서 변경"' : '') + '>'
+      + '<div style="font-size:13px;font-weight:700;color:var(--navy)">' + (_curEditMode ? '⠿ ' : '') + level + '</div>'
       + '<div style="display:flex;gap:4px">';
     if (_curEditMode) {
       html += '<button onclick="_curRenameLevel(\'' + level.replace(/'/g,"\\'") + '\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt3)" title="이름 변경">✏️</button>'
@@ -23381,13 +23424,13 @@ function renderRefCurriculum() {
     html += '</div></div>';
 
     // lesson 목록
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    html += '<div class="cur-les" data-lv="' + encodeURIComponent(level) + '" style="display:flex;flex-wrap:wrap;gap:4px;min-height:24px">';
     lessons.forEach(function(l, idx) {
       var special = l.includes('Level Test') || l.includes('Portfolio') || l.includes('Review');
       var bg = special ? '#fef3c7' : 'var(--surface2)';
       var color = special ? '#92400e' : 'var(--txt2)';
       if (_curEditMode) {
-        html += '<div style="display:flex;align-items:center;gap:2px;background:' + bg + ';border-radius:6px;padding:2px 4px">'
+        html += '<div class="cur-chip" draggable="true" data-lv="' + encodeURIComponent(level) + '" data-idx="' + idx + '" style="display:flex;align-items:center;gap:2px;background:' + bg + ';border-radius:6px;padding:2px 4px;cursor:grab" title="드래그해서 이동">'
           + '<span onclick="_curRenameLesson(\'' + level.replace(/'/g,"\\'") + '\',' + idx + ')" style="font-size:11px;color:' + color + ';cursor:pointer" title="클릭하여 수정">' + l + '</span>'
           + '<span onclick="_curDeleteLesson(\'' + level.replace(/'/g,"\\'") + '\',' + idx + ')" style="cursor:pointer;color:#ef4444;font-size:10px;margin-left:1px" title="삭제">✕</span>'
           + '</div>';
