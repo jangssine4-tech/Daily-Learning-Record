@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-s';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-t';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -9615,7 +9615,7 @@ function startReport(studentId,makeupId,sessionTime){
   $('r-date').value=_scheduleDate||todayISO();
   var lvSel=$('r-level');
   var _initLvForModal=rep?rep.level:(window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s));
-  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===_initLvForModal?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(_initLvForModal,rep?.progress||'');}updateDictationDropdown(_initLvForModal,rep?.dictation||'');
+  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===_initLvForModal?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(_initLvForModal,rep?.progress||'',null,true);}updateDictationDropdown(_initLvForModal,rep?.dictation||'');
   // Check for temp saved data
   var tempKey='tempReport_'+studentId+'_'+((_scheduleDate||todayISO()))+(makeupId?'_mk'+makeupId:'')+(sessionTime?'_t'+sessionTime.replace(':',''):'');
   var tempData=null;
@@ -9692,17 +9692,53 @@ function tempSaveReport(){
   var ind=$('temp-save-indicator');if(ind)ind.style.display='block';
   toast('📋 임시 저장 완료 (DB에는 저장되지 않음)');
 }
-function populateProgressDropdown(level,current,refDate){
+function _nextLevelNE(level){
+  var o=getLevelOrder(),i=o.indexOf(level);if(i<0)return null;
+  for(var k=i+1;k<o.length;k++){if((CURRICULUM[o[k]]||[]).length)return o[k];}
+  return null;
+}
+// 학생의 직전 진도(이전 날짜 + 같은 날 앞 교시)를 찾아 다음 단계/진도를 계산
+function _autoNextProgress(sId,level,dt,sessTime,depth){
+  depth=depth||0;
+  var lessons=CURRICULUM[level]||[];if(!lessons.length||depth>8)return null;
+  var cur=window._currentSessionTime||sessTime||'';
+  function before(r){
+    if(r.date<dt)return true;
+    if(r.date===dt&&cur&&r.sessionTime&&r.sessionTime<cur)return true;
+    return false;
+  }
+  var cand=reports.filter(function(r){return r.studentId===sId&&!r.absent&&r.progress&&before(r);});
+  function key(r){return r.date+' '+(r.sessionTime||'');}
+  cand.sort(function(a,b){return key(b).localeCompare(key(a));});
+  var last=cand.filter(function(r){return r.level===level;})[0];
+  if(!last)return null;
+  var idx=lessons.indexOf(last.progress);if(idx<0)return null;
+  if(idx+1<lessons.length)return {level:level,progress:lessons[idx+1]};
+  var N=_nextLevelNE(level);
+  if(!N)return {level:level,progress:lessons[idx]};
+  var newer=cand.filter(function(r){return r.level===N&&key(r)>=key(last);})[0];
+  if(newer)return _autoNextProgress(sId,N,dt,sessTime,depth+1)||{level:N,progress:CURRICULUM[N][0]};
+  return {level:N,progress:CURRICULUM[N][0],jumped:true};
+}
+function populateProgressDropdown(level,current,refDate,allowJump){
   var sel=$('r-progress');if(!sel)return;
   var lessons=CURRICULUM[level]||[];
   sel.innerHTML='<option value="">선택</option>'+lessons.map(function(l){return'<option value="'+l+'"'+(l===current?' selected':'')+'>'+l+'</option>';}).join('');
   if(!current&&lessons.length>0){
     var sId=$('r-student-id').value;var dt=refDate||$('r-date').value||todayISO();
-    // Find the most recent report for this student+level BEFORE the given date
-    var lastRep=reports.filter(function(r){return r.studentId===sId&&r.level===level&&r.progress&&r.date<dt;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
-    // If no prior report, also check same-date report
-    if(!lastRep)lastRep=reports.find(function(r){return r.studentId===sId&&r.level===level&&r.progress;});
-    if(lastRep){var idx2=lessons.indexOf(lastRep.progress);if(idx2>=0&&idx2+1<lessons.length)sel.value=lessons[idx2+1];else if(idx2>=0)sel.value=lessons[idx2];}
+    var res=_autoNextProgress(sId,level,dt,'');
+    if(res){
+      if(res.level===level){sel.value=res.progress;}
+      else if(allowJump){
+        var lv=$('r-level');
+        if(lv){lv.value=res.level;try{onReportLevelChange();}catch(e){}
+          var s2=$('r-progress');if(s2){s2.value=res.progress;}
+          toast('📚 '+level+' 완료 → 다음 단계 '+res.level+' · '+res.progress);}
+      }else{
+        // 점프 불가 상황(수동 단계 선택)에서는 마지막 레슨 유지
+        var li=lessons.length-1;sel.value=lessons[li];
+      }
+    }
   }
 }
 var _lastLoadedReportTs='';
@@ -9767,7 +9803,7 @@ function onReportDateChange(){
   var _st2=window._currentSessionTime||'';var existingRep=reports.find(function(r){return r.studentId===sId&&r.date===newDate&&(r.makeupId||'')===(window._currentMakeupId||'')&&(r.sessionTime||'')==_st2;});
   if(existingRep){
     _lastLoadedReportTs=existingRep.updatedAt||existingRep.createdAt||'';
-    populateProgressDropdown($('r-level').value,existingRep.progress||'',newDate);
+    populateProgressDropdown($('r-level').value,existingRep.progress||'',newDate,true);
     if($('r-review-yn'))$('r-review-yn').value=existingRep.reviewYN||'';if($('r-review'))$('r-review').value=existingRep.reviewTest||'';if($('r-review-items'))$('r-review-items').value=existingRep.reviewTestItems||'';
     _setAttitudeFields(existingRep.attitude||'');if($('r-quiz'))$('r-quiz').value=existingRep.dailyQuiz||'';
     if($('r-study-times'))$('r-study-times').value=existingRep.studyTimes||'';
@@ -9785,12 +9821,13 @@ function onReportDateChange(){
         $('r-progress').value=lessons[idx+1];
         toast('📅 '+dayOfWeek+'요일 수업일 — 진도: '+lessons[idx+1]);
       } else if(idx>=0){
-        toast('📅 '+dayOfWeek+'요일 수업일 — 마지막 진도입니다');
+        var _N=_nextLevelNE(level);
+        if(_N){$('r-level').value=_N;try{onReportLevelChange();}catch(e){}$('r-progress').value=CURRICULUM[_N][0];toast('📚 '+level+' 완료 → 다음 단계 '+_N+' · '+CURRICULUM[_N][0]);}
+        else toast('📅 '+dayOfWeek+'요일 수업일 — 마지막 진도입니다');
       }
     } else if(!curProgress&&lessons.length>0){
       // No current progress — try to find from DB
-      var lastRep=reports.filter(function(r){return r.studentId===sId&&r.level===level&&r.progress&&r.date<newDate;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
-      if(lastRep){var idx2=lessons.indexOf(lastRep.progress);if(idx2>=0&&idx2+1<lessons.length){$('r-progress').value=lessons[idx2+1];toast('📅 '+dayOfWeek+'요일 수업일 — 진도: '+lessons[idx2+1]);}}
+      populateProgressDropdown(level,'',newDate,true);
     }
   }
 }
