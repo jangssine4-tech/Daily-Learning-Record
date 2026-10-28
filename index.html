@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-u';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-v';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -9616,6 +9616,7 @@ function _clearReportForm(){
   // _evalState, _currentEvalModule 은 startReport 진입 시 초기화되므로 여기서 건드리지 않음
 }
 function startReport(studentId,makeupId,sessionTime){
+  if(window._lpAutoT){clearTimeout(window._lpAutoT);window._lpAutoT=0;try{_autoSaveLvPg();}catch(e){}}   // 학생 전환 직전에 방금 고른 단계·진도 보관
   if(window._reportSaving){toast('⚠️ 저장 중입니다. 잠시 후 다시 시도해주세요');return;}
   window._currentReportStudentId=studentId;
   window._currentEvalModule='';window._evalState={};window._evalComments={};window._saveImageAfter=false;_lastLoadedReportTs='';
@@ -9708,7 +9709,7 @@ function startReport(studentId,makeupId,sessionTime){
 }
 function tempSaveReport(silent){
   var sId=(($('r-student-id')||{}).value);if(!sId){if(!silent)toast('⚠️ 학생을 선택하세요');return;}
-  var tempKey='tempReport_'+sId+'_'+(($('r-date')||{}).value)+(window._currentMakeupId?'_mk'+window._currentMakeupId:'')+(window._currentSessionTime?'_'+window._currentSessionTime.replace(':',''):'');
+  var tempKey='tempReport_'+sId+'_'+(($('r-date')||{}).value)+(window._currentMakeupId?'_mk'+window._currentMakeupId:'')+(window._currentSessionTime?'_t'+window._currentSessionTime.replace(':',''):'');
   combineHw();
   var data={level:(($('r-level')||{}).value),progress:(($('r-progress')||{}).value),teacherTablet:(($('r-teacher-tablet')||{}).value),teacherBook:(($('r-teacher-book')||{}).value),reviewYN:(($('r-review-yn')||{}).value),reviewTest:(($('r-review')||{}).value),reviewTestItems:(($('r-review-items')||{}).value),attitude:(($('r-attitude')||{}).value),dailyQuiz:(($('r-quiz')||{}).value),homework:(($('r-hw')||{}).value),hwStatus:(($('r-hw-status')||{}).value)||'미확인',comment:_combineComment(),memo:(($('r-memo')||{}).value),memoBook:($('r-memo-book')?.value||''),examDate:$('r-exam-date')?.value||'',examType:$('r-exam-type')?.value||'',needsMakeup:(($('r-makeup-check')||{}).checked)||false,makeupContent:(($('r-makeup-content')||{}).value)||'',parentContact:$('r-parent-contact')?.checked||false,dictation:(($('r-dictation')||{}).value)||'',dictRetest1:($('r-rt1')?.value||''),dictRetest2:($('r-rt2')?.value||''),evalModule:window._currentEvalModule||'',evalState:window._evalState||{},evalComments:window._evalComments||{},savedAt:new Date().toISOString()};
   localStorage.setItem(tempKey,JSON.stringify(data));
