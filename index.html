@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-t';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-u';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3411,6 +3411,29 @@ function _ccPushForm(){
 ['input','change'].forEach(function(ev){document.addEventListener(ev,function(e){
   var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;
   clearTimeout(window._ccPgT);window._ccPgT=setTimeout(_ccPushForm,700);
+});});
+// 단계·진도를 고르면 저장 버튼 없이 자동 보관: ① 이 기기 임시 저장(다시 열어도 유지) ② 이미 출석·일지가 있는 칸이면 DB에도 반영
+function _autoSaveLvPg(){
+  try{
+    if(window._reportSaving||window._lvPgAutoOff)return;
+    var g=function(i){return document.getElementById(i);};
+    var sid=g('r-student-id')&&g('r-student-id').value,dt=g('r-date')&&g('r-date').value;
+    if(!sid||!dt||!db||!currentUser)return;
+    var lv=String((g('r-level')||{}).value||'').trim(),pg=String((g('r-progress')||{}).value||'').trim();
+    if(!lv&&!pg)return;
+    try{tempSaveReport(true);}catch(e){}
+    var mk=window._currentMakeupId||'',st=window._currentSessionTime||'';
+    var rep=reports.find(function(r){return r.studentId===sid&&r.date===dt&&(r.makeupId||'')===mk&&(r.sessionTime||'')===st;});
+    if(!rep||rep.absent||!rep.id)return;
+    if((rep.level||'')===lv&&(rep.progress||'')===pg)return;
+    var u={level:lv,progress:pg,updatedAt:new Date().toISOString()};
+    db.collection('reports').doc(rep.id).update(u).then(function(){rep.level=lv;rep.progress=pg;rep.updatedAt=u.updatedAt;
+      var i=g('temp-save-indicator');}).catch(function(e){console.warn('autosave',e);});
+  }catch(e){console.warn(e);}
+}
+['input','change'].forEach(function(ev){document.addEventListener(ev,function(e){
+  var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;
+  clearTimeout(window._lpAutoT);window._lpAutoT=setTimeout(_autoSaveLvPg,900);
 });});
 function _bcRef(id){return db.collection('bookChecks').doc(id);}
 function _bcCall(id){
@@ -9683,14 +9706,14 @@ function startReport(studentId,makeupId,sessionTime){
   try{_dayTEnsure($('r-date').value);_dayTFill();}catch(e){}
   _rzName();
 }
-function tempSaveReport(){
-  var sId=$('r-student-id').value;if(!sId){toast('⚠️ 학생을 선택하세요');return;}
-  var tempKey='tempReport_'+sId+'_'+$('r-date').value+(window._currentMakeupId?'_mk'+window._currentMakeupId:'')+(window._currentSessionTime?'_'+window._currentSessionTime.replace(':',''):'');
+function tempSaveReport(silent){
+  var sId=(($('r-student-id')||{}).value);if(!sId){if(!silent)toast('⚠️ 학생을 선택하세요');return;}
+  var tempKey='tempReport_'+sId+'_'+(($('r-date')||{}).value)+(window._currentMakeupId?'_mk'+window._currentMakeupId:'')+(window._currentSessionTime?'_'+window._currentSessionTime.replace(':',''):'');
   combineHw();
-  var data={level:$('r-level').value,progress:$('r-progress').value,teacherTablet:$('r-teacher-tablet').value,teacherBook:$('r-teacher-book').value,reviewYN:$('r-review-yn').value,reviewTest:$('r-review').value,reviewTestItems:$('r-review-items').value,attitude:$('r-attitude').value,dailyQuiz:$('r-quiz').value,homework:$('r-hw').value,hwStatus:$('r-hw-status').value||'미확인',comment:_combineComment(),memo:$('r-memo').value,memoBook:($('r-memo-book')?.value||''),examDate:$('r-exam-date')?.value||'',examType:$('r-exam-type')?.value||'',needsMakeup:$('r-makeup-check').checked||false,makeupContent:$('r-makeup-content').value||'',parentContact:$('r-parent-contact')?.checked||false,dictation:$('r-dictation').value||'',dictRetest1:($('r-rt1')?.value||''),dictRetest2:($('r-rt2')?.value||''),evalModule:window._currentEvalModule||'',evalState:window._evalState||{},evalComments:window._evalComments||{},savedAt:new Date().toISOString()};
+  var data={level:(($('r-level')||{}).value),progress:(($('r-progress')||{}).value),teacherTablet:(($('r-teacher-tablet')||{}).value),teacherBook:(($('r-teacher-book')||{}).value),reviewYN:(($('r-review-yn')||{}).value),reviewTest:(($('r-review')||{}).value),reviewTestItems:(($('r-review-items')||{}).value),attitude:(($('r-attitude')||{}).value),dailyQuiz:(($('r-quiz')||{}).value),homework:(($('r-hw')||{}).value),hwStatus:(($('r-hw-status')||{}).value)||'미확인',comment:_combineComment(),memo:(($('r-memo')||{}).value),memoBook:($('r-memo-book')?.value||''),examDate:$('r-exam-date')?.value||'',examType:$('r-exam-type')?.value||'',needsMakeup:(($('r-makeup-check')||{}).checked)||false,makeupContent:(($('r-makeup-content')||{}).value)||'',parentContact:$('r-parent-contact')?.checked||false,dictation:(($('r-dictation')||{}).value)||'',dictRetest1:($('r-rt1')?.value||''),dictRetest2:($('r-rt2')?.value||''),evalModule:window._currentEvalModule||'',evalState:window._evalState||{},evalComments:window._evalComments||{},savedAt:new Date().toISOString()};
   localStorage.setItem(tempKey,JSON.stringify(data));
   var ind=$('temp-save-indicator');if(ind)ind.style.display='block';
-  toast('📋 임시 저장 완료 (DB에는 저장되지 않음)');
+  if(!silent)toast('📋 임시 저장 완료 (DB에는 저장되지 않음)');
 }
 function _nextLevelNE(level){
   var o=getLevelOrder(),i=o.indexOf(level);if(i<0)return null;
