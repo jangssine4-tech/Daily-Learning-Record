@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-za';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-ze';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3503,7 +3503,7 @@ function _bcRemove(id){
 
 // ── 점검 항목 편집 모달 (단계별) ──
 var _bcEd=null;
-var _BCED_TYPES=[['check','체크칸'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)']];
+var _BCED_TYPES=[['check','체크칸'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)'],['ox','O/X 선택']];
 // 체크콜 편집 권한: 관리자는 항상 가능, 교사는 관리자가 메뉴 권한에서 허용한 경우만 가능
 function _ccCan(k){return !!currentUser&&(currentUser.role==='admin'||!!(currentUser.menuPerms&&currentUser.menuPerms[k]===true));}
 // ── 운영 매뉴얼 > 체크콜 Study Plan 설정 탭 ──
@@ -4048,6 +4048,7 @@ function _ccChip(it){
   var t=it.t||'check';
   if(t==='number')return '<span class="ccx-chip n">숫자'+(it.u?' · '+_bcEsc(it.u):'')+'</span>';
   if(t==='dict')return '<span class="ccx-chip d">받아쓰기</span>';
+  if(t==='ox')return '<span class="ccx-chip n">O/X</span>';
   if(t==='call')return '<span class="ccx-chip c">검사 받기 · '+(it.to==='book'?'교재':'태블릿')+' 교사</span>';
   return '<span class="ccx-chip">체크</span>';
 }
@@ -5131,6 +5132,9 @@ function _wlPaint(){
       }else if(it.t==='number'){
         var nv=v[it.id];var has=nv!==undefined&&nv!==null&&nv!=='';
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has?' on':'')+'">'+(has?_bcEsc(nv)+(it.u?_bcEsc(it.u):'점'):'')+'</span></div>';
+      }else if(it.t==='ox'){
+        var ov2=v[it.id];var hasO=ov2==='O'||ov2==='X';
+        rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(hasO?' on':'')+'" style="'+(ov2==='X'?'color:#c0392b':'')+'">'+(hasO?ov2:'')+'</span></div>';
       }else if(it.t==='dict'){
         var d=v[it.id]||{};var has2=d.c!==undefined&&d.c!==null&&d.c!=='';
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has2?' on':'')+'">'+(has2?_bcEsc(d.c)+' / '+_bcEsc(d.t===undefined?'?':d.t)+'개':'')+'</span></div>';
@@ -9677,7 +9681,7 @@ function startReport(studentId,makeupId,sessionTime){
   $('r-date').value=_scheduleDate||todayISO();
   var lvSel=$('r-level');
   var _initLvForModal=rep?rep.level:(window._currentSessionIsSpecial?getStudentSpecialLevel(s):getStudentLevel(s));
-  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===_initLvForModal?' selected':'')+'>'+lv+'</option>';}).join('');populateProgressDropdown(_initLvForModal,rep?.progress||'',null,true);}updateDictationDropdown(_initLvForModal,rep?.dictation||'');
+  if(lvSel){lvSel.innerHTML='<option value="">선택</option>'+Object.keys(CURRICULUM).map(function(lv){return'<option value="'+lv+'"'+(lv===_initLvForModal?' selected':'')+'>'+lv+'</option>';}).join('');if(_initLvForModal&&!CURRICULUM[_initLvForModal]){var _lo=document.createElement('option');_lo.value=_initLvForModal;_lo.textContent=_initLvForModal+' (목록에 없음)';_lo.selected=true;lvSel.appendChild(_lo);}populateProgressDropdown(_initLvForModal,rep?.progress||'',null,true);}updateDictationDropdown(_initLvForModal,rep?.dictation||'');
   // Check for temp saved data
   var tempKey='tempReport_'+studentId+'_'+((_scheduleDate||todayISO()))+(makeupId?'_mk'+makeupId:'')+(sessionTime?'_t'+sessionTime.replace(':',''):'');
   var tempData=null;
@@ -9776,20 +9780,62 @@ function _autoNextProgress(sId,level,dt,sessTime,depth){
   var last=cand.filter(function(r){return r.level===level;})[0];
   if(!last)return null;
   var idx=lessons.indexOf(last.progress);if(idx<0)return null;
-  if(idx+1<lessons.length)return {level:level,progress:lessons[idx+1]};
-  var N=_nextLevelNE(level);
-  if(!N)return {level:level,progress:lessons[idx]};
-  var newer=cand.filter(function(r){return r.level===N&&key(r)>=key(last);})[0];
-  if(newer)return _autoNextProgress(sId,N,dt,sessTime,depth+1)||{level:N,progress:CURRICULUM[N][0]};
-  return {level:N,progress:CURRICULUM[N][0],jumped:true};
+  var res;
+  if(idx+1<lessons.length)res={level:level,progress:lessons[idx+1]};
+  else{
+    var N=_nextLevelNE(level);
+    if(!N)return {level:level,progress:lessons[idx]};
+    var newer=cand.filter(function(r){return r.level===N&&key(r)>=key(last);})[0];
+    if(newer)return _autoNextProgress(sId,N,dt,sessTime,depth+1)||{level:N,progress:CURRICULUM[N][0]};
+    res={level:N,progress:CURRICULUM[N][0],jumped:true};
+  }
+  // 마지막 진도 기록 이후, 일지를 저장하지 않았거나 진도 없이 출석만 처리한 수업일은 수업을 한 것으로 보고 그만큼 더 넘김
+  var miss=_missedClassDays(sId,last.date,dt);
+  if(miss>0){
+    var lv2=res.level,ls2=CURRICULUM[lv2]||[],pos=ls2.indexOf(res.progress);
+    for(var q=0;q<miss&&pos>=0;q++){
+      if(pos+1<ls2.length)pos++;
+      else{var N2=_nextLevelNE(lv2);if(!N2)break;lv2=N2;ls2=CURRICULUM[lv2];pos=0;res.jumped=true;}
+    }
+    if(pos>=0)res={level:lv2,progress:ls2[pos],jumped:res.jumped||lv2!==level};
+    res.missed=miss;res.lastDate=last.date;res.lastProgress=last.progress;
+  }
+  return res;
+}
+// from(마지막 진도 기록일) 다음 날부터 to(오늘) 전날까지, 학생의 수업 요일 중 결석·조퇴·공휴일이 아닌 날 수
+function _missedClassDays(sId,from,to){
+  var st=students.find(function(x){return x.id===sId;});if(!st||!(st.days||[]).length)return 0;
+  var names=['일','월','화','수','목','금','토'],n=0,d=new Date(from+'T00:00:00'),end=new Date(to+'T00:00:00');
+  d.setDate(d.getDate()+1);
+  for(var i=0;i<60&&d<end;i++,d.setDate(d.getDate()+1)){
+    if(st.days.indexOf(names[d.getDay()])<0)continue;
+    var iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    try{if(isHoliday(d.getFullYear(),d.getMonth(),d.getDate())!=null)continue;}catch(e){}
+    var rs=reports.filter(function(r){return r.studentId===sId&&r.date===iso;});
+    if(rs.some(function(r){return r.absent||r.earlyLeave;}))continue;
+    n++;
+  }
+  return n;
+}
+function _pgHint(msg){
+  var sel=$('r-progress');if(!sel)return;
+  var h=$('r-pg-hint');
+  if(!msg){if(h)h.style.display='none';return;}
+  if(!h){h=document.createElement('div');h.id='r-pg-hint';h.style.cssText='font-size:11px;color:#b45309;margin-top:3px;flex-basis:100%';sel.insertAdjacentElement('afterend',h);}
+  h.textContent=msg;h.style.display='block';
 }
 function populateProgressDropdown(level,current,refDate,allowJump){
   var sel=$('r-progress');if(!sel)return;
+  _pgHint('');
   var lessons=CURRICULUM[level]||[];
   sel.innerHTML='<option value="">선택</option>'+lessons.map(function(l){return'<option value="'+l+'"'+(l===current?' selected':'')+'>'+l+'</option>';}).join('');
+  // 저장된 진도가 지금 레벨별 진도 목록에 없어도(이름이 바뀌었거나 목록에서 빠진 경우) '선택'으로 보이지 않게 그대로 보여줌
+  if(current&&lessons.indexOf(current)<0){var _o=document.createElement('option');_o.value=current;_o.textContent=current+' (목록에 없음)';_o.selected=true;sel.appendChild(_o);}
   if(!current&&lessons.length>0){
     var sId=$('r-student-id').value;var dt=refDate||$('r-date').value||todayISO();
     var res=_autoNextProgress(sId,level,dt,'');
+    _pgHint(res?'':'이 학생의 "'+level+'" 지난 일지에 진도가 기록돼 있지 않아 자동으로 채우지 못했어요. 직접 골라 주세요.');
+    if(res&&res.missed)_pgHint('마지막 진도 기록('+res.lastDate+' '+res.lastProgress+') 이후 일지가 없는 수업일 '+res.missed+'회를 수업한 것으로 보고 넘겼어요. 다르면 직접 골라 주세요.');
     if(res){
       if(res.level===level){sel.value=res.progress;}
       else if(allowJump){
