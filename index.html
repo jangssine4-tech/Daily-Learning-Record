@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-x';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-za';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3424,21 +3424,27 @@ function _lpRecord(){
   var lv=(document.getElementById('r-level')||{}).value||'',pg=(document.getElementById('r-progress')||{}).value||'';
   window._lpDirty=window._lpEpoch||0;
   window._lpCtx={sid:(document.getElementById('r-student-id')||{}).value||'',mk:window._currentMakeupId||'',st:window._currentSessionTime||''};
-  if(lv&&pg)window._lpDraft[k]={level:lv,progress:pg};else if(!pg)delete window._lpDraft[k];
+  if(lv)window._lpDraft[k]={level:lv,progress:pg};
 }
 function _lpApplyDraft(){
-  var k=_lpKey(),d=window._lpDraft[k];if(!d)return;
+  var k=_lpKey(),d=window._lpDraft[k];
+  if(!d){   // 카드/목록으로 열 때 보강·회차 표기가 달라도, 그 학생·그 날짜의 기억이 하나뿐이면 그걸 사용
+    var p=k.split('|').slice(0,2).join('|')+'|',ks=Object.keys(window._lpDraft).filter(function(x){return x.indexOf(p)===0;});
+    if(ks.length===1)d=window._lpDraft[ks[0]];
+  }
+  if(!d)return;
   if((window._lpDirty||0)===(window._lpEpoch||0))return;   // 이번 화면에서 사용자가 직접 바꿨으면 건드리지 않음
   var lv=document.getElementById('r-level'),ps=document.getElementById('r-progress');if(!lv||!ps)return;
-  if(lv.value===d.level&&ps.value===d.progress)return;
+  if(lv.value===d.level&&(!d.progress||ps.value===d.progress))return;
   if(lv.value!==d.level){lv.value=d.level;if(lv.value!==d.level)return;try{updateDictationDropdown(d.level,'');}catch(e){}
     try{var m=getEvalModuleForLevel(d.level);if(m)renderEvalArea(m,window._evalState||{});}catch(e){}}
+  if(!d.progress)return;
   populateProgressDropdown(d.level,d.progress);
   ps.value=d.progress;try{highlightProgress(ps);}catch(e){}
 }
 function _lpApplyDraftLater(){[0,400,1000,2000].forEach(function(ms){setTimeout(function(){try{_lpApplyDraft();}catch(e){}},ms);});}
 ['input','change'].forEach(function(ev){document.addEventListener(ev,function(e){
-  var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;_lpRecord();
+  var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;if(e.isTrusted===false)return;_lpRecord();
 });});
 function _autoSaveLvPg(){
   try{
@@ -3447,7 +3453,7 @@ function _autoSaveLvPg(){
     var sid=g('r-student-id')&&g('r-student-id').value,dt=g('r-date')&&g('r-date').value;
     if(!sid||!dt||!db||!currentUser)return;
     var lv=String((g('r-level')||{}).value||'').trim(),pg=String((g('r-progress')||{}).value||'').trim();
-    if(!lv&&!pg)return;
+    if(!lv||!pg)return;
     var _c=window._lpCtx,_om=window._currentMakeupId,_os=window._currentSessionTime;
     if(_c&&_c.sid===sid){window._currentMakeupId=_c.mk;window._currentSessionTime=_c.st;}   // 카드 전환 직전이면 고를 때의 회차 기준으로 보관
     try{tempSaveReport(true);}catch(e){}
@@ -3462,7 +3468,7 @@ function _autoSaveLvPg(){
   }catch(e){console.warn(e);}
 }
 ['input','change'].forEach(function(ev){document.addEventListener(ev,function(e){
-  var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;
+  var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;if(e.isTrusted===false)return;
   clearTimeout(window._lpAutoT);window._lpAutoT=setTimeout(_autoSaveLvPg,900);
 });});
 function _bcRef(id){return db.collection('bookChecks').doc(id);}
@@ -4446,6 +4452,7 @@ function _ccItApplyDo(si,ii){
     var t=p.ov[x.name];
     var ts=t.sections.find(function(z){return sec.k&&z.k===sec.k;})||t.sections.find(function(z){return z.title===sec.title&&(z.grp||'')===(sec.grp||'');});
     if(!ts){ts={k:sec.k||('n_'+_bcNewId()),title:sec.title,items:[]};if(sec.grp)ts.grp=sec.grp;t.sections.push(ts);}
+    else if(ii<0&&sec.title)ts.title=sec.title;   // 구역 전체 적용이면 구역 이름도 함께 복사
     var sameBlock=!srcPlan||+srcPlan[1]===x.bi;
     var hit=ts.items.find(function(z){return sameBlock&&z.id===src.id;})||ts.items.find(function(z){return z.l===src.l;});
     if(hit){F.forEach(function(f){if(src[f]!==undefined&&src[f]!=='')hit[f]=src[f];else delete hit[f];});delete hit.off;delete hit.del;}
