@@ -548,7 +548,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   <div id="write-wrap" style="display:flex;gap:16px;align-items:flex-start;padding:0 0 0 0;overflow-x:auto;-webkit-overflow-scrolling:touch">
   <div class="cp" style="max-width:560px;min-width:320px;flex:0 0 auto"><div class="card" style="padding:16px">
     <input type="hidden" id="r-student-id">
-    <div class="r2" id="rz-top"><div class="field"><div class="fl">날짜</div><input type="date" class="fi" id="r-date" onchange="onReportDateChange()"></div><div class="field"><div class="fl">수행/지필 평가</div><div style="display:flex;gap:4px"><input type="date" class="fi" id="r-exam-date" style="flex:1"><select class="fi" id="r-exam-type" style="width:auto;font-size:11px;padding:6px 4px"><option value="">종류</option><option value="수행">수행</option><option value="중간">중간</option><option value="기말">기말</option><option value="모의고사">모의고사</option><option value="Tosel 정기">Tosel 정기</option><option value="Tosel Voca">Tosel Voca 올림피아드</option><option value="PFC">PFC</option></select></div></div></div>
+    <div class="r2" id="rz-top"><div class="field"><div class="fl">날짜</div><div style="display:flex;gap:4px"><input type="date" class="fi" id="r-date" style="flex:1;min-width:0" onchange="onReportDateChange()"><button type="button" class="btn btn-sm" style="white-space:nowrap;font-size:11px;padding:4px 7px" onclick="_clOpen()" title="학원 전체가 쉬는 날을 등록하면 모든 학생의 진도가 그날은 넘어가지 않아요">🏖 휴원일 등록</button></div></div><div class="field"><div class="fl">수행/지필 평가</div><div style="display:flex;gap:4px"><input type="date" class="fi" id="r-exam-date" style="flex:1"><select class="fi" id="r-exam-type" style="width:auto;font-size:11px;padding:6px 4px"><option value="">종류</option><option value="수행">수행</option><option value="중간">중간</option><option value="기말">기말</option><option value="모의고사">모의고사</option><option value="Tosel 정기">Tosel 정기</option><option value="Tosel Voca">Tosel Voca 올림피아드</option><option value="PFC">PFC</option></select></div></div></div>
     <div id="rz-tablet" style="border:1.5px solid #93c5fd;background:#eff6ff;border-radius:12px;padding:10px;margin-bottom:10px">
       <div style="font-size:13px;font-weight:800;color:#1d4ed8;margin-bottom:8px">📱 태블릿 점검 <span id="rz-t-name" style="font-weight:600;font-size:11px;background:#dbeafe;border-radius:10px;padding:1px 8px"></span></div>
       <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:8px;margin-bottom:8px"><div class="field" style="margin-bottom:0;min-width:0;display:none"><div class="fl">태블릿 점검 교사</div><select class="fi" id="r-teacher-tablet"></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl"><span style="color:#ef4444;font-weight:800" title="체크콜·홈체크에 연동되는 항목입니다">★</span> 단계</div><select class="fi" id="r-level" onchange="onReportLevelChange()"><option value="">선택</option></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl"><span style="color:#ef4444;font-weight:800" title="체크콜·홈체크에 연동되는 항목입니다">★</span> 진도</div><div style="display:flex;gap:4px"><select class="fi" id="r-progress" style="flex:1" onchange="highlightProgress(this)"><option value="">선택</option></select><select class="fi" id="r-review-yn" style="width:64px;font-size:10px;padding:6px 2px"><option value="">Review</option><option value="Review">✔ Review</option></select></div></div></div>
@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zg';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zj';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3528,6 +3528,14 @@ function _autoSaveLvPg(){
     var mk=window._currentMakeupId||'',st=window._currentSessionTime||'';
     window._currentMakeupId=_om;window._currentSessionTime=_os;
     var rep=reports.find(function(r){return r.studentId===sid&&r.date===dt&&(r.makeupId||'')===mk&&(r.sessionTime||'')===st;});
+    // 일지를 저장하지 않아도 고른 단계·진도를 학생 정보에 '출발점'으로 남겨, 다음 수업일 자동 진도의 기준으로 씀
+    if(!mk&&!(rep&&!rep.absent&&rep.progress)){
+      var stu=students.find(function(x){return x.id===sid;});
+      if(stu&&!(stu.pgPlan&&stu.pgPlan.date===dt&&stu.pgPlan.level===lv&&stu.pgPlan.progress===pg)&&(!stu.pgPlan||stu.pgPlan.date<=dt)){
+        var pp={date:dt,level:lv,progress:pg};stu.pgPlan=pp;
+        db.collection('students').doc(sid).update({pgPlan:pp}).catch(function(e){console.warn('pgPlan',e);});
+      }
+    }
     if(!rep||rep.absent||!rep.id)return;
     if((rep.level||'')===lv&&(rep.progress||'')===pg)return;
     var u={level:lv,progress:pg,updatedAt:new Date().toISOString()};
@@ -9855,7 +9863,15 @@ function _autoNextProgress(sId,level,dt,sessTime,depth){
   var cand=reports.filter(function(r){return r.studentId===sId&&!r.absent&&r.progress&&before(r);});
   function key(r){return r.date+' '+(r.sessionTime||'');}
   cand.sort(function(a,b){return key(b).localeCompare(key(a));});
-  var last=cand.filter(function(r){return r.level===level;})[0],prevLv='';
+  var last=cand.filter(function(r){return r.level===level;})[0],prevLv='',planNotDone=false;
+  try{   // 일지 없이 고른 단계·진도(출발점)가 마지막 일지보다 최근이면 그것을 기준으로 삼음
+    var stP=students.find(function(x){return x.id===sId;}),pl=stP&&stP.pgPlan;
+    if(pl&&pl.level===level&&pl.date<dt&&lessons.indexOf(pl.progress)>=0&&(!last||pl.date>last.date)){
+      var rsP=reports.filter(function(r){return r.studentId===sId&&r.date===pl.date;});
+      var heldP=!(rsP.some(function(r){return r.absent||r.earlyLeave;})||(window._closed||{})[pl.date]!==undefined);
+      last={date:pl.date,progress:pl.progress,level:level};planNotDone=!heldP;
+    }
+  }catch(e){}
   if(!last){   // 이 단계 기록이 없으면: 바로 앞 단계를 마친(마지막 레슨·Level Test·Review) 기록이 있을 때 이 단계 첫 레슨부터 시작
     var any=cand.filter(function(r){return r.level!==level&&CURRICULUM[r.level];})[0];
     if(!any)return null;
@@ -9864,7 +9880,7 @@ function _autoNextProgress(sId,level,dt,sessTime,depth){
     if(!al.slice(ai+1).every(function(x){return /Level Test|Review|Portfolio/i.test(x);}))return null;
     last={date:any.date,progress:any.progress,level:any.level};prevLv=any.level;
   }
-  var idx=prevLv?-1:lessons.indexOf(last.progress);if(!prevLv&&idx<0)return null;
+  var idx=prevLv?-1:lessons.indexOf(last.progress)-(planNotDone?1:0);if(!prevLv&&idx<-1)return null;if(!prevLv&&idx<0&&!planNotDone)return null;
   var res;
   if(prevLv)res={level:level,progress:lessons[0],prevLevel:prevLv};
   else if(idx+1<lessons.length)res={level:level,progress:lessons[idx+1]};
@@ -9898,6 +9914,8 @@ function _missedClassDays(sId,from,to){
     if(st.days.indexOf(names[d.getDay()])<0)continue;
     var iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     try{if(isHoliday(d.getFullYear(),d.getMonth(),d.getDate())!=null)continue;}catch(e){}
+    var iso0=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if((window._closed||{})[iso0]!==undefined)continue;   // 학원 휴원일
     var rs=reports.filter(function(r){return r.studentId===sId&&r.date===iso;});
     if(rs.some(function(r){return r.absent||r.earlyLeave;}))continue;
     n++;
@@ -9921,7 +9939,8 @@ function populateProgressDropdown(level,current,refDate,allowJump){
   if(!current&&lessons.length>0){
     var sId=$('r-student-id').value;var dt=refDate||$('r-date').value||todayISO();
     var res=_autoNextProgress(sId,level,dt,'');
-    _pgHint(res?'':'이 학생의 "'+level+'" 지난 일지에 진도가 기록돼 있지 않아 자동으로 채우지 못했어요. 직접 골라 주세요.');
+    var _lastAny=reports.filter(function(r){return r.studentId===sId&&!r.absent&&r.progress&&r.date<dt;}).sort(function(a,b){return (b.date+(b.sessionTime||'')).localeCompare(a.date+(a.sessionTime||''));})[0];
+    _pgHint(res?'':'이 학생의 "'+level+'" 지난 일지에 진도가 기록돼 있지 않아 자동으로 채우지 못했어요. '+(_lastAny?'(가장 최근 진도 기록: '+_lastAny.date+' '+_lastAny.level+' '+_lastAny.progress+') ':'(진도가 적힌 지난 일지가 없어요) ')+'직접 골라 주세요.');
     if(res&&res.prevLevel&&!res.missed)_pgHint('이전 단계 "'+res.prevLevel+'"를 마친 기록('+res.lastDate+' '+res.lastProgress+')이 있어 이 단계의 첫 레슨으로 채웠어요. 다르면 직접 골라 주세요.');
     if(res&&res.missed)_pgHint('마지막 진도 기록('+res.lastDate+' '+res.lastProgress+') 이후 일지가 없는 수업일 '+res.missed+'회를 수업한 것으로 보고 넘겼어요. 다르면 직접 골라 주세요.');
     if(res){
@@ -28100,7 +28119,39 @@ function _brandApply(b){
   var c=document.querySelector('#boot-overlay .boot-logo');if(c)c.innerHTML=L?img(56):txt;
   var d=document.querySelector('#login-screen h1');if(d)d.innerHTML=L?img(64):txt;
 }
+// ── 학원 휴원일(전체 학생 진도 정지) ──
+window._closed=window._closed||{};
+function _closeStart(){
+  try{db.collection('config').doc('closures').onSnapshot(function(d){
+    window._closed=(d.exists&&d.data().days)||{};
+    var m=document.getElementById('cl-modal');if(m)_clDraw();
+    try{var e=$('r-student-id');if(e&&e.value&&$('r-progress')&&!$('r-progress').value&&$('r-level')&&$('r-level').value)populateProgressDropdown($('r-level').value,'',$('r-date').value,false);}catch(x){}
+  },function(){});}catch(e){}
+}
+function _clSave(){return db.collection('config').doc('closures').set({days:window._closed});}
+function _clOpen(){
+  var m=document.getElementById('cl-modal');if(m)m.remove();
+  m=document.createElement('div');m.id='cl-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.innerHTML='<div style="background:var(--surface,#fff);color:var(--txt,#111);border-radius:14px;padding:16px;width:100%;max-width:380px;max-height:85vh;overflow:auto"><div style="font-weight:800;font-size:15px;margin-bottom:4px">🏖 휴원일 등록</div><div style="font-size:11px;color:#777;line-height:1.4;margin-bottom:10px">등록한 날은 모든 학생이 수업이 없는 날로 처리되어, 다음 수업일의 단계·진도가 그날만큼 넘어가지 않아요.</div><div style="display:flex;gap:4px;margin-bottom:6px"><input type="date" class="fi" id="cl-date" style="flex:1;min-width:0"><input class="fi" id="cl-why" placeholder="사유 (예: 할로윈 파티)" style="flex:1.2;min-width:0"></div><button class="btn" style="width:100%;margin-bottom:10px" onclick="_clAdd()">등록</button><div id="cl-list"></div><button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="document.getElementById(\'cl-modal\').remove()">닫기</button></div>';
+  document.body.appendChild(m);
+  $('cl-date').value=($('r-date')&&$('r-date').value)||todayISO();
+  _clDraw();
+}
+function _clDraw(){
+  var l=document.getElementById('cl-list');if(!l)return;
+  var ks=Object.keys(window._closed||{}).sort().reverse();
+  l.innerHTML=ks.length?ks.map(function(k){return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid #eee;font-size:12px"><b>'+k+'</b><span style="flex:1;color:#666">'+_bcEsc(window._closed[k]||'')+'</span><button class="btn btn-sm" style="font-size:11px" onclick="_clDel(\''+k+'\')">삭제</button></div>';}).join(''):'<div style="font-size:12px;color:#999;text-align:center;padding:6px">등록된 휴원일이 없어요</div>';
+}
+function _clAdd(){
+  var d=$('cl-date').value;if(!d){toast('⚠️ 날짜를 선택하세요');return;}
+  window._closed[d]=($('cl-why').value||'').trim();$('cl-why').value='';
+  _clSave().then(function(){toast('✅ '+d+' 휴원일로 등록했어요');}).catch(function(){toast('⚠️ 저장 실패');});_clDraw();
+}
+function _clDel(k){delete window._closed[k];_clSave().catch(function(){});_clDraw();}
 function _brandStart(){
+  try{_closeStart();}catch(e){}
   try{
     db.collection('config').doc('branding').onSnapshot(function(d){
       var b=d.exists?d.data():{};
