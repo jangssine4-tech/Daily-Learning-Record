@@ -1819,7 +1819,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zy';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zz';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -2963,9 +2963,10 @@ function refreshCurrentView(trigger){
 // 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
 //   to: tablet|book 호출 대상, link: hwPrep|hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
 var CC_DEFAULT_TEMPLATE={sections:[
- {title:'숙제 했나요?',items:[
-  {id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},
-  {id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]},
+ {title:'수업 준비는 됐나요?',items:[
+  {id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},
+  {id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},
+  {id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}]},
  {title:'스마트 학습 1',items:[
   {id:'vt',t:'check',l:'어휘트레이닝'}]},
  {title:'단어장',items:[
@@ -2991,6 +2992,27 @@ var CC_DEFAULT_TEMPLATE={sections:[
   {id:'q2',t:'check',l:'오답 노트 하기'},
   {id:'q3',t:'call',l:'오답 노트 검사 받기',to:'tablet'}]}
 ]};
+// ── 공통 구역 "수업 준비는 됐나요?" (예전 이름 "숙제 했나요?") ──
+//   기본 항목: 교재 준비 · 교재 숙제 · 영상 숙제 (O/X 선택). 전체 계획표 맨 위 "공통 구역" 카드에서 편집해요.
+//   예전에 저장된 계획표(이름 "숙제 했나요?", 체크칸 2개)는 읽을 때 자동으로 새 기본값으로 바꿔서 써요.
+var CC_HW_TITLE='수업 준비는 됐나요?',CC_HW_OLD_TITLE='숙제 했나요?';
+function _ccHwDefault(){return [{id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},{id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}];}
+function _ccHwTitleMig(t){return (!t||t===CC_HW_OLD_TITLE)?CC_HW_TITLE:t;}
+function _ccHwItemsMig(items){   // 원본은 건드리지 않고 복사본을 돌려줘요
+  if(!Array.isArray(items))return items;
+  items=JSON.parse(JSON.stringify(items));
+  if(items.length===2&&items[0]&&items[1]&&items[0].id==='hwb'&&items[1].id==='hwv'&&items[0].t==='check'&&items[1].t==='check'&&items[0].l==='교재 숙제'&&items[1].l==='영상 숙제')return _ccHwDefault();
+  items.forEach(function(it){if(it&&it.t==='check'&&/^(교재준비|교재숙제|영상숙제)/.test(String(it.l||'').replace(/\s+/g,'')))it.t='ox';});
+  return items;
+}
+function _ccHwMigSecs(secs){(secs||[]).forEach(function(sc){if(sc&&sc.k==='hw'){sc.title=_ccHwTitleMig(sc.title);sc.items=_ccHwItemsMig(sc.items||[]);}});return secs;}
+function _ccHwMigPlan(p){   // 편집용 복사본(p)을 제자리에서 새 형식으로
+  if(!p)return p;
+  if(p.hwTitle)p.hwTitle=_ccHwTitleMig(p.hwTitle);
+  if(Array.isArray(p.hw))p.hw=_ccHwItemsMig(p.hw);
+  Object.keys(p.ov||{}).forEach(function(ln){if(p.ov[ln])_ccHwMigSecs(p.ov[ln].sections);});
+  return p;
+}
 var CC_DEFAULT_MINUTES=90;
 var CC_PLANS={"Phonics 1A":{"key":"Phonics 1A","blocks":[{"lessons":["Unit 1 Lesson 1","Unit 1 Lesson 2","Unit 1 Lesson 3","Unit 1 Lesson 4","Unit 2 Lesson 1","Unit 2 Lesson 2","Unit 2 Lesson 3","Unit 2 Lesson 4","Unit 3 Lesson 1","Unit 3 Lesson 2","Unit 3 Lesson 3","Unit 3 Lesson 4","Unit 4 Lesson 1","Unit 4 Lesson 2","Unit 4 Lesson 3","Unit 4 Lesson 4"],"rows":[{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(영한/한영)","c":"cxxxcxxxcxxxcxxx"},{"g":"스마트 학습","s":"Word Training","l":"말하기 훈련","c":"xcxxxcxxxcxxxcxx"},{"g":"스마트 학습","s":"Word Training","l":"의미 확인","c":"xxcxxxcxxxcxxxcx"},{"g":"스마트 학습","s":"Word Training","l":"스펠링 확인","c":"xxxcxxxcxxxcxxxc"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Daily Study","l":"오늘 배운 알파벳 소리와 단어 익히기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Speaking Training","l":"큰소리로 문장 듣고 따라하기","c":"cccxcccxcccxcccx"},{"g":"스마트 학습","s":"Daily Quiz","l":"Daily Quiz / Unit Test","c":"ssssssssssssssss"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"그림 보고 영단어 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"영단어 읽고 뜻 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"단어 외우기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"큰 소리로 읽으면서 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"또박 또박 예쁘게 쓰기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"[Look and say] 소리와 단어 3번 읽기","c":"cccxcccxcccxcccx"},{"g":"교재 학습","s":"Studentbook","l":"[Phonics Song] 노래 부르기","c":"cccxcccxcccxcccx"}]}]},"Phonics 1B":{"key":"Phonics 1B","blocks":[{"lessons":["Unit 1 Lesson 1","Unit 1 Lesson 2","Unit 1 Lesson 3","Unit 1 Lesson 4","Unit 2 Lesson 1","Unit 2 Lesson 2","Unit 2 Lesson 3","Unit 2 Lesson 4","Unit 3 Lesson 1","Unit 3 Lesson 2","Unit 3 Lesson 3","Unit 3 Lesson 4","Unit 4 Lesson 1","Unit 4 Lesson 2","Unit 4 Lesson 3","Unit 4 Lesson 4"],"rows":[{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(영한/한영)","c":"cxxxcxxxcxxxcxxx"},{"g":"스마트 학습","s":"Word Training","l":"말하기 훈련","c":"xcxxxcxxxcxxxcxx"},{"g":"스마트 학습","s":"Word Training","l":"의미 확인","c":"xxcxxxcxxxcxxxcx"},{"g":"스마트 학습","s":"Word Training","l":"스펠링 확인","c":"xxxcxxxcxxxcxxxc"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Daily Study","l":"오늘 배운 소리와 단어 익히기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Speaking Training","l":"큰소리로 문장 듣고 따라하기","c":"cccxcccxcccxcccx"},{"g":"스마트 학습","s":"Daily Quiz","l":"Daily Quiz / Unit Test","c":"ssssssssssssssss"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"그림 보고 영단어 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"영단어 읽고 뜻 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"단어 외우기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"큰 소리로 읽으면서 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"또박 또박 예쁘게 쓰기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"[Look and say] 소리와 단어 3번 읽기","c":"cccxcccxcccxcccx"},{"g":"교재 학습","s":"Studentbook","l":"[Let's Read] 문장 듣고 따라하기","c":"cccxcccxcccxcccx"},{"g":"교재 학습","s":"Studentbook","l":"[Let's Read] Sight Words 외우기","c":"cccxcccxcccxcccx"}]}],"lt":"AI-QV 메뉴의 \"I\"로 접속해서 Level Test에 응시하고 결과를 확인하세요. (나의 점수 :            점)"},"Phonics 2A~3B":{"key":"Phonics 2A~3B","blocks":[{"lessons":["Unit 1 Lesson 1","Unit 1 Lesson 2","Unit 1 Lesson 3","Unit 1 Lesson 4","Unit 2 Lesson 1","Unit 2 Lesson 2","Unit 2 Lesson 3","Unit 2 Lesson 4","Unit 3 Lesson 1","Unit 3 Lesson 2","Unit 3 Lesson 3","Unit 3 Lesson 4","Unit 4 Lesson 1","Unit 4 Lesson 2","Unit 4 Lesson 3","Unit 4 Lesson 4"],"rows":[{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(영한/한영)","c":"cxxxcxxxcxxxcxxx"},{"g":"스마트 학습","s":"Word Training","l":"말하기 훈련","c":"xcxxxcxxxcxxxcxx"},{"g":"스마트 학습","s":"Word Training","l":"의미 확인","c":"xxcxxxcxxxcxxxcx"},{"g":"스마트 학습","s":"Word Training","l":"스펠링 확인","c":"xxxcxxxcxxxcxxxc"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Daily Study","l":"오늘 배운 소리와 단어 익히기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Speaking Training","l":"큰소리로 문장 듣고 따라하기","c":"cccxcccxcccxcccx"},{"g":"스마트 학습","s":"Daily Quiz","l":"Daily Quiz / Unit Test","c":"ssssssssssssssss"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"그림 보고 영단어 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"영단어 읽고 뜻 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"큰소리로 읽으며 3번 쓰기","c":"cccxcccxcccxcccx"},{"g":"교재 학습","s":"Voca","l":"단어 외우기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"큰 소리로 읽으면서 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"또박 또박 예쁘게 쓰기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"[Look and say] 소리와 단어 3번 읽기","c":"cccxcccxcccxcccx"},{"g":"교재 학습","s":"Studentbook","l":"[Let's Read] 문장 듣고 따라하기","c":"cccxcccxcccxcccx"},{"g":"교재 학습","s":"Studentbook","l":"[Let's Read] Sight Words 외우기","c":"cccxcccxcccxcccx"}]}],"lt":"AI-QV 메뉴의 \"I\"로 접속해서 Level Test에 응시하고 결과를 확인하세요. (나의 점수 :            점)","ltSuf":"B"},"Master Phonics 1":{"key":"Master Phonics 1","blocks":[{"lessons":["Lesson 1","Lesson 2","Lesson 3","Lesson 4","Lesson 5","Lesson 6","Lesson 7","Lesson 8","Lesson 9","Lesson 10","Lesson 11","Lesson 12","Lesson 13","Lesson 14","Lesson 15","Lesson 16"],"rows":[{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Daily Study","l":"오늘 배운 알파벳 소리와 단어 익히기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Sentence Training","l":"큰소리로 문장 듣고 따라하기","c":"cccccccxcccxcccx"},{"g":"스마트 학습","s":"Sentence Training","l":"[Sight Words] 단어 외우기","c":"xxxcxxxcxxxcxxxc"},{"g":"교재 학습","s":"Voca","l":"그림 보고 영단어 말하기","c":"cccccccccccccccc","n":{"7":"L1~7 복습","15":"L9~15 복습"}},{"g":"교재 학습","s":"Voca","l":"영단어 읽고 뜻 말하기","c":"cccccccccccccccc","n":{"7":"L1~7 복습","15":"L9~15 복습"}},{"g":"교재 학습","s":"Voca","l":"단어 3번씩 쓰면서 외우기","c":"cccccccxcccccccx"},{"g":"교재 학습","s":"Voca","l":"[Sight Words] 단어 외우기","c":"cccccccccccccccc","n":{"7":"L1~7 복습","15":"L9~15 복습"}},{"g":"교재 학습","s":"Studentbook","l":"큰 소리로 읽으면서 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"또박 또박 예쁘게 쓰기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"[Story Time] 큰소리로 3번 읽기","c":"cccxcccxcccxcccx","h":"모르는 단어에 형광펜 표시하기"},{"g":"교재 학습","s":"Studentbook","l":"[Sight Words] 단어 외우기","c":"cccxcccxcccxcccx"}]}]},"Master Phonics 2":{"key":"Master Phonics 2","blocks":[{"lessons":["Lesson 1","Lesson 2","Lesson 3","Lesson 4","Lesson 5","Lesson 6","Lesson 7","Lesson 8","Lesson 9","Lesson 10","Lesson 11","Lesson 12","Lesson 13","Lesson 14","Lesson 15","Lesson 16"],"rows":[{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Daily Study","l":"오늘 배운 알파벳 소리와 단어 익히기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Sentence Training","l":"큰소리로 문장 듣고 따라하기","c":"cccccccxcccxcccx"},{"g":"스마트 학습","s":"Sentence Training","l":"[Sight Words] 단어 외우기","c":"xxxcxxxcxxxcxxxc"},{"g":"교재 학습","s":"Voca","l":"그림 보고 영단어 말하기","c":"cccccccccccccccc","n":{"7":"L1~7 복습","15":"L9~15 복습"}},{"g":"교재 학습","s":"Voca","l":"영단어 읽고 뜻 말하기","c":"cccccccccccccccc","n":{"7":"L1~7 복습","15":"L9~15 복습"}},{"g":"교재 학습","s":"Voca","l":"단어 3번씩 쓰면서 외우기","c":"cccccccxcccccccx"},{"g":"교재 학습","s":"Voca","l":"[Sight Words] 단어 외우기","c":"cccccccccccccccc","n":{"7":"L1~7 복습","15":"L9~15 복습"}},{"g":"교재 학습","s":"Studentbook","l":"큰 소리로 읽으면서 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"또박 또박 예쁘게 쓰기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Studentbook","l":"[Story Time] 큰소리로 3번 읽기","c":"cccxcccxcccxcccx","h":"모르는 단어에 형광펜 표시하기"},{"g":"교재 학습","s":"Studentbook","l":"[Sight Words] 단어 외우기","c":"cccxcccxcccxcccx"}]}]},"Basic":{"key":"Basic","blocks":[{"lessons":["Unit 1 Lesson 1","Unit 1 Lesson 2","Unit 1 Lesson 3","Unit 1 Lesson 4","Unit 2 Lesson 1","Unit 2 Lesson 2","Unit 2 Lesson 3","Unit 2 Lesson 4","Unit 3 Lesson 1","Unit 3 Lesson 2","Unit 3 Lesson 3","Unit 3 Lesson 4","Unit 4 Lesson 1","Unit 4 Lesson 2","Unit 4 Lesson 3","Unit 4 Lesson 4"],"rows":[{"g":"스마트 학습","s":"어휘 트레이닝","l":"암기 훈련(영한/한영)","c":"cxxxcxxxcxxxcxxx"},{"g":"스마트 학습","s":"어휘 트레이닝","l":"말하기 훈련","c":"xcxxxcxxxcxxxcxx"},{"g":"스마트 학습","s":"어휘 트레이닝","l":"의미 확인","c":"xxcxxxcxxxcxxxcx"},{"g":"스마트 학습","s":"어휘 트레이닝","l":"스펠링 확인","c":"xxxcxxxcxxxcxxxc"},{"g":"스마트 학습","s":"Workbook","l":"문법 설명 듣기","c":"cccxcccxcccxcccx"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하기(무슨 뜻인지 생각하며)","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"스피킹 트레이닝","l":"큰소리로 듣고 따라하기(듣기 / 말하기 훈련)","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"Daily Quiz","l":"Daily Quiz / Unit Test","c":"ssssssssssssssss"},{"g":"스마트 학습","s":"오답노트","l":"선생님과 같이 풀기","c":"cccccccccccccccc"},{"g":"스마트 학습","s":"포트폴리오 녹화","l":"누가, 뭐했는지 생각하며 말하기 연습 후 녹화","c":"xxxcxxxcxxxcxxxc"},{"g":"교재 학습","s":"Voca","l":"영단어 보고, 읽고 뜻 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"그림 보고 영단어 말하기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"큰소리로 읽으며 쓰기 x3","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"Words Writing for UNIT 풀기","c":"xxxcxxxcxxxcxxxc"},{"g":"교재 학습","s":"Voca","l":"단어 시험 보기(선생님 앞에서)","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"문법표 외우기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"큰소리로 읽으며 문제 풀기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"[Read and Write] 그림 보고 말해보기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Storybook","l":"모르는 단어 형광펜 표시하며 읽기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Storybook","l":"배웠던 단어에 집중해서 읽기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Storybook","l":"또박 또박 읽기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Storybook","l":"애니메이션 속도로 읽기","c":"cccccccccccccccc"},{"g":"교재 학습","s":"Storybook","l":"그림 보고 영어로 말해보기","c":"cccccccccccccccc"}]}],"lt":"AI-QV 메뉴의 \"I\"로 접속해서 Level Test에 응시하고 결과를 확인하세요. (나의 점수 :            점)","ltSuf":"C"},"First Grammar":{"key":"First Grammar","blocks":[{"lessons":["Unit 1 Lesson 1","Unit 1 Lesson 2","Unit 1 Lesson 3","Unit 1 Lesson 4","Unit 2 Lesson 1","Unit 2 Lesson 2","Unit 2 Lesson 3","Unit 2 Lesson 4","Unit 3 Lesson 1","Unit 3 Lesson 2","Unit 3 Lesson 3","Unit 3 Lesson 4","Unit 4 Lesson 1","Unit 4 Lesson 2","Unit 4 Lesson 3","Unit 4 Lesson 4","Review"],"rows":[{"g":"시험","s":"Vocabulary","l":"단어 시험 보기(복습)","c":"xcccccccccccccccc","n":{"1":"L1","2":"L2","3":"L3","4":"L1~L3","5":"L1","6":"L2","7":"L3","8":"L1~L3","9":"L1","10":"L2","11":"L3","12":"L1~L3","13":"L1","14":"L2","15":"L3","16":"L1~3"}},{"g":"Plus 메뉴","s":"Vocabulary Check-up","l":"따라 말하면서 암기","c":"cccxcccxcccxcccxx"},{"g":"Plus 메뉴","s":"Structure & Sentence","l":"큰소리로 읽으면서 풀기","c":"cccxcccxcccxcccxx"},{"g":"Plus 메뉴","s":"Speaking with Grammar","l":"뜻 생각하면서 말하기 연습","c":"cccxcccxcccxcccxx"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 태블릿 하기","c":"cccxcccxcccxcccxx"},{"g":"스마트 학습","s":"Daily Study","l":"문법 강의 내용 필기하기","c":"cccxcccxcccxcccxx","h":"Mainbook의 문법 정리 부분에"},{"g":"스마트 학습","s":"Daily Quiz","l":"점수","c":"sssxsssxsssxsssxx"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 하기","c":"cccxcccxcccxcccxx"},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"ccccccccccccccccc","n":{"3":"L1~L3","7":"L1~L3","11":"L1~L3","15":"L1~L3","16":"L1~3"}},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"ccccccccccccccccc","n":{"3":"L1~L3","7":"L1~L3","11":"L1~L3","15":"L1~L3","16":"L1~3"}},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"ccccccccccccccccc","h":"L4에서는 모른다고 표시된 부분만","n":{"3":"L1~L3","7":"L1~L3","11":"L1~L3","15":"L1~L3","16":"L1~3"}},{"g":"교재 학습","s":"Voca","l":"받아쓰기","c":"ccccccccccccccccc","n":{"0":"L1","1":"L2","2":"L3","3":"L1~L3","7":"L1~L3","11":"L1~L3","15":"L1~L3"}},{"g":"교재 학습","s":"Main book","l":"문법표 말하며 외우기","c":"ccccccccccccccccc","n":{"3":"L1~L3","7":"L1~L3","11":"L1~L3","15":"L1~L3","16":"L1~3"}},{"g":"교재 학습","s":"Main book","l":"문법 노트 정리하기","c":"ccccccccccccccccx","n":{"3":"L1~L3","7":"L1~L3","11":"L1~L3","15":"L1~L3"}},{"g":"교재 학습","s":"Main book","l":"문법 백지노트 시험 보기","c":"cccxcccxcccxcccxc"},{"g":"교재 학습","s":"Main book","l":"오답노트 쓰고 익히기","c":"cccxcccxcccxcccxx"},{"g":"교재 학습","s":"Main book (Lesson 4)","l":"[SUMMARY & REVIEW] 풀기","c":"xxxcxxxcxxxcxxxcx"},{"g":"교재 학습","s":"Main book (Lesson 4)","l":"[WORDS & PHRASES] 풀기","c":"xxxcxxxcxxxcxxxcx"},{"g":"교재 학습","s":"Main book (Lesson 4)","l":"[Wrap-up Test] 풀고 채점하기","c":"xxxcxxxcxxxcxxxcx"},{"g":"Plus 메뉴","s":"Grammar Lecture (Lesson 4)","l":"틀린 문제 강의 듣고","c":"xxxcxxxcxxxcxxxcx","h":"오답노트 쓰고 익히기"},{"g":"Plus 메뉴","s":"Workbook","l":"문제 풀이 & 채점","c":"ccccccccccccccccx"},{"g":"Plus 메뉴","s":"Workbook","l":"오답노트 쓰고 익히기","c":"ccccccccccccccccx"},{"g":"Plus 메뉴","s":"Workbook","l":"D 영작한 문장 말하며 익히기","c":"ccccccccccccccccc","n":{"3":"L1~L3","7":"L1~L3","11":"L1~L3","15":"L1~L3","16":"L1~3"}}]}],"lt":"□ Level Test 보기    □  Level Test Lecture 보며 오답노트 쓰기    □ Level Test 오답노트 익히기 → 검사"},"Grammar Plus 4~6":{"key":"Grammar Plus 4~6","blocks":[{"lessons":["Preview 1","Preview 2","Preview 3","Pre Wrap-Up","Lesson 1","Lesson 2","Lesson 3","Lesson 4","Wrap-Up 1","Lesson 5","Lesson 6","Lesson 7","Lesson 8","Wrap-Up 2"],"rows":[{"g":"복습","s":"Workbook","l":"지난 lesson 복습하기","c":"xxxxxcccxxcccc"},{"g":"복습","s":"Workbook","l":"지난 lesson 풀고 채점하기","c":"xxxxxcccxxcccc"},{"g":"복습","s":"단어 시험","l":"지난 lesson 단어 시험보기","c":"xxxxxccccxcccc","n":{"8":"L1~L4"}},{"g":"복습","s":"Main Book","l":"Wrap-up 풀고 채점하기","c":"xxxcxxxxcxxxxc"},{"g":"스마트 학습","s":"Word Plus+","l":"단어 / 예문 말하며 익히기","c":"xxxxccccxccccx"},{"g":"스마트 학습","s":"Study","l":"큰소리로 따라 말하기","c":"cccxccccxccccx"},{"g":"스마트 학습","s":"Study","l":"문법 강의 내용 필기하기","c":"cccxccccxccccx","h":"Workbook의 Lecture Note에 필기"},{"g":"스마트 학습","s":"Quiz","l":"Daily Quiz / Level Test","c":"xxxxssssxssssx"},{"g":"스마트 학습","s":"Lecture","l":"틀린 문제만 Lecture 보고 익히기","c":"xxxcxxxxcxxxxc"},{"g":"스마트 학습","s":"Quiz Review","l":"오답 다시 풀기","c":"xxxxccccxccccx"},{"g":"교재 학습","s":"Workbook","l":"오답노트 쓰고 외우기","c":"xxxxxxxxcxxxxc"},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"xxxccccccccccc"},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"xxxccccccccccc"},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"xxxccccccccccc"},{"g":"교재 학습","s":"Voca","l":"단어 시험 보기(선생님 앞에서 Self Test)","c":"xxxccccccccccc"},{"g":"교재 학습","s":"Main Book","l":"문법 개념 설명해 보기 / 문법 백지노트 쓰기","c":"cccxcccccccccx"},{"g":"교재 학습","s":"Main Book","l":"문제 풀고 채점","c":"cccxccccxccccx"},{"g":"교재 학습","s":"Main Book","l":"틀린 문제 옆에 오답 적기","c":"ccccccccxccccx"},{"g":"교재 학습","s":"Main Book","l":"[Let's Talk] 외워 말하기","c":"xxxxccccxccccx"},{"g":"교재 학습","s":"Main Book","l":"[Read and Write] 영어로 말하기","c":"xxxxccccxccccx"}]},{"lessons":["Lesson 9","Lesson 10","Lesson 11","Lesson 12","Wrap-Up 3"],"rows":[{"g":"복습","s":"Workbook","l":"[Lecture Note] 지난 lesson 필기한 내용 읽어보기","c":"xcccc"},{"g":"복습","s":"Workbook","l":"지난 lesson 풀고 채점하기","c":"xcccc"},{"g":"복습","s":"단어 시험","l":"지난 lesson 단어 시험보기","c":"xcccc"},{"g":"복습","s":"Main Book","l":"Wrap-up 풀고 채점하기","c":"xxxxc"},{"g":"스마트 학습","s":"Word Plus+","l":"단어 / 예문 말하며 익히기","c":"ccccx"},{"g":"스마트 학습","s":"Study","l":"큰소리로 따라 말하기","c":"ccccx"},{"g":"스마트 학습","s":"Study","l":"문법 강의 내용 필기하기","c":"ccccx","h":"Workbook의 Lecture Note에 필기"},{"g":"스마트 학습","s":"Quiz","l":"Daily Quiz / Level Test","c":"ssssx"},{"g":"스마트 학습","s":"Lecture","l":"틀린 문제만 Lecture 보고 익히기","c":"xxxxc"},{"g":"스마트 학습","s":"Quiz Review","l":"오답 다시 풀기","c":"ccccx"},{"g":"교재 학습","s":"Workbook","l":"오답노트 쓰고 외우기","c":"xxxxc"},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"ccccc"},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"ccccc"},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"ccccc"},{"g":"교재 학습","s":"Voca","l":"단어 시험 보기(선생님 앞에서 Self Test)","c":"ccccc"},{"g":"교재 학습","s":"Main Book","l":"문법 개념 설명해 보기 / 문법표 외워 말하기","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"문제 풀고 채점","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"틀린 문제 옆에 오답 적기","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"[Let's Talk] 외워 말하기","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"[Read and Write] 영어로 말하기","c":"ccccx"}]}],"lt":"□ 레벨 테스트 풀고 결과 확인하기  □ 틀린 문제 해설 강의 듣기(Plus메뉴 → Lecture)  □ 오답노트에 틀린 이유 정리하기(Workbook → Levelt Test 오답노트)"},"Grammar Plus 2~3":{"key":"Grammar Plus 2~3","blocks":[{"lessons":["Preview 1","Preview 2","Preview 3","Pre Wrap-Up","Lesson 1","Lesson 2","Lesson 3","Lesson 4","Wrap-Up 1","Lesson 5","Lesson 6","Lesson 7","Lesson 8","Wrap-Up 2"],"rows":[{"g":"복습","s":"Workbook","l":"지난 lesson 복습하기","c":"xxxxxccccxcccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"복습","s":"Workbook","l":"지난 lesson 풀고 채점하기","c":"xxxxxcccxxcccx"},{"g":"복습","s":"단어 시험","l":"지난 lesson 단어 받아쓰기 시험보기","c":"xxxxxccccxcccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"스마트 학습","s":"Word Plus+","l":"단어 / 예문 말하며 익히기","c":"xxxxccccxccccx"},{"g":"스마트 학습","s":"Study","l":"큰소리로 따라 말하기","c":"cccxccccxccccx"},{"g":"스마트 학습","s":"Study","l":"문법 선생님께 설명하기","c":"cccxccccxccccx"},{"g":"스마트 학습","s":"Quiz","l":"Daily Quiz / Level Test","c":"xxxxssssxssssx"},{"g":"스마트 학습","s":"Lecture","l":"틀린 문제만 Lecture 보고 익히기","c":"xxxcxxxxxxxxxx"},{"g":"스마트 학습","s":"Quiz Review","l":"오답 다시 풀기","c":"xxxxccccxccccx"},{"g":"교재 학습","s":"Workbook","l":"오답 선생님께 설명하기","c":"xxxxxxxxcxxxxc"},{"g":"교재 학습","s":"Voca","l":"QR 3번 듣고 따라 읽기","c":"xxxxcccccccccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"xxxxcccccccccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"xxxxcccccccccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"xxxxccccxccccx"},{"g":"교재 학습","s":"Voca","l":"단어 발음+예문 시험","c":"xxxxcccccccccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"교재 학습","s":"Voca","l":"단어 받아쓰기 시험 보기","c":"xxxccccccccccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"교재 학습","s":"Voca","l":"단어 재시험(60점 이하)","c":"xxxxcccccccccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"교재 학습","s":"Main Book","l":"백지노트 쓰기/문법 개념 선생님께 설명하기","c":"cccxcccccccccc","n":{"8":"L1~L4","13":"L5~L8"}},{"g":"교재 학습","s":"Main Book","l":"문제 풀고 채점","c":"cccxccccxccccx"},{"g":"교재 학습","s":"Main Book","l":"틀린 문제 선생님께 설명하기","c":"ccccccccxccccx"},{"g":"교재 학습","s":"Main Book","l":"[Let's Talk] 외워 말하기","c":"xxxxccccxccccx"},{"g":"교재 학습","s":"Main Book","l":"[Read and Write] 영어로 말하기","c":"xxxxccccxccccx"},{"g":"교재 학습","s":"Main Book","l":"Wrap-up 풀고 채점하기","c":"xxxcxxxxcxxxxc"},{"g":"교재 학습","s":"Main Book","l":"오답노트 쓰고 익히기","c":"xxxcxxxxcxxxxc"}]},{"lessons":["Lesson 9","Lesson 10","Lesson 11","Lesson 12","Wrap-Up 3"],"rows":[{"g":"복습","s":"Workbook","l":"지난 lesson 복습하기","c":"xcccc","n":{"4":"L9~L12"}},{"g":"복습","s":"Workbook","l":"지난 lesson 풀고 채점하기","c":"xcccx"},{"g":"복습","s":"단어 시험","l":"지난 lesson 단어 받아쓰기 시험보기","c":"xcccc","n":{"4":"L9~L12"}},{"g":"스마트 학습","s":"Word Plus+","l":"단어 / 예문 말하며 익히기","c":"ccccx"},{"g":"스마트 학습","s":"Study","l":"큰소리로 따라 말하기","c":"ccccx"},{"g":"스마트 학습","s":"Study","l":"문법 선생님께 설명하기","c":"ccccx"},{"g":"스마트 학습","s":"Quiz","l":"Daily Quiz / Level Test","c":"ssssx"},{"g":"스마트 학습","s":"Lecture","l":"틀린 문제만 Lecture 보고 익히기","c":"xxxxx"},{"g":"스마트 학습","s":"Quiz Review","l":"오답 다시 풀기","c":"ccccx"},{"g":"교재 학습","s":"Workbook","l":"오답 선생님께 설명하기","c":"xxxxc"},{"g":"교재 학습","s":"Voca","l":"QR 3번 듣고 따라 읽기","c":"ccccc","n":{"4":"L9~L12"}},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"ccccc","n":{"4":"L9~L12"}},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"ccccc","n":{"4":"L9~L12"}},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"ccccx"},{"g":"교재 학습","s":"Voca","l":"단어 발음+예문 시험","c":"ccccc","n":{"4":"L9~L12"}},{"g":"교재 학습","s":"Voca","l":"단어 받아쓰기 시험 보기","c":"ccccc","n":{"4":"L9~L12"}},{"g":"교재 학습","s":"Voca","l":"단어 재시험(60점 이하)","c":"ccccc","n":{"4":"L9~L12"}},{"g":"교재 학습","s":"Main Book","l":"백지노트 쓰기/문법 개념 선생님께 설명하기","c":"ccccc","n":{"4":"L9~L12"}},{"g":"교재 학습","s":"Main Book","l":"문제 풀고 채점","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"틀린 문제 선생님께 설명하기","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"[Let's Talk] 외워 말하기","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"[Read and Write] 영어로 말하기","c":"ccccx"},{"g":"교재 학습","s":"Main Book","l":"Wrap-up 풀고 채점하기","c":"xxxxc"},{"g":"교재 학습","s":"Main Book","l":"오답노트 쓰고 익히기","c":"xxxxc"}]}],"lt":"□ 레벨 테스트 풀고 결과 확인하기  □ 틀린 문제 해설 강의 듣기(Plus메뉴 → Lecture)  □ 오답노트에 틀린 이유 정리하고 익히기(Workbook → Levelt Test 오답노트)"},"Prime A":{"key":"Prime A","blocks":[{"lessons":["Unit 1 Lesson 1","Unit 1 Lesson 2","Unit 1 Lesson 3","Unit 1 Lesson 4","Unit 1 Lesson 5","Unit 2 Lesson 1","Unit 2 Lesson 2","Unit 2 Lesson 3","Unit 2 Lesson 4","Unit 2 Lesson 5","Unit 3 Lesson 1","Unit 3 Lesson 2","Unit 3 Lesson 3","Unit 3 Lesson 4","Unit 3 Lesson 5"],"rows":[{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(영한)","c":"cxxxxcxxxxcxxxx"},{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(한영)","c":"xcxxxxcxxxxcxxx"},{"g":"스마트 학습","s":"Word Training","l":"말하기 훈련","c":"xxcxxxxcxxxxcxx"},{"g":"스마트 학습","s":"Word Training","l":"의미 확인","c":"xxxcxxxxcxxxxcx"},{"g":"스마트 학습","s":"Word Training","l":"스펠링 확인","c":"xxxxcxxxxcxxxxc"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Speaking Training","l":"큰소리로 듣고 따라하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Daily Quiz","l":"점수","c":"sssssssssssssss"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"AI-QV","l":"A(역할극 하기)","c":"ccxccccxccccxcc"},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"ccccxccccxccccx"},{"g":"교재 학습","s":"Voca","l":"단어 시험 보기(선생님 앞에서 Self Test)","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Guidebook","l":"직독직해하기(의미 단위로 끊어 읽으며)","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"[Let's Talk]","c":"ccxxxccxxxccxxx","h":"질문에 대한 답 찾고 영어로 말해보기"},{"g":"교재 학습","s":"Guidebook","l":"유창하게 읽기","c":"xxcxxxxcxxxxcxx"},{"g":"교재 학습","s":"Workbook","l":"큰소리로 읽으며 풀기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"백지 노트 시험 준비","c":"xxxccxxxccxxxcc"}]}],"pf":"□ Daily Study(Portfolio) 하기    □ Portfolio 쓰기(~ Writing the 1st Draft) → 검사    □ Portfolio 외워 쓰기(Writing Test)   □ Writing Test 말하며 익히기   □  Portfolio 녹화"},"Prime B":{"key":"Prime B","blocks":[{"lessons":["Unit 4 Lesson 1","Unit 4 Lesson 2","Unit 4 Lesson 3","Unit 4 Lesson 4","Unit 4 Lesson 5","Unit 5 Lesson 1","Unit 5 Lesson 2","Unit 5 Lesson 3","Unit 5 Lesson 4","Unit 5 Lesson 5","Unit 6 Lesson 1","Unit 6 Lesson 2","Unit 6 Lesson 3","Unit 6 Lesson 4","Unit 6 Lesson 5"],"rows":[{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(영한)","c":"cxxxxcxxxxcxxxx"},{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(한영)","c":"xcxxxxcxxxxcxxx"},{"g":"스마트 학습","s":"Word Training","l":"말하기 훈련","c":"xxcxxxxcxxxxcxx"},{"g":"스마트 학습","s":"Word Training","l":"의미 확인","c":"xxxcxxxxcxxxxcx"},{"g":"스마트 학습","s":"Word Training","l":"스펠링 확인","c":"xxxxcxxxxcxxxxc"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Speaking Training","l":"큰소리로 듣고 따라하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Daily Quiz","l":"점수","c":"sssssssssssssss"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"AI-QV","l":"A(역할극 하기)","c":"ccxccccxccccccx"},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"ccccxccccxccccx"},{"g":"교재 학습","s":"Voca","l":"단어 시험 보기(선생님 앞에서 Self Test)","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Guidebook","l":"직독직해하기(의미 단위로 끊어 읽으며)","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"[Let's Talk]","c":"ccxxxccxxxxxxxx","h":"질문에 대한 답 찾고 영어로 말해보기"},{"g":"교재 학습","s":"Guidebook","l":"유창하게 읽기","c":"ccccxccccxccccx"},{"g":"교재 학습","s":"Workbook","l":"큰소리로 읽으며 풀기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"백지 노트 시험 준비","c":"xxxccxxxccxxxxx"}]}],"lt":"AI-QV 메뉴의 'I'로 접속해, Level Test에 응시하고 결과를 확인하세요. (나의 점수:             점)","pf":"□ Daily Study(Portfolio) 하기    □ Portfolio 쓰기(~ Writing the 1st Draft) → 검사    □ Portfolio 외워 쓰기(Writing Test)   □ Writing Test 말하며 익히기   □  Portfolio 녹화"},"Advanced A":{"key":"Advanced A","blocks":[{"lessons":["Unit 1 Lesson 1","Unit 1 Lesson 2","Unit 1 Lesson 3","Unit 1 Lesson 4","Unit 1 Lesson 5","Unit 2 Lesson 1","Unit 2 Lesson 2","Unit 2 Lesson 3","Unit 2 Lesson 4","Unit 2 Lesson 5","Unit 3 Lesson 1","Unit 3 Lesson 2","Unit 3 Lesson 3","Unit 3 Lesson 4","Unit 3 Lesson 5"],"rows":[{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(영한)","c":"cxxxxcxxxxcxxxx"},{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(한영)","c":"xcxxxxcxxxxcxxx"},{"g":"스마트 학습","s":"Word Training","l":"말하기 훈련","c":"xxcxxxxcxxxxcxx"},{"g":"스마트 학습","s":"Word Training","l":"의미 확인","c":"xxxcxxxxcxxxxcx"},{"g":"스마트 학습","s":"Word Training","l":"스펠링 확인","c":"xxxxcxxxxcxxxxc"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Speaking Training","l":"큰소리로 듣고 따라하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Daily Quiz","l":"점수","c":"sssssssssssssss"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"AI-QV","l":"A(역할극 하기)","c":"ccxccccxccccxcc"},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"ccccxccccxccccx"},{"g":"교재 학습","s":"Voca","l":"단어 시험 보기(선생님 앞에서 Self Test)","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Guidebook","l":"직독직해하기(의미 단위로 끊어 읽으며)","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"[Let's Talk]","c":"ccxxxccxxxccxxx","h":"질문에 대한 답 찾고 영어로 말해보기"},{"g":"교재 학습","s":"Guidebook","l":"유창하게 읽기","c":"xxcxxxxcxxxxcxx"},{"g":"교재 학습","s":"Workbook","l":"큰소리로 읽으며 풀기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"백지 노트 시험 준비","c":"xxxccxxxccxxxcc"}]}],"pf":"□ Daily Study(Portfolio) 하기    □ Portfolio 쓰기(~ Writing the 1st Draft) → 검사    □ Portfolio 외워 쓰기(Writing Test)   □ Writing Test 말하며 익히기   □  Portfolio 녹화"},"Advanced B":{"key":"Advanced B","blocks":[{"lessons":["Unit 4 Lesson 1","Unit 4 Lesson 2","Unit 4 Lesson 3","Unit 4 Lesson 4","Unit 4 Lesson 5","Unit 5 Lesson 1","Unit 5 Lesson 2","Unit 5 Lesson 3","Unit 5 Lesson 4","Unit 5 Lesson 5","Unit 6 Lesson 1","Unit 6 Lesson 2","Unit 6 Lesson 3","Unit 6 Lesson 4","Unit 6 Lesson 5"],"rows":[{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(영한)","c":"cxxxxcxxxxcxxxx"},{"g":"스마트 학습","s":"Word Training","l":"암기 훈련(한영)","c":"xcxxxxcxxxxcxxx"},{"g":"스마트 학습","s":"Word Training","l":"말하기 훈련","c":"xxcxxxxcxxxxcxx"},{"g":"스마트 학습","s":"Word Training","l":"의미 확인","c":"xxxcxxxxcxxxxcx"},{"g":"스마트 학습","s":"Word Training","l":"스펠링 확인","c":"xxxxcxxxxcxxxxc"},{"g":"스마트 학습","s":"Daily Study","l":"큰소리로 따라하며 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Speaking Training","l":"큰소리로 듣고 따라하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"Daily Quiz","l":"점수","c":"sssssssssssssss"},{"g":"스마트 학습","s":"Quiz Review","l":"선생님과 같이 하기","c":"ccccccccccccccc"},{"g":"스마트 학습","s":"AI-QV","l":"A(역할극 하기)","c":"ccxccccxccccccx"},{"g":"교재 학습","s":"Voca","l":"영단어 보고 읽고 뜻 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"뜻 보고 영단어 익히기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Voca","l":"예문 말하며 익히기","c":"ccccxccccxccccx"},{"g":"교재 학습","s":"Voca","l":"단어 시험 보기(선생님 앞에서 Self Test)","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Guidebook","l":"직독직해하기(의미 단위로 끊어 읽으며)","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"cccxxcccxxcccxx"},{"g":"교재 학습","s":"Guidebook","l":"[Let's Talk]","c":"ccxxxccxxxxxxxx","h":"질문에 대한 답 찾고 영어로 말해보기"},{"g":"교재 학습","s":"Guidebook","l":"유창하게 읽기","c":"ccccxccccxccccx"},{"g":"교재 학습","s":"Workbook","l":"큰소리로 읽으며 풀기","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"모르는 단어, 해석 안되는 부분 형광펜 표시","c":"ccccccccccccccc"},{"g":"교재 학습","s":"Workbook","l":"백지 노트 시험 준비","c":"xxxccxxxccxxxxx"}]}],"lt":"AI-QV 메뉴의 'I'로 접속해, Level Test에 응시하고 결과를 확인하세요. (나의 점수:             점)","pf":"□ Daily Study(Portfolio) 하기    □ Portfolio 쓰기(~ Writing the 1st Draft) → 검사    □ Portfolio 외워 쓰기(Writing Test)   □ Writing Test 말하며 익히기   □  Portfolio 녹화"}};
 // ── Study Plan(단계별 계획표) 해석: 단계+진도 → 체크콜 화면 항목 ──
@@ -3117,7 +3139,7 @@ function ccResolve(plan,level,progress){
   if(/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim()))p='전체 Review';   // 전체 Review는 Review와 따로 편집
   // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
-    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));
+    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccHwMigSecs(_ot.sections);
     _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off&&!i.del;});});
     return _ccAutoLink(_ot);
   }
@@ -3131,7 +3153,7 @@ function ccResolve(plan,level,progress){
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
   var p=ccNormProg(progress);if(!p)return null;
-  var hw={k:'hw',title:(plan.hwTitle||'숙제 했나요?'),items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
+  var hw={k:'hw',title:_ccHwTitleMig(plan.hwTitle),items:(Array.isArray(plan.hw)?_ccHwItemsMig(plan.hw):_ccHwDefault())};
   var HWS=hw.items.length?[hw]:[];   // 공통 구역(숙제)을 전부 지우면 이 구역은 나오지 않아요
   // 특별 진도(Level Test · Portfolio · Review · 전체 Review): 전체 계획표에서 편집한 내용(plan.sp)이 있으면 그걸 써요
   var _spk=/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim())?'전체 Review':(/^Review$/i.test(p)?'Review':((p==='Level Test'||p==='Portfolio')?p:''));
@@ -4058,7 +4080,7 @@ function _ccKeyOptsDraw(){
     op.textContent=k+(n?'  ✎ '+n:'  ✓');
   });
 }
-function _ccWork(){var k=_ccEd.key;if(!_ccEd.work[k])_ccEd.work[k]=JSON.parse(JSON.stringify(_ccEffPlan(k)));return _ccEd.work[k];}
+function _ccWork(){var k=_ccEd.key;if(!_ccEd.work[k])_ccEd.work[k]=_ccHwMigPlan(JSON.parse(JSON.stringify(_ccEffPlan(k))));return _ccEd.work[k];}
 function _ccPlanKey(k){_ccEd.spec=null;_ccEd.key=k;_ccEd.bi=0;_ccEd.sel=0;document.getElementById('ccp-key').value=k;_ccPlanDraw();}
 function _ccPlanBlk(i){_ccEd.spec=null;_ccEd.bi=i;_ccEd.sel=0;_ccPlanDraw();}
 function _ccPlanSel(i){_ccEd.spec=null;_ccEd.sel=i;_ccPlanDraw();}
@@ -4088,16 +4110,16 @@ function _ccPlanDraw(){
   var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:230px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
   ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+(_ccCustom(_ccWork(),n)?' ✎':'')+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
-  var _pk=null,_ncol=ls.length+2;
+  var _pk=null,_ncol=ls.length+2,_run=-1;
   b.rows.forEach(function(r,ri){
     var _k=(r.g||'')+'|'+(r.s||''),_gc=_ccGrpCol(b,r.g);
-    if(_k!==_pk){_pk=_k;
+    if(_k!==_pk){_pk=_k;_run++;
       var _gs=[];b.rows.forEach(function(x){if(_gs.indexOf(x.g||'')<0)_gs.push(x.g||'');});['스마트 학습','교재 학습'].forEach(function(x){if(_gs.indexOf(x)<0)_gs.push(x);});
-      h+='<tr><td colspan="'+_ncol+'" style="background:'+_gc[0]+';color:'+_gc[1]+';padding:4px 8px;border-top:2px solid '+_gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+      h+='<tr data-ccsec="1" data-run="'+_run+'"><td colspan="'+_ncol+'" style="background:'+_gc[0]+';color:'+_gc[1]+';padding:4px 8px;border-top:2px solid '+_gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="cc-sec-h" draggable="true" data-ri="'+ri+'" title="끌어서 구역 전체를 옮겨요" style="cursor:grab;font-size:16px;line-height:1;padding:2px 4px;user-select:none;opacity:.8">⠿</span>'
         +'<input value="'+_bcEsc(r.s||'')+'" onchange="_ccSecEdit('+ri+',\'s\',this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px">'
         +'<select onchange="_ccSecEdit('+ri+',\'g\',this.value)" title="묶음" style="font-size:11px;padding:3px;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7);color:inherit">'+_gs.map(function(x){return '<option value="'+_bcEsc(x)+'"'+((r.g||'')===x?' selected':'')+'>'+_bcEsc(x||'(묶음 없음)')+'</option>';}).join('')+'</select>'
         +'<span style="flex:1"></span><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecRowAdd('+ri+')">＋ 항목 추가</button><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecDel('+ri+')">구역 삭제</button></div></td></tr>';}
-    h+='<tr><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3)">'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
+    h+='<tr data-ccrow="1" data-run="'+_run+'" data-ri="'+ri+'"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3);display:flex;align-items:center;gap:4px"><span class="cc-row-h" draggable="true" data-ri="'+ri+'" title="끌어서 이 구역 안에서 순서를 바꿔요" style="cursor:grab;font-size:14px;line-height:1;user-select:none;color:#64748b">⠿</span>'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
     for(var i=0;i<ls.length;i++){
       var ch=r.c.charAt(i),txt=ch==='c'?'□':(ch==='s'?'점':'×'),bg=ch==='c'?'#ecfdf5':(ch==='s'?'#fef9c3':'#f3f4f6'),col=ch==='x'?'#9ca3af':'#065f46';
       h+='<td style="text-align:center;border-bottom:1px solid var(--border);'+(i===sel?'background:#eff6ff;':'')+'"><button onclick="_ccPlanCell('+ri+','+i+')" title="'+_bcEsc(r.n&&r.n[i]?r.n[i]:'')+'" style="width:30px;height:24px;border:1px solid #d1d5db;border-radius:5px;background:'+bg+';color:'+col+';cursor:pointer;font-size:12px">'+txt+'</button></td>';
@@ -4169,14 +4191,14 @@ function _ccHelp(){
    +'<li>학생의 <b>단계·진도</b>(일지에서 입력)에 맞는 항목만 체크콜에 나타납니다. 레슨을 고르면 그 레슨의 점검 항목이 아래에 나옵니다.</li>'
    +'<li><b>표시 체크</b>(맨 앞 파란 칸): 체크를 풀면 글씨가 흐려지고 그 레슨의 체크콜 화면에서 빠집니다. 다시 체크하면 되살아납니다.</li>'
    +'<li><b>순서 변경</b>: 구역 제목 앞 ⠿ 을 끌면 구역 순서, 항목 앞 ⠿ 을 끌면 항목 순서가 바뀝니다.</li>'
-   +'<li><b>종류</b>: 체크칸(학생이 체크) / 숫자 입력 / 받아쓰기(맞은 개수/전체) / 검사 받기(선생님 호출 — 태블릿 교사 또는 교재 교사)</li>'
+   +'<li><b>종류</b>: 체크칸(학생이 체크) / 숫자 입력 / 받아쓰기(맞은 개수/전체) / 검사 받기(선생님 호출 — 태블릿 교사 또는 교재 교사) / O/X 선택(학생이 O 또는 X를 고름)</li>'
    +'<li><b>일지 연동</b>: 학생이 체크콜에 입력하면 학습 일지의 해당 칸에 자동으로 들어갑니다. 예) "→ 교재 숙제"는 일지의 교재 숙제 칸, "→ Daily Quiz"는 Daily Quiz 칸, "→ 받아쓰기"는 받아쓰기 칸입니다. (일지에서 옅은 회색으로 표시되는 칸)</li>'
    +'<li><b>항목 이름</b>은 칸에서 바로 고칩니다. 이름·종류·순서를 고치면 그 레슨 전용 내용(✎)으로 저장됩니다. 맨 위 "전체 계획표 내용으로 되돌리기"로 되돌립니다.</li>'
    +'<li><b>항목 삭제</b>: 항목 오른쪽 "삭제" 버튼을 누르면 그 항목이 흐리게 바뀌어 이 레슨의 체크콜에서 빠집니다. 같은 자리의 "복원" 버튼을 누르면 바로 되돌아옵니다.</li>'
    +'<li><b>구역</b>: "＋ 구역 추가"는 새 구역을 만들고, 구역 제목 오른쪽의 "＋ 항목 추가"는 그 구역에 항목을 더하며, "구역 삭제"는 이 레슨에서 그 구역을 지웁니다.</li>'
    +'<li><b>이 구역 순서를 모든 레슨에 적용</b>: 지금 레슨의 구역 순서를 같은 계획표의 다른 레슨에도 똑같이 적용합니다(직접 고친 레슨 제외).</li>'
    +'<li><b>적용</b>: 이 레슨의 설정을 다른 레슨에 복사합니다. 누르면 레슨 목록이 나오고, 체크한 레슨에 적용됩니다. \"같은 번호 레슨만\", \"이 Unit 전체\" 같은 빠른 선택도 있습니다. \"구역 순서만\"을 고르면 항목은 그대로 두고 순서만 복사합니다.</li>'
-   +'<li><b>전체 계획표</b>: 위쪽 \"전체 계획표\" 탭에서 모든 레슨에 공통인 구역과 항목을 추가·이름 변경·삭제합니다. 이 레슨만 따로 고친 내용(✎)은 전체 계획표를 고치면 계획표 기준으로 되돌아갑니다(고치기 전에 확인을 묻습니다). 아래쪽 \"특별 진도\"에서 Level Test · Portfolio · Review · 전체 Review 항목도 편집합니다.</li>'
+   +'<li><b>전체 계획표</b>: 위쪽 \"전체 계획표\" 탭 맨 위 \"공통 구역\"(수업 준비는 됐나요? — 교재 준비·교재 숙제·영상 숙제)과 그 아래 표에서 모든 레슨에 공통인 구역과 항목을 추가·이름 변경·삭제합니다. 이 레슨만 따로 고친 내용(✎)은 전체 계획표를 고치면 계획표 기준으로 되돌아갑니다(고치기 전에 확인을 묻습니다). 아래쪽 \"특별 진도\"에서 Level Test · Portfolio · Review · 전체 Review 항목도 편집합니다.</li>'
    +'<li><b>시간 막대 기준</b>: 학생 태블릿 위쪽 시간 막대가 가득 차는 시간(분)입니다. 단계마다 정하며, 기본값은 Phonics 50분 · Basic/Grammar 60분 · Prime/Advanced 90분입니다.</li>'
    +'<li><b>저장</b>: 아래 "저장 (태블릿에 반영)"을 눌러야 체크콜에 반영됩니다.</li>'
    +'</ul></div>';
@@ -4193,7 +4215,7 @@ function _ccChip(it){
   return '<span class="ccx-chip">체크</span>';
 }
 // ── 직접 고친 레슨 판정 / 정리 ──
-function _ccSig(t){return JSON.stringify(((t&&t.sections)||[]).map(function(s){return [s.k||'',s.title||'',(s.items||[]).map(function(i){return [i.id||'',i.t||'',i.l||'',i.to||'',i.u||'',i.link||'',i.hint||'',i.off?1:0,i.del?1:0];})];}));}
+function _ccSig(t){return JSON.stringify(((t&&t.sections)||[]).map(function(s){if(s.k==='hw')s={k:s.k,title:_ccHwTitleMig(s.title),items:_ccHwItemsMig(s.items||[])};return [s.k||'',s.title||'',(s.items||[]).map(function(i){return [i.id||'',i.t||'',i.l||'',i.to||'',i.u||'',i.link||'',i.hint||'',i.off?1:0,i.del?1:0];})];}));}
 function _ccPlain(p,ln){var q={};for(var k in p)q[k]=p[k];q.ov=null;var r=null;try{r=ccResolve(q,'',ln);}catch(e){}return r;}
 function _ccCustom(p,ln){if(!(p&&p.ov&&p.ov[ln]))return false;return _ccSig(_ccPlain(p,ln))!==_ccSig(p.ov[ln]);}
 function _ccPruneOv(p){var n=0;if(!p||!p.ov)return 0;Object.keys(p.ov).forEach(function(ln){if(!_ccCustom(p,ln)){delete p.ov[ln];if(p.ovDel)delete p.ovDel[ln];n++;}});return n;}
@@ -4276,8 +4298,83 @@ function _ccApplyDo(){
 }
 // ── 전체 계획표 편집 (구역·항목·공통 구역) ──
 // 전체 계획표를 고치기 전에: 따로 고친 레슨(✎)은 계획표 기준으로 되돌립니다 (전체 계획표 우선)
-// 전체 계획표를 고쳐도 "직접 관련 없는" 레슨별 수정(예: 숙제 했나요? 구역의 교재 준비)은 그대로 둡니다.
+// 전체 계획표를 고쳐도 "직접 관련 없는" 레슨별 수정(예: 수업 준비는 됐나요? 구역의 항목)은 그대로 둡니다.
 // 고친 항목과 관련된 내용만 각 함수에서 레슨별 수정(ov)에도 똑같이 반영합니다.
+// ── 전체 계획표: 구역·항목 끌어서 순서 바꾸기 ──
+function _ccRuns(b){var runs=[],pk=null;b.rows.forEach(function(r,i){var k=(r.g||'')+'|'+(r.s||'');if(k!==pk){pk=k;runs.push({k:k,s:i,e:i});}else runs[runs.length-1].e=i;});return runs;}
+function _ccRowsPermute(p,bi,perm){   // 줄 순서가 바뀌면 레슨별로 고친 내용(ov)·삭제 목록(ovDel)의 항목 번호(b0r3 …)도 같이 바꿈
+  var re=/^b(\d+)r(\d+)$/;
+  function fix(o){
+    if(Array.isArray(o)){o.forEach(fix);return;}
+    if(!o||typeof o!=='object')return;
+    Object.keys(o).forEach(function(k){
+      var v=o[k],m;
+      if(k==='id'&&typeof v==='string'&&(m=re.exec(v))){if(+m[1]===bi&&perm[+m[2]]!==undefined)o[k]='b'+bi+'r'+perm[+m[2]];}
+      else fix(v);
+    });
+  }
+  fix(p.ov);fix(p.ovDel);
+}
+function _ccApplyOrder(p,bi,order){
+  var b=p.blocks[bi],perm={};
+  order.forEach(function(oldI,newI){perm[oldI]=newI;});
+  b.rows=order.map(function(i){return b.rows[i];});
+  _ccRowsPermute(p,bi,perm);
+}
+function _ccSecMove(a,t){
+  if(a===t||isNaN(a)||isNaN(t))return;
+  if(!_ccTblGuard())return;
+  var p=_ccWork(),bi=_ccEd.bi,b=p.blocks[bi],runs=_ccRuns(b),A=runs[a],T=runs[t];if(!A||!T)return;
+  var after=a<t,order=[];
+  function push(r){for(var i=r.s;i<=r.e;i++)order.push(i);}
+  runs.forEach(function(r,i){if(i===a)return;if(i===t&&!after)push(A);push(r);if(i===t&&after)push(A);});
+  _ccApplyOrder(p,bi,order);
+  if(A.k!==T.k){   // '모든 레슨에 적용'한 구역 순서(sorder)·레슨별 순서(lord)도 같은 방향으로 맞춤
+    var mv=function(arr){if(!arr||arr.indexOf(A.k)<0||arr.indexOf(T.k)<0)return arr;var n=arr.filter(function(x){return x!==A.k;}),ti=n.indexOf(T.k);n.splice(after?ti+1:ti,0,A.k);return n;};
+    if(p.sorder)p.sorder=mv(p.sorder);
+    if(p.lord)Object.keys(p.lord).forEach(function(l){p.lord[l]=mv(p.lord[l]);});
+  }
+  _ccMark();_ccPlanDraw();
+}
+function _ccRowMove(src,tgt){
+  if(src===tgt||isNaN(src)||isNaN(tgt))return;
+  if(!_ccTblGuard())return;
+  var p=_ccWork(),bi=_ccEd.bi,b=p.blocks[bi],rs=b.rows,a=rs[src],t=rs[tgt];if(!a||!t)return;
+  if((a.g||'')!==(t.g||'')||(a.s||'')!==(t.s||''))return;   // 같은 구역 안에서만
+  var order=[];for(var i=0;i<rs.length;i++)order.push(i);
+  order.splice(src,1);var ti=order.indexOf(tgt);order.splice(src<tgt?ti+1:ti,0,src);
+  _ccApplyOrder(p,bi,order);
+  _ccMark();_ccPlanDraw();
+}
+var _ccDg=null;
+function _ccDgClear(){document.querySelectorAll('#ccp-tbl tr').forEach(function(r){r.style.boxShadow='';r.style.opacity='';});}
+document.addEventListener('dragstart',function(e){
+  var h=e.target&&e.target.closest?e.target.closest('.cc-sec-h,.cc-row-h'):null;if(!h)return;
+  var tr=h.closest('tr');
+  _ccDg={t:h.classList.contains('cc-sec-h')?'sec':'row',ri:+h.dataset.ri,run:tr?+tr.dataset.run:-1};
+  try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','ccgrid');}catch(x){}
+  if(tr)tr.style.opacity='.45';
+});
+document.addEventListener('dragover',function(e){
+  if(!_ccDg)return;
+  var tr=e.target&&e.target.closest?e.target.closest('#ccp-tbl tr[data-run]'):null;if(!tr)return;
+  var ok=_ccDg.t==='sec'?true:(tr.dataset.ccrow==='1'&&+tr.dataset.run===_ccDg.run&&+tr.dataset.ri!==_ccDg.ri);
+  if(!ok)return;
+  e.preventDefault();
+  _ccDgClear();
+  var down=_ccDg.t==='sec'?(_ccDg.run<+tr.dataset.run):(_ccDg.ri<+tr.dataset.ri);
+  if(_ccDg.t==='sec'&&+tr.dataset.run===_ccDg.run)return;
+  tr.style.boxShadow=down?'inset 0 -3px 0 #2563eb':'inset 0 3px 0 #2563eb';
+});
+document.addEventListener('drop',function(e){
+  if(!_ccDg)return;
+  var tr=e.target&&e.target.closest?e.target.closest('#ccp-tbl tr[data-run]'):null;if(!tr){_ccDgClear();_ccDg=null;return;}
+  e.preventDefault();
+  var d=_ccDg;_ccDg=null;_ccDgClear();
+  if(d.t==='sec')_ccSecMove(d.run,+tr.dataset.run);
+  else if(tr.dataset.ccrow==='1'&&+tr.dataset.run===d.run)_ccRowMove(d.ri,+tr.dataset.ri);
+});
+document.addEventListener('dragend',function(){if(_ccDg){_ccDgClear();_ccDg=null;}});
 function _ccTblGuard(){var p=_ccWork();_ccPruneOv(p);return true;}
 function _ccOvSyncRow(ri){var p=_ccWork(),b=p.blocks[_ccEd.bi];b.lessons.forEach(function(ln,i){if(p.ov&&p.ov[ln])_ccOvSync(ri,i);});}
 function _ccOvDropSec(p,k){Object.keys(p.ov||{}).forEach(function(ln){p.ov[ln].sections=(p.ov[ln].sections||[]).filter(function(sc){return sc.k!==k;});});}
@@ -4350,20 +4447,83 @@ function _ccOvClearAll(){
   cu.forEach(function(ln){delete p.ov[ln];if(p.ovDel)delete p.ovDel[ln];});
   _ccMark();_ccPlanDraw();
 }
+function _ccHwOvEach(p,fn){Object.keys(p.ov||{}).forEach(function(ln){var o=p.ov[ln];if(o&&o.sections)o.sections.forEach(function(sc){if(sc&&sc.k==='hw'){if(!Array.isArray(sc.items))sc.items=[];fn(sc,ln);}});});}
 function _ccHwTitle(v){
   var p=_ccWork();v=String(v||'').trim();if(!v){_ccPlanDraw();return;}
-  if(v===(p.hwTitle||'숙제 했나요?'))return;
-  _ccPruneOv(p);p.hwTitle=v;_ccMark();_ccPlanDraw();
+  var old=_ccHwTitleMig(p.hwTitle);
+  if(v===old)return;
+  _ccPruneOv(p);
+  _ccHwOvEach(p,function(sc){if(sc.title===old)sc.title=v;});   // 이름을 직접 바꾸지 않은 레슨에도 같이 반영
+  p.hwTitle=v;_ccMark();_ccPlanDraw();
 }
-function _ccHwInit(p){if(!Array.isArray(p.hw))p.hw=[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}];return p.hw;}
+function _ccHwInit(p){if(!Array.isArray(p.hw))p.hw=_ccHwDefault();return p.hw;}
 function _ccHwSet(i,f,v){
   var p=_ccWork();_ccPruneOv(p);var a=_ccHwInit(p),it=a[i];if(!it)return;
-  if(f==='l'){v=String(v||'').trim();if(!v){_ccPlanDraw();return;}it.l=v;}
+  v=String(v==null?'':v);
+  if(f==='l'){v=v.trim();if(!v){_ccPlanDraw();return;}it.l=v;}
+  else if(f==='u'){it.u=v;}
+  else if(f==='to'){it.to=v;}
   else if(f==='lk'){if(v){it.link=v;delete it.nl;}else{delete it.link;it.nl=1;}}
+  else if(f==='t'){
+    var keep=(v==='check'||v==='ox')&&(it.t==='check'||it.t==='ox');
+    it.t=v;if(!keep)delete it.link;
+    if(v==='call'){it.to=it.to||'tablet';}else{delete it.to;}
+    if(v==='number'&&!it.u)it.u='점';if(v!=='number')delete it.u;
+  }
+  // 레슨별로 따로 고친 내용(✎)에도 같은 항목이면 똑같이 반영
+  _ccHwOvEach(p,function(sc){sc.items.forEach(function(x){if(x.id===it.id){['l','t','link','nl','to','u'].forEach(function(k){if(it[k]===undefined)delete x[k];else x[k]=it[k];});}});});
   _ccMark();_ccPlanDraw();
 }
-function _ccHwAdd(){var p=_ccWork();_ccPruneOv(p);_ccHwInit(p).push({id:_bcNewId(),t:'check',l:'새 항목'});_ccMark();_ccPlanDraw();}
-function _ccHwDel(i){var p=_ccWork(),a=_ccHwInit(p);if(!a[i])return;if(!confirm('"'+a[i].l+'" 항목을 모든 레슨에서 삭제할까요?'))return;_ccPruneOv(p);a.splice(i,1);_ccMark();_ccPlanDraw();}
+function _ccHwAdd(){
+  var p=_ccWork();_ccPruneOv(p);var it={id:_bcNewId(),t:'ox',l:'새 항목'};
+  _ccHwInit(p).push(it);
+  _ccHwOvEach(p,function(sc){sc.items.push(JSON.parse(JSON.stringify(it)));});
+  _ccMark();_ccPlanDraw();
+}
+function _ccHwDel(i){
+  var p=_ccWork(),a=_ccHwInit(p);if(!a[i])return;
+  if(!confirm('"'+a[i].l+'" 항목을 모든 레슨에서 삭제할까요?'))return;
+  _ccPruneOv(p);var id=a[i].id;a.splice(i,1);
+  _ccHwOvEach(p,function(sc){sc.items=sc.items.filter(function(x){return x.id!==id;});});
+  _ccMark();_ccPlanDraw();
+}
+function _ccHwMove(i,d){
+  var p=_ccWork(),a=_ccHwInit(p),j=i+d;if(!a[i]||j<0||j>=a.length)return;
+  _ccPruneOv(p);var t=a[i];a[i]=a[j];a[j]=t;
+  _ccHwOvEach(p,function(sc){   // 따로 고친 레슨은 같은 항목 순서를 맞춰 줘요
+    var idA=a[j].id,idB=a[i].id,x=-1,y=-1;sc.items.forEach(function(it,k){if(it.id===idA)x=k;if(it.id===idB)y=k;});
+    if(x>=0&&y>=0){var z=sc.items[x];sc.items[x]=sc.items[y];sc.items[y]=z;}
+  });
+  _ccMark();_ccPlanDraw();
+}
+function _ccHwRow(it,i,n){
+  var lk=[];
+  if(it.t==='check'||it.t==='ox')lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
+  if(it.t==='number')lk=[['','일지 연동 안 함'],['quiz','일지 연동 · 퀴즈 점수']];
+  if(it.t==='dict')lk=[['','일지 연동 안 함'],['dict','일지 연동 · 받아쓰기']];
+  var q=function(f){return "_ccHwSet("+i+",'"+f+"',this.value)";};
+  var h='<div class="ccx-row"><div class="ccx-line">'
+    +'<button class="mini" style="border:0;background:transparent;cursor:pointer;padding:0 2px"'+(i===0?' disabled':'')+' title="위로" onclick="_ccHwMove('+i+',-1)">▲</button><button class="mini" style="border:0;background:transparent;cursor:pointer;padding:0 2px"'+(i>=n-1?' disabled':'')+' title="아래로" onclick="_ccHwMove('+i+',1)">▼</button>'
+    +'<select onchange="'+q('t')+'" style="width:96px">'+_BCED_TYPES.map(function(x){return '<option value="'+x[0]+'"'+(it.t===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
+  if(it.t==='call')h+='<select onchange="'+q('to')+'" style="width:92px"><option value="tablet"'+(it.to!=='book'?' selected':'')+'>태블릿 교사</option><option value="book"'+(it.to==='book'?' selected':'')+'>교재 교사</option></select>';
+  h+='<input class="ccx-nm" value="'+_bcEsc(it.l)+'" onchange="'+q('l')+'">';
+  if(it.t==='number')h+='<input value="'+_bcEsc(it.u||'')+'" onchange="'+q('u')+'" placeholder="단위" style="width:48px" title="단위">';
+  h+=lk.length?'<select onchange="'+q('lk')+'" style="width:168px">'+lk.map(function(x){return '<option value="'+x[0]+'"'+((it.link||'')===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>':'<span style="width:168px"></span>';
+  h+='<button class="ccx-del" onclick="_ccHwDel('+i+')">삭제</button></div></div>';
+  return h;
+}
+// 전체 계획표 맨 위 "공통 구역" 카드 — 모든 레슨 맨 위에 나오는 구역(수업 준비는 됐나요?)
+function _ccHwCard(p){
+  var items=Array.isArray(p.hw)?p.hw:_ccHwDefault(),title=_ccHwTitleMig(p.hwTitle);
+  var h='<div style="margin:0 10px 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+    +'<div class="ccx-sec" style="background:#fef3c7;color:#92400e;border-radius:0;padding:5px 9px"><span style="white-space:nowrap">공통 구역</span>'
+    +'<input value="'+_bcEsc(title)+'" onchange="_ccHwTitle(this.value)" title="구역 이름" style="color:inherit"><small>모든 레슨 맨 위에 나옵니다</small>'
+    +'<button class="mini" onclick="_ccHwAdd()">＋ 항목 추가</button></div><div style="padding:0 9px 6px">';
+  items.forEach(function(it,i){h+=_ccHwRow(it,i,items.length);});
+  if(!items.length)h+='<div style="padding:8px 4px;font-size:11px;color:var(--txt3)">항목이 없으면 이 구역은 체크콜에 나오지 않습니다.</div>';
+  h+='<div style="font-size:11px;color:var(--txt3);padding:4px 2px 0">종류를 "O/X 선택"으로 두면 학생이 체크콜에서 O 또는 X를 골라요. 여기서 고치면 모든 레슨에 반영되고, 이 레슨만 따로 고친 내용(✎)도 같은 항목이면 같이 바뀝니다.</div></div></div>';
+  return h;
+}
 // ── 특별 진도: Level Test · Portfolio · Review · 전체 Review (전체 계획표에서 편집) ──
 var _CC_SPN=['Level Test','Portfolio','Review','전체 Review'];
 function _ccSpDerive(p,name){
@@ -4391,7 +4551,7 @@ function _ccSpMake(name){
   if(name==='Level Test'||name==='Portfolio'){secs=[{k:'sp0',title:name,items:[{id:_bcNewId(),t:'check',l:'새 항목'}]}];}
   else{
     var d=_bcTplFor(null);
-    secs=(d.sections||[]).filter(function(sc){return !(sc.items||[]).every(function(i){return i.link==='hwBook'||i.link==='hwVideo';});});
+    secs=(d.sections||[]).filter(function(sc){return !(sc.items||[]).every(function(i){return i.link==='hwPrep'||i.link==='hwBook'||i.link==='hwVideo';});});
     secs.forEach(function(sc,i){sc.k='sp'+i;});
   }
   p.sp[name]={sections:secs};_ccMark();_ccPlanDraw();
@@ -4468,6 +4628,7 @@ function _ccSpCards(p){
 }
 function _ccMinHtml(){var p=_ccWork();return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2);white-space:nowrap">시간 막대 기준 <input class="fi" id="ccp-min" type="number" min="10" max="300" value="'+_ccMinOf(_ccEd.key,p)+'" style="width:56px;padding:3px 5px" onchange="_ccPlanMinSet(this.value)"> 분</span>';}
 function _ccColMove(d){var b=_ccWork().blocks[_ccEd.bi],sel=_ccEd.sel,to=sel+d;if(to<0||to>=b.lessons.length)return;_ccLessonMove(sel,to);_ccEd.sel=to;_ccPlanDraw();}
+function _ccColToggle(){_ccEd.colOpen=!_ccEd.colOpen;_ccPlanDraw();}
 function _ccColBar(p){
   var b=p.blocks[_ccEd.bi],sel=_ccEd.sel,n=b.lessons.length;
   var bt=function(t,f,dis){return '<button class="btn btn-outline btn-xs" onclick="'+f+'"'+(dis?' disabled':'')+'>'+t+'</button>';};
@@ -4482,7 +4643,8 @@ function _ccGridPre(p){
   var cu=Object.keys(p.ov||{}).filter(function(ln){return _ccCustom(p,ln);});
   var h='';
   if(cu.length)h+='<div style="margin:0 10px 8px;padding:8px 10px;background:#fef3c7;border-radius:8px;font-size:11px;color:#92400e;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">✎ 따로 고친 레슨 '+cu.length+'개('+cu.slice(0,5).map(_bcEsc).join(', ')+(cu.length>5?' 외':'')+')는 이 표를 고쳐도 직접 고친 내용이 그대로 유지됩니다. 이 표 내용으로 전부 다시 맞추려면 오른쪽 버튼을 누르세요.</span><button class="btn btn-outline btn-xs" onclick="_ccOvClearAll()">모두 전체 계획표대로 되돌리기</button></div>';
-  h+=_ccColBar(p)+'<div style="margin:0 10px 8px"><button class="btn btn-outline btn-xs" onclick="_ccSecAdd()">＋ 구역 추가</button></div>';
+  var _co=!!_ccEd.colOpen;
+  h+=_ccHwCard(p)+'<div style="margin:0 10px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_ccSecAdd()">＋ 구역 추가</button><button class="btn btn-outline btn-xs'+(_co?' on':'')+'" style="'+(_co?'background:#dbeafe;border-color:#93c5fd;':'')+'" onclick="_ccColToggle()" title="레슨(열) 삽입·이동·이름 변경·삭제">＋ 열 추가</button></div>'+(_co?_ccColBar(p):'');
   return h;
 }
 function _ccLessonView(b,sel){
