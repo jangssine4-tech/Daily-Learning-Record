@@ -4434,7 +4434,11 @@ function _ccSecAdd(){
   var t=document.getElementById('ccp-tbl');if(t)t.scrollTop=t.scrollHeight;
 }
 // ── ✎ 수정 사항: 레슨별로 따로 고친 내용 안내 + 되돌리기 ──
-function _ccModToggle(e){if(e)e.stopPropagation();_ccEd.modOpen=!_ccEd.modOpen;_ccEd.modAll=false;_ccPlanDraw();}
+function _ccModToggle(e){
+  if(e)e.stopPropagation();
+  var b=e&&e.currentTarget;if(b&&b.getBoundingClientRect){var r=b.getBoundingClientRect();_ccEd.modRect={left:r.left,bottom:r.bottom};}
+  _ccEd.modOpen=!_ccEd.modOpen;_ccEd.modAll=false;_ccEd.modAt=Date.now();_ccPlanDraw();
+}
 function _ccModAll(e){if(e)e.stopPropagation();_ccEd.modAll=!_ccEd.modAll;_ccPlanDraw();}
 function _ccModJump(n){_ccEd.modOpen=false;_ccJump(n);}
 function _ccModBtn(p){
@@ -4442,7 +4446,10 @@ function _ccModBtn(p){
   var h='<span class="ccx-modwrap" style="position:relative;display:inline-block"><button class="btn btn-outline btn-xs" style="'+(n?'background:#fef3c7;border-color:#fcd34d;color:#92400e;':'color:var(--txt3);')+'" onclick="_ccModToggle(event)" title="레슨별로 따로 고친 내용">✎ 수정 사항 ('+n+')</button>';
   if(open){
     var lim=_ccEd.modAll?cu.length:8;
-    h+='<div class="ccx-modpanel" onclick="event.stopPropagation()" style="position:absolute;z-index:40;left:0;top:100%;margin-top:4px;width:380px;max-width:80vw;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:10px 12px;font-size:11px;line-height:1.7;color:var(--txt2);white-space:normal">';
+    var _mr=_ccEd.modRect||{left:20,bottom:120},_mw=Math.min(380,window.innerWidth-24),_ml=Math.max(12,Math.min(_mr.left,window.innerWidth-_mw-12)),_mt=_mr.bottom+4;
+    h+='<div class="ccx-modpanel" onclick="event.stopPropagation()" style="position:fixed;z-index:1000;left:'+_ml+'px;top:'+_mt+'px;width:'+_mw+'px;max-height:'+Math.max(140,window.innerHeight-_mt-16)+'px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:10px 12px;font-size:11px;line-height:1.7;color:var(--txt2);white-space:normal">';
+    var _own=(_ccEd.mode||'lesson')==='lesson'&&_ccEd.pv&&_ccCustom(p,_ccEd.pv);
+    if(_own)h+='<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)"><div style="color:#92400e"><b>이 레슨('+_bcEsc(_ccEd.pv)+')은 따로 고친 내용입니다</b></div><div style="text-align:right;margin-top:4px"><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">이 레슨만 전체 계획표 내용으로 되돌리기</button></div></div>';
     if(!n)h+='<div style="color:#047857">✓ 이 단계의 모든 레슨('+tot+'개)이 전체 계획표와 같습니다. 체크콜에도 같은 내용이 나옵니다.</div>';
     else{
       h+='<div style="color:#92400e"><b>따로 고친 레슨 '+n+'개</b>'+(n===tot?' (모든 레슨)':' / 전체 '+tot+'개')+'</div>'
@@ -4455,6 +4462,13 @@ function _ccModBtn(p){
   }
   return h+'</span>';
 }
+function _ccModClose(e){
+  if(typeof _ccEd==='undefined'||!_ccEd||!_ccEd.modOpen)return;
+  if(e&&e.target&&e.target.closest&&e.target.closest('.ccx-modpanel'))return;
+  if(e&&e.type==='scroll'&&Date.now()-(_ccEd.modAt||0)<500)return;
+  _ccEd.modOpen=false;var el=document.querySelector('.ccx-modpanel');if(el)el.remove();
+}
+window.addEventListener('scroll',_ccModClose,true);window.addEventListener('resize',_ccModClose);
 document.addEventListener('click',function(e){
   if(typeof _ccEd==='undefined'||!_ccEd||!_ccEd.modOpen)return;
   if(e.target&&e.target.closest&&e.target.closest('.ccx-modwrap'))return;
@@ -4678,9 +4692,9 @@ function _ccLessonView(b,sel){
   if(!t){try{t=ccResolve(p,'',ln);}catch(e){}}
   var h='<div style="padding:8px 10px">'
     +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">'
+    +'<button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button>'+_ccModBtn(p)
     +_ccMinHtml()+'<span style="flex:1"></span>'
-    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨만 따로 고친 내용입니다</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">전체 계획표 내용으로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">전체 계획표와 같음</span>')
-    +'<button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button>'+_ccModBtn(p)+'</div>';
+    +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨만 따로 고친 내용입니다</span>':'<span style="font-size:11px;color:var(--txt3)">전체 계획표와 같음</span>')+'</div>';
   if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 기본 점검 항목이 나옵니다.</div>';t={sections:[]};}
   // 계획표에서 꺼진 항목을 해당 구역 안에 흐리게 함께 보여줌
   var offBy={},li=spec?-1:sel;
