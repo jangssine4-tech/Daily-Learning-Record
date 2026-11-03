@@ -1241,9 +1241,19 @@ function saveCacheDebounced() {
 // ═══════════════════════════════════════════════════
 var _CURRICULUM = null;
 var _levelOrder = null;
+// Grammar Plus: Preview 1·2 / Preview 3·Pre Wrap-Up 는 각각 같은 날 진도를 나가므로 한 칸으로 합쳐 보여줌 (저장돼 있던 옛 목록도 읽을 때 바꿈)
+var _GP_A='Preview 1·2',_GP_B='Preview 3·Pre Wrap-Up';
+function _gpAlias(p){p=String(p||'');return (p==='Preview 1'||p==='Preview 2')?_GP_A:((p==='Preview 3'||p==='Pre Wrap-Up')?_GP_B:p);}
+function _gpNormCurr(C){
+  try{Object.keys(C||{}).forEach(function(k){
+    if(!/^Grammar Plus/.test(k)||!Array.isArray(C[k]))return;
+    var out=[];C[k].forEach(function(x){var y=_gpAlias(x);if(out.indexOf(y)<0)out.push(y);});C[k]=out;
+  });}catch(e){}
+}
 function getCURRICULUM() {
   if (_CURRICULUM) return _CURRICULUM;
   _CURRICULUM = _buildCurriculum();
+  _gpNormCurr(_CURRICULUM);
   return _CURRICULUM;
 }
 // Firestore에서 커리큘럼 로드 (저장된 것이 있으면 우선 사용)
@@ -1252,6 +1262,7 @@ function loadCurriculumFromFirestore() {
     .then(async function(d) {
       if (d.exists && d.data().data && Object.keys(d.data().data).length > 0) {
         _CURRICULUM = d.data().data;
+        _gpNormCurr(_CURRICULUM);
         if (d.data().levelOrder) _levelOrder = d.data().levelOrder;
       } else {
         getCURRICULUM(); // 기본값 사용
@@ -1290,7 +1301,7 @@ function _buildCurriculum() {
     return arr;
   }
   function gp() {
-    return ['Preview 1','Preview 2','Preview 3','Pre Wrap-Up','Lesson 1','Lesson 2','Lesson 3','Lesson 4','Wrap-Up 1','Lesson 5','Lesson 6','Lesson 7','Lesson 8','Wrap-Up 2','Lesson 9','Lesson 10','Lesson 11','Lesson 12','Wrap-Up 3','Level Test','전체 Review'];
+    return ['Preview 1·2','Preview 3·Pre Wrap-Up','Lesson 1','Lesson 2','Lesson 3','Lesson 4','Wrap-Up 1','Lesson 5','Lesson 6','Lesson 7','Lesson 8','Wrap-Up 2','Lesson 9','Lesson 10','Lesson 11','Lesson 12','Wrap-Up 3','Level Test','전체 Review'];
   }
   function primeA() { return ul(3, 5, ['Portfolio','Level Test','전체 Review']); }
   function primeB() { return ['Unit 4 Lesson 1','Unit 4 Lesson 2','Unit 4 Lesson 3','Unit 4 Lesson 4','Unit 4 Lesson 5','Unt 5 Lesson 1','Unt 5 Lesson 2','Unt 5 Lesson 3','Unt 5 Lesson 4','Unt 5 Lesson 5','Unit 6 Lesson 1','Unit 6 Lesson 2','Unit 6 Lesson 3','Unit 6 Lesson 4','Unit 6 Lesson 5','Portfolio','Level Test','전체 Review']; }
@@ -1805,7 +1816,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zj';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zk';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3022,6 +3033,7 @@ function _ccMergeGp(plan){
     }
   });
   out.blocks=[{lessons:A.lessons.concat(B.lessons),rows:rows}];
+  out=_ccMergePrev(out);
   function remap(o){   // 레슨별로 고친 내용(ov)의 항목 번호(b0r3, b1r3 …)를 새 표 기준으로 바꿈
     if(Array.isArray(o)){o.forEach(remap);return;}
     if(!o||typeof o!=='object')return;
@@ -3036,6 +3048,29 @@ function _ccMergeGp(plan){
   if(out.ov)remap(out.ov);
   if(out.ovDel)remap(out.ovDel);
   return out;
+}
+// Preview 1·2 / Preview 3·Pre Wrap-Up : 같은 날 진도를 나가는 레슨 열을 하나로 합침
+function _ccMergePrev(plan){
+  try{
+    var b=plan&&plan.blocks&&plan.blocks[0];if(!b)return plan;
+    var L=b.lessons;
+    if(!(L[0]==='Preview 1'&&L[1]==='Preview 2'&&L[2]==='Preview 3'&&L[3]==='Pre Wrap-Up'))return plan;
+    var out=JSON.parse(JSON.stringify(plan)),nb=out.blocks[0];
+    nb.lessons=[_GP_A,_GP_B].concat(L.slice(4));
+    var mc=function(c,i,j){var a=c.charAt(i),d=c.charAt(j);return (a&&a!=='x')?a:((d&&d!=='x')?d:(a||d||'x'));};
+    nb.rows.forEach(function(r){
+      r.c=mc(r.c,0,1)+mc(r.c,2,3)+r.c.slice(4);
+      if(r.n){var n={};Object.keys(r.n).forEach(function(k){var i=+k,ni=i<=1?0:(i<=3?1:i-2);if(n[String(ni)]===undefined)n[String(ni)]=r.n[k];});r.n=n;}
+    });
+    var ren=function(o){if(!o||typeof o!=='object')return;
+      [[_GP_A,'Preview 1','Preview 2'],[_GP_B,'Preview 3','Pre Wrap-Up']].forEach(function(m){
+        var v=o[m[1]]!==undefined?o[m[1]]:o[m[2]];
+        if(o[m[0]]===undefined&&v!==undefined)o[m[0]]=v;
+        delete o[m[1]];delete o[m[2]];
+      });};
+    ren(out.ov);ren(out.ovDel);ren(out.lord);
+    return out;
+  }catch(e){return plan;}
 }
 CC_PLANS['Grammar Plus']=_ccMergeGp(CC_PLANS['Grammar Plus']);
 function ccPlanKey(level,grade){
@@ -3053,7 +3088,7 @@ function ccPlanKey(level,grade){
 function ccNormProg(p){
   p=String(p||'').replace(/\s+/g,' ').trim();
   p=p.replace(/^Unt /,'Unit ').replace(/^전체 ?/,'');
-  return p;
+  return _gpAlias(p);
 }
 var CC_AUTO_CALL={voca:['단어장 검사 받기','tablet'],storybook:['스토리북 검사 받기','book'],studentbook:['교재 검사 받기','book'],guidebook:['가이드북 검사 받기','book'],workbook:['워크북 검사 받기','tablet'],mainbook:['메인북 검사 받기','book']};
 function ccSplitChecks(text){
@@ -3799,7 +3834,9 @@ async function _bcSaveSettings(){
 window._ccPlanOv={};
 function _ccEffPlan(key){
   var pl=_ccEffPlan0(key);
-  return (key==='Grammar Plus'&&pl&&pl.blocks&&pl.blocks.length===2)?_ccMergeGp(pl):pl;
+  if(key!=='Grammar Plus'||!pl)return pl;
+  if(pl.blocks&&pl.blocks.length===2)pl=_ccMergeGp(pl);
+  return _ccMergePrev(pl);
 }
 function _ccEffPlan0(key){
   if(!key)return null;var ov=window._ccPlanOv||{};
