@@ -241,9 +241,10 @@ var AC=null, ringTimers=[], shownCall={}, unsubRoster=null;
 // 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
 //   to: tablet|book 호출 대상, link: hwPrep|hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
 var CC_DEFAULT_TEMPLATE={sections:[
- {title:'숙제 했나요?',items:[
-  {id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},
-  {id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]},
+ {title:'수업 준비는 됐나요?',items:[
+  {id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},
+  {id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},
+  {id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}]},
  {title:'스마트 학습 1',items:[
   {id:'vt',t:'check',l:'어휘트레이닝'}]},
  {title:'단어장',items:[
@@ -269,6 +270,19 @@ var CC_DEFAULT_TEMPLATE={sections:[
   {id:'q2',t:'check',l:'오답 노트 하기'},
   {id:'q3',t:'call',l:'오답 노트 검사 받기',to:'tablet'}]}
 ]};
+// ── 공통 구역 "수업 준비는 됐나요?" (예전 이름 "숙제 했나요?") — 학생관리앱(index.html)과 같은 규칙 ──
+//   예전에 저장된 계획표(이름 "숙제 했나요?", 체크칸 2개)도 읽을 때 자동으로 새 기본값으로 바꿔서 써요.
+var CC_HW_TITLE='수업 준비는 됐나요?',CC_HW_OLD_TITLE='숙제 했나요?';
+function _ccHwDefault(){return [{id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},{id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}];}
+function _ccHwTitleMig(t){return (!t||t===CC_HW_OLD_TITLE)?CC_HW_TITLE:t;}
+function _ccHwItemsMig(items){
+  if(!Array.isArray(items))return items;
+  items=JSON.parse(JSON.stringify(items));
+  if(items.length===2&&items[0]&&items[1]&&items[0].id==='hwb'&&items[1].id==='hwv'&&items[0].t==='check'&&items[1].t==='check'&&items[0].l==='교재 숙제'&&items[1].l==='영상 숙제')return _ccHwDefault();
+  items.forEach(function(it){if(it&&it.t==='check'&&/^(교재준비|교재숙제|영상숙제)/.test(String(it.l||'').replace(/\s+/g,'')))it.t='ox';});
+  return items;
+}
+function _ccHwMigSecs(secs){(secs||[]).forEach(function(sc){if(sc&&sc.k==='hw'){sc.title=_ccHwTitleMig(sc.title);sc.items=_ccHwItemsMig(sc.items||[]);}});return secs;}
 var CC_DEFAULT_MINUTES=90;
 // ── Study Plan(레슨별 계획표) 해석: 단계+진도 → 체크콜 화면 항목 ──
 // 계획표 셀: c=해야 함(체크) / x=해당 없음 / s=점수 입력
@@ -315,7 +329,7 @@ function ccResolve(plan,level,progress){
   if(/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim()))p='전체 Review';   // 전체 Review는 Review와 따로 편집
   // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
-    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));
+    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccHwMigSecs(_ot.sections);
     _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off&&!i.del;});});   // 체크를 풀어 숨긴 항목은 학생 화면에서 제외
     return _ccAutoLink(_ot);
   }
@@ -329,7 +343,7 @@ function ccResolve(plan,level,progress){
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
   var p=ccNormProg(progress);if(!p)return null;
-  var hw={k:'hw',title:(plan.hwTitle||'숙제 했나요?'),items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
+  var hw={k:'hw',title:_ccHwTitleMig(plan.hwTitle),items:(Array.isArray(plan.hw)?_ccHwItemsMig(plan.hw):_ccHwDefault())};
   var HWS=hw.items.length?[hw]:[];   // 공통 구역(숙제)을 전부 지우면 이 구역은 나오지 않아요
   // 특별 진도(Level Test · Portfolio · Review · 전체 Review): 전체 계획표에서 편집한 내용(plan.sp)이 있으면 그걸 써요
   var _spk=/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim())?'전체 Review':(/^Review$/i.test(p)?'Review':((p==='Level Test'||p==='Portfolio')?p:''));
