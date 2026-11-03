@@ -676,11 +676,15 @@ function applySecs(){
       its.splice(at,0,{id:k,t:'check',l:x.l});last[x.after]=at;break;
     }
   });
-  // Daily Quiz 100점이면 오답 노트 항목은 자동으로 사라져요
-  secs.forEach(function(sec){
-    var q=sec.items.filter(function(i){return i.t==='number'&&i.link==='quiz';})[0];
-    if(!q)return;var v=LOG.v[q.id];
-    if(v!==undefined&&v!==''&&Number(v)>=100)sec.items=sec.items.filter(function(i){return !/오답\s*노트/.test(i.l);});
+  // Quiz 100점이면 오답 관련 항목(오답 노트·오답 검사 받기·오답 다시 풀기)은 자동으로 사라져요
+  // 점수 칸(숫자 입력 + 일지 연동 '퀴즈 점수')이 다른 구역에 있어도 적용하고, Quiz·오답 구역에만 적용해요 (Main Book 등의 오답 항목은 그대로)
+  var _q100=false;
+  secs.forEach(function(sec){sec.items.forEach(function(i){
+    if(i.t==='number'&&i.link==='quiz'){var v=LOG.v[i.id];if(v!==undefined&&v!==''&&Number(v)>=100)_q100=true;}
+  });});
+  if(_q100)secs.forEach(function(sec){
+    var hasQ=sec.items.some(function(i){return i.t==='number'&&i.link==='quiz';});
+    if(hasQ||/quiz|오답/i.test(String(sec.title||'')))sec.items=sec.items.filter(function(i){return !/오답/.test(String(i.l||''));});
   });
   secs=secs.filter(function(s){return s.items.length;});
   _addTimers(secs);
