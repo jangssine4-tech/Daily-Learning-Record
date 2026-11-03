@@ -1818,7 +1818,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zu';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zv';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -11474,6 +11474,13 @@ function renderMakeupCalendar(){
           if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
           cellChips.push({m:m,isAbsentCell:true});
         });
+        // 결석 기간(시작일~종료일)으로만 저장된 기록은 기간 안의 평일마다 이름을 보여줌 (같은 학생의 그날 기록이 따로 있으면 중복 표시 안 함)
+        if(!isSun2&&!isSat2)monthMakeups.forEach(function(m){
+          if(!m.absentDate||!m.absentDateEnd||!(m.absentDateEnd>m.absentDate)||dateStr<=m.absentDate||dateStr>m.absentDateEnd)return;
+          if(makeups.some(function(z){return z.studentId===m.studentId&&z.absentDate===dateStr;}))return;
+          var rk=m.id+'@'+dateStr;if(_chipSeen[rk])return;_chipSeen[rk]=true;
+          cellChips.push({m:m,isAbsentCell:true});
+        });
         monthMakeups.filter(function(m){return m.makeupDate===dateStr&&m.absentDate!==dateStr;}).forEach(function(m){
           if(_chipSeen[m.id])return;_chipSeen[m.id]=true;
           cellChips.push({m:m,isAbsentCell:false});
@@ -11807,6 +11814,22 @@ async function saveMakeupUnified(){
     await db.collection('makeups').doc(id).update(updateData);
     var idx=makeups.findIndex(function(m){return m.id===id;});
     if(idx>=0)Object.assign(makeups[idx],updateData);
+    // 결석 기간을 고쳐 저장한 경우: 아직 없는 날짜(주말 제외)의 결석 기록과 결석 일지도 만들어 줌
+    try{
+      var _m0=makeups[idx>=0?idx:0],_st0=updateData.absentDate,_en0=updateData.absentDateEnd;
+      if(_isAbsReason&&_m0&&_st0&&_en0&&_en0>_st0){
+        var _made=0;
+        var _ds=_getMkWeekdays(_st0,_en0);
+        for(var _k=0;_k<_ds.length;_k++){
+          var _d=_ds[_k];if(_d===_st0)continue;
+          if(makeups.some(function(z){return z.studentId===_m0.studentId&&z.absentDate===_d;}))continue;
+          var _nd={studentId:_m0.studentId,studentName:_m0.studentName,absentDate:_d,absentDateEnd:'',absentReason:mkNote||'보강',makeupStatus:'pending',makeupDate:'',makeupTime:'',makeupPeriod:'',makeupNote:mkNote,makeupContent:'',makeupResult:'',makeupResultMemo:'',createdAt:new Date().toISOString()};
+          var _ref=await db.collection('makeups').add(_nd);_made++;
+          await autoCreateAbsentReport(_m0.studentId,_d,_ref.id);
+        }
+        if(_made){toast('✅ 결석 기간의 나머지 '+_made+'일도 결석으로 처리했어요');}
+      }
+    }catch(e){console.warn('결석 기간 확장 실패',e);}
     toast('✅ 저장 완료');
   }
   closeM('makeup');
