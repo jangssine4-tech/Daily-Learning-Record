@@ -521,7 +521,7 @@ async function startSession(sid,data){
   openSession(sid,data,n);
 }
 function openSession(sid,data,sess){
-  S={sid:sid,data:data,sess:sess,ses:(data.ses&&data.ses[DN[new Date().getDay()]])||null,name:data.name,plan:data.plan||null,lvl:data.lvl||data.level||'',fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
+  S={sid:sid,data:data,sess:sess,ses:(data.ses&&data.ses[DN[new Date().getDay()]])||null,name:data.name,plan:data.plan||null,lvl:data.lvl||data.level||'',pg0:data.pg||'',fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
   try{localStorage.setItem('cc_sid',sid);}catch(e){}
   shownCall={};checks={};LOG={e:{},v:{}};curSec=0;
   $('hName').textContent=S.name;$('hDate').textContent=dateLabel();
@@ -546,7 +546,7 @@ function openSession(sid,data,sess){
   if(unsubRoster){unsubRoster();unsubRoster=null;}
   unsubRoster=db.collection('checkRoster').doc(sid).onSnapshot(function(d){
     if(!S||!d.exists)return;var x=d.data();
-    S.data=x;S.plan=x.plan||null;S.lvl=x.lvl||x.level||'';S.fb=x.template||null;S.totalMin=x.totalMin||CC_DEFAULT_MINUTES;
+    S.data=x;S.plan=x.plan||null;S.lvl=x.lvl||x.level||'';S.pg0=x.pg||'';S.fb=x.template||null;S.totalMin=x.totalMin||CC_DEFAULT_MINUTES;
     render();
   },function(e){console.warn(e);});
   setPresence('in');show('sMain');render();
@@ -662,7 +662,7 @@ function render(){
 // 오늘 일지의 단계·진도에 맞는 점검 항목 (계획표 기준). 진도를 모르면 기본 항목을 써요
 function applySecs(){
   var t=null;
-  try{t=ccResolve(S.plan,LOG.lv||S.lvl,LOG.pg);}catch(e){}
+  try{t=ccResolve(S.plan,LOG.lv||S.lvl,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:''));}catch(e){}
   var secs=normTpl(t||S.fb);
   // 선생님이 '연습'을 누르면 해당 검사 받기 버튼 바로 아래에 연습 항목이 생겨요 (checkLogs.x)
   var xs=LOG.x||{},xk=Object.keys(xs).sort(function(a,b){return (xs[a].at||0)-(xs[b].at||0);}),last={};
@@ -777,7 +777,7 @@ function paintBar(){
       sw.style.display='inline-flex';
     }else{sw.style.display='none';sw.dataset.h='';}
   }
-  var lv=[LOG.lv,LOG.pg].filter(function(x){return x&&String(x).trim();}).join(' · '),el=$('hLv');
+  var lv=[LOG.lv||S.lvl,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:'')].filter(function(x){return x&&String(x).trim();}).join(' · '),el=$('hLv');
   if(el){el.textContent=lv;el.style.display=lv?'inline-flex':'none';}
   var st=LOG.startAt,en=LOG.endAt;
   $('tStart').textContent=st?hm(st):'--:--';
