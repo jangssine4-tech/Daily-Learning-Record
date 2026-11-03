@@ -109,6 +109,8 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .bc-global .sch-dd-panel{z-index:10001;max-height:70vh}
 /* ── 시간표 상단 드롭다운 (성적표·상장 / 수업 없는 학생 / 점검 받을 학생) ── */
 .sch-dd{position:relative}
+@keyframes pgBlink{0%,100%{opacity:1}50%{opacity:.2}}
+.pg-blink{animation:pgBlink 1s infinite}
 .sch-dd-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit}
 .sch-dd-btn.has{background:#fffbeb;border-color:#fbbf24;color:#92400e}
 .sch-dd-btn.bc-blink{animation:bcBlink 1s infinite;border-color:#ef4444;color:#b91c1c;background:#fef2f2}
@@ -1816,7 +1818,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zp';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zr';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3581,6 +3583,8 @@ function _autoSaveLvPg(){
 ['input','change'].forEach(function(ev){document.addEventListener(ev,function(e){
   var t=e.target;if(!t||(t.id!=='r-progress'&&t.id!=='r-level'))return;if(e.isTrusted===false)return;
   clearTimeout(window._lpAutoT);window._lpAutoT=setTimeout(_autoSaveLvPg,900);
+  if(t.id==='r-progress'&&t.value){delete window._pgAuto[_pgMemKey()];_pgHint('');}   // 진도를 직접 고르면 전구는 사라짐
+  if(t.id==='r-level')delete window._pgAuto[_pgMemKey()];
 });});
 function _bcRef(id){return db.collection('bookChecks').doc(id);}
 function _bcCall(id){
@@ -9971,12 +9975,32 @@ function _missedClassDays(sId,from,to){
   }
   return n;
 }
+window._pgAuto=window._pgAuto||{};
+function _pgMemKey(){var g=function(i){var e=document.getElementById(i);return e?e.value:'';};return g('r-student-id')+'|'+g('r-date');}
 function _pgHint(msg){
+  window._pgLastMsg=msg||'';
   var sel=$('r-progress');if(!sel)return;
-  var h=$('r-pg-hint');
-  if(!msg){if(h)h.style.display='none';return;}
-  if(!h){h=document.createElement('div');h.id='r-pg-hint';h.style.cssText='font-size:11px;color:#b45309;margin-top:3px;line-height:1.35';(sel.parentNode||sel).insertAdjacentElement('afterend',h);}
-  h.textContent=msg;h.style.display='block';
+  var fld=sel.closest?sel.closest('.field'):null,lab=fld&&fld.querySelector('.fl');
+  var old=$('r-pg-hint');if(old)old.style.display='none';
+  var b=$('r-pg-bulb');
+  if(!msg){if(b)b.style.display='none';var bb=$('r-pg-bubble');if(bb)bb.style.display='none';return;}
+  if(!lab)return;
+  if(!b){
+    lab.style.position='relative';
+    b=document.createElement('span');b.id='r-pg-bulb';b.textContent='💡';b.title='눌러서 안내 보기';
+    b.style.cssText='cursor:pointer;margin-left:6px;font-size:14px;display:inline-block;vertical-align:middle';
+    b.onclick=function(e){e.stopPropagation();var bu=$('r-pg-bubble');b.classList.remove('pg-blink');if(bu)bu.style.display=bu.style.display==='block'?'none':'block';};
+    lab.appendChild(b);
+    var bu=document.createElement('div');bu.id='r-pg-bubble';
+    bu.style.cssText='display:none;position:absolute;left:0;top:100%;margin-top:6px;z-index:60;width:min(300px,80vw);background:#fffbeb;border:1.5px solid #fbbf24;color:#92400e;border-radius:10px;padding:8px 10px;font-size:11.5px;font-weight:600;line-height:1.45;box-shadow:0 6px 18px rgba(0,0,0,.18);white-space:normal';
+    bu.onclick=function(e){e.stopPropagation();};
+    lab.appendChild(bu);
+    if(!window._pgBulbDoc){window._pgBulbDoc=1;document.addEventListener('click',function(){var x=$('r-pg-bubble');if(x)x.style.display='none';});}
+  }
+  var fail=/^이 학생의/.test(msg),detail=String(msg).replace(/\s*다르면 직접 골라 주세요\.?$/,'');
+  var bub=$('r-pg-bubble');
+  bub.innerHTML=fail?_bcEsc(msg):('LMS상의 진도와 다르면 직접 골라주세요.<div style="font-weight:500;font-size:11px;margin-top:4px;opacity:.85">'+_bcEsc(detail)+'</div>');
+  bub.style.display='none';b.style.display='inline-block';b.classList.add('pg-blink');
 }
 function populateProgressDropdown(level,current,refDate,allowJump){
   var sel=$('r-progress');if(!sel)return;
@@ -10004,6 +10028,10 @@ function populateProgressDropdown(level,current,refDate,allowJump){
         var li=lessons.length-1;sel.value=lessons[li];
       }
     }
+    if(window._pgLastMsg&&sel.value)window._pgAuto[_pgMemKey()]={msg:window._pgLastMsg,pg:sel.value,lv:level};   // 자동으로 채운 진도 기억
+  }else if(current){   // 학생을 바꿨다 돌아와도, 직접 고르지 않은 자동 진도면 전구를 다시 보여줌
+    var mm=window._pgAuto[_pgMemKey()];
+    if(mm&&mm.pg===current&&mm.lv===level)_pgHint(mm.msg);
   }
 }
 var _lastLoadedReportTs='';
@@ -28191,14 +28219,14 @@ function _clOpen(){
 function _clDraw(){
   var l=document.getElementById('cl-list');if(!l)return;
   var ks=Object.keys(window._closed||{}).sort().reverse();
-  l.innerHTML=ks.length?ks.map(function(k){return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid #eee;font-size:12px"><b>'+k+'</b><span style="flex:1;color:#666">'+_bcEsc(window._closed[k]||'')+'</span><button class="btn btn-sm" style="font-size:11px" onclick="_clDel(\''+k+'\')">삭제</button></div>';}).join(''):'<div style="font-size:12px;color:#999;text-align:center;padding:6px">등록된 휴원일이 없어요</div>';
+  l.innerHTML=ks.length?ks.map(function(k){return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid #eee;font-size:12px"><b>'+k+'</b><span style="flex:1;color:#666">'+_bcEsc(window._closed[k]||'')+'</span><button class="btn btn-sm" style="font-size:11px" onclick="_clDel(\''+k+'\')">등록 취소</button></div>';}).join(''):'<div style="font-size:12px;color:#999;text-align:center;padding:6px">등록된 휴원일이 없어요</div>';
 }
 function _clAdd(){
   var d=$('cl-date').value;if(!d){toast('⚠️ 날짜를 선택하세요');return;}
   window._closed[d]=($('cl-why').value||'').trim();$('cl-why').value='';
   _clSave().then(function(){toast('✅ '+d+' 휴원일로 등록했어요');}).catch(function(){toast('⚠️ 저장 실패');});_clDraw();
 }
-function _clDel(k){delete window._closed[k];_clSave().catch(function(){});_clDraw();}
+function _clDel(k){delete window._closed[k];_clSave().then(function(){toast('↩️ '+k+' 휴원일 등록을 취소했어요');}).catch(function(){toast('⚠️ 취소 저장 실패');});_clDraw();}
 function _brandStart(){
   try{_closeStart();}catch(e){}
   try{
