@@ -1805,7 +1805,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zf';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zg';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -2990,6 +2990,54 @@ var CC_PLANS={"Phonics 1A":{"key":"Phonics 1A","blocks":[{"lessons":["Unit 1 Les
   });
   CC_PLANS=out;
 })();
+// Grammar Plus: 원래 한 표인데 두 표(1번 표: Preview 1~Wrap-Up 2, 2번 표: Lesson 9~Wrap-Up 3)로 나뉘어 있던 계획표를 한 표로 합침
+function _ccMergeGp(plan){
+  if(!plan||!plan.blocks||plan.blocks.length!==2)return plan;
+  var A=plan.blocks[0],B=plan.blocks[1];
+  if(!A.rows||!B.rows||A.rows.length!==B.rows.length)return plan;
+  for(var q=0;q<A.rows.length;q++){if((A.rows[q].g||'')!==(B.rows[q].g||'')||(A.rows[q].s||'')!==(B.rows[q].s||''))return plan;}
+  var lA=A.lessons.length,lB=B.lessons.length,X=function(n){return new Array(n+1).join('x');};
+  var out=JSON.parse(JSON.stringify(plan)),rows=[],mapA={},mapB={};
+  function shiftN(n){var o={};Object.keys(n||{}).forEach(function(k){o[String(+k+lA)]=n[k];});return o;}
+  A.rows.forEach(function(a,i){
+    var b=B.rows[i],same=a.l===b.l,gram=/^문법 개념 설명해 보기/.test(a.l)&&/^문법 개념 설명해 보기/.test(b.l);
+    if(same||gram){
+      var r=JSON.parse(JSON.stringify(a));
+      r.c=a.c+b.c;
+      if(gram&&!same)r.l='문법 개념 설명해 보기 / 문법 백지노트 쓰기 / 문법표 외워 말하기';
+      var n=Object.assign({},a.n||{},shiftN(b.n));if(Object.keys(n).length)r.n=n;else delete r.n;
+      if(!r.h&&b.h)r.h=b.h;
+      mapA[i]=mapB[i]=rows.length;rows.push(r);
+    }else{   // 문구가 서로 다른 항목은 둘 다 남기고, 원래 있던 레슨에서만 켭니다
+      var ra=JSON.parse(JSON.stringify(a)),rb=JSON.parse(JSON.stringify(b));
+      var u=a.c+b.c,uc='';for(var z=0;z<u.length;z++){uc+=u.charAt(z)!=='x'?u.charAt(z):'x';}
+      // 두 항목 모두 넣기: 어느 한쪽이라도 켜져 있던 레슨에서는 둘 다 켭니다
+      var cu='',ca=a.c+X(lB),cb=X(lA)+b.c;
+      for(var z2=0;z2<ca.length;z2++){var ch=ca.charAt(z2)!=='x'?ca.charAt(z2):(cb.charAt(z2)!=='x'?cb.charAt(z2):'x');cu+=ch;}
+      // 앞 표 레슨은 앞 표 항목, 뒤 표 레슨은 뒤 표 항목이 켜져 있던 것을 서로 복사
+      var ia=a.c.indexOf('c')>=0||a.c.indexOf('s')>=0;
+      ra.c=cu;rb.c=cu;
+      if(rb.n)rb.n=shiftN(b.n);
+      mapA[i]=rows.length;rows.push(ra);mapB[i]=rows.length;rows.push(rb);
+    }
+  });
+  out.blocks=[{lessons:A.lessons.concat(B.lessons),rows:rows}];
+  function remap(o){   // 레슨별로 고친 내용(ov)의 항목 번호(b0r3, b1r3 …)를 새 표 기준으로 바꿈
+    if(Array.isArray(o)){o.forEach(remap);return;}
+    if(!o||typeof o!=='object')return;
+    Object.keys(o).forEach(function(k){
+      var v=o[k],m;
+      if(k==='id'&&typeof v==='string'&&(m=/^b(\d+)r(\d+)$/.exec(v))){
+        var mp=m[1]==='0'?mapA:mapB,nr=mp[+m[2]];
+        if(nr!==undefined)o[k]='b0r'+nr;
+      }else remap(v);
+    });
+  }
+  if(out.ov)remap(out.ov);
+  if(out.ovDel)remap(out.ovDel);
+  return out;
+}
+CC_PLANS['Grammar Plus']=_ccMergeGp(CC_PLANS['Grammar Plus']);
 function ccPlanKey(level,grade){
   var l=String(level||'').replace(/\s+/g,' ').trim(),m;
   if(/^Phonics ?1A$/i.test(l))return 'Phonics 1A';
@@ -3742,6 +3790,10 @@ async function _bcSaveSettings(){
 // ── 단계별 계획표(Study Plan) 편집 ──
 window._ccPlanOv={};
 function _ccEffPlan(key){
+  var pl=_ccEffPlan0(key);
+  return (key==='Grammar Plus'&&pl&&pl.blocks&&pl.blocks.length===2)?_ccMergeGp(pl):pl;
+}
+function _ccEffPlan0(key){
   if(!key)return null;var ov=window._ccPlanOv||{};
   if(ov[key])return ov[key];
   if(key==='Grammar Plus'&&(ov['Grammar Plus 4~6']||ov['Grammar Plus 2~3'])){   // 예전에 둘로 나눠 저장한 계획표가 있으면 그걸 이어서 사용
@@ -9803,11 +9855,19 @@ function _autoNextProgress(sId,level,dt,sessTime,depth){
   var cand=reports.filter(function(r){return r.studentId===sId&&!r.absent&&r.progress&&before(r);});
   function key(r){return r.date+' '+(r.sessionTime||'');}
   cand.sort(function(a,b){return key(b).localeCompare(key(a));});
-  var last=cand.filter(function(r){return r.level===level;})[0];
-  if(!last)return null;
-  var idx=lessons.indexOf(last.progress);if(idx<0)return null;
+  var last=cand.filter(function(r){return r.level===level;})[0],prevLv='';
+  if(!last){   // 이 단계 기록이 없으면: 바로 앞 단계를 마친(마지막 레슨·Level Test·Review) 기록이 있을 때 이 단계 첫 레슨부터 시작
+    var any=cand.filter(function(r){return r.level!==level&&CURRICULUM[r.level];})[0];
+    if(!any)return null;
+    var al=CURRICULUM[any.level],ai=al.indexOf(any.progress);
+    if(ai<0||_nextLevelNE(any.level)!==level)return null;
+    if(!al.slice(ai+1).every(function(x){return /Level Test|Review|Portfolio/i.test(x);}))return null;
+    last={date:any.date,progress:any.progress,level:any.level};prevLv=any.level;
+  }
+  var idx=prevLv?-1:lessons.indexOf(last.progress);if(!prevLv&&idx<0)return null;
   var res;
-  if(idx+1<lessons.length)res={level:level,progress:lessons[idx+1]};
+  if(prevLv)res={level:level,progress:lessons[0],prevLevel:prevLv};
+  else if(idx+1<lessons.length)res={level:level,progress:lessons[idx+1]};
   else{
     var N=_nextLevelNE(level);
     if(!N)return {level:level,progress:lessons[idx]};
@@ -9826,6 +9886,7 @@ function _autoNextProgress(sId,level,dt,sessTime,depth){
     if(pos>=0)res={level:lv2,progress:ls2[pos],jumped:res.jumped||lv2!==level};
     res.missed=miss;res.lastDate=last.date;res.lastProgress=last.progress;
   }
+  if(prevLv){res.lastDate=last.date;res.lastProgress=last.progress;}
   return res;
 }
 // from(마지막 진도 기록일) 다음 날부터 to(오늘) 전날까지, 학생의 수업 요일 중 결석·조퇴·공휴일이 아닌 날 수
@@ -9847,7 +9908,7 @@ function _pgHint(msg){
   var sel=$('r-progress');if(!sel)return;
   var h=$('r-pg-hint');
   if(!msg){if(h)h.style.display='none';return;}
-  if(!h){h=document.createElement('div');h.id='r-pg-hint';h.style.cssText='font-size:11px;color:#b45309;margin-top:3px;flex-basis:100%';sel.insertAdjacentElement('afterend',h);}
+  if(!h){h=document.createElement('div');h.id='r-pg-hint';h.style.cssText='font-size:11px;color:#b45309;margin-top:3px;line-height:1.35';(sel.parentNode||sel).insertAdjacentElement('afterend',h);}
   h.textContent=msg;h.style.display='block';
 }
 function populateProgressDropdown(level,current,refDate,allowJump){
@@ -9861,6 +9922,7 @@ function populateProgressDropdown(level,current,refDate,allowJump){
     var sId=$('r-student-id').value;var dt=refDate||$('r-date').value||todayISO();
     var res=_autoNextProgress(sId,level,dt,'');
     _pgHint(res?'':'이 학생의 "'+level+'" 지난 일지에 진도가 기록돼 있지 않아 자동으로 채우지 못했어요. 직접 골라 주세요.');
+    if(res&&res.prevLevel&&!res.missed)_pgHint('이전 단계 "'+res.prevLevel+'"를 마친 기록('+res.lastDate+' '+res.lastProgress+')이 있어 이 단계의 첫 레슨으로 채웠어요. 다르면 직접 골라 주세요.');
     if(res&&res.missed)_pgHint('마지막 진도 기록('+res.lastDate+' '+res.lastProgress+') 이후 일지가 없는 수업일 '+res.missed+'회를 수업한 것으로 보고 넘겼어요. 다르면 직접 골라 주세요.');
     if(res){
       if(res.level===level){sel.value=res.progress;}
