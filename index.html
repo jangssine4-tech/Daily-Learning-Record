@@ -1818,7 +1818,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zs';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zt';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -10011,6 +10011,14 @@ function populateProgressDropdown(level,current,refDate,allowJump){
   if(current&&lessons.indexOf(current)<0){var _o=document.createElement('option');_o.value=current;_o.textContent=current+' (목록에 없음)';_o.selected=true;sel.appendChild(_o);}
   if(!current&&lessons.length>0){
     var sId=$('r-student-id').value;var dt=refDate||$('r-date').value||todayISO();
+    // 같은 날 직접 골라 둔 진도(일지 저장 전)가 있으면 새로 고침·재접속 뒤에도 그대로 불러옴
+    try{
+      var _stp=students.find(function(x){return x.id===sId;}),_pp=_stp&&_stp.pgPlan;
+      if(_pp&&_pp.date===dt&&_pp.level===level&&lessons.indexOf(_pp.progress)>=0&&!(window._currentMakeupId)){
+        var _rr=reports.find(function(r){return r.studentId===sId&&r.date===dt&&!r.absent&&r.progress;});
+        if(!_rr){sel.value=_pp.progress;return;}
+      }
+    }catch(e){}
     var res=_autoNextProgress(sId,level,dt,'');
     var _lastAny=reports.filter(function(r){return r.studentId===sId&&!r.absent&&r.progress&&r.date<dt;}).sort(function(a,b){return (b.date+(b.sessionTime||'')).localeCompare(a.date+(a.sessionTime||''));})[0];
     _pgHint(res?'':'이 학생의 "'+level+'" 지난 일지에 진도가 기록돼 있지 않아 자동으로 채우지 못했어요. '+(_lastAny?'(가장 최근 진도 기록: '+_lastAny.date+' '+_lastAny.level+' '+_lastAny.progress+') ':'(진도가 적힌 지난 일지가 없어요) ')+'직접 골라 주세요.');
