@@ -1816,7 +1816,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zk';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zl';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3102,7 +3102,7 @@ function _ccAutoLink(t){   // 교재 준비 · 교재 숙제 · 영상 숙제 �
   var used={};
   t.sections.forEach(function(sc){(sc.items||[]).forEach(function(it){if(it.link)used[it.link]=1;});});
   t.sections.forEach(function(sc){(sc.items||[]).forEach(function(it){
-    if(it.t!=='check'||it.link||it.nl)return;
+    if((it.t!=='check'&&it.t!=='ox')||it.link||it.nl)return;
     var l=String(it.l||'').replace(/\s+/g,''),k=/^교재준비/.test(l)?'hwPrep':/^교재숙제/.test(l)?'hwBook':/^영상숙제/.test(l)?'hwVideo':'';
     if(k&&!used[k]){it.link=k;used[k]=1;}
   });});
@@ -3732,7 +3732,7 @@ function _bcEdDraw(){
       if(it.t==='call')h+='<select class="fi bced-to" '+d+' style="width:92px;font-size:11px;padding:5px"><option value="tablet"'+(it.to!=='book'?' selected':'')+'>태블릿 교사</option><option value="book"'+(it.to==='book'?' selected':'')+'>교재 교사</option></select>';
       if(it.t==='number')h+='<input class="fi bced-u" '+d+' value="'+_bcEsc(it.u||'')+'" placeholder="단위" style="width:48px;padding:5px">';
       var lk=[];
-      if(it.t==='check')lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
+      if((it.t==='check'||it.t==='ox'))lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
       if(it.t==='number')lk=[['','일지 연동 안 함'],['quiz','일지 연동 · 퀴즈 점수']];
       if(it.t==='dict')lk=[['','일지 연동 안 함'],['dict','일지 연동 · 받아쓰기']];
       if(lk.length)h+='<select class="fi bced-link" '+d+' style="width:168px;font-size:11px;padding:5px">'+lk.map(function(x){return '<option value="'+x[0]+'"'+((it.link||'')===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
@@ -3760,7 +3760,7 @@ function _bcEdRe(){_bcEdSync();_bcEdTouch();
   _bcEd.view.sections.forEach(function(sec){sec.items.forEach(function(it){   // 종류가 바뀌면 맞지 않는 옵션 정리
     if(it.t!=='call')delete it.to;else if(!it.to)it.to='tablet';
     if(it.t!=='number')delete it.u;
-    var ok={check:['','hwPrep','hwBook','hwVideo'],number:['','quiz'],dict:['','dict'],call:['']}[it.t]||[''];
+    var ok={check:['','hwPrep','hwBook','hwVideo'],ox:['','hwPrep','hwBook','hwVideo'],number:['','quiz'],dict:['','dict'],call:['']}[it.t]||[''];
     if(ok.indexOf(it.link||'')<0)it.link='';
   });});
   _bcEdDraw();}
@@ -4008,7 +4008,7 @@ function _ccPlanPrev(reset,target){
       +'<button class="bc-b" onclick="_ccPvOp(\'secup\','+si+')" title="위로">▲</button><button class="bc-b" onclick="_ccPvOp(\'secdown\','+si+')" title="아래로">▼</button><button class="bc-b x" onclick="_ccPvOp(\'secdel\','+si+')" title="구역 삭제">✕</button></div>';
     sec.items.forEach(function(it,ii){
       var d=si+','+ii,lk=[];
-      if(it.t==='check')lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
+      if((it.t==='check'||it.t==='ox'))lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
       if(it.t==='number')lk=[['','일지 연동 안 함'],['quiz','일지 연동 · 퀴즈 점수']];
       if(it.t==='dict')lk=[['','일지 연동 안 함'],['dict','일지 연동 · 받아쓰기']];
       h+='<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px;flex-wrap:wrap">'
@@ -4410,7 +4410,7 @@ function _ccSpOp(name,op,si,ii){
 }
 function _ccSpRow(name,si,ii,it){
   var lk=[];
-  if(it.t==='check')lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
+  if((it.t==='check'||it.t==='ox'))lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
   if(it.t==='number')lk=[['','일지 연동 안 함'],['quiz','일지 연동 · 퀴즈 점수']];
   if(it.t==='dict')lk=[['','일지 연동 안 함'],['dict','일지 연동 · 받아쓰기']];
   var q=function(f){return "_ccSpSet('"+name+"','"+f+"',"+si+","+ii+",this.value)";};
@@ -4495,7 +4495,7 @@ function _ccLessonView(b,sel){
       +(e.real?'<button class="mini" title="이 구역의 항목 전체를 다른 레슨에 적용" onclick="_ccItApplyOpen('+si+',-1)">적용</button><button class="mini" onclick="_ccPvOp(\'add\','+si+')">＋ 항목 추가</button><button class="mini" title="이 구역을 이 레슨에서 삭제" onclick="_ccPvOp(\'secdel\','+si+')">구역 삭제</button>':'')+'</div>';
     sec.items.forEach(function(it,ii){
       var d=si+','+ii,lk=[],off=!!it.off,dl=!!it.del;
-      if(it.t==='check')lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
+      if((it.t==='check'||it.t==='ox'))lk=[['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
       if(it.t==='number')lk=[['','일지 연동 안 함'],['quiz','일지 연동 · 퀴즈 점수']];
       if(it.t==='dict')lk=[['','일지 연동 안 함'],['dict','일지 연동 · 받아쓰기']];
       var isPlan=/^b(\d+)r(\d+)$/.test(it.id||'');

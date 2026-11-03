@@ -303,7 +303,7 @@ function _ccAutoLink(t){   // 교재 준비 · 교재 숙제 · 영상 숙제 �
   var used={};
   t.sections.forEach(function(sc){(sc.items||[]).forEach(function(it){if(it.link)used[it.link]=1;});});
   t.sections.forEach(function(sc){(sc.items||[]).forEach(function(it){
-    if(it.t!=='check'||it.link||it.nl)return;
+    if((it.t!=='check'&&it.t!=='ox')||it.link||it.nl)return;
     var l=String(it.l||'').replace(/\s+/g,''),k=/^교재준비/.test(l)?'hwPrep':/^교재숙제/.test(l)?'hwBook':/^영상숙제/.test(l)?'hwVideo':'';
     if(k&&!used[k]){it.link=k;used[k]=1;}
   });});
@@ -588,6 +588,10 @@ function calcJ(){
     if(it.link==='hwPrep'&&it.t==='check')j.hwPrep=LOG.e[it.id]?'준비':'미준비';
     else if(it.link==='hwBook'&&it.t==='check')j.hwBook=LOG.e[it.id]?'완료':'미완료';
     else if(it.link==='hwVideo'&&it.t==='check')j.hwVideo=LOG.e[it.id]?'제출':'미제출';
+    else if(it.t==='ox'&&(it.link==='hwPrep'||it.link==='hwBook'||it.link==='hwVideo')){   // O/X: O → 준비·완료·제출, X → 미준비·미완료·미제출 (아직 안 눌렀으면 비워 둠)
+      if(v==='O'||v==='X'){var on=v==='O';
+        if(it.link==='hwPrep')j.hwPrep=on?'준비':'미준비';else if(it.link==='hwBook')j.hwBook=on?'완료':'미완료';else j.hwVideo=on?'제출':'미제출';}
+    }
     else if(it.link==='quiz'&&it.t==='number'&&v!==undefined&&v!=='')j.quiz=String(v);
     else if(it.link==='dict'&&it.t==='dict'&&v&&v.c!==undefined&&v.c!==''&&v.t!==undefined&&v.t!=='')j.dict=v.c+'/'+v.t;
   });});
