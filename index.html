@@ -608,7 +608,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
     <div id="temp-save-indicator" style="display:none;text-align:center;margin-top:6px;font-size:11px;color:var(--blue)">📋 임시 저장된 데이터가 있습니다</div>
   </div></div>
   <!-- 오른쪽: 최근 2주 학습 흐름 패널 -->
-  <div id="write-flow-panel" style="flex:1;min-width:260px;max-width:380px;display:none;align-self:flex-start;position:sticky;top:60px;max-height:calc(100vh - 80px);overflow-y:auto">
+  <div id="write-flow-panel" style="flex:1;min-width:260px;max-width:380px;display:none;align-self:flex-start;position:sticky;top:14px;max-height:calc(100vh - 80px);overflow-y:auto">
     <div class="card" style="padding:14px">
       <div id="write-flow-content"></div>
     </div>
@@ -1819,7 +1819,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zx';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zz';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4088,16 +4088,16 @@ function _ccPlanDraw(){
   var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:230px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
   ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+(_ccCustom(_ccWork(),n)?' ✎':'')+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
-  var _pk=null,_ncol=ls.length+2;
+  var _pk=null,_ncol=ls.length+2,_run=-1;
   b.rows.forEach(function(r,ri){
     var _k=(r.g||'')+'|'+(r.s||''),_gc=_ccGrpCol(b,r.g);
-    if(_k!==_pk){_pk=_k;
+    if(_k!==_pk){_pk=_k;_run++;
       var _gs=[];b.rows.forEach(function(x){if(_gs.indexOf(x.g||'')<0)_gs.push(x.g||'');});['스마트 학습','교재 학습'].forEach(function(x){if(_gs.indexOf(x)<0)_gs.push(x);});
-      h+='<tr><td colspan="'+_ncol+'" style="background:'+_gc[0]+';color:'+_gc[1]+';padding:4px 8px;border-top:2px solid '+_gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+      h+='<tr data-ccsec="1" data-run="'+_run+'"><td colspan="'+_ncol+'" style="background:'+_gc[0]+';color:'+_gc[1]+';padding:4px 8px;border-top:2px solid '+_gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="cc-sec-h" draggable="true" data-ri="'+ri+'" title="끌어서 구역 전체를 옮겨요" style="cursor:grab;font-size:16px;line-height:1;padding:2px 4px;user-select:none;opacity:.8">⠿</span>'
         +'<input value="'+_bcEsc(r.s||'')+'" onchange="_ccSecEdit('+ri+',\'s\',this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px">'
         +'<select onchange="_ccSecEdit('+ri+',\'g\',this.value)" title="묶음" style="font-size:11px;padding:3px;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7);color:inherit">'+_gs.map(function(x){return '<option value="'+_bcEsc(x)+'"'+((r.g||'')===x?' selected':'')+'>'+_bcEsc(x||'(묶음 없음)')+'</option>';}).join('')+'</select>'
         +'<span style="flex:1"></span><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecRowAdd('+ri+')">＋ 항목 추가</button><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecDel('+ri+')">구역 삭제</button></div></td></tr>';}
-    h+='<tr><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3)">'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
+    h+='<tr data-ccrow="1" data-run="'+_run+'" data-ri="'+ri+'"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3);display:flex;align-items:center;gap:4px"><span class="cc-row-h" draggable="true" data-ri="'+ri+'" title="끌어서 이 구역 안에서 순서를 바꿔요" style="cursor:grab;font-size:14px;line-height:1;user-select:none;color:#64748b">⠿</span>'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
     for(var i=0;i<ls.length;i++){
       var ch=r.c.charAt(i),txt=ch==='c'?'□':(ch==='s'?'점':'×'),bg=ch==='c'?'#ecfdf5':(ch==='s'?'#fef9c3':'#f3f4f6'),col=ch==='x'?'#9ca3af':'#065f46';
       h+='<td style="text-align:center;border-bottom:1px solid var(--border);'+(i===sel?'background:#eff6ff;':'')+'"><button onclick="_ccPlanCell('+ri+','+i+')" title="'+_bcEsc(r.n&&r.n[i]?r.n[i]:'')+'" style="width:30px;height:24px;border:1px solid #d1d5db;border-radius:5px;background:'+bg+';color:'+col+';cursor:pointer;font-size:12px">'+txt+'</button></td>';
@@ -4278,6 +4278,81 @@ function _ccApplyDo(){
 // 전체 계획표를 고치기 전에: 따로 고친 레슨(✎)은 계획표 기준으로 되돌립니다 (전체 계획표 우선)
 // 전체 계획표를 고쳐도 "직접 관련 없는" 레슨별 수정(예: 숙제 했나요? 구역의 교재 준비)은 그대로 둡니다.
 // 고친 항목과 관련된 내용만 각 함수에서 레슨별 수정(ov)에도 똑같이 반영합니다.
+// ── 전체 계획표: 구역·항목 끌어서 순서 바꾸기 ──
+function _ccRuns(b){var runs=[],pk=null;b.rows.forEach(function(r,i){var k=(r.g||'')+'|'+(r.s||'');if(k!==pk){pk=k;runs.push({k:k,s:i,e:i});}else runs[runs.length-1].e=i;});return runs;}
+function _ccRowsPermute(p,bi,perm){   // 줄 순서가 바뀌면 레슨별로 고친 내용(ov)·삭제 목록(ovDel)의 항목 번호(b0r3 …)도 같이 바꿈
+  var re=/^b(\d+)r(\d+)$/;
+  function fix(o){
+    if(Array.isArray(o)){o.forEach(fix);return;}
+    if(!o||typeof o!=='object')return;
+    Object.keys(o).forEach(function(k){
+      var v=o[k],m;
+      if(k==='id'&&typeof v==='string'&&(m=re.exec(v))){if(+m[1]===bi&&perm[+m[2]]!==undefined)o[k]='b'+bi+'r'+perm[+m[2]];}
+      else fix(v);
+    });
+  }
+  fix(p.ov);fix(p.ovDel);
+}
+function _ccApplyOrder(p,bi,order){
+  var b=p.blocks[bi],perm={};
+  order.forEach(function(oldI,newI){perm[oldI]=newI;});
+  b.rows=order.map(function(i){return b.rows[i];});
+  _ccRowsPermute(p,bi,perm);
+}
+function _ccSecMove(a,t){
+  if(a===t||isNaN(a)||isNaN(t))return;
+  if(!_ccTblGuard())return;
+  var p=_ccWork(),bi=_ccEd.bi,b=p.blocks[bi],runs=_ccRuns(b),A=runs[a],T=runs[t];if(!A||!T)return;
+  var after=a<t,order=[];
+  function push(r){for(var i=r.s;i<=r.e;i++)order.push(i);}
+  runs.forEach(function(r,i){if(i===a)return;if(i===t&&!after)push(A);push(r);if(i===t&&after)push(A);});
+  _ccApplyOrder(p,bi,order);
+  if(A.k!==T.k){   // '모든 레슨에 적용'한 구역 순서(sorder)·레슨별 순서(lord)도 같은 방향으로 맞춤
+    var mv=function(arr){if(!arr||arr.indexOf(A.k)<0||arr.indexOf(T.k)<0)return arr;var n=arr.filter(function(x){return x!==A.k;}),ti=n.indexOf(T.k);n.splice(after?ti+1:ti,0,A.k);return n;};
+    if(p.sorder)p.sorder=mv(p.sorder);
+    if(p.lord)Object.keys(p.lord).forEach(function(l){p.lord[l]=mv(p.lord[l]);});
+  }
+  _ccMark();_ccPlanDraw();
+}
+function _ccRowMove(src,tgt){
+  if(src===tgt||isNaN(src)||isNaN(tgt))return;
+  if(!_ccTblGuard())return;
+  var p=_ccWork(),bi=_ccEd.bi,b=p.blocks[bi],rs=b.rows,a=rs[src],t=rs[tgt];if(!a||!t)return;
+  if((a.g||'')!==(t.g||'')||(a.s||'')!==(t.s||''))return;   // 같은 구역 안에서만
+  var order=[];for(var i=0;i<rs.length;i++)order.push(i);
+  order.splice(src,1);var ti=order.indexOf(tgt);order.splice(src<tgt?ti+1:ti,0,src);
+  _ccApplyOrder(p,bi,order);
+  _ccMark();_ccPlanDraw();
+}
+var _ccDg=null;
+function _ccDgClear(){document.querySelectorAll('#ccp-tbl tr').forEach(function(r){r.style.boxShadow='';r.style.opacity='';});}
+document.addEventListener('dragstart',function(e){
+  var h=e.target&&e.target.closest?e.target.closest('.cc-sec-h,.cc-row-h'):null;if(!h)return;
+  var tr=h.closest('tr');
+  _ccDg={t:h.classList.contains('cc-sec-h')?'sec':'row',ri:+h.dataset.ri,run:tr?+tr.dataset.run:-1};
+  try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','ccgrid');}catch(x){}
+  if(tr)tr.style.opacity='.45';
+});
+document.addEventListener('dragover',function(e){
+  if(!_ccDg)return;
+  var tr=e.target&&e.target.closest?e.target.closest('#ccp-tbl tr[data-run]'):null;if(!tr)return;
+  var ok=_ccDg.t==='sec'?true:(tr.dataset.ccrow==='1'&&+tr.dataset.run===_ccDg.run&&+tr.dataset.ri!==_ccDg.ri);
+  if(!ok)return;
+  e.preventDefault();
+  _ccDgClear();
+  var down=_ccDg.t==='sec'?(_ccDg.run<+tr.dataset.run):(_ccDg.ri<+tr.dataset.ri);
+  if(_ccDg.t==='sec'&&+tr.dataset.run===_ccDg.run)return;
+  tr.style.boxShadow=down?'inset 0 -3px 0 #2563eb':'inset 0 3px 0 #2563eb';
+});
+document.addEventListener('drop',function(e){
+  if(!_ccDg)return;
+  var tr=e.target&&e.target.closest?e.target.closest('#ccp-tbl tr[data-run]'):null;if(!tr){_ccDgClear();_ccDg=null;return;}
+  e.preventDefault();
+  var d=_ccDg;_ccDg=null;_ccDgClear();
+  if(d.t==='sec')_ccSecMove(d.run,+tr.dataset.run);
+  else if(tr.dataset.ccrow==='1'&&+tr.dataset.run===d.run)_ccRowMove(d.ri,+tr.dataset.ri);
+});
+document.addEventListener('dragend',function(){if(_ccDg){_ccDgClear();_ccDg=null;}});
 function _ccTblGuard(){var p=_ccWork();_ccPruneOv(p);return true;}
 function _ccOvSyncRow(ri){var p=_ccWork(),b=p.blocks[_ccEd.bi];b.lessons.forEach(function(ln,i){if(p.ov&&p.ov[ln])_ccOvSync(ri,i);});}
 function _ccOvDropSec(p,k){Object.keys(p.ov||{}).forEach(function(ln){p.ov[ln].sections=(p.ov[ln].sections||[]).filter(function(sc){return sc.k!==k;});});}
