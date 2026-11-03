@@ -556,7 +556,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
       <div style="font-size:13px;font-weight:800;color:#1d4ed8;margin-bottom:8px">📱 태블릿 점검 <span id="rz-t-name" style="font-weight:600;font-size:11px;background:#dbeafe;border-radius:10px;padding:1px 8px"></span></div>
       <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:8px;margin-bottom:8px"><div class="field" style="margin-bottom:0;min-width:0;display:none"><div class="fl">태블릿 점검 교사</div><select class="fi" id="r-teacher-tablet"></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl"><span style="color:#ef4444;font-weight:800" title="체크콜·홈체크에 연동되는 항목입니다">★</span> 단계</div><select class="fi" id="r-level" onchange="onReportLevelChange()"><option value="">선택</option></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl"><span style="color:#ef4444;font-weight:800" title="체크콜·홈체크에 연동되는 항목입니다">★</span> 진도</div><div style="display:flex;gap:4px"><select class="fi" id="r-progress" style="flex:1" onchange="highlightProgress(this)"><option value="">선택</option></select><select class="fi" id="r-review-yn" style="width:64px;font-size:10px;padding:6px 2px"><option value="">Review</option><option value="Review">✔ Review</option></select></div></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px"><div class="field" style="margin-bottom:0;min-width:0"><div class="fl">교재 준비</div><select class="fi" id="r-review-items"><option value="">-</option><option value="준비">준비</option><option value="미준비">미준비</option></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl">교재 숙제</div><select class="fi" id="r-hw-book" onchange="combineHw()"><option value="">-</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl">영상 숙제</div><select class="fi" id="r-hw-video" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div></div>
-    <div class="r2"><div class="field"><div class="fl">수업 태도</div><select class="fi" id="r-attitude-level" onchange="onAttitudeLevelChange(this.value)"><option value="">-</option><option value="매우 우수">⭐ 매우 우수</option><option value="우수">✅ 우수</option><option value="산만함">⚠️ 산만함</option><option value="수업 방해">🚨 수업 방해</option></select><select class="fi" id="r-attitude" style="margin-top:6px;font-size:11px;display:none"><option value="">세부 항목 선택</option></select></div><div class="field"><div class="fl">Daily Quiz</div><input class="fi" id="r-quiz" placeholder="예: 9/10"></div></div>
+    <div class="r2"><div class="field"><div class="fl">수업 태도</div><select class="fi" id="r-attitude-level" onchange="onAttitudeLevelChange(this.value)"><option value="">-</option><option value="매우 우수">⭐ 매우 우수</option><option value="우수">✅ 우수</option><option value="산만함">⚠️ 집중 필요</option><option value="수업 방해">🚨 지도 필요</option></select><select class="fi" id="r-attitude" style="margin-top:6px;font-size:11px;display:none"><option value="">세부 항목 선택</option></select></div><div class="field"><div class="fl">Daily Quiz</div><input class="fi" id="r-quiz" placeholder="예: 9/10"></div></div>
       <div id="eval-area-t"></div>
     <div class="field" style="display:none"><div class="fl">선생님 코멘트 (태블릿)</div><textarea class="fi" id="r-comment-tablet" rows="2" placeholder="태블릿 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">칭찬 포인트</div><textarea class="fi" id="r-memo" rows="2"></textarea></div>
@@ -1819,7 +1819,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zw';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zx';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -5326,9 +5326,8 @@ function renderWriteFlowPanel(studentId){
   if(!s){panel.style.display='none';return;}
   panel.style.display='';
 
-  var today=new Date();
-  var fourWeeks=new Date(today);fourWeeks.setDate(fourWeeks.getDate()-28);
-  var sReps=reports.filter(function(r){return r.studentId===studentId&&!r.makeupId&&new Date(r.date)>=fourWeeks;}).sort(function(a,b){return a.date>b.date?-1:1;});
+  var _jd=(($('r-date')||{}).value)||todayISO(),ym=_jd.slice(0,7),monthNo=parseInt(_jd.slice(5,7),10);   // 일지 날짜가 속한 달만 보여줌
+  var sReps=reports.filter(function(r){return r.studentId===studentId&&!r.makeupId&&String(r.date||'').slice(0,7)===ym;}).sort(function(a,b){return a.date>b.date?-1:1;});
 
   var attMap={'매우 우수':3,'우수':2.5,'산만함':1.5,'수업 방해':1,'참여도가 매우 높음':3,'기본적인 참여도를 보임':2,'집중 유지에 도움이 필요한 모습':1};
   function parseScore(v){var m=String(v||'').match(/(\d+)/);return m?parseInt(m[1]):null;}
@@ -5410,7 +5409,7 @@ function renderWriteFlowPanel(studentId){
   var subCauses=causes.slice(1,3).map(function(c){return c.t;});
   var extraCount=causes.length>3?causes.length-3:0;
   // ── HTML 시작 ──
-  var html='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 '+s.name+' · 최근 4주</div>';
+  var html='<div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px">📊 '+s.name+' · '+monthNo+'월</div>';
 
   // ① 상태 배지 (이유 포함)
   html+='<div style="background:'+riskBg+';border:1px solid '+riskColor+';border-radius:10px;padding:9px 12px;margin-bottom:10px">'
@@ -5469,44 +5468,66 @@ function renderWriteFlowPanel(studentId){
       +'</div>';
   }
 
-  // ⑤ 최근 수업 흐름 (날짜별 근거)
+  // ⑤ 수업 흐름 (이번 달, 날짜별 근거)
   if(sReps.length){
+    var _td='padding:4px 1px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center';
+    var _th='padding:3px 1px;font-weight:700;color:var(--txt3);vertical-align:middle;text-align:center';
+    function _stMin(js){   // 체크콜에서 넘어온 구역별 공부 시간 → 스마트 학습 / 교재 학습 합계(분)
+      var a;try{a=JSON.parse(js||'[]');}catch(e){a=[];}
+      var sm=0,bk=0,smN=0,bkN=0,open=false;
+      (a||[]).forEach(function(x){
+        var g=String(x.g||''),n=String(x.n||'');
+        var isSmart=/스마트/.test(g)||(!g&&/^(daily ?study|daily ?quiz|study|quiz)\b/i.test(n));
+        if(!x.e){open=true;return;}
+        var m=Math.max(0,Math.round((x.e-x.s)/60000));
+        if(isSmart){sm+=m;smN++;}else{bk+=m;bkN++;}
+      });
+      return {sm:smN?sm:null,bk:bkN?bk:null,open:open};
+    }
+    function _minTxt(v){return v===null?'-':v+'분';}
     html+='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:5px;padding-top:6px;border-top:1px solid var(--border)">최근 수업 흐름</div>'
-      +'<div style="display:grid;grid-template-columns:30px 44px 44px 52px 28px 52px;gap:2px;font-size:9px;font-weight:700;color:var(--txt3);padding-bottom:3px;border-bottom:2px solid var(--border);margin-bottom:3px;text-align:center"><span>날짜</span><span>교재 숙제</span><span>영상 숙제</span><span>태도</span><span>Quiz</span><span>받아 쓰기</span></div>';
-    sReps.slice(0,8).forEach(function(r){
-      var testLabel=r.absent?'-':(r.reviewTest||'-');
-      var testColor=r.absent?'var(--txt3)':r.reviewTest==='매우잘함'||r.reviewTest==='잘함'?'#16a34a':r.reviewTest==='부진'?'#dc2626':'var(--txt)';
-      var _attTop='';
-      if(r.absent){_attTop='결석';}
-      else if(r.attitude){
-        var _av=r.attitude;
-        if(_av==='매우 우수'||_av.includes('매우'))_attTop='⭐매우우수';
-        else if(_av==='우수')_attTop='✅우수';
-        else if(_av==='수업 방해'||_av.includes('방해'))_attTop='🚨방해';
-        else if(_av==='산만함'||_av.includes('산만'))_attTop='⚠️산만';
-        else{
-          var _found=false;
-          for(var _lv in _ATTITUDE_ITEMS){if(_ATTITUDE_ITEMS[_lv].indexOf(_av)>=0){_attTop=_lv.substring(0,5);_found=true;break;}}
-          if(!_found)_attTop=_av.substring(0,5);
-        }
-      }else{_attTop='-';}
-      var attColor=r.absent?'#dc2626':r.attitude&&(r.attitude.includes('산만')||r.attitude.includes('방해'))?'#dc2626':r.attitude&&(r.attitude.includes('매우')||r.attitude.includes('우수'))?'#16a34a':'var(--txt)';
-      var quizLabel=r.dailyQuiz||'-';
+      +'<table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed">'
+      +'<colgroup><col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:11%"><col style="width:12%"><col style="width:12%"><col style="width:15%"><col style="width:9%"><col style="width:14%"></colgroup>'
+      +'<thead><tr style="border-bottom:1px solid var(--border)">'
+      +'<th rowspan="2" style="'+_th+'">날짜</th><th colspan="2" style="'+_th+'">숙제</th><th rowspan="2" style="'+_th+'">정시<br>출석</th><th colspan="2" style="'+_th+'">학습 시간</th><th rowspan="2" style="'+_th+'">태도</th><th rowspan="2" style="'+_th+'">quiz</th><th rowspan="2" style="'+_th+'">받아쓰기</th></tr>'
+      +'<tr style="border-bottom:2px solid var(--border)"><th style="'+_th+'">교재</th><th style="'+_th+'">영상</th><th style="'+_th+'">스마트</th><th style="'+_th+'">교재</th></tr></thead><tbody>';
+    sReps.forEach(function(r){
+      var attTxt,attCol;
+      if(r.absent){attTxt='결석';attCol='#dc2626';}
+      else if(r.late){attTxt='지각';attCol='#d97706';}
+      else if(r.earlyLeave){attTxt='조퇴';attCol='#d97706';}
+      else{attTxt='정시';attCol='#16a34a';}
+      var _attTop='-',attColor='var(--txt)';
+      if(!r.absent&&r.attitude){
+        var _lv=(typeof _getAttitudeLevel==='function')?_getAttitudeLevel(r.attitude):'';
+        var _v=_lv||r.attitude;
+        if(/매우/.test(_v)){_attTop='매우 우수';attColor='#16a34a';}
+        else if(/우수/.test(_v)){_attTop='우수';attColor='#16a34a';}
+        else if(/산만|집중/.test(_v)){_attTop='집중 필요';attColor='#d97706';}
+        else if(/방해|지도/.test(_v)){_attTop='지도 필요';attColor='#dc2626';}
+        else _attTop=String(_v).substring(0,5);
+      }
+      var quizLabel=(!r.absent&&r.dailyQuiz)?r.dailyQuiz:'-';
       var dictLabel='-';
-      if(r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictLabel=pct+'%<br>'+dm[1]+'/'+dm[2];}else dictLabel=r.dictation;}
+      if(!r.absent&&r.dictation){var dm=r.dictation.match(/^(\d+)\/(\d+)/);if(dm){var pct=parseInt(dm[2])>0?Math.round(parseInt(dm[1])/parseInt(dm[2])*100):0;dictLabel=pct+'%<br>'+dm[1]+'/'+dm[2];}else dictLabel=r.dictation;}
       var hwBook=r.homeworkBook||(typeof splitHw==='function'?splitHw(r.homework||'').book:'')||'';
       var hwVideo=r.hwVideo||(typeof splitHw==='function'?splitHw(r.homework||'').video:'')||'';
-      html+='<div style="display:grid;grid-template-columns:30px 44px 44px 52px 28px 52px;gap:2px;font-size:9px;padding:3px 0;border-bottom:1px solid var(--border);text-align:center">'
-        +'<span style="color:var(--txt3)">'+r.date.substring(5)+'</span>'
-        +hwIcon(hwBook,r.absent)
-        +hwIcon(hwVideo,r.absent)
-        +'<span style="color:'+attColor+'">'+_attTop+'</span>'
-        +'<span style="color:var(--txt)">'+quizLabel+'</span>'
-        +'<span style="color:var(--txt);line-height:1.4">'+dictLabel+'</span>'
-        +'</div>'+_stHtml(r.studyTimes);
+      var tm=_stMin(r.studyTimes);
+      html+='<tr>'
+        +'<td style="'+_td+';color:var(--txt3)">'+r.date.substring(5)+'</td>'
+        +'<td style="'+_td+'">'+hwIcon(hwBook,r.absent)+'</td>'
+        +'<td style="'+_td+'">'+hwIcon(hwVideo,r.absent)+'</td>'
+        +'<td style="'+_td+';color:'+attCol+';font-weight:700">'+attTxt+'</td>'
+        +'<td style="'+_td+'" title="'+(tm.open?'끝을 누르지 않은 구역은 제외':'')+'">'+_minTxt(tm.sm)+'</td>'
+        +'<td style="'+_td+'">'+_minTxt(tm.bk)+'</td>'
+        +'<td style="'+_td+';color:'+attColor+'">'+_attTop+'</td>'
+        +'<td style="'+_td+'">'+_bcEsc(quizLabel)+'</td>'
+        +'<td style="'+_td+';line-height:1.35">'+dictLabel+'</td>'
+        +'</tr>';
     });
+    html+='</tbody></table>';
   } else {
-    html+='<div style="font-size:11px;color:var(--txt3);text-align:center;padding:10px">최근 2주 수업 기록 없음</div>';
+    html+='<div style="font-size:11px;color:var(--txt3);text-align:center;padding:10px">이번 달 수업 기록 없음</div>';
   }
 
   // Praise
@@ -10124,6 +10145,7 @@ function onReportDateChange(){
   try{_wSelBuild();}catch(e){console.warn(e);}
   try{_dayTEnsure($('r-date').value);}catch(e){}
   try{_wlShow($('r-student-id').value);}catch(e){}
+  try{if($('r-student-id').value)renderWriteFlowPanel($('r-student-id').value);}catch(e){}   // 달이 바뀌면 월 통계도 새로 계산
   var sId=$('r-student-id').value;if(!sId)return;
   var s=students.find(function(x){return x.id===sId;});if(!s)return;
   var newDate=$('r-date').value;if(!newDate)return;
