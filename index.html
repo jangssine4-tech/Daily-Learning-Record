@@ -167,6 +167,7 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .att-btn.done-btn{color:#86efac}.att-btn.done-btn.active{background:#dcfce7;color:#16a34a}
 .att-btn.abs-btn{color:#fca5a5}.att-btn.abs-btn.active{background:#fee2e2;color:#dc2626}
 .att-btn.early-btn{color:#fcd34d}.att-btn.early-btn.active{background:#fef3c7;color:#d97706}
+.att-btn.late-btn{filter:grayscale(1);opacity:.55}.att-btn.late-btn.active{background:#dcfce7;filter:none;opacity:1}
 .hist-table{width:100%;border-collapse:collapse;font-size:12px}
 .hist-table th{background:var(--navy);color:#fff;padding:8px 10px;text-align:center;position:sticky;top:0;z-index:2;white-space:nowrap}
 .hist-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center}
@@ -1818,7 +1819,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1028-zv';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1028-zw';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -8272,6 +8273,7 @@ function openConsultPrepCard(studentId){
   var total=sReps.length;
   var absent=sReps.filter(function(r){return r.absent;}).length;
   var early=sReps.filter(function(r){return r.earlyLeave;}).length;
+  var lateN=sReps.filter(function(r){return r.late&&!r.absent;}).length;
   var attend=total-absent-early;
 
   // 숙제
@@ -8321,7 +8323,7 @@ function openConsultPrepCard(studentId){
 
     +'<div style="background:#f0f9ff;border-radius:8px;padding:10px">'
     +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">1. 출결</div>'
-    +'<div style="font-size:12px">출석 <b>'+attend+'회</b> / 결석 <b style="color:'+(absent?'#dc2626':'var(--txt)')+'">'+(absent||0)+'회</b>'+(early?' / 조퇴 <b>'+early+'회</b>':'')+'</div>'
+    +'<div style="font-size:12px">출석 <b>'+attend+'회</b> / 결석 <b style="color:'+(absent?'#dc2626':'var(--txt)')+'">'+(absent||0)+'회</b>'+(early?' / 조퇴 <b>'+early+'회</b>':'')+(lateN?' / 지각 <b>'+lateN+'회</b>':'')+'</div>'
     +'</div>'
 
     +'<div style="background:#f0fdf4;border-radius:8px;padding:10px">'
@@ -8787,6 +8789,7 @@ function renderSchedule(){
         var done=rep&&!rep.absent&&!rep.earlyLeave;
         var absent=rep&&rep.absent;
         var early=rep&&rep.earlyLeave;
+        var late=!!(rep&&rep.late&&!rep.absent);
         var badge='';
         var pData2=(s.periods||{})[dayName];var pTime3='';
         if(s._isMakeup)pTime3=s._makeupTime||'';
@@ -8819,9 +8822,9 @@ function renderSchedule(){
         html+='<div class="s-card-sub">'+((rep&&rep.level)?rep.level:getStudentLevel(s))+'</div>';
         html+='<div class="s-card-btns">';
         var _mkId=s._isMakeup?s._makeupId:'';var _st=encodeURIComponent(pTime2||'');
-        html+='<button class="att-btn done-btn'+(done?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'present\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
+        html+='<button class="att-btn done-btn'+(done&&!late?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'present\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✔</span></button>';
         html+='<button class="att-btn abs-btn'+(absent?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'absent\',\''+_mkId+'\')"><span style="font-size:17px;font-weight:700">✕</span></button>';
-        html+='<button class="att-btn early-btn'+(early?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'early\',\''+_mkId+'\')" title="조퇴/학습 마무리 못함"><span style="font-size:15px;font-weight:700">▲</span></button>';
+        html+='<button class="att-btn late-btn'+(late?' active':'')+'" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';markAttendance(\''+s.id+'\',\'late\',\''+_mkId+'\')" title="지각"><span style="font-size:14px;font-weight:700">⏰</span></button>';
         if(done||absent||early)html+='<button class="att-btn" onclick="_setSessionTime(\''+pTime2+'\');window._currentSessionIsSpecial='+(s._isSpecialClass?'true':'false')+';startReport(\''+s.id+'\',\''+_mkId+'\',\''+pTime2+'\')" title="일지 작성">📝</button>';
 
         html+='</div>';
@@ -8905,8 +8908,10 @@ async function markAttendance(studentId, action, makeupId){
   if(makeupId){existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr&&r.makeupId===makeupId;});}
   else{var _ms=window._currentSessionTime||'';existing=reports.find(function(r){return r.studentId===studentId&&r.date===todayStr&&!r.makeupId&&(r.sessionTime||'')==_ms;});}
   var isAbsent=action==='absent';
-  var isEarly=action==='early';
+  var isLate=action==='late';
+  var isEarly=false;   // 조퇴 기능은 지각으로 대체됨 (이미 저장된 조퇴 기록은 그대로 유지)
   var isPresent=action==='present';
+  var _openRep=false;
 
   async function removeAutoMakeup(){
     var mk=makeups.find(function(m){return m.studentId===studentId&&m.absentDate===todayStr&&m.autoCreated&&m.makeupStatus==='pending';});
@@ -8937,7 +8942,7 @@ async function markAttendance(studentId, action, makeupId){
   }
 
   if(existing){
-    var sameState=(isPresent&&!existing.absent&&!existing.earlyLeave)||(isAbsent&&existing.absent)||(isEarly&&existing.earlyLeave);
+    var sameState=(isPresent&&!existing.absent&&!existing.earlyLeave&&!existing.late)||(isAbsent&&existing.absent)||(isLate&&existing.late&&!existing.absent);
     if(sameState){
       await db.collection('reports').doc(existing.id).delete();
       reports=reports.filter(function(r){return r.id!==existing.id;});
@@ -8945,33 +8950,35 @@ async function markAttendance(studentId, action, makeupId){
       toast('↩ '+s.name+' 상태 취소');
     } else {
       var wasAbsentOrEarly=existing.absent||existing.earlyLeave;
-      var update={absent:isAbsent,earlyLeave:isEarly||false,updatedAt:new Date().toISOString()};
+      var update={absent:isAbsent,earlyLeave:false,late:isLate,updatedAt:new Date().toISOString()};
       await db.collection('reports').doc(existing.id).update(update);
       var idx=reports.findIndex(function(r){return r.id===existing.id;});
       if(idx>=0) reports[idx]={...reports[idx],...update};
       if(isAbsent){ await createAutoMakeup(); showAbsentNotifyModal(s); }
-      else if(isEarly){ await createAutoMakeup(); }
-      else if(isPresent&&wasAbsentOrEarly){ await removeAutoMakeup(); }
+      else if((isPresent||isLate)&&wasAbsentOrEarly){ await removeAutoMakeup(); }
       if(isAbsent) toast('❌ '+s.name+' 결석 (보강 계획표 등록)');
-      else if(isEarly) toast('⚠️ '+s.name+' 조퇴 (보강 계획표 등록)');
+      else if(isLate) toast('⏰ '+s.name+' 지각');
       else toast('✅ '+s.name+' 출석');
+      if(isPresent||isLate)_openRep=true;
     }
   } else {
     var cls2=classes.find(function(c){return c.id===s.classId;});
     var _isSpecial=!!makeupId?false:!!(window._currentSessionIsSpecial);
     var _initLevel=_isSpecial?getStudentSpecialLevel(s):getStudentLevel(s);
     var _initEval=getEvalModuleForLevel(_initLevel);
-    var data={studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',teacherTablet:(_dayT.date===todayStr?_dayT.tablet:''),teacherBook:(_dayT.date===todayStr?_dayT.book:''),level:_initLevel,progress:'',absent:isAbsent,earlyLeave:isEarly||false,absentReason:isEarly?'조퇴':'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:_initEval,evalItems:{},praise:[],createdAt:new Date().toISOString()};
+    var data={studentId:studentId,studentName:s.name,classId:s.classId||'',date:todayStr,teacher:currentUser.name||'',teacherTablet:(_dayT.date===todayStr?_dayT.tablet:''),teacherBook:(_dayT.date===todayStr?_dayT.book:''),level:_initLevel,progress:'',absent:isAbsent,earlyLeave:false,late:isLate,absentReason:'',reviewTest:'',attitude:'',dailyQuiz:'',homework:'',comment:'',memo:'',evalModule:_initEval,evalItems:{},praise:[],createdAt:new Date().toISOString()};
     if(makeupId)data.makeupId=makeupId;
     if(window._currentSessionTime)data.sessionTime=window._currentSessionTime;
     var newR=await db.collection('reports').add(data);
     reports.push({id:newR.id,...data});
-    if(isAbsent||isEarly) await createAutoMakeup();
+    if(isAbsent) await createAutoMakeup();
     if(isAbsent){ toast('❌ '+s.name+' 결석 (보강 계획표 등록)'); showAbsentNotifyModal(s); }
-    else if(isEarly) toast('⚠️ '+s.name+' 조퇴 (보강 계획표 등록)');
+    else if(isLate) toast('⏰ '+s.name+' 지각');
     else toast('✅ '+s.name+' 출석');
+    if(isPresent||isLate)_openRep=true;
   }
   renderSchedule();saveCacheDebounced();
+  if(_openRep){try{startReport(studentId,makeupId||'',window._currentSessionTime||'');}catch(e){console.warn(e);}}   // 출석·지각을 누르면 일지 작성 화면이 바로 열림
 }
 
 window._kakaoConfig={};
