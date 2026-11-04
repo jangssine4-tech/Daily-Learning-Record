@@ -83,6 +83,8 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .sttw .tbs{display:flex;gap:8px;margin:0 0 0 6px}
 .tbn{min-height:48px;min-width:92px;padding:0 18px;border-radius:14px;border:2px solid #E4572E;background:#fff;color:#B83A14;font-size:clamp(15px,3.2vw,18px);font-weight:900;letter-spacing:-.02em}
 .tbn.pulse{animation:pulse 1.2s ease-in-out infinite}
+.skb{margin-left:10px;min-height:44px;padding:0 14px;border-radius:12px;border:2px solid #D9D2C3;background:#fff;color:#4A4F5E;font-size:14px;font-weight:800}
+.skb.on{background:#FFF1D6;border-color:#F3C16B;color:#9A5B00}
 .nmod{position:fixed;inset:0;z-index:120;background:rgba(23,32,58,.55);display:flex;align-items:center;justify-content:center;padding:20px}
 .nmod .nbox{background:#fff;border-radius:22px;padding:24px 22px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 48px -16px rgba(0,0,0,.4)}
 .nmod .nt1{font-size:clamp(18px,4vw,22px);font-weight:900;color:#1F2433;margin-bottom:10px;letter-spacing:-.03em}
@@ -689,7 +691,7 @@ function calcJ(){
       if(v==='O'||v==='X'){var on=v==='O';
         if(it.link==='hwPrep')j.hwPrep=on?'준비':'미준비';else if(it.link==='hwBook')j.hwBook=on?'완료':'미완료';else j.hwVideo=on?'제출':'미제출';}
     }
-    else if(it.link==='quiz'&&it.t==='number'&&v!==undefined&&v!=='')j.quiz=String(v);
+    else if(it.link==='quiz'&&it.t==='number'&&v!==undefined&&v!==''&&v!=='skip')j.quiz=String(v);   // '안 봤어요'는 일지에 점수로 넘기지 않아요
     else if(it.link==='dict'&&it.t==='dict'&&v&&v.c!==undefined&&v.c!==''&&v.t!==undefined&&v.t!=='')j.dict=v.c+'/'+v.t;
   });});
   return j;
@@ -877,7 +879,8 @@ function itemHtml(it,si,ii){
   }
   if(it.t==='number'){
     var v=LOG.v[it.id];
-    return '<div class="bi"><span class="lb">'+esc(it.l)+'</span><span class="nu"><input class="nn" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-id="'+esc(it.id)+'" data-si="'+si+'" data-ii="'+ii+'" value="'+(v===undefined?'':esc(v))+'" oninput="numIn(this)" onchange="numIn(this,1)" aria-label="'+esc(it.l)+'">'+esc(it.u||'')+'</span><span class="t">'+tm+'</span></div>';
+    if(it.link==='quiz'&&v==='skip')return '<div class="bi"><span class="lb">'+esc(it.l)+'</span><span class="nu"><button class="skb on" onclick="numSkip(\''+esc(it.id)+'\')">안 봤어요 ✓</button></span><span class="t">'+tm+'</span></div>';
+    return '<div class="bi"><span class="lb">'+esc(it.l)+'</span><span class="nu"><input class="nn" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-id="'+esc(it.id)+'" data-si="'+si+'" data-ii="'+ii+'" value="'+(v===undefined?'':esc(v))+'" oninput="numIn(this)" onchange="numIn(this,1)" aria-label="'+esc(it.l)+'">'+esc(it.u||'')+(it.link==='quiz'?'<button class="skb" onclick="numSkip(\''+esc(it.id)+'\')">안 봤어요</button>':'')+'</span><span class="t">'+tm+'</span></div>';
   }
   if(it.t==='ox'){
     var ov=LOG.v[it.id],hwx=it.link==='hwPrep'||it.link==='hwBook'||it.link==='hwVideo';   // 교재 준비·교재 숙제·영상 숙제 O/X: 시간 없이 O/X를 맨 왼쪽에
@@ -993,13 +996,27 @@ function setOx(si,ii,val){
   var o3={},v3={};_syncEnd(S.secs[si],o3,v3);if(Object.keys(o3).length||Object.keys(v3).length)commit(o3,v3);
   render();
 }
+// 점수를 쓰거나 '안 봤어요'를 누르면 아직 안 눌렀던 '끝'이 자동으로 체크돼요 (시작을 누른 경우)
+function _secOfId(id){for(var a=0;a<S.secs.length;a++){var sc=S.secs[a];for(var b=0;b<sc.items.length;b++){if(sc.items[b].id===id)return sc;}}return null;}
+function _endByScore(id){
+  var sec=_secOfId(id);if(!sec)return;
+  var ts=null,te=null;sec.items.forEach(function(i){if(i.role==='ts')ts=i;if(i.role==='te')te=i;});
+  if(!ts||!te||!LOG.e[ts.id]||LOG.e[te.id])return;
+  var o={},v={};o[te.id]=Date.now();v[te.id]='auto';commit(o,v);
+}
+function numSkip(id){
+  initAudio();
+  if(LOG.v[id]==='skip'){var o0={},v0={};o0[id]=0;v0[id]=null;commit(o0,v0);render();return;}   // 다시 누르면 취소
+  if(_lockedById(id))return;
+  var o={},v={};o[id]=Date.now();v[id]='skip';commit(o,v);_endByScore(id);render();
+}
 function numIn(el,now){
   var id=el.dataset.id,val=el.value.replace(/\D/g,'');el.value=val;
   if(val!==''&&_lockedById(id)){el.value='';return;}
   clearTimeout(saveT[id]);
   var go=function(){
     var eP={};if(val===''){eP[id]=0;commit(eP,(function(){var o={};o[id]=null;return o;})());}
-    else{if(!LOG.e[id])eP[id]=Date.now();var o2={};o2[id]=Number(val);commit(eP,o2);}
+    else{if(!LOG.e[id])eP[id]=Date.now();var o2={};o2[id]=Number(val);commit(eP,o2);_endByScore(id);}
   };
   if(now){go();try{el.blur();}catch(e){}setTimeout(render,250);}else saveT[id]=setTimeout(go,500);   // 입력을 마치면 화면을 다시 그려요 (Quiz 100점이면 오답 항목 숨김)
 }
