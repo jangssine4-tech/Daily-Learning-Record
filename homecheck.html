@@ -105,6 +105,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 var $=function(i){return document.getElementById(i);};
 var db=null,S=null,R=null,LOG={e:{}},pin='',busy=false,unsubR=null,unsubL=null,logKey='',saveT=null,pendingE=null;
@@ -125,6 +126,8 @@ async function boot(){
   if(!cfg||!cfg.apiKey||!cfg.projectId){show('sSetup');return;}
   try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
   db=firebase.firestore();
+  /* 익명 로그인: 학생은 아무것도 입력하지 않아요. 실패해도 홈체크는 계속 동작해요 */
+  try{if(firebase.auth){var A=firebase.auth();var cu=await new Promise(function(r){var un=A.onAuthStateChanged(function(u){un();r(u);});});if(!cu)await A.signInAnonymously();}}catch(e){console.warn('[auth] 익명 로그인 실패',e);}
   buildPad();paintDots();
   var sid=null;try{sid=localStorage.getItem('hc_sid');}catch(e){}
   if(sid)resume(sid);else show('sLogin');
