@@ -1860,7 +1860,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1105-j';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1105-k';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -5644,9 +5644,16 @@ function _wlPaint(){
         rows+='<div class="wl-call'+k+'"><span>'+_bcEsc(it.l)+'</span><small>'+tx+'</small></div>';
       }
     });
+    var _done=items.length>0&&items.every(function(it){
+      if(it.t==='check')return !!e[it.id];
+      if(it.t==='number'){var nv0=v[it.id];return nv0!==undefined&&nv0!==null&&nv0!=='';}
+      if(it.t==='ox'){var o0=v[it.id];return o0==='O'||o0==='X';}
+      if(it.t==='dict'){var d0=v[it.id]||{};return d0.c!==undefined&&d0.c!==''&&d0.t!==undefined&&d0.t!=='';}
+      var c0=_wl.checks[it.l];return !!(c0&&c0.status&&c0.status!=='none');   // 검사 받기: 눌렀으면 학생 몫은 끝
+    });
     var _sk=!!(L.sk&&L.sk[String(sec.title||'').trim()]),_tk=encodeURIComponent(String(sec.title||'').trim());
     var _skb='<button class="btn btn-outline btn-xs" style="float:right;font-size:11px;padding:1px 8px;'+(_sk?'background:#fef3c7;border-color:#f59e0b;color:#92400e':'')+'" onclick="event.stopPropagation();_wlSkip(\''+_tk+'\','+(_sk?'false':'true')+')" title="오늘 하지 않는 구역을 학생 체크콜에서 통과 처리해요">'+(_sk?'선생님 완료 · 취소':'완료 처리')+'</button>';
-    h+='<div class="wl-sec"><div class="wl-sh">'+_bcEsc(sec.title||'')+_skb+'</div>'+rows+'</div>';
+    h+='<div class="wl-sec'+(_sk?' skip':(_done?' ok':''))+'"><div class="wl-sh">'+_bcEsc(sec.title||'')+(_done&&!_sk?' <span style="font-weight:700;color:#0f766e">· 완료</span>':'')+_skb+'</div>'+rows+'</div>';
   });
   var tl=L.tl||[],sm=0,bk=0,smN=0,bkN=0,openT=false;
   tl.forEach(function(x){
@@ -5677,7 +5684,7 @@ function _wlPaint(){
 (function(){
   var st=document.createElement('style');
   st.textContent='.wl-head{font-size:13px;color:var(--navy);margin-bottom:6px}.wl-meta{font-size:11px;color:var(--txt2);background:var(--surface2);border-radius:8px;padding:6px 8px;margin-bottom:8px;line-height:1.5}'
-  +'.wl-sec{border:1px solid var(--border,#e5e7eb);border-radius:10px;padding:2px 10px 4px;margin-bottom:8px;background:var(--surface)}.wl-sh{font-weight:800;font-size:12px;color:var(--navy);padding:7px 0 3px}'
+  +'.wl-sec.ok{background:#ecfdf5!important;border-color:#6ee7b7!important}.wl-sec.skip{background:#fffbeb!important;border-color:#fcd34d!important}.wl-sec{border:1px solid var(--border,#e5e7eb);border-radius:10px;padding:2px 10px 4px;margin-bottom:8px;background:var(--surface)}.wl-sh{font-weight:800;font-size:12px;color:var(--navy);padding:7px 0 3px}'
   +'.wl-row{display:flex;align-items:center;gap:8px;min-height:28px;border-top:1px solid var(--surface2);font-size:12px;color:var(--txt2)}.wl-row.on{color:var(--txt)}'
   +'.wl-dot{width:16px;height:16px;border-radius:5px;border:1.5px solid #9aa3b5;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:900}.wl-dot.on{background:#0f766e;border-color:#0f766e}'
   +'.wl-lb{flex:1;min-width:0}.wl-t,.wl-val{margin-left:auto;font-size:11px;color:var(--txt3);white-space:nowrap;font-variant-numeric:tabular-nums}.wl-val.on{color:var(--navy);font-weight:800;font-size:12px}'
