@@ -4236,7 +4236,7 @@ function _ccInfo(e){
 }
 function _hcInfo(e){
   if(e)e.stopPropagation();
-  _ccBubble(e.currentTarget,'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">🏠 홈체크 Homework Plan</div>학생이 집에서 폰으로 체크하는 <b>Homework Plan</b>입니다. 학생에게는 <b>가장 최근 수업 일지의 단계·진도</b>에 맞는 숙제가 나옵니다. <b>레슨별 계획표</b>는 레슨 하나씩, <b>전체 계획표</b>는 모든 레슨을 한 표로 보며 고칩니다. 항목의 <b>일지 연동</b>을 고르면 학생이 체크한 결과가 학습 일지의 교재·영상 숙제 칸에 자동으로 들어옵니다. <b>일지 연동 · 사진 숙제</b>로 정한 항목은 학생이 <b>사진을 올려야 체크</b>되고, 항목당 최대 5장까지 올릴 수 있습니다.','hcinfo',380);
+  _ccBubble(e.currentTarget,'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">🏠 홈체크 Homework Plan</div>학생이 집에서 폰으로 체크하는 <b>Homework Plan</b>입니다. 학생에게는 <b>가장 최근 수업 일지의 단계·진도</b>에 맞는 숙제가 나옵니다. <b>레슨별 계획표</b>는 레슨 하나씩, <b>전체 계획표</b>는 모든 레슨을 한 표로 보며 고칩니다. 항목의 <b>일지 연동</b>을 고르면 학생이 체크한 결과가 학습 일지의 교재·영상 숙제 칸에 자동으로 들어옵니다.','hcinfo',380);
 }
 function _ccHelp(){
   var h=document.getElementById('ccp-help');if(!h)return;
@@ -5594,6 +5594,15 @@ function _wlShow(sid){
   }catch(e){console.warn(e);}
   _wlPaint();
 }
+// 오늘 하지 않는 구역을 선생님이 완료 처리 → 학생 체크콜에서 통과로 인식 (checkLogs.sk)
+function _wlSkip(enc,on){
+  if(!db||!_wl.sid)return;var t=decodeURIComponent(enc),o={};
+  o[t]=on?Date.now():firebase.firestore.FieldValue.delete();
+  var u={date:_wl.date,studentId:_wl.sid,sk:o};if(_wl.sess===2)u.sess=2;
+  db.collection('checkLogs').doc(_ccDocId(_wl.date,_wl.sid,_wl.sess)).set(u,{merge:true})
+    .then(function(){toast(on?'"'+t+'" 구역을 완료 처리했어요':'완료 처리를 취소했어요');})
+    .catch(function(e){console.warn(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
+}
 function _wlHM(ms){if(!ms)return '';var d=new Date(ms),p=function(n){return String(n).padStart(2,'0');};return p(d.getHours())+':'+p(d.getMinutes());}
 function _wlPaint(){
   var el=$('write-live-content');if(!el||!_wl.sid)return;
@@ -5635,7 +5644,9 @@ function _wlPaint(){
         rows+='<div class="wl-call'+k+'"><span>'+_bcEsc(it.l)+'</span><small>'+tx+'</small></div>';
       }
     });
-    h+='<div class="wl-sec"><div class="wl-sh">'+_bcEsc(sec.title||'')+'</div>'+rows+'</div>';
+    var _sk=!!(L.sk&&L.sk[String(sec.title||'').trim()]),_tk=encodeURIComponent(String(sec.title||'').trim());
+    var _skb='<button class="btn btn-outline btn-xs" style="float:right;font-size:11px;padding:1px 8px;'+(_sk?'background:#fef3c7;border-color:#f59e0b;color:#92400e':'')+'" onclick="event.stopPropagation();_wlSkip(\''+_tk+'\','+(_sk?'false':'true')+')" title="오늘 하지 않는 구역을 학생 체크콜에서 통과 처리해요">'+(_sk?'선생님 완료 · 취소':'완료 처리')+'</button>';
+    h+='<div class="wl-sec"><div class="wl-sh">'+_bcEsc(sec.title||'')+_skb+'</div>'+rows+'</div>';
   });
   var tl=L.tl||[],sm=0,bk=0,smN=0,bkN=0,openT=false;
   tl.forEach(function(x){
