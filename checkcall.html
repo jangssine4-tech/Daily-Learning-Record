@@ -79,6 +79,13 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(228,87,46,.55)}50%{box-shadow:0 0 0 8px rgba(228,87,46,0)}}
 .now{margin:0 4px 2px;font-size:15px;font-weight:700;color:#E4572E}
 .sttw{display:flex;align-items:baseline;justify-content:space-between;gap:6px 14px;flex-wrap:wrap;margin:0 4px 14px}.sttw .stt{margin:0}
+.sttw .tbs{display:flex;gap:8px;margin-left:auto}
+.tbn{min-height:48px;min-width:92px;padding:0 18px;border-radius:14px;border:2px solid #E4572E;background:#fff;color:#B83A14;font-size:clamp(15px,3.2vw,18px);font-weight:900;letter-spacing:-.02em}
+.tbn.pulse{animation:pulse 1.2s ease-in-out infinite}
+.tbn.on{background:#0F766E;border-color:#0F766E;color:#fff}
+.tbn.end{border-color:#0F766E;color:#0F766E}
+.tbn.end.on{color:#fff}
+.tbn.dis{border-color:#D9D2C3;color:#A3A7B3;background:#F2EEE4}
 .tmr{font-size:clamp(13px,3.3vw,16px);font-weight:800;color:#0F766E;background:#E3F6F1;border-radius:999px;padding:4px 12px;white-space:nowrap}.tmr.run{background:#FFF1D6;color:#9A5B00}
 .stt{margin:0 4px 14px;font-size:clamp(21px,4.4vw,27px);font-weight:900;color:#1F2433;letter-spacing:-.04em}
 .bi{display:flex;align-items:center;gap:14px;min-height:clamp(56px,10.5vw,68px);background:#fff;border-radius:18px;padding:0 clamp(14px,3vw,22px);margin-bottom:10px;font-size:clamp(15px,3.1vw,19px);font-weight:700;color:#1F2433;letter-spacing:-.02em}
@@ -615,7 +622,7 @@ function itemDone(it){
   return false;
 }
 function secProg(sec){
-  var cnt=sec.items.filter(function(i){return i.t==='check'||i.t==='call';});
+  var cnt=sec.items.filter(function(i){return !i.role&&(i.t==='check'||i.t==='call');});   // 시작·끝은 제목 옆 버튼이라 세지 않아요
   if(!cnt.length)cnt=sec.items;
   return {d:cnt.filter(itemDone).length,n:cnt.length};
 }
@@ -680,8 +687,15 @@ function render(){
   // 항목
   var sec=S.secs[curSec],h='';
   if(sec){
-    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="sttw"><div class="stt">'+esc(sec.title)+'</div><div class="tmr" id="tmr" style="display:none"></div></div>';
-    sec.items.forEach(function(it,ii){h+=itemHtml(it,curSec,ii);});
+    var _ti=-1,_ei=-1;sec.items.forEach(function(it,ii){if(it.role==='ts')_ti=ii;if(it.role==='te')_ei=ii;});
+    var _tb='';
+    if(_ti>=0&&_ei>=0){
+      var _son=!!LOG.e[sec.items[_ti].id],_eon=!!LOG.e[sec.items[_ei].id];
+      _tb='<div class="tbs"><button class="tbn'+(_son?' on':' pulse')+'" onclick="toggle('+curSec+','+_ti+')" aria-label="시작'+(_son?' 완료':'')+'">'+(_son?'✓ 시작':'▶ 시작')+'</button>'
+        +'<button class="tbn end'+(_eon?' on':'')+(!_son&&!_eon?' dis':'')+'" onclick="toggle('+curSec+','+_ei+')" aria-label="끝'+(_eon?' 완료':'')+'">'+(_eon?'✓ 끝':'■ 끝')+'</button></div>';
+    }
+    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="sttw"><div class="stt">'+esc(sec.title)+'</div><div class="tmr" id="tmr" style="display:none"></div>'+_tb+'</div>';
+    sec.items.forEach(function(it,ii){if(it.role)return;h+=itemHtml(it,curSec,ii);});
   }
   $('list').innerHTML=h;
   $('hint').textContent=S.secs.length?'':'오늘 점검할 항목이 아직 없어요. 선생님께 말씀드려 주세요.';
@@ -883,17 +897,34 @@ function goSec(i){curSec=i;render();var l=$('list');if(l)window.scrollTo({top:0,
 document.addEventListener('focusout',function(e){if(e.target&&e.target.tagName==='INPUT'&&S){setTimeout(render,80);}});
 
 /* ── 입력 ── */
+// 구역 항목을 모두 체크하면 그 시각을 '끝'으로 기록해요 (직접 누른 끝이 있으면 그대로 두고, 체크를 풀면 자동 끝은 지워요)
+function _syncEnd(sec,o,vP){
+  if(!sec)return;
+  var ts=null,te=null,te_ix=-1;sec.items.forEach(function(i,ix){if(i.role==='ts')ts=i;if(i.role==='te'){te=i;te_ix=ix;}});
+  if(!ts||!te)return;
+  var pre=sec.items.filter(function(i,ix){return ix<te_ix&&!i.role;});
+  var all=pre.length>0&&pre.every(itemDone);
+  var teOn=!!LOG.e[te.id],auto=LOG.v[te.id]==='auto';
+  if(all&&LOG.e[ts.id]&&!teOn){o[te.id]=Date.now();vP[te.id]='auto';}
+  else if(!all&&teOn&&auto){o[te.id]=0;vP[te.id]=null;}
+}
 function toggle(si,ii){
   initAudio();var sec=S.secs[si],it=sec.items[ii],o={};
   if(it.role==='te'&&!LOG.e[it.id]){var st0=sec.items.filter(function(i){return i.role==='ts';})[0];if(st0&&!LOG.e[st0.id]){toast('먼저 "시작"을 눌러 주세요');return;}}
   if(it.role==='ts'&&LOG.e[it.id]){var en0=sec.items.filter(function(i){return i.role==='te';})[0];if(en0&&LOG.e[en0.id])o[en0.id]=0;}
-  o[it.id]=LOG.e[it.id]?0:Date.now();commit(o,null);render();
+  o[it.id]=LOG.e[it.id]?0:Date.now();
+  if(it.role==='te'){var vp0={};vp0[it.id]=null;commit(o,vp0);render();return;}   // 직접 누른 끝은 자동 표시를 지워요
+  commit(o,null);
+  var o2={},v2={};_syncEnd(sec,o2,v2);if(Object.keys(o2).length||Object.keys(v2).length)commit(o2,v2);
+  render();
 }
 function setOx(si,ii,val){
   initAudio();var it=S.secs[si].items[ii],id=it.id,eP={},vP={};
   if(LOG.v[id]===val){eP[id]=0;vP[id]=null;}   // 같은 걸 다시 누르면 선택 취소
   else{if(!LOG.e[id])eP[id]=Date.now();vP[id]=val;}
-  commit(eP,vP);render();
+  commit(eP,vP);
+  var o3={},v3={};_syncEnd(S.secs[si],o3,v3);if(Object.keys(o3).length||Object.keys(v3).length)commit(o3,v3);
+  render();
 }
 function numIn(el,now){
   var id=el.dataset.id,val=el.value.replace(/\D/g,'');el.value=val;
