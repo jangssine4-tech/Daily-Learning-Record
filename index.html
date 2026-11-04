@@ -1860,7 +1860,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1105-e';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1105-h';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -25633,7 +25633,7 @@ if(document.readyState==='loading'){
 </div>
 
 <div class="view" id="view-teacher-resources">
-  <div class="page-top"><h2>📁 교사 자료실</h2></div>
+  <div class="page-top"><h2>📁 교사 자료실<button type="button" onclick="event.stopPropagation();_showHelp(this,'trfiles')" style="width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--txt2);font-size:11px;font-weight:800;cursor:pointer;line-height:1;vertical-align:middle;margin-left:6px" aria-label="업로드 안내">?</button></h2></div>
   <div id="tr-root" style="padding:0 4px"></div>
 </div>
 
@@ -25829,6 +25829,8 @@ function trRender(){
       var _previewable3=['pdf','jpg','jpeg','png','txt'].indexOf(_ext3)>=0;
       if(_previewable3){
         h+='<button onclick="trPreview(\''+f.id+'\')" style="background:#0369a1;border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">미리보기</button>';
+            }else{
+        h+='<button onclick="trDownload(\''+f.id+'\')" style="background:#475569;border:none;color:#fff;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">내려받기</button>';
       }
 
       h+='<button onclick="trDelete(\''+f.id+'\')" title="삭제" style="background:none;border:1px solid var(--border);color:var(--txt3);border-radius:4px;padding:2px 5px;cursor:pointer;font-size:12px">×</button>';
@@ -26067,6 +26069,14 @@ function trUploadOne(file,folderId){
   });
 }
 
+function trDownload(fileId){
+  var f=_trFiles.find(function(x){return x.id===fileId;});
+  if(!f)return;
+  function go(url){var a=document.createElement('a');a.href=url;a.download=f.name||'';a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();}
+  if(f.url){go(f.url);}
+  else if(_trStorage&&f.path){_trStorage.ref(f.path).getDownloadURL().then(go).catch(function(e){toast('내려받기 실패: '+e.message);});}
+  else{toast('내려받을 수 없습니다.');}
+}
 function trPreview(fileId){
   var f=_trFiles.find(function(x){return x.id===fileId;});
   if(!f)return;
@@ -27893,6 +27903,7 @@ function _hiddenUsersRow(){
    +hid.map(function(u){return '<span style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:4px 8px">'+dgEsc(u.name||'')+' <span style="color:var(--txt3)">'+dgEsc(u.loginId||'')+'</span> <button class="btn btn-outline btn-xs" onclick="restoreAdminUser(\''+u.id+'\')">복구</button> <button class="btn btn-outline btn-xs" style="border-color:#dc2626;color:#dc2626" onclick="purgeAdminUser(\''+u.id+'\')">완전 삭제</button></span>';}).join('')+'</div></td></tr>';
 }
 var _helpTxt={
+ trfiles:['📎 파일 업로드 안내','<b>PDF 파일로 올려 주세요.</b> PDF만 [미리보기]와 인쇄가 가능합니다.<br>한글(hwp)·워드 등 다른 형식은 [내려받기]만 되고 미리보기와 인쇄가 되지 않으니, PDF로 저장해서 올려 주시기 바랍니다.'],
  retire:['🚪 퇴사 처리','퇴사일을 정하면 재직 명단에서 빠지고 [퇴사] 탭으로 이동합니다.<br>급여(회계 &gt; 강사)에는 퇴사일이 속한 달까지 계속 보이고, 퇴사일 다음 날부터는 근무시간이 0시간으로 계산됩니다.<br>기록은 지워지지 않습니다. 잘못 눌렀다면 퇴사 탭에서 [재직 복귀]로 되돌릴 수 있습니다.'],
  purge:['🗑 삭제 (영구 삭제)','계정이 완전히 지워지며, 근무 시간표와 시급 설정도 함께 사라집니다. 되돌릴 수 없으므로 다음의 경우에만 사용해 주시기 바랍니다.<ol style="margin:4px 0 6px 16px;padding:0"><li>같은 아이디가 중복 등록된 경우</li><li>잘못 만든 계정인 경우</li><li>급여 자료의 보관기간이 지나 삭제할 필요가 있는 경우</li></ol>삭제 전에 필요한 급여 자료는 [이미지 저장]으로 보관하시기 바랍니다.<br>이미 작성된 보고서 등의 기록은 이름이 남아 있어 그대로 보입니다.'],
  notify:['📱 학부모 안내','보강 계획표에서 직접 등록한 결석(예: 가족 여행 등 미리 알려 온 기간 결석)이나, 보강 일정이 확정된 뒤 학부모에게 다시 안내할 때 사용합니다.<br>안내 메시지에는 학부모가 보강 시간을 고를 수 있는 전용 링크가 들어갑니다.'],

@@ -231,7 +231,6 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 var $=function(i){return document.getElementById(i);};
 var db=null;
@@ -406,52 +405,13 @@ function toast(m){var t=$('toast');t.textContent=m;t.classList.add('on');clearTi
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function ico(id){return '<svg><use href="#i-'+id+'"/></svg>';}
 
-/* ── 학원 계정 로그인 (Firebase Auth) ── */
-var _AUTH_MSG={'auth/invalid-credential':'이메일 또는 비밀번호가 맞지 않아요','auth/wrong-password':'이메일 또는 비밀번호가 맞지 않아요','auth/user-not-found':'이메일 또는 비밀번호가 맞지 않아요','auth/invalid-email':'이메일 형식이 아니에요','auth/too-many-requests':'시도가 너무 많아요. 잠시 후 다시 해 주세요','auth/network-request-failed':'인터넷 연결을 확인해 주세요','auth/operation-not-allowed':'이메일 로그인이 꺼져 있어요 (Firebase 콘솔 확인)'};
-function _authGate(done){
-  var A=null;try{A=firebase.auth();}catch(e){}
-  if(!A){console.warn('[auth] SDK 없음 - 로그인 없이 진행');done();return;}
-  var fin=false;
-  A.onAuthStateChanged(function(u){
-    if(fin)return;
-    if(u&&!u.isAnonymous){fin=true;var o=document.getElementById('acad-auth');if(o)o.remove();done();}
-    else _authShow(A);
-  });
-}
-function _authShow(A){
-  var o=document.getElementById('acad-auth');
-  if(o){o.style.display='flex';return;}
-  var inp='display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:13px;border:1px solid #d8e0e8;border-radius:12px;font-size:16px;font-family:inherit';
-  o=document.createElement('div');o.id='acad-auth';
-  o.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:100000;background:#0f1a35;display:flex;align-items:center;justify-content:center;padding:20px;font-family:inherit';
-  o.innerHTML='<form id="acad-auth-f" style="background:#fff;border-radius:20px;padding:28px 24px;width:100%;max-width:360px;box-shadow:0 20px 50px rgba(0,0,0,.35);text-align:center;color:#14302b">'
-   +'<div style="font-size:21px;font-weight:800;margin-bottom:4px">학원 계정 로그인</div>'
-   +'<div style="font-size:13px;color:#64748b;margin-bottom:14px">이 기기에서 처음 한 번만 입력해요</div>'
-   +'<input id="acad-auth-e" type="email" autocomplete="username" placeholder="이메일" style="'+inp+'">'
-   +'<input id="acad-auth-p" type="password" autocomplete="current-password" placeholder="비밀번호" style="'+inp+'">'
-   +'<div id="acad-auth-m" style="min-height:20px;color:#e5484d;font-size:13px;font-weight:700;margin:6px 0"></div>'
-   +'<button id="acad-auth-b" type="submit" style="width:100%;padding:14px;border:none;border-radius:12px;background:#0f5c4d;color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit">로그인</button></form>';
-  document.body.appendChild(o);
-  var em=document.getElementById('acad-auth-e'),pw=document.getElementById('acad-auth-p'),ms=document.getElementById('acad-auth-m'),bt=document.getElementById('acad-auth-b');
-  try{em.value=localStorage.getItem('acad_auth_email')||'';}catch(e){}
-  document.getElementById('acad-auth-f').onsubmit=function(ev){
-    ev.preventDefault();var e=em.value.trim(),p=pw.value;
-    if(!e||!p){ms.textContent='이메일과 비밀번호를 입력하세요';return;}
-    ms.textContent='';bt.disabled=true;bt.textContent='확인 중…';
-    A.signInWithEmailAndPassword(e,p).then(function(){try{localStorage.setItem('acad_auth_email',e);}catch(_){}})
-     .catch(function(er){ms.textContent=_AUTH_MSG[er.code]||('로그인 실패: '+(er.code||er.message));bt.disabled=false;bt.textContent='로그인';});
-  };
-  setTimeout(function(){(em.value?pw:em).focus();},50);
-}
-function acadSignOut(){try{firebase.auth().signOut().then(function(){location.reload();});}catch(e){}}
-
 /* ── 시작 ── */
 function loadScript(u){return new Promise(function(res,rej){var s=document.createElement('script');s.src=u;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
 async function ensureFirebase(){
   if(window.firebase&&firebase.firestore)return true;
   var bases=['https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/','https://cdn.jsdelivr.net/npm/firebase@10.12.2/'];
   for(var i=0;i<bases.length;i++){
-    try{await loadScript(bases[i]+'firebase-app-compat.js');await loadScript(bases[i]+'firebase-firestore-compat.js');try{await loadScript(bases[i]+'firebase-auth-compat.js');}catch(_){}if(window.firebase&&firebase.firestore)return true;}catch(e){}
+    try{await loadScript(bases[i]+'firebase-app-compat.js');await loadScript(bases[i]+'firebase-firestore-compat.js');if(window.firebase&&firebase.firestore)return true;}catch(e){}
   }
   return false;
 }
@@ -467,7 +427,6 @@ async function boot(){
   if(!cfg||!cfg.apiKey||!cfg.projectId){show('sSetup');return;}
   try{firebase.app();}catch(e){firebase.initializeApp(cfg);}
   db=firebase.firestore();
-  await new Promise(function(r){_authGate(r);});
   buildPad();paintDots();
   var sid=null;try{sid=localStorage.getItem('cc_sid');}catch(e){}
   if(sid){resume(sid);}else{show('sLogin');}
@@ -719,6 +678,16 @@ function applySecs(){
   });
   secs=secs.filter(function(s){return s.items.length;});
   _addTimers(secs);
+  // 퀴즈 점수 칸은 '끝' 바로 아래에 둬요 (시작 → 문제 풀이 → 끝 → 점수)
+  secs.forEach(function(sec){
+    var ei=-1;sec.items.forEach(function(i,ix){if(ei<0&&i.role==='te')ei=ix;});
+    if(ei<0)return;
+    var sc=sec.items.filter(function(i){return i.t==='number'&&(i.link==='quiz'||/quiz|퀴즈/i.test(String(i.l||'')));});
+    if(!sc.length)return;
+    sec.items=sec.items.filter(function(i){return sc.indexOf(i)<0;});
+    var at=-1;sec.items.forEach(function(i,ix){if(at<0&&i.role==='te')at=ix;});
+    sec.items.splice.apply(sec.items,[at+1,0].concat(sc));
+  });
   _aliasIds(secs);
   var _isQz=function(i){return i.t==='number'&&(i.link==='quiz'||/quiz|퀴즈/i.test(String(i.l||'')));};
   // Quiz 100점이면 오답 관련 항목(오답 노트·오답 검사 받기·오답 다시 풀기)은 자동으로 사라져요
