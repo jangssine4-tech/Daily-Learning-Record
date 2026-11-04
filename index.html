@@ -326,6 +326,7 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .ccx-sec input{flex:1;min-width:0;border:0;background:transparent;font-weight:800;font-size:12px;padding:3px 2px}
 .ccx-sec small{font-weight:600;opacity:.75;white-space:nowrap}
 .ccx-sec .mini{border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer;color:inherit}
+.hc-ov-up{box-shadow:inset 0 3px 0 #2563eb}.hc-ov-dn{box-shadow:inset 0 -3px 0 #2563eb}tr.hc-ov-up>td{box-shadow:inset 0 3px 0 #2563eb}tr.hc-ov-dn>td{box-shadow:inset 0 -3px 0 #2563eb}.hc-grip{cursor:grab;user-select:none;font-size:15px;line-height:1;padding:0 3px;opacity:.75}
 .ccx-row{border-bottom:1px solid var(--border)}
 .ccx-line{display:flex;gap:8px;align-items:center;padding:5px 2px}
 .ccx-tg{flex:0 0 auto;width:34px;height:30px;border-radius:7px;border:1.5px solid #10b981;background:#ecfdf5;color:#065f46;font-size:16px;cursor:pointer}
@@ -28102,7 +28103,8 @@ function _hcLessonHtml(p){
   if(!secs.length)h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨에는 숙제 항목이 없습니다. 아래 "＋ 구역 추가"로 만들어 주세요.</div>';
   secs.forEach(function(sec,si){
     var gc=_CCG_COL[si%_CCG_COL.length];
-    h+='<div style="margin-top:12px"><div class="ccx-sec" style="background:'+gc[0]+';color:'+gc[1]+'">'
+    h+='<div style="margin-top:12px" ondragover="_hcDgOver(event,\'sec\','+si+',-1)" ondragleave="_hcDgClear()" ondrop="_hcDgDrop(event,\'sec\','+si+',-1)"><div class="ccx-sec" style="background:'+gc[0]+';color:'+gc[1]+'">'
+      +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'sec\','+si+',-1)" ondragend="_hcDgEnd()" title="끌어서 구역 순서 변경">⠿</span>'
       +(sec.grp?'<small>'+_bcEsc(sec.grp)+'</small>':'')
       +'<input value="'+_bcEsc(sec.title)+'" oninput="_hcSet(\'title\','+si+',0,this.value)" placeholder="구역 이름">'
       +'<input value="'+_bcEsc(sec.sub||'')+'" oninput="_hcSet(\'sub\','+si+',0,this.value)" placeholder="부제(선택)" style="max-width:150px;font-weight:600">'
@@ -28110,7 +28112,8 @@ function _hcLessonHtml(p){
       +'<button class="mini" onclick="_hcItApplyOpen('+si+',-1)">적용</button><button class="mini" onclick="_hcOp(\'add\','+si+')">＋ 항목 추가</button><button class="mini" onclick="_hcOp(\'secdel\','+si+')">구역 삭제</button></div>';
     sec.items.forEach(function(it,ii){
       var d=si+','+ii;
-      h+='<div class="ccx-row"><div class="ccx-line">'
+      h+='<div class="ccx-row" ondragover="_hcDgOver(event,\'it\','+si+','+ii+')" ondragleave="_hcDgClear()" ondrop="_hcDgDrop(event,\'it\','+si+','+ii+')"><div class="ccx-line">'
+        +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'it\','+si+','+ii+')" ondragend="_hcDgEnd()" title="끌어서 항목 순서 변경">⠿</span>'
         +'<input class="ccx-nm" value="'+_bcEsc(it.l)+'" oninput="_hcSet(\'l\','+d+',this.value)" placeholder="항목 이름">'
         +'<input value="'+_bcEsc(it.hint||'')+'" oninput="_hcSet(\'hint\','+d+',this.value)" placeholder="안내(선택)" style="width:120px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px">'
         +_hcLinkSel(it.link,'_hcSet(\'link\','+d+',this.value)')
@@ -28166,12 +28169,14 @@ function _hcGridHtml(p){
   var ncol=ls.length+2;
   rows.forEach(function(S,si){
     var gc=_CCG_COL[si%_CCG_COL.length];
-    h+='<tr><td colspan="'+ncol+'" style="background:'+gc[0]+';color:'+gc[1]+';padding:4px 8px;border-top:2px solid '+gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;position:sticky;left:6px">'
+    h+='<tr ondragover="_hcDgOver(event,\'gsec\','+si+',-1)" ondragleave="_hcDgClear()" ondrop="_hcDgDrop(event,\'gsec\','+si+',-1)"><td colspan="'+ncol+'" style="background:'+gc[0]+';color:'+gc[1]+';padding:4px 8px;border-top:2px solid '+gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;position:sticky;left:6px">'
+      +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'gsec\','+si+',-1)" ondragend="_hcDgEnd()" title="끌어서 구역 순서 변경">⠿</span>'
       +'<input value="'+_bcEsc(S.title)+'" onchange="_hcSecRename('+si+',this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px">'
       +'<button style="'+cs[0]+'" onclick="_hcSecMove('+si+',-1)">▲</button><button style="'+cs[0]+'" onclick="_hcSecMove('+si+',1)">▼</button>'
       +'<button style="'+cs[0]+'" onclick="_hcRowAdd('+si+')">＋ 항목 추가</button><button style="'+cs[0]+'" onclick="_hcSecDel('+si+')">구역 삭제</button></div></td></tr>';
     S.items.forEach(function(R,ri){
-      h+='<tr><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="display:flex;gap:4px;align-items:center">'
+      h+='<tr ondragover="_hcDgOver(event,\'grow\','+si+','+ri+')" ondragleave="_hcDgClear()" ondrop="_hcDgDrop(event,\'grow\','+si+','+ri+')"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="display:flex;gap:4px;align-items:center">'
+        +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'grow\','+si+','+ri+')" ondragend="_hcDgEnd()" title="끌어서 항목 순서 변경 (같은 구역 안)">⠿</span>'
         +'<input class="fi" value="'+_bcEsc(R.l)+'" onchange="_hcRowSet('+si+','+ri+',\'l\',this.value)" style="padding:3px 5px;font-size:11px;flex:1;min-width:130px">'
         +_hcLinkSel(R.link,'_hcRowSet('+si+','+ri+',\'link\',this.value)',118).replace('<select','<select style="font-size:10px;width:118px"').replace('style="width:118px"','')
         +'<button class="bc-b" onclick="_hcRowMove('+si+','+ri+',-1)" title="위로">▲</button><button class="bc-b" onclick="_hcRowMove('+si+','+ri+',1)" title="아래로">▼</button></div></td>';
@@ -28227,6 +28232,46 @@ function _hcRowMove(si,ri,d){
   var x=S.items[ri];S.items[ri]=S.items[j];S.items[j]=x;
   p.secOrder=rows.map(function(s){return s.title;});p.rowOrder=p.rowOrder||{};rows.forEach(function(s){p.rowOrder[s.title]=s.items.map(function(z){return z.l;});});
   _hcSortAll(p,'items',ttl);_hcMark();_hcDraw();
+}
+// ── 끌어서 순서 바꾸기 (구역 · 항목) ──
+var _hcDr=null;
+function _hcDgStart(e,kind,a,b){
+  _hcDr={k:kind,a:a,b:b};
+  try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','hc');var row=e.target.closest('.ccx-row,.ccx-sec,tr');if(row&&e.dataTransfer.setDragImage)e.dataTransfer.setDragImage(row,12,12);}catch(x){}
+}
+function _hcDgClear(){Array.prototype.forEach.call(document.querySelectorAll('.hc-ov-up,.hc-ov-dn'),function(n){n.classList.remove('hc-ov-up','hc-ov-dn');});}
+function _hcDgEnd(){_hcDr=null;_hcDgClear();}
+function _hcDgOver(e,kind,a,b){
+  if(!_hcDr||_hcDr.k!==kind)return;
+  if((kind==='it'||kind==='grow')&&_hcDr.a!==a)return;   // 항목은 같은 구역 안에서만
+  e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(x){}
+  var sec=(kind==='sec'||kind==='gsec'),from=sec?_hcDr.a:_hcDr.b,to=sec?a:b;
+  _hcDgClear();if(from!==to)e.currentTarget.classList.add(from<to?'hc-ov-dn':'hc-ov-up');
+}
+function _hcDgDrop(e,kind,a,b){
+  if(!_hcDr||_hcDr.k!==kind)return;
+  if((kind==='it'||kind==='grow')&&_hcDr.a!==a)return;
+  e.preventDefault();e.stopPropagation();
+  var d=_hcDr;_hcDr=null;_hcDgClear();
+  if(kind==='sec')_hcLsMove('sec',0,d.a,a);
+  else if(kind==='it')_hcLsMove('it',a,d.b,b);
+  else if(kind==='gsec')_hcGridMove('gsec',0,d.a,a);
+  else _hcGridMove('grow',a,d.b,b);
+}
+function _hcLsMove(kind,si,from,to){   // 레슨별 계획표: 이 레슨의 구역/항목 순서
+  if(from===to)return;var secs=_hcSecs();
+  if(kind==='sec'){if(!secs[from])return;secs.splice(to,0,secs.splice(from,1)[0]);}
+  else{var sec=secs[si];if(!sec||!sec.items[from])return;sec.items.splice(to,0,sec.items.splice(from,1)[0]);}
+  _hcMark();_hcDraw();
+}
+function _hcGridMove(kind,si,from,to){   // 전체 계획표: 모든 레슨의 구역/항목 순서
+  if(from===to)return;
+  var p=_hcWork(),rows=_hcRows(p);
+  if(kind==='gsec'){if(!rows[from])return;rows.splice(to,0,rows.splice(from,1)[0]);}
+  else{var S=rows[si];if(!S||!S.items[from])return;S.items.splice(to,0,S.items.splice(from,1)[0]);}
+  p.secOrder=rows.map(function(s){return s.title;});p.rowOrder=p.rowOrder||{};rows.forEach(function(s){p.rowOrder[s.title]=s.items.map(function(z){return z.l;});});
+  if(kind==='gsec')_hcSortAll(p,'secs');else _hcSortAll(p,'items',rows[si].title);
+  _hcMark();_hcDraw();
 }
 function _hcSecMove(si,d){
   var p=_hcWork(),rows=_hcRows(p),j=si+d;if(j<0||j>=rows.length)return;
