@@ -610,6 +610,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   </div></div>
   <!-- 오른쪽: 최근 2주 학습 흐름 패널 -->
   <div id="write-flow-panel" style="flex:1;min-width:260px;max-width:380px;display:none;align-self:flex-start;position:sticky;top:14px;max-height:calc(100vh - 80px);overflow-y:auto">
+    <div class="card" id="write-live-panel" style="padding:12px 14px;margin-bottom:10px;display:none"><div id="write-live-content"></div></div>
     <div class="card" style="padding:14px">
       <div id="write-flow-content"></div>
     </div>
@@ -1820,7 +1821,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1029-a';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1029-b';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -5506,26 +5507,33 @@ function goto(view){
 // ══ SCHEDULE ══
 var _scheduleDate=null; // null = today
 // ── 학습 일지 작성 페이지: 체크콜 실시간 패널 (보기 전용, A안 체크시트) ──
-var _wl={sid:null,date:null,unsubL:null,unsubC:null,log:null,checks:{}};
+var _wl={sid:null,date:null,sess:1,open:undefined,unsubL:null,unsubC:null,log:null,checks:{}};
 function _wlStop(){
   if(_wl.unsubL){try{_wl.unsubL();}catch(e){}}
   if(_wl.unsubC){try{_wl.unsubC();}catch(e){}}
-  _wl.unsubL=_wl.unsubC=null;_wl.sid=_wl.date=null;_wl.log=null;_wl.checks={};
+  _wl.unsubL=_wl.unsubC=null;_wl.sid=_wl.date=null;_wl.sess=1;_wl.log=null;_wl.checks={};
+}
+function _wlOpenToggle(){
+  _wl.open=!_wl.open;
+  try{localStorage.setItem('wl_open',_wl.open?'1':'0');}catch(e){}
+  _wlPaint();
 }
 function _wlShow(sid){
   var p=$('write-live-panel');if(!p)return;
   var s=sid&&students.find(function(x){return x.id===sid;});
   if(!s||!db){_wlStop();p.style.display='none';return;}
   var date=($('r-date')&&$('r-date').value)||todayISO();
+  var sess=1;try{sess=_ccSess(s,date,window._currentSessionTime||'');}catch(e){}
   p.style.display='';
-  if(_wl.sid===sid&&_wl.date===date){_wlPaint();return;}
-  _wlStop();_wl.sid=sid;_wl.date=date;
+  if(_wl.open===undefined){try{_wl.open=localStorage.getItem('wl_open')==='1';}catch(e){_wl.open=false;}}
+  if(_wl.sid===sid&&_wl.date===date&&_wl.sess===sess){_wlPaint();return;}
+  _wlStop();_wl.sid=sid;_wl.date=date;_wl.sess=sess;
   try{
-    _wl.unsubL=db.collection('checkLogs').doc(date+'_'+sid).onSnapshot(function(snap){
+    _wl.unsubL=db.collection('checkLogs').doc(_ccDocId(date,sid,sess)).onSnapshot(function(snap){
       if(_wl.sid!==sid)return;_wl.log=snap.exists?snap.data():null;_wlPaint();
     },function(e){console.warn('wl log',e);});
     _wl.unsubC=db.collection('bookChecks').where('studentId','==',sid).where('date','==',date).onSnapshot(function(snap){
-      if(_wl.sid!==sid)return;_wl.checks={};snap.forEach(function(d){var x=d.data();_wl.checks[x.item]=x;});_wlPaint();
+      if(_wl.sid!==sid)return;_wl.checks={};snap.forEach(function(d){var x=d.data();if((x.sess===2?2:1)!==sess)return;_wl.checks[x.item]=x;});_wlPaint();
     },function(e){console.warn('wl chk',e);});
   }catch(e){console.warn(e);}
   _wlPaint();
@@ -5540,9 +5548,13 @@ function _wlPaint(){
   var tpl=null;
   try{tpl=ccResolve(_ccEffPlan(ccPlanKey(lvl,s.grade)),lvl,pg);}catch(x){}
   if(!tpl)tpl=_bcTplFor(s);
-  var done=0,total=0,h='';
+  var done=0,total=0,h='',nCall=0,callWait=0,callDone=0,quiz=[],dictS=[],oxS=[];
+  var q100=false;
+  (tpl.sections||[]).forEach(function(sec){(sec.items||[]).forEach(function(i){if(i&&i.t==='number'&&i.link==='quiz'){var qv=v[i.id];if(qv!==undefined&&qv!==''&&Number(qv)>=100)q100=true;}});});
   (tpl.sections||[]).forEach(function(sec){
-    var items=(sec.items||[]).filter(function(i){return i&&i.l;});if(!items.length)return;
+    var items=(sec.items||[]).filter(function(i){return i&&i.l;});
+    if(q100&&(items.some(function(i){return i.t==='number'&&i.link==='quiz';})||/quiz|오답/i.test(String(sec.title||''))))items=items.filter(function(i){return !/오답/.test(String(i.l||''));});
+    if(!items.length)return;
     var rows='';
     items.forEach(function(it){
       var chk='<span class="wl-dot"></span>',right='',cls='';
@@ -5550,16 +5562,16 @@ function _wlPaint(){
         total++;var on=!!e[it.id];if(on){done++;cls=' on';chk='<span class="wl-dot on">✓</span>';right=_wlHM(e[it.id]);}
         rows+='<div class="wl-row'+cls+'">'+chk+'<span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-t">'+right+'</span></div>';
       }else if(it.t==='number'){
-        var nv=v[it.id];var has=nv!==undefined&&nv!==null&&nv!=='';
+        var nv=v[it.id];var has=nv!==undefined&&nv!==null&&nv!=='';total++;if(has)done++;if(has)quiz.push(it.l.replace(/\s*점수$/,'')+' '+nv);
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has?' on':'')+'">'+(has?_bcEsc(nv)+(it.u?_bcEsc(it.u):'점'):'')+'</span></div>';
       }else if(it.t==='ox'){
-        var ov2=v[it.id];var hasO=ov2==='O'||ov2==='X';
+        var ov2=v[it.id];var hasO=ov2==='O'||ov2==='X';total++;if(hasO){done++;oxS.push(it.l.replace(/\s+/g,'').replace(/^교재/,'')+' '+ov2);}
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(hasO?' on':'')+'" style="'+(ov2==='X'?'color:#c0392b':'')+'">'+(hasO?ov2:'')+'</span></div>';
       }else if(it.t==='dict'){
-        var d=v[it.id]||{};var has2=d.c!==undefined&&d.c!==null&&d.c!=='';
+        var d=v[it.id]||{};var has2=d.c!==undefined&&d.c!==null&&d.c!=='';total++;if(has2&&d.t!==undefined&&d.t!==''){done++;}if(has2)dictS.push(d.c+'/'+(d.t===undefined?'?':d.t));
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has2?' on':'')+'">'+(has2?_bcEsc(d.c)+' / '+_bcEsc(d.t===undefined?'?':d.t)+'개':'')+'</span></div>';
       }else{
-        var c=_wl.checks[it.l],st=c?c.status:'none',tx='',k='';
+        var c=_wl.checks[it.l],st=c?c.status:'none',tx='',k='';nCall++;total++;if(st==='waiting'||st==='called')callWait++;if(st==='done'){callDone++;done++;}
         if(st==='waiting'){tx='호출 중';k=' wait';}
         else if(st==='called'){tx=_bcEsc(c.calledBy||'선생님')+' 선생님 호출됨';k=' call';}
         else if(st==='done'){tx='검사 끝'+(c.doneAt&&c.doneAt.toMillis?' · '+_wlHM(c.doneAt.toMillis()):'');k=' done';}
@@ -5569,14 +5581,31 @@ function _wlPaint(){
     });
     h+='<div class="wl-sec"><div class="wl-sh">'+_bcEsc(sec.title||'')+'</div>'+rows+'</div>';
   });
-  var head='<div class="wl-head"><b>📡 '+_bcEsc(s.name)+' · 체크콜 실시간</b></div>';
+  var tl=L.tl||[],sm=0,bk=0,smN=0,bkN=0,openT=false;
+  tl.forEach(function(x){
+    var g=String(x.g||''),n=String(x.n||''),isSm=/스마트/.test(g)||(!g&&/^(daily ?study|daily ?quiz|study|quiz)\b/i.test(n));
+    if(!x.e){openT=true;return;}
+    var m=Math.max(0,Math.round((x.e-x.s)/60000));if(isSm){sm+=m;smN++;}else{bk+=m;bkN++;}
+  });
+  var pct=total?Math.round(done/total*100):0;
+  var chips=[];
+  if(smN||bkN)chips.push('⏱ 스마트 '+(smN?sm+'분':'-')+' · 교재 '+(bkN?bk+'분':'-')+(openT?' (진행 중)':''));
+  if(quiz.length)chips.push('📝 '+quiz.map(_bcEsc).join(' · '));
+  if(dictS.length)chips.push('✍️ 받아쓰기 '+dictS.map(_bcEsc).join(', '));
+  if(oxS.length)chips.push(oxS.map(_bcEsc).join(' · '));
+  if(callWait)chips.push('<span style="color:#b45309;font-weight:800">🔔 호출 대기 '+callWait+'</span>');
+  else if(callDone)chips.push('✅ 검사 완료 '+callDone+'/'+nCall);
+  var lbl=!_wl.log?'<span style="color:var(--txt3)">아직 시작 전</span>':(L.fin?'<span style="color:#0f766e;font-weight:800">모두 마침</span>':(L.startAt?'진행 중':'시작 전'));
+  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b><span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>';
   var meta='';
   if(_wl.log){
-    meta='<div class="wl-meta">시작 <b>'+(_wlHM(L.startAt)||'--:--')+'</b> · 끝 <b>'+(_wlHM(L.endAt)||'--:--')+'</b> · 체크 <b>'+done+'/'+total+'</b>'+(pg?'<br><span style="color:var(--txt3)">'+_bcEsc(lvl)+' · '+_bcEsc(pg)+'</span>':'')+'</div>';
+    meta='<div style="margin-top:7px"><div style="height:7px;border-radius:5px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#0f766e':'#3b82f6')+'"></div></div>'
+      +'<div class="wl-meta" style="margin:5px 0 0">체크 <b>'+done+'/'+total+'</b> · 시작 <b>'+(_wlHM(L.startAt)||'--:--')+'</b> · 끝 <b>'+(_wlHM(L.endAt)||'--:--')+'</b>'+(pg?' · '+_bcEsc(lvl)+' '+_bcEsc(pg):'')
+      +(chips.length?'<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px 10px">'+chips.map(function(c){return '<span>'+c+'</span>';}).join('')+'</div>':'')+'</div></div>';
   }else{
-    meta='<div class="wl-meta" style="color:var(--txt3)">아직 체크콜을 시작하지 않았어요 ('+_wl.date+')</div>';
+    meta='<div class="wl-meta" style="color:var(--txt3);margin:7px 0 0">아직 체크콜을 시작하지 않았어요 ('+_wl.date+')</div>';
   }
-  el.innerHTML=head+meta+h;
+  el.innerHTML=head+meta+(_wl.open?'<div style="margin-top:8px">'+h+'</div>':'');
 }
 (function(){
   var st=document.createElement('style');
