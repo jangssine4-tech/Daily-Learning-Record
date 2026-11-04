@@ -28186,7 +28186,6 @@ function _hcLessonHtml(p){
       +(sec.grp?'<small>'+_bcEsc(sec.grp)+'</small>':'')
       +'<input value="'+_bcEsc(sec.title)+'" oninput="_hcSet(\'title\','+si+',0,this.value)" placeholder="구역 이름">'
       +'<input value="'+_bcEsc(sec.sub||'')+'" oninput="_hcSet(\'sub\','+si+',0,this.value)" placeholder="부제(선택)" style="max-width:150px;font-weight:600">'
-      +'<button class="mini" onclick="_hcOp(\'secup\','+si+')">▲</button><button class="mini" onclick="_hcOp(\'secdown\','+si+')">▼</button>'
       +'<button class="mini" onclick="_hcItApplyOpen('+si+',-1)">적용</button><button class="mini" onclick="_hcOp(\'add\','+si+')">＋ 항목 추가</button><button class="mini" onclick="_hcOp(\'secdel\','+si+')">구역 삭제</button></div>';
     sec.items.forEach(function(it,ii){
       var d=si+','+ii;
@@ -28196,7 +28195,6 @@ function _hcLessonHtml(p){
         +'<input value="'+_bcEsc(it.hint||'')+'" oninput="_hcSet(\'hint\','+d+',this.value)" placeholder="안내(선택)" style="width:120px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px">'
         +_hcLinkSel(it.link,'_hcSet(\'link\','+d+',this.value)')
         +'<button class="ccx-ap" title="이 항목을 다른 레슨에도 적용" onclick="_hcItApplyOpen('+d+')">적용</button>'
-        +'<button class="mini" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:3px 6px;cursor:pointer" onclick="_hcOp(\'up\','+d+')">▲</button><button class="mini" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:3px 6px;cursor:pointer" onclick="_hcOp(\'down\','+d+')">▼</button>'
         +'<button class="ccx-del" onclick="_hcOp(\'del\','+d+')">삭제</button></div></div>';
     });
     h+='</div>';
@@ -28250,14 +28248,13 @@ function _hcGridHtml(p){
     h+='<tr ondragover="_hcDgOver(event,\'sec\')" ondragleave="_hcDgLeave(event)" ondrop="_hcDgDrop(event,\'sec\','+si+',0)"><td colspan="'+ncol+'" style="background:'+gc[0]+';color:'+gc[1]+';padding:4px 8px;border-top:2px solid '+gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;position:sticky;left:6px">'
       +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'sec\','+si+',0)" ondragend="_hcDgEnd()" title="끌어서 구역 전체를 옮겨요">⠿</span>'
       +'<input value="'+_bcEsc(S.title)+'" onchange="_hcSecRename('+si+',this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px">'
-      +'<button style="'+cs[0]+'" onclick="_hcSecMove('+si+',-1)">▲</button><button style="'+cs[0]+'" onclick="_hcSecMove('+si+',1)">▼</button>'
       +'<button style="'+cs[0]+'" onclick="_hcRowAdd('+si+')">＋ 항목 추가</button><button style="'+cs[0]+'" onclick="_hcSecDel('+si+')">구역 삭제</button></div></td></tr>';
     S.items.forEach(function(R,ri){
       h+='<tr ondragover="_hcDgOver(event,\'it\')" ondragleave="_hcDgLeave(event)" ondrop="_hcDgDrop(event,\'it\','+si+','+ri+')"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="display:flex;gap:4px;align-items:center">'
         +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'it\','+si+','+ri+')" ondragend="_hcDgEnd()" title="끌어서 이 구역 안에서 순서를 바꿔요">⠿</span>'
         +'<input class="fi" value="'+_bcEsc(R.l)+'" onchange="_hcRowSet('+si+','+ri+',\'l\',this.value)" style="padding:3px 5px;font-size:11px;flex:1;min-width:130px">'
         +_hcLinkSel(R.link,'_hcRowSet('+si+','+ri+',\'link\',this.value)',118).replace('<select','<select style="font-size:10px;width:118px"').replace('style="width:118px"','')
-        +'<button class="bc-b" onclick="_hcRowMove('+si+','+ri+',-1)" title="위로">▲</button><button class="bc-b" onclick="_hcRowMove('+si+','+ri+',1)" title="아래로">▼</button></div></td>';
+        +'</div></td>';
       ls.forEach(function(nm,li){
         var sec=(p.lessons[nm]||[]).find(function(z){return z.title===S.title;}),on=!!(sec&&sec.items.some(function(x){return x.l===R.l;}));
         h+='<td style="text-align:center;border-bottom:1px solid var(--border);'+(nm===_hcEd.les?'background:#eff6ff;':'')+'"><button onclick="_hcCell('+si+','+ri+','+li+')" style="width:30px;height:24px;border:1px solid #d1d5db;border-radius:5px;background:'+(on?'#ecfdf5':'#f3f4f6')+';color:'+(on?'#065f46':'#9ca3af')+';cursor:pointer;font-size:12px">'+(on?'□':'×')+'</button></td>';
@@ -28305,18 +28302,6 @@ function _hcRowSet(si,ri,f,v){
   _hcMark();_hcDraw();
 }
 function _hcSortAllKeep(p,title,oldL,newL){var ro=p.rowOrder&&p.rowOrder[title];if(ro){var i=ro.indexOf(oldL);if(i>=0)ro[i]=newL;}}
-function _hcRowMove(si,ri,d){
-  var p=_hcWork(),rows=_hcRows(p),S=rows[si],j=ri+d;if(!S||j<0||j>=S.items.length)return;var ttl=S.title;
-  var x=S.items[ri];S.items[ri]=S.items[j];S.items[j]=x;
-  p.secOrder=rows.map(function(s){return s.title;});p.rowOrder=p.rowOrder||{};rows.forEach(function(s){p.rowOrder[s.title]=s.items.map(function(z){return z.l;});});
-  _hcSortAll(p,'items',ttl);_hcMark();_hcDraw();
-}
-function _hcSecMove(si,d){
-  var p=_hcWork(),rows=_hcRows(p),j=si+d;if(j<0||j>=rows.length)return;
-  var x=rows[si];rows[si]=rows[j];rows[j]=x;
-  p.secOrder=rows.map(function(s){return s.title;});p.rowOrder=p.rowOrder||{};rows.forEach(function(s){p.rowOrder[s.title]=s.items.map(function(z){return z.l;});});
-  _hcSortAll(p,'secs');_hcMark();_hcDraw();
-}
 // ── 끌어서 순서 바꾸기 (레슨별 · 전체 계획표 공통) ──
 var _hcDg=null;
 function _hcDgStart(e,t,si,ii){_hcDg={t:t,si:si,ii:ii};try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',t+':'+si+':'+ii);}catch(x){}e.stopPropagation();}
@@ -28396,12 +28381,9 @@ function _hcSet(f,si,ii,v){
 }
 function _hcOp(op,si,ii){
   var secs=_hcSecs(),sec=secs[si];
-  function mv(a,i,d){var j=i+d;if(j<0||j>=a.length)return;var x=a[i];a[i]=a[j];a[j]=x;}
   if(op==='secadd')secs.push({k:'n_'+_bcNewId(),title:'새 구역',items:[{id:'n'+_bcNewId(),l:'새 항목',link:'hwBook'}]});
-  else if(op==='secup')mv(secs,si,-1);else if(op==='secdown')mv(secs,si,1);
   else if(op==='secdel'){if(!confirm('이 구역을 삭제할까요?'))return;secs.splice(si,1);}
   else if(op==='add')sec.items.push({id:'n'+_bcNewId(),l:'새 항목',link:'hwBook'});
-  else if(op==='up')mv(sec.items,ii,-1);else if(op==='down')mv(sec.items,ii,1);
   else if(op==='del')sec.items.splice(ii,1);
   _hcMark();_hcDraw();
 }
