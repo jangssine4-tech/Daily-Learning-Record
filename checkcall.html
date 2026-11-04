@@ -719,15 +719,17 @@ function applySecs(){
   });
   secs=secs.filter(function(s){return s.items.length;});
   _addTimers(secs);
-  // 퀴즈 점수 칸은 '끝' 바로 아래에 둬요 (시작 → 문제 풀이 → 끝 → 점수)
+  // 순서: 시작 → 공부 항목 → 끝 → 검사 받기 → 시험(점수 칸·시험 항목)
   secs.forEach(function(sec){
     var ei=-1;sec.items.forEach(function(i,ix){if(ei<0&&i.role==='te')ei=ix;});
     if(ei<0)return;
-    var sc=sec.items.filter(function(i){return i.t==='number'&&(i.link==='quiz'||/quiz|퀴즈/i.test(String(i.l||'')));});
-    if(!sc.length)return;
-    sec.items=sec.items.filter(function(i){return sc.indexOf(i)<0;});
-    var at=-1;sec.items.forEach(function(i,ix){if(at<0&&i.role==='te')at=ix;});
-    sec.items.splice.apply(sec.items,[at+1,0].concat(sc));
+    var isT=function(i){return !i.role&&i.t!=='call'&&((i.t==='number'&&(i.link==='quiz'||/quiz|퀴즈/i.test(String(i.l||''))))||/시험|test/i.test(String(i.l||'')));};
+    var ts=sec.items.filter(isT);
+    if(!ts.length)return;
+    sec.items=sec.items.filter(function(i){return ts.indexOf(i)<0;});
+    var at=-1;sec.items.forEach(function(i,ix){if(i.t==='call')at=ix;});       // 마지막 검사 받기 뒤
+    if(at<0)sec.items.forEach(function(i,ix){if(at<0&&i.role==='te')at=ix;});   // 검사 받기가 없으면 끝 뒤
+    sec.items.splice.apply(sec.items,[at+1,0].concat(ts));
   });
   _aliasIds(secs);
   var _isQz=function(i){return i.t==='number'&&(i.link==='quiz'||/quiz|퀴즈/i.test(String(i.l||'')));};
