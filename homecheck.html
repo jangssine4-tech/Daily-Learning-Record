@@ -185,7 +185,7 @@ function logout(){
   S=null;R=null;LOG={e:{}};logKey='';pin='';paintDots();$('err').textContent='';show('sLogin');
 }
 function counts(){
-  var n=0,d=0,L={hwBook:{n:0,d:0},hwVideo:{n:0,d:0}};
+  var n=0,d=0,L={hwBook:{n:0,d:0},hwVideo:{n:0,d:0},hwPhoto:{n:0,d:0}};
   ((R&&R.secs)||[]).forEach(function(s){(s.items||[]).forEach(function(it){
     n++;var ok=!!LOG.e[it.id];if(ok)d++;
     if(it.link&&L[it.link]){L[it.link].n++;if(ok)L[it.link].d++;}
@@ -211,7 +211,7 @@ function render(){
     var d=0;s.items.forEach(function(it){if(LOG.e[it.id])d++;});
     h+='<div class="sec"><div class="sh"><span>'+esc(s.title)+(s.sub?' <small>'+esc(s.sub)+'</small>':'')+'</span><span class="cn">'+d+'/'+s.items.length+'</span></div>';
     s.items.forEach(function(it){
-      h+='<button class="it'+(LOG.e[it.id]?' on':'')+'" onclick="tog(\''+esc(it.id)+'\')"><span class="cb"><svg><use href="#i-check"/></svg></span><span class="tx">'+esc(it.l)+(it.hint?'<em>'+esc(it.hint)+'</em>':'')+'</span>'+(it.link==='hwVideo'?'<span class="vd">영상</span>':'')+'</button>';
+      h+='<button class="it'+(LOG.e[it.id]?' on':'')+'" onclick="tog(\''+esc(it.id)+'\')"><span class="cb"><svg><use href="#i-check"/></svg></span><span class="tx">'+esc(it.l)+(it.hint?'<em>'+esc(it.hint)+'</em>':'')+'</span>'+(it.link==='hwVideo'?'<span class="vd">영상</span>':(it.link==='hwPhoto'?'<span class="vd" style="background:#FDEBF3;color:#C2417A">사진</span>':''))+'</button>';
     });
     h+='</div>';
   });
@@ -230,6 +230,7 @@ async function saveLog(){
   var n={},j={};
   if(c.L.hwBook.n){n.hwBook=c.L.hwBook;j.hwBook=c.L.hwBook.d===c.L.hwBook.n?'완료':'미완료';}
   if(c.L.hwVideo.n){n.hwVideo=c.L.hwVideo;j.hwVideo=c.L.hwVideo.d===c.L.hwVideo.n?'제출':'미제출';}
+  if(c.L.hwPhoto.n){n.hwPhoto=c.L.hwPhoto;j.hwPhoto=c.L.hwPhoto.d===c.L.hwPhoto.n?'제출':'미제출';}
   try{
     await db.collection('homeLogs').doc(k).set({sid:S,key:R.key||'',les:R.les,e:e,j:j,n:n,upd:Date.now()});
     if(pendingE&&pendingE.k===k&&pendingE.e===e)pendingE=null;
