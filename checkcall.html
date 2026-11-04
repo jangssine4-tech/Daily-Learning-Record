@@ -86,6 +86,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .nmod{position:fixed;inset:0;z-index:120;background:rgba(23,32,58,.55);display:flex;align-items:center;justify-content:center;padding:20px}
 .nmod .nbox{background:#fff;border-radius:22px;padding:24px 22px;max-width:420px;width:100%;text-align:center;box-shadow:0 24px 48px -16px rgba(0,0,0,.4)}
 .nmod .nt1{font-size:clamp(18px,4vw,22px);font-weight:900;color:#1F2433;margin-bottom:10px;letter-spacing:-.03em}
+.nmod .nt3{font-size:clamp(13px,3vw,15px);color:#B83A14;font-weight:700;margin:-8px 0 16px}
 .nmod .nt2{font-size:clamp(14px,3.2vw,16px);color:#4A4F5E;line-height:1.5;margin-bottom:18px}
 .nmod button{width:100%;min-height:52px;border-radius:14px;background:#E4572E;color:#fff;font-size:18px;font-weight:900}
 .tbn.pulse.shake{animation:shake .4s}
@@ -644,10 +645,32 @@ function _passed(sec){
     return itemDone(i);
   });
 }
-function _nmodal(title,msg){
+// 이름 뒤에 붙는 를/을 (한글은 받침으로, 영어는 읽는 소리로 대충 맞춰요)
+function _eul(w){
+  w=String(w||'').trim().replace(/[^A-Za-z0-9\uAC00-\uD7A3]+$/,'');var c=w.charAt(w.length-1),code=c.charCodeAt(0);
+  if(code>=0xAC00&&code<=0xD7A3)return (code-0xAC00)%28?'을':'를';
+  var m=w.replace(/[^A-Za-z]/g,'').slice(-1).toLowerCase();
+  return /[kmnlpb]/.test(m)?'을':'를';
+}
+// 막힌 이유를 쉬운 말로 알려줘요 (체크 → 검사 받기 → 점수 순서로 먼저 걸린 것 하나)
+function _whyBlock(sec){
+  var undone=null,call=null,score=null;
+  sec.items.forEach(function(i){
+    if(i.role)return;
+    if(i.t==='call'){var c=checks[i.l];if(!(c&&c.status&&c.status!=='none')&&!call)call=i;return;}
+    if(itemDone(i))return;
+    if(i.t==='number'&&(i.link==='quiz'||/quiz|퀴즈|점수/i.test(String(i.l||'')))){if(!score)score=i;return;}
+    if(!undone)undone=i;
+  });
+  if(undone)return {m:'체크를 모두 해야 다음으로 넘어갈 수 있어요.',d:'아직 안 한 것: '+(undone.l||'')};
+  if(call)return {m:'검사 받기 버튼을 눌러야 다음으로 넘어갈 수 있어요.',d:'"'+(call.l||'')+'" 버튼을 눌러 주세요.'};
+  if(score)return {m:'점수를 적어야 다음으로 넘어갈 수 있어요.',d:'"'+(score.l||'')+'" 칸에 점수를 적어 주세요.'};
+  return {m:'이 구역을 모두 해야 다음으로 넘어갈 수 있어요.',d:''};
+}
+function _nmodal(title,msg,sub){
   var m=document.getElementById('nmod');
   if(!m){m=document.createElement('div');m.id='nmod';m.className='nmod';document.body.appendChild(m);}
-  m.innerHTML='<div class="nbox"><div class="nt1">'+esc(title)+'</div><div class="nt2">'+esc(msg)+'</div><button onclick="document.getElementById(\'nmod\').remove()">확인</button></div>';
+  m.innerHTML='<div class="nbox"><div class="nt1">'+esc(title)+'</div><div class="nt2">'+esc(msg)+'</div>'+(sub?'<div class="nt3">'+esc(sub)+'</div>':'')+'<button onclick="document.getElementById(\'nmod\').remove()">확인</button></div>';
 }
 function _nextBlock(to){
   for(var k=0;k<to&&k<S.secs.length;k++){if(!_passed(S.secs[k]))return S.secs[k];}
@@ -920,7 +943,7 @@ function callOk(){
   closeCall();
 }
 function goSec(i){
-  if(i>curSec){var bl=_nextBlock(i);if(bl){_nmodal('"'+bl.title+'" 구역을 먼저 끝내요','항목을 모두 체크하고 검사 받기 버튼을 누르고 점수를 적어야 다음으로 갈 수 있어요. 오늘 하지 않는 구역이면 선생님께 말씀드려 주세요.');return;}}
+  if(i>curSec){var bl=_nextBlock(i);if(bl){var wy=_whyBlock(bl);_nmodal((/[A-Za-z0-9\uAC00-\uD7A3]$/.test(String(bl.title).trim())?bl.title:'“'+bl.title+'”')+_eul(bl.title)+' 먼저 끝내요',wy.m,wy.d);return;}}
   curSec=i;render();var l=$('list');if(l)window.scrollTo({top:0,behavior:'smooth'});}
 document.addEventListener('focusout',function(e){if(e.target&&e.target.tagName==='INPUT'&&S){setTimeout(render,80);}});
 
