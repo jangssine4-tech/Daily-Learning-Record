@@ -676,25 +676,27 @@ function applySecs(){
       its.splice(at,0,{id:k,t:'check',l:x.l});last[x.after]=at;break;
     }
   });
+  secs=secs.filter(function(s){return s.items.length;});
+  _addTimers(secs);
+  _aliasIds(secs);
+  var _isQz=function(i){return i.t==='number'&&(i.link==='quiz'||/quiz|퀴즈/i.test(String(i.l||'')));};
   // Quiz 100점이면 오답 관련 항목(오답 노트·오답 검사 받기·오답 다시 풀기)은 자동으로 사라져요
   // 점수 칸(숫자 입력 + 일지 연동 '퀴즈 점수')이 다른 구역에 있어도 적용하고, Quiz·오답 구역에만 적용해요 (Main Book 등의 오답 항목은 그대로)
   var _q100=false;
   secs.forEach(function(sec){sec.items.forEach(function(i){
-    if(i.t==='number'&&i.link==='quiz'){var v=LOG.v[i.id];if(v!==undefined&&v!==''&&Number(v)>=100)_q100=true;}
+    if(_isQz(i)){var v=LOG.v[i.id];if(v!==undefined&&v!==''&&Number(v)>=100)_q100=true;}
   });});
   if(_q100)secs.forEach(function(sec){
-    var hasQ=sec.items.some(function(i){return i.t==='number'&&i.link==='quiz';});
+    var hasQ=sec.items.some(_isQz);
     var wrongSec=/오답/.test(String(sec.title||''));
     if(hasQ||wrongSec||/quiz/i.test(String(sec.title||'')))sec.items=sec.items.filter(function(i){
-      if(i.t==='number'&&i.link==='quiz')return true;                         // 점수 칸은 그대로
+      if(_isQz(i))return true;                         // 점수 칸은 그대로
       var l=String(i.l||'');
       if(/오답|같이\s*풀기|다시\s*풀기/.test(l))return false;                  // '선생님과 같이 풀기'처럼 이름에 오답이 없어도 지워요
       return !wrongSec;                                                       // 제목에 '오답'이 든 구역은 점수 칸 말고 모두 지워요
     });
   });
   secs=secs.filter(function(s){return s.items.length;});
-  _addTimers(secs);
-  _aliasIds(secs);
   var sig=JSON.stringify(secs);
   if(sig!==S.secSig){S.secSig=sig;S.secs=secs;if(curSec>=secs.length)curSec=0;}
 }
@@ -847,7 +849,7 @@ function numIn(el,now){
     var eP={};if(val===''){eP[id]=0;commit(eP,(function(){var o={};o[id]=null;return o;})());}
     else{if(!LOG.e[id])eP[id]=Date.now();var o2={};o2[id]=Number(val);commit(eP,o2);}
   };
-  if(now)go();else saveT[id]=setTimeout(go,500);
+  if(now){go();try{el.blur();}catch(e){}setTimeout(render,250);}else saveT[id]=setTimeout(go,500);   // 입력을 마치면 화면을 다시 그려요 (Quiz 100점이면 오답 항목 숨김)
 }
 function dictIn(el,now){
   var id=el.dataset.id,k=el.dataset.k;el.value=el.value.replace(/\D/g,'');
