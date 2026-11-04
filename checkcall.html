@@ -224,7 +224,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1105-n</div>
   </div>
 </div>
 
@@ -963,7 +963,16 @@ function _syncEnd(sec,o,vP){
   else if(!all&&teOn&&auto){o[te.id]=0;vP[te.id]=null;}
 }
 // 시작을 누르기 전에는 '끝' 앞의 항목을 체크할 수 없어요 (이미 체크한 항목은 그대로 풀 수 있어요)
-function _startLocked(sec,it){
+function _callLocked(sec,it){
+  if(!sec||!it||it.role||it.t==='call'||itemDone(it))return false;
+  if(it.t==='number'||it.t==='dict')return false;   // 점수·받아쓰기는 검사를 기다리는 동안에도 쓸 수 있어요
+  var ix=sec.items.indexOf(it),blk=null;
+  sec.items.forEach(function(i,k){if(!blk&&k<ix&&i.t==='call'){var c=checks[i.l];if(!(c&&c.status&&c.status!=='none'))blk=i;}});
+  if(!blk)return false;
+  _nmodal('"'+blk.l+'" 버튼을 먼저 눌러요','이 버튼을 누르고 나서 다음 항목을 할 수 있어요.');
+  return true;
+}
+function _startLocked0(sec,it){
   if(!sec||!it||it.role||it.t==='call')return false;
   var ts=null,te_ix=-1,ix=sec.items.indexOf(it);
   sec.items.forEach(function(i,k){if(i.role==='ts')ts=i;if(i.role==='te')te_ix=k;});
@@ -975,6 +984,7 @@ function _startLocked(sec,it){
   var b=document.querySelector('.tbn');if(b){b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');}
   return true;
 }
+function _startLocked(sec,it){return _startLocked0(sec,it)||_callLocked(sec,it);}   // 시작 → 호출 버튼(검사 받기·설명하기) → 나머지 순서
 function _lockedById(id){
   for(var a=0;a<S.secs.length;a++){var sec=S.secs[a];for(var b=0;b<sec.items.length;b++){if(sec.items[b].id===id)return _startLocked(sec,sec.items[b]);}}
   return false;
