@@ -1860,7 +1860,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1105-b';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1105-c';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3900,11 +3900,22 @@ async function _bcSaveSettings(){
 
 // ── 단계별 계획표(Study Plan) 편집 ──
 window._ccPlanOv={};
+// Quiz·Test 구역의 항목은 기본이 '점수'(s) 칸이에요. 처음 한 번만 바꾸고(qsMig 표시), 이후 직접 바꾼 칸은 그대로 둬요
+function _ccScoreMig(p){
+  if(!p||p.qsMig||!p.blocks)return p;
+  p.blocks.forEach(function(b){(b.rows||[]).forEach(function(r){
+    if(!_ccIsScoreSec(r.s||r.g)||/오답|노트|복습/.test(String(r.l||'')))return;
+    if(r.c&&r.c.indexOf('c')>=0)r.c=r.c.replace(/c/g,'s');
+  });});
+  p.qsMig=1;return p;
+}
 function _ccEffPlan(key){
   var pl=_ccEffPlan0(key);
-  if(key!=='Grammar Plus'||!pl)return pl;
-  if(pl.blocks&&pl.blocks.length===2)pl=_ccMergeGp(pl);
-  return _ccMergePrev(pl);
+  if(key==='Grammar Plus'&&pl){
+    if(pl.blocks&&pl.blocks.length===2)pl=_ccMergeGp(pl);
+    pl=_ccMergePrev(pl);
+  }
+  return _ccScoreMig(pl);
 }
 function _ccEffPlan0(key){
   if(!key)return null;var ov=window._ccPlanOv||{};
