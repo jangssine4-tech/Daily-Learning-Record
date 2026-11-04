@@ -684,7 +684,13 @@ function applySecs(){
   });});
   if(_q100)secs.forEach(function(sec){
     var hasQ=sec.items.some(function(i){return i.t==='number'&&i.link==='quiz';});
-    if(hasQ||/quiz|오답/i.test(String(sec.title||'')))sec.items=sec.items.filter(function(i){return !/오답/.test(String(i.l||''));});
+    var wrongSec=/오답/.test(String(sec.title||''));
+    if(hasQ||wrongSec||/quiz/i.test(String(sec.title||'')))sec.items=sec.items.filter(function(i){
+      if(i.t==='number'&&i.link==='quiz')return true;                         // 점수 칸은 그대로
+      var l=String(i.l||'');
+      if(/오답|같이\s*풀기|다시\s*풀기/.test(l))return false;                  // '선생님과 같이 풀기'처럼 이름에 오답이 없어도 지워요
+      return !wrongSec;                                                       // 제목에 '오답'이 든 구역은 점수 칸 말고 모두 지워요
+    });
   });
   secs=secs.filter(function(s){return s.items.length;});
   _addTimers(secs);
