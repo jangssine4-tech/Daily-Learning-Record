@@ -78,13 +78,15 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .it0{display:flex;align-items:center;gap:14px;padding:15px 16px 8px;font-size:clamp(16px,4.2vw,18px);font-weight:600;line-height:1.35}
 .itp.on .cb{background:var(--g);border-color:var(--g)}.itp.on .cb svg{opacity:1}
 .ph{display:flex;flex-wrap:wrap;gap:10px;padding:2px 16px 14px}
+.it0{padding-bottom:12px}.it0+.ph{padding-top:0}
 .pc{position:relative;width:78px;border-radius:12px;background:var(--line2);text-align:center;padding:4px 4px 6px;font-size:11px}
 .pc img{width:100%;height:68px;object-fit:cover;border-radius:8px;display:block}
 .pc .pi{display:flex;height:68px;align-items:center;justify-content:center;font-size:26px}
 .pc small{display:block;margin-top:3px;font-weight:700;color:var(--g2);line-height:1.25}
 .pc.re{background:#FDECEC}.pc.re small{color:var(--red)}.pc.ok small{color:#3E63DD}
 .px{position:absolute;top:-7px;right:-7px;width:24px;height:24px;border-radius:50%;background:#14302B;color:#fff;font-size:15px;line-height:1;padding:0}
-.pbtn{display:flex;align-items:center;justify-content:center;min-width:78px;height:86px;padding:0 14px;border-radius:12px;background:#FDEBF3;color:#C2417A;font-weight:800;font-size:14px;cursor:pointer;text-align:center;line-height:1.4}
+.pbtn{flex:none;display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border-radius:12px;background:#FDEBF3;color:#C2417A;font-weight:800;font-size:inherit;line-height:1.2;cursor:pointer;white-space:nowrap}
+.pbtn:active{background:#F8D3E3}.pbtn.off{background:var(--line2);color:var(--ink3);cursor:default}
 .pbtn input{display:none}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#14302B;color:#fff;border-radius:12px;padding:11px 18px;font-size:14px;font-weight:600;display:none;z-index:9;max-width:90vw}
 </style>
@@ -275,14 +277,19 @@ function watchUp(k){
 }
 function photoHtml(it){
   var ups=UPL[it.id]||[],on=!!LOG.e[it.id],n=ups.length,ub=!!UPB[it.id];
-  var h='<div class="itp'+(on?' on':'')+'"><div class="it0"><span class="cb"><svg><use href="#i-check"/></svg></span><span class="tx">'+esc(it.l)+(it.hint?'<em>'+esc(it.hint)+'</em>':'')+'</span><span class="vd" style="background:#FDEBF3;color:#C2417A">사진</span></div><div class="ph">';
-  ups.forEach(function(u){
-    var re=u.status==='재제출',ok=u.status==='확인';
-    h+='<div class="pc'+(re?' re':(ok?' ok':''))+'">'+(LP[u.id]?'<img src="'+LP[u.id]+'" alt="">':'<span class="pi">🖼</span>')+'<small>'+(re?'다시 올려 주세요':(ok?'확인됐어요':'올렸어요'))+'</small>'+((!ok)?'<button class="px" onclick="delPhoto(\''+esc(u.id)+'\')" aria-label="사진 지우기">×</button>':'')+'</div>';
-  });
-  if(ub)h+='<div class="pc"><span class="pi">⏳</span><small>올리는 중 '+(UPP[it.id]||0)+'%</small></div>';
-  else if(n<MAXP)h+='<label class="pbtn">📷 사진 올리기<br>('+n+'/'+MAXP+')<input type="file" accept="image/*" multiple onchange="pickPhotos(this,\''+esc(it.id)+'\')"></label>';
-  return h+'</div></div>';
+  var btn=ub?'<span class="pbtn off">올리는 중 '+(UPP[it.id]||0)+'%</span>'
+    :(n<MAXP?'<label class="pbtn">사진 올리기'+(n?' '+n+'/'+MAXP:'')+'<input type="file" accept="image/*" multiple onchange="pickPhotos(this,\''+esc(it.id)+'\')"></label>'
+    :'<span class="pbtn off">사진 '+MAXP+'/'+MAXP+'</span>');
+  var h='<div class="itp'+(on?' on':'')+'"><div class="it0"><span class="cb"><svg><use href="#i-check"/></svg></span><span class="tx">'+esc(it.l)+(it.hint?'<em>'+esc(it.hint)+'</em>':'')+'</span>'+btn+'</div>';
+  if(n){
+    h+='<div class="ph">';
+    ups.forEach(function(u){
+      var re=u.status==='재제출',ok=u.status==='확인';
+      h+='<div class="pc'+(re?' re':(ok?' ok':''))+'">'+(LP[u.id]?'<img src="'+LP[u.id]+'" alt="">':'<span class="pi">🖼</span>')+'<small>'+(re?'다시 올려 주세요':(ok?'확인됐어요':'올렸어요'))+'</small>'+((!ok)?'<button class="px" onclick="delPhoto(\''+esc(u.id)+'\')" aria-label="사진 지우기">×</button>':'')+'</div>';
+    });
+    h+='</div>';
+  }
+  return h+'</div>';
 }
 function setChecked(id,on){
   if(!R||!R.les)return;
