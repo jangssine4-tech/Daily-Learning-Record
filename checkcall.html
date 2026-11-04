@@ -967,8 +967,11 @@ function _startLocked(sec,it){
   if(!sec||!it||it.role||it.t==='call')return false;
   var ts=null,te_ix=-1,ix=sec.items.indexOf(it);
   sec.items.forEach(function(i,k){if(i.role==='ts')ts=i;if(i.role==='te')te_ix=k;});
-  if(!ts||te_ix<0||ix<0||ix>te_ix||LOG.e[ts.id]||itemDone(it))return false;
-  toast('먼저 ▶ 시작을 눌러 주세요');
+  if(!ts||te_ix<0||ix<0||LOG.e[ts.id]||itemDone(it))return false;
+  var res=(it.t==='number'||it.t==='dict');   // 점수·받아쓰기 같은 시험 결과는 '끝' 뒤에 있어도 시작을 눌러야 써요
+  if(ix>te_ix&&!res)return false;
+  if(res)_nmodal('시작 버튼을 먼저 눌러요','▶ 시작 버튼을 누르면 점수를 쓸 수 있어요.');
+  else toast('먼저 ▶ 시작을 눌러 주세요');
   var b=document.querySelector('.tbn');if(b){b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');}
   return true;
 }
