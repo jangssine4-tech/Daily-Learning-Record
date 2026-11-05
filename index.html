@@ -1860,7 +1860,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1105-p';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1105-q';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3233,6 +3233,7 @@ function ccResolve0(plan,level,progress){
     var ch=r.c.charAt(li);if(ch==='x'||!ch)return;
     var key=(r.g||'')+'|'+(r.s||''),sec=map[key];
     if(!sec){sec={title:r.s||r.g||'',grp:r.g||'',items:[],_k:key};map[key]=sec;secs.push(sec);}
+    if(sec.tmx===undefined&&(r.tm===0||r.tm===1))sec.tmx=r.tm;   // 구역별 시간 측정(시작/끝) 켜기·끄기
     var note=r.n&&r.n[String(li)]?' ('+r.n[String(li)]+')':'';
     var id='b'+bi+'r'+ri,lab=r.l;
     if(ch==='s'){
@@ -4165,6 +4166,7 @@ function _ccPlanDraw(){
       h+='<tr data-ccsec="1" data-run="'+_run+'"><td colspan="'+_ncol+'" style="background:'+_gc[0]+';color:'+_gc[1]+';padding:4px 8px;border-top:2px solid '+_gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="cc-sec-h" draggable="true" data-ri="'+ri+'" title="끌어서 구역 전체를 옮겨요" style="cursor:grab;font-size:16px;line-height:1;padding:2px 4px;user-select:none;opacity:.8">⠿</span>'
         +'<input value="'+_bcEsc(r.s||'')+'" onchange="_ccSecEdit('+ri+',\'s\',this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px">'
         +'<select onchange="_ccSecEdit('+ri+',\'g\',this.value)" title="묶음" style="font-size:11px;padding:3px;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7);color:inherit">'+_gs.map(function(x){return '<option value="'+_bcEsc(x)+'"'+((r.g||'')===x?' selected':'')+'>'+_bcEsc(x||'(묶음 없음)')+'</option>';}).join('')+'</select>'
+        +'<label title="켜면 이 구역에 학생 체크콜 \'시작\'·\'끝\' 버튼이 생기고 공부 시간을 재요" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 7px"><input type="checkbox"'+(_ccTmOn(b,r)?' checked':'')+' onchange="_ccSecTm('+ri+',this.checked)">⏱ 시작·끝</label>'
         +'<span style="flex:1"></span><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecRowAdd('+ri+')">＋ 항목 추가</button><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecDel('+ri+')">구역 삭제</button></div></td></tr>';}
     h+='<tr data-ccrow="1" data-run="'+_run+'" data-ri="'+ri+'"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3);display:flex;align-items:center;gap:4px"><span class="cc-row-h" draggable="true" data-ri="'+ri+'" title="끌어서 이 구역 안에서 순서를 바꿔요" style="cursor:grab;font-size:14px;line-height:1;user-select:none;color:#64748b">⠿</span>'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
     for(var i=0;i<ls.length;i++){
@@ -4458,6 +4460,13 @@ function _ccKeyMove(p,b,oK,nK,oS,nS){
     if(p.ov&&p.ov[l])(p.ov[l].sections||[]).forEach(function(sc){if(sc.k===oK){sc.k=nK;if(sc.title===oS)sc.title=nS;}});
   });
 }
+var CC_TM_RE=/^(?:(?:교재 학습|스마트 학습|복습)\s+)?(daily study|daily quiz|study|quiz|voca|student ?book|workbook|main ?book|storybook|guide ?book)(?:\s*\(.*\))?$/i;
+function _ccTmOn(b,r){var g=r.g||'',n=r.s||'',t;b.rows.forEach(function(x){if((x.g||'')===g&&(x.s||'')===n&&t===undefined&&(x.tm===0||x.tm===1))t=x.tm;});return t===undefined?CC_TM_RE.test(String(n).trim()):t===1;}
+function _ccSecTm(ri,on){
+  if(!_ccTblGuard()){_ccPlanDraw();return;}var p=_ccWork();var b=p.blocks[_ccEd.bi],r0=b.rows[ri];if(!r0)return;
+  b.rows.forEach(function(r){if((r.g||'')===(r0.g||'')&&(r.s||'')===(r0.s||''))r.tm=on?1:0;});
+  _ccMark();_ccPlanDraw();
+}
 function _ccSecEdit(ri,f,v){
   if(!_ccTblGuard()){_ccPlanDraw();return;}var p=_ccWork();var b=p.blocks[_ccEd.bi],r0=b.rows[ri];if(!r0)return;
   v=String(v||'').trim();if(!v){_ccPlanDraw();return;}
@@ -4475,7 +4484,7 @@ function _ccSecRowAdd(ri){
   var at=ri;for(var j=0;j<b.rows.length;j++){if((b.rows[j].g||'')===(r0.g||'')&&(b.rows[j].s||'')===(r0.s||''))at=j;}
   var sc_=_ccIsScoreSec(r0.s||r0.g),c='';for(var i=0;i<b.lessons.length;i++)c+=sc_?'s':'c';
   _ccRowsShift(p,_ccEd.bi,at+1,1);
-  b.rows.splice(at+1,0,{g:r0.g||'',s:r0.s||'',l:sc_?'점수':'새 항목',c:c});
+  b.rows.splice(at+1,0,{g:r0.g||'',s:r0.s||'',l:sc_?'점수':'새 항목',c:c});if(r0.tm===0||r0.tm===1)b.rows[at+1].tm=r0.tm;
   _ccOvSyncRow(at+1);
   _ccMark();_ccPlanDraw();toast('새 항목을 추가했습니다. 이름을 고쳐 주세요 (모든 레슨에 켜져 있으니 필요 없는 레슨은 칸을 눌러 끄세요)');
 }

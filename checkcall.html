@@ -225,7 +225,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1105-r</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1105-s</div>
   </div>
 </div>
 
@@ -387,6 +387,7 @@ function ccResolve0(plan,level,progress){
     var ch=r.c.charAt(li);if(ch==='x'||!ch)return;
     var key=(r.g||'')+'|'+(r.s||''),sec=map[key];
     if(!sec){sec={title:r.s||r.g||'',grp:r.g||'',items:[],_k:key};map[key]=sec;secs.push(sec);}
+    if(sec.tmx===undefined&&(r.tm===0||r.tm===1))sec.tmx=r.tm;   // 구역별 시간 측정(시작/끝) 켜기·끄기
     var note=r.n&&r.n[String(li)]?' ('+r.n[String(li)]+')':'';
     var id='b'+bi+'r'+ri,lab=r.l;
     if(ch==='s'){
@@ -573,7 +574,7 @@ function closeSessListeners(){
 }
 function normTpl(t){
   var src=(t&&t.sections&&t.sections.length)?t:CC_DEFAULT_TEMPLATE;
-  return src.sections.map(function(sec){return {k:sec.k||'',title:sec.title||'',grp:sec.grp||'',items:(sec.items||[]).filter(function(i){return i&&i.l&&i.l!=='받아쓰기 검사 받기';})};}).filter(function(s){return s.items.length;});
+  return src.sections.map(function(sec){return {k:sec.k||'',title:sec.title||'',grp:sec.grp||'',tmx:sec.tmx,items:(sec.items||[]).filter(function(i){return i&&i.l&&i.l!=='받아쓰기 검사 받기';})};}).filter(function(s){return s.items.length;});
 }
 async function startSession(sid,data){
   var n=await pickSess(sid,data);
@@ -856,7 +857,8 @@ function _aliasIds(secs){
 // ── 구역별 공부 시간 (시작 항목 ~ 끝 항목) ──
 var TM_RE=/^(?:(?:교재 학습|스마트 학습|복습)\s+)?(daily study|daily quiz|study|quiz|voca|student ?book|workbook|main ?book|storybook|guide ?book)(?:\s*\(.*\))?$/i;
 function _addTimers(secs){secs.forEach(function(sec){
-  if(!TM_RE.test(String(sec.title||'').trim())||!sec.items.length||sec.items.some(function(i){return i.role;}))return;
+  var _on=sec.tmx===1||(sec.tmx!==0&&TM_RE.test(String(sec.title||'').trim()));   // 선생님이 정한 값이 우선, 없으면 이름으로 자동
+  if(!_on||!sec.items.length||sec.items.some(function(i){return i.role;}))return;
   var sl=String((sec.grp||'')+'_'+sec.title).replace(/[^\w가-힣]/g,'_');
   var nm=String(sec.title||'').trim(),ci=-1;
   sec.items.forEach(function(i,ix){if(ci<0&&i.t==='call')ci=ix;});   // 검사 받기 버튼이 있으면 그보다 앞에서 끝내요 (검사 받는 시간은 공부 시간에 넣지 않아요)
