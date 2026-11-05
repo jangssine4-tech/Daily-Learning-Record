@@ -220,11 +220,12 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
       <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span><span class="sw" id="hSess" style="display:none"></span></div></div>
       <button class="out" onclick="logout()">나가기</button>
     </div>
+    <div id="pauseBan" style="display:none;margin:6px 0;padding:10px 12px;border-radius:12px;background:#FEF3C7;color:#92400E;font-weight:800;font-size:15px;text-align:center">⏸ 시간이 멈춰 있어요. 항목을 체크하면 다시 시작돼요</div>
     <div class="tbar"><span>시작 <b id="tStart">--:--</b></span><div class="tr"><i id="tFill"></i></div><span>끝 <b id="tEnd">--:--</b></span></div>
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1105-p</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1105-q</div>
   </div>
 </div>
 
@@ -561,7 +562,7 @@ async function pickSess(sid,data){
 async function switchSess(n){
   if(!S||S.sess===n||!S.data)return;
   try{localStorage.setItem('cc_sess',JSON.stringify({d:S.date,s:S.sid,n:n}));}catch(e){}
-  if(!LOG.endAt){try{await logRef().set({endAt:Date.now()},{merge:true});}catch(e){}}
+  if(!LOG.endAt||_psOpen()){try{var _su={endAt:LOG.endAt||Date.now()};if(_psOpen())_su.ps=_psClosed();await logRef().set(_su,{merge:true});}catch(e){}}
   var sid=S.sid,data=S.data;
   closeSessListeners();
   openSession(sid,data,n);
@@ -598,6 +599,7 @@ function openSession(sid,data,sess){
     var u={date:S.date,studentId:sid,studentName:S.name,endAt:firebase.firestore.FieldValue.delete(),fl:{out:false,inc:[],sig:''}};
     if(S.sess===2)u.sess=2;
     if(!snap.exists||!snap.data().startAt)u.startAt=Date.now();
+    var _pl=(snap.exists&&snap.data().ps)||[];if(_pl.length&&!_pl[_pl.length-1].b){var _nn=Date.now();u.ps=_pl.map(function(p){return p.b?{a:p.a,b:p.b}:{a:p.a,b:_nn};});}   // 다시 로그인하면 멈춤 해제
     return logRef().set(u,{merge:true});
   }).catch(function(e){console.warn(e);});
   // 선생님이 Study Plan을 저장하면 로그인 중인 태블릿에도 바로 반영돼요
@@ -611,7 +613,7 @@ function openSession(sid,data,sess){
   clearInterval(tickT);tickT=setInterval(paintBar,30000);
 }
 function logout(){
-  if(S){try{var lu={fl:flagsDoc(true)};if(!LOG.endAt)lu.endAt=Date.now();logRef().set(lu,{merge:true});}catch(e){}}
+  if(S){try{var lu={fl:flagsDoc(true)};if(!LOG.endAt)lu.endAt=Date.now();if(_psOpen())lu.ps=_psClosed();logRef().set(lu,{merge:true});}catch(e){}}
   setPresence('out');
   if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}if(unsubRoster){unsubRoster();unsubRoster=null;}
   clearInterval(tickT);
@@ -715,6 +717,7 @@ function commit(ePatch,vPatch){
   if(Object.keys(ue).length)u.e=ue;
   if(Object.keys(uv).length)u.v=uv;
   var fd=flagsDoc(false);if(!LOG.fl||LOG.fl.sig!==fd.sig||LOG.fl.out){u.fl=fd;LOG.fl=fd;}
+  if(_psOpen()){u.ps=_psClosed();LOG.ps=u.ps;}   // 멈춤 중에 항목을 체크하면 다시 시작
   u.j=calcJ();u.tl=calcTL();
   logRef().set(u,{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
@@ -862,6 +865,10 @@ function _addTimers(secs){secs.forEach(function(sec){
   sec.tm=1;
 });}
 function _hk(ms){var d=new Date(ms),p=function(n){return String(n).padStart(2,'0');};return p(d.getHours())+'시 '+p(d.getMinutes())+'분';}
+function _psList(){return Array.isArray(LOG.ps)?LOG.ps:[];}
+function _psOpen(){var l=_psList();return l.length&&!l[l.length-1].b?l[l.length-1]:null;}
+function _psMs(s,e){var t=0,n=Date.now();_psList().forEach(function(p){var a=Math.max(p.a,s),b=Math.min(p.b||n,e);if(b>a)t+=b-a;});return t;}
+function _psClosed(){var n=Date.now();return _psList().map(function(p){return p.b?{a:p.a,b:p.b}:{a:p.a,b:n};});}
 function _tmOf(sec){
   if(!sec||!sec.tm)return null;
   var a=sec.items.filter(function(i){return i.role==='ts';})[0],b=sec.items.filter(function(i){return i.role==='te';})[0];
@@ -870,14 +877,15 @@ function _tmOf(sec){
 }
 function _tmText(sec){
   var x=_tmOf(sec);if(!x)return '';
-  if(x.e)return _hk(x.s)+'~'+_hk(x.e)+', '+Math.max(0,Math.round((x.e-x.s)/60000))+'분 공부';
-  return _hk(x.s)+'~ 공부 중 ('+Math.max(0,Math.floor((Date.now()-x.s)/60000))+'분째)';
+  if(x.e)return _hk(x.s)+'~'+_hk(x.e)+', '+Math.max(0,Math.round((x.e-x.s-_psMs(x.s,x.e))/60000))+'분 공부';
+  if(_psOpen())return _hk(x.s)+'~ 멈춤 중 ⏸ ('+Math.max(0,Math.floor((Date.now()-x.s-_psMs(x.s,Date.now()))/60000))+'분 공부)';
+  return _hk(x.s)+'~ 공부 중 ('+Math.max(0,Math.floor((Date.now()-x.s-_psMs(x.s,Date.now()))/60000))+'분째)';
 }
 function paintTmr(){
   var el=$('tmr');if(!el||!S)return;var sec=S.secs[curSec],x=_tmOf(sec);
   el.textContent=x?_tmText(sec):'';el.style.display=x?'':'none';el.className='tmr'+(x&&!x.e?' run':'');
 }
-function calcTL(){var o=[];S.secs.forEach(function(sec){var x=_tmOf(sec);if(x)o.push(x);});return o;}
+function calcTL(){var o=[];S.secs.forEach(function(sec){var x=_tmOf(sec);if(x){x.p=_psMs(x.s,x.e||Date.now());o.push(x);}});return o;}
 function itemHtml(it,si,ii){
   var chk='<svg viewBox="0 0 24 24"><use href="#i-check"/></svg>',tm=LOG.e[it.id]?hm(LOG.e[it.id]):'';
   if(it.t==='check'){
@@ -923,7 +931,8 @@ function paintBar(){
   var st=LOG.startAt,en=LOG.endAt;
   $('tStart').textContent=st?hm(st):'--:--';
   $('tEnd').textContent=en?hm(en):'--:--';
-  var pct=0;if(st){pct=Math.max(0,Math.min(100,((en||Date.now())-st)/(S.totalMin*60000)*100));}
+  var pb=$('pauseBan');if(pb)pb.style.display=(_psOpen()&&!LOG.fin)?'':'none';
+  var pct=0;if(st){var _en=en||Date.now();pct=Math.max(0,Math.min(100,(_en-st-_psMs(st,_en))/(S.totalMin*60000)*100));}
   $('tFill').style.width=pct+'%';
 }
 var ASKS=[{k:'화장실 가고 싶어요',ic:'🚻',ok:'화장실 다녀오세요 🚻'},{k:'물 마시고 싶어요',ic:'💧',ok:'물 마시고 오세요 💧'}];
@@ -1082,7 +1091,7 @@ function flagsDoc(out){var c=calcFlags(),inc=out?c.inc:[];return {ord:c.ord,inc:
 function finishAll(){
   $('dName').textContent=S.name+', 수고했어요';
   if(!LOG.endAt){LOG.endAt=Date.now();}
-  try{logRef().set({endAt:LOG.endAt,fin:true},{merge:true});}catch(e){}   // fin: 이 회차 점검을 모두 마침
+  try{var _fu={endAt:LOG.endAt,fin:true};if(_psOpen()){_fu.ps=_psClosed();LOG.ps=_fu.ps;}logRef().set(_fu,{merge:true});}catch(e){}   // fin: 이 회차 점검을 모두 마침
   show('sDone');
 }
 
