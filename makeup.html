@@ -67,6 +67,7 @@ h1{font-size:20px;color:var(--navy);text-align:center;margin:0 0 16px}
 .it.cfm .r{color:var(--ok);font-weight:700}
 .it.dis{opacity:.6;cursor:default}
 .mhint{font-size:12.5px;color:var(--sub);text-align:center;margin-top:10px}
+.nc{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:9px 11px;margin-top:12px;font-size:12.5px;line-height:1.55;color:#92400e}
 </style>
 </head>
 <body>
@@ -113,6 +114,11 @@ function setLogo(src){
   else tryFile();
 }
 
+// 결석 기간 중 수업이 없는 날 안내
+function ncHtml(o){
+  var a=(o&&o.noClass)||[];if(!a.length)return '';
+  return '<div class="nc">※ 정규 수업이 없는 날('+a.map(function(x){return shortDate(x.date);}).join(', ')+')은 보강 대상에서 제외했습니다.</div>';
+}
 function show(big,title,sub,extra){root.innerHTML='<div class="card msg"><div class="big">'+big+'</div><div class="t">'+esc(title)+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+(extra||'')+'</div>';}
 
 /* ── 화면 그리기 ── */
@@ -155,6 +161,7 @@ function drawPicker(){
     +(S.changing?'새로 원하시는 날짜와 시간을 선택해 주세요. 선택하시면 기존 일정이 새 일정으로 바뀝니다.':'편하신 날짜와 시간을 선택해 주세요. 선택하신 일정으로 보강이 진행되며, 필요하시면 최대 2회까지 변경하실 수 있습니다.')+'</div>';
   var hasRec=(o.candidates||[]).some(function(c){return c.rec;});
   if(o.current)h+='<div class="cur">현재 일정: '+fmtDate(o.current.date)+' '+(o.current.time?fmtTime(o.current.time):'')+'</div>';
+  h+=ncHtml(o);
   h+='</div><div class="card"><div class="cal-head"><button class="nav" id="pm" '+(S.mi===0?'disabled':'')+'>◀</button><b>'+y+'년 '+m+'월</b><button class="nav" id="nm" '+(S.mi>=S.months.length-1?'disabled':'')+'>▶</button></div><div class="grid">';
   ['일','월','화','수','목','금','토'].forEach(function(l,i){h+='<div class="dow'+(i===6?' sat':i===0?' sun':'')+'">'+l+'</div>';});
   for(var i=0;i<startCol;i++)h+='<div></div>';
@@ -251,7 +258,7 @@ function drawMulti(){
     var lb=itemLabel(it),dis=!it.canChange;
     h+='<button class="it'+(i===M.idx?' act':'')+(lb.cls?' '+lb.cls:'')+(dis?' dis':'')+'" data-i="'+i+'"'+(dis?' disabled':'')+'><span class="l">'+shortDate(it.absentDate)+' 결석</span><span class="r">'+esc(lb.txt)+(dis?'<br>변경 불가':'')+'</span></button>';
   });
-  h+='</div></div>';
+  h+='</div>'+ncHtml(o)+'</div>';
   if(act){
     var cands=mCands(act),by={};
     cands.forEach(function(c){(by[c.date]=by[c.date]||[]).push(c);});

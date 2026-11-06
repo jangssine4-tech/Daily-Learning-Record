@@ -107,6 +107,12 @@ input,select,textarea{font-family:inherit;font-size:13px;color:var(--txt);outlin
 .bc-global{position:fixed;right:18px;bottom:18px;z-index:10000;touch-action:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .bc-global .sch-dd-btn{box-shadow:0 8px 24px rgba(11,44,92,.28);padding:10px 15px;font-size:12px;cursor:grab}
 .bc-global .sch-dd-panel{z-index:10001;max-height:70vh}
+/* 팝업 안 내용이 길면 줄바꿈해서, 아래 가로 스크롤을 움직이지 않아도 전부 보이게 */
+.bc-global .sch-dd-panel{overflow-x:hidden;box-sizing:border-box;width:min(460px,calc(100vw - 24px));max-width:calc(100vw - 24px);min-width:0!important}
+.bc-global .bc-row{flex-wrap:wrap;row-gap:5px}
+.bc-global .bc-row .bc-nm{flex-shrink:0}
+.bc-global .bc-row .bc-it{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;min-width:0;flex:1 1 140px}
+.bc-global .bc-row .bc-tag{white-space:normal}
 /* ── 시간표 상단 드롭다운 (성적표·상장 / 수업 없는 학생 / 점검 받을 학생) ── */
 .sch-dd{position:relative}
 @keyframes pgBlink{0%,100%{opacity:1}50%{opacity:.2}}
@@ -11955,6 +11961,7 @@ function renderMakeupCalendar(){
         // 결석 기간(시작일~종료일)으로만 저장된 기록은 기간 안의 평일마다 이름을 보여줌 (같은 학생의 그날 기록이 따로 있으면 중복 표시 안 함)
         if(!isSun2&&!isSat2)monthMakeups.forEach(function(m){
           if(!m.absentDate||!m.absentDateEnd||!(m.absentDateEnd>m.absentDate)||dateStr<=m.absentDate||dateStr>m.absentDateEnd)return;
+          if(!_mkClassDaysOnly(m.studentId,[dateStr],false).length)return;   // 그 학생의 수업이 없는 요일(예: 화)은 이름을 보여주지 않음
           if(makeups.some(function(z){return z.studentId===m.studentId&&z.absentDate===dateStr;}))return;
           var rk=m.id+'@'+dateStr;if(_chipSeen[rk])return;_chipSeen[rk]=true;
           cellChips.push({m:m,isAbsentCell:true});
@@ -12149,6 +12156,20 @@ async function _mkUpdateNotifyMsg(){
   var makeupDateStr=makeupDateVal?makeupDateVal.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1년 $2월 $3일'):'';
   var template=kc.absentMsg||'안녕하세요, 어머니~^^\n{날짜} {이름} 학생 결석으로 진행하지 못한 수업은 따로 보강할 예정입니다.\n아래 링크에서 편하신 보강 날짜와 시간을 선택해 주세요.\n\n👉 {링크}\n\n감사합니다~^^';
   var msg=template.replace(/\{이름\}/g,sName).replace(/\{날짜\}/g,absentDateStr).replace(/\{링크\}/g,bookingUrl||'(저장 후 링크가 생성됩니다)');
+  // 결석 기간 중 이 학생의 수업이 없는 날은 안내 한 줄을 링크 앞에 넣는다
+  try{
+    var _nsid=_mkCurStudentId();
+    if(_nsid&&absentDateVal&&absentDateEndVal&&absentDateEndVal>absentDateVal&&!makeupDateStr){
+      var _allD=_getMkWeekdays(absentDateVal,absentDateEndVal),_clD=_mkClassDaysOnly(_nsid,_allD,true);
+      var _ncD=_allD.filter(function(d){return _clD.indexOf(d)<0;});
+      if(_ncD.length){
+        var _KD=['일','월','화','수','목','금','토'];
+        var _ncTxt=_ncD.map(function(d){var q=new Date(d+'T12:00:00');return (q.getMonth()+1)+'/'+q.getDate()+'('+_KD[q.getDay()]+')';}).join(', ');
+        var _ncLine='※ 수업이 없는 날('+_ncTxt+')은 보강에서 제외했습니다.';
+        msg=msg.indexOf('👉')>=0?msg.replace('👉',_ncLine+'\n\n👉'):msg+'\n\n'+_ncLine;
+      }
+    }
+  }catch(e){console.warn('수업 없는 날 안내 실패',e);}
   // 보강 일정이 잡혀 있으면 메시지에 자동 추가
   if(makeupDateStr){
     var scheduleInfo='\n\n📅 보강 일정: '+makeupDateStr+(makeupPeriodTxt?' '+makeupPeriodTxt:'');
