@@ -11348,8 +11348,9 @@ function _mkOnAbsentRangeChange(){
     if(e&&endVal&&endVal<startVal){e.value='';info.textContent='📅 결석일: '+_fmtKorDate(startVal)+' (1일) — 종료일이 시작일보다 빠릅니다';}
     return;
   }
-  var days=_getMkWeekdays(startVal,endVal);
-  info.textContent='📅 '+_fmtKorDate(startVal)+' ~ '+_fmtKorDate(endVal)+' · 수업일 '+days.length+'일 (주말 제외)';
+  var days=_getMkWeekdays(startVal,endVal);var _sid=_mkCurStudentId();
+  if(_sid)days=_mkClassDaysOnly(_sid,days,true);
+  info.textContent='📅 '+_fmtKorDate(startVal)+' ~ '+_fmtKorDate(endVal)+' · 수업일 '+days.length+'일 ('+(_sid?'이 학생의 수업 요일 기준':'주말 제외')+')';
   _mkUpdateNotifyMsg();
 }
 function _fmtKorDate(iso){
@@ -11360,6 +11361,27 @@ function _getMkWeekdays(startISO,endISO){
   var days=[],cur=new Date(startISO+'T12:00:00'),end=new Date(endISO+'T12:00:00');
   while(cur<=end){var d=cur.getDay();if(d!==0&&d!==6)days.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
   return days;
+}
+// 결석 기간(평일 목록) 중 그 학생의 수업(정규·특강)이 있는 요일만 남김. keepFirst=true 면 시작일은 수업이 없어도 항상 포함
+function _mkClassDaysOnly(sId,days,keepFirst){
+  var s=students.find(function(x){return x.id===sId;});
+  if(!s)return days;
+  var DN=['일','월','화','수','목','금','토'];
+  return days.filter(function(d,i){
+    if(keepFirst&&i===0)return true;
+    var st=studentAtDate(s,d),dn=DN[new Date(d+'T12:00:00').getDay()];
+    var reg=(st.days||[]).indexOf(dn)>=0;
+    var sp=st.specialPeriods&&st.specialPeriods[dn];
+    return !!(reg||(sp&&sp.time));
+  });
+}
+// 보강 창에서 지금 선택된(또는 열려 있는 건의) 학생 id
+function _mkCurStudentId(){
+  var sel=$('mk-student-select');
+  if(sel&&sel.style.display!=='none'&&sel.value)return sel.value;
+  var id=($('mk-id')||{}).value||'';
+  var m=id?makeups.find(function(x){return x.id===id;}):null;
+  return m?m.studentId:'';
 }
 // 정규 외 시간 직접 입력
 function _mkOnManualTimeChange(){
@@ -12243,7 +12265,7 @@ async function saveMakeupUnified(){
     var absentDateEnd=_isAbsReason?(($('mk-absent-date-end')||{}).value||''):'';
     // 날짜 범위 계산 (주말 제외)
     var absentDays=(absentDateEnd&&absentDateEnd>absentDateStart)
-      ?_getMkWeekdays(absentDateStart,absentDateEnd)
+      ?_mkClassDaysOnly(sId,_getMkWeekdays(absentDateStart,absentDateEnd),true)
       :(absentDateStart?[absentDateStart]:[]);
     if(!absentDays.length)absentDays=[''];
     var firstDate=absentDays[0]||'';
@@ -12275,7 +12297,7 @@ async function saveMakeupUnified(){
       var _m0=makeups[idx>=0?idx:0],_st0=updateData.absentDate,_en0=updateData.absentDateEnd;
       if(_isAbsReason&&_m0&&_st0&&_en0&&_en0>_st0){
         var _made=0;
-        var _ds=_getMkWeekdays(_st0,_en0);
+        var _ds=_mkClassDaysOnly(_m0.studentId,_getMkWeekdays(_st0,_en0),true);
         for(var _k=0;_k<_ds.length;_k++){
           var _d=_ds[_k];if(_d===_st0)continue;
           if(makeups.some(function(z){return z.studentId===_m0.studentId&&z.absentDate===_d;}))continue;
