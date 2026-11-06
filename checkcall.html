@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1105-t</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1105-u</div>
   </div>
 </div>
 
@@ -428,13 +428,20 @@ function _ccAutoLink(t){   // 교재 준비 · 교재 숙제 · 영상 숙제 �
   });});
   return t;
 }
+function _ccOvTm(plan,t){   // 레슨 전용 계획표에도 구역별 시작·끝 설정(tm)을 반영
+  try{(t.sections||[]).forEach(function(sc){
+    if(!sc||sc.tmx!==undefined||!sc.k)return;
+    (plan.blocks||[]).forEach(function(b){(b.rows||[]).forEach(function(r){
+      if(sc.tmx===undefined&&((r.g||'')+'|'+(r.s||''))===sc.k&&(r.tm===0||r.tm===1))sc.tmx=r.tm;});});
+  });}catch(e){}
+}
 function ccResolve(plan,level,progress){
   if(!plan)return null;
   var p=ccNormProg(progress);
   if(/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim()))p='전체 Review';   // 전체 Review는 Review와 따로 편집
   // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
-    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));
+    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccOvTm(plan,_ot);
     _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off&&!i.del;});});   // 체크를 풀어 숨긴 항목은 학생 화면에서 제외
     return _ccAutoLink(_ot);
   }

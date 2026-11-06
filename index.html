@@ -1860,7 +1860,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1105-r';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1105-s';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3174,13 +3174,20 @@ function _ccAutoLink(t){   // 교재 준비 · 교재 숙제 · 영상 숙제 �
   });});
   return t;
 }
+function _ccOvTm(plan,t){   // 레슨 전용 계획표에도 구역별 시작·끝 설정(tm)을 반영
+  try{(t.sections||[]).forEach(function(sc){
+    if(!sc||sc.tmx!==undefined||!sc.k)return;
+    (plan.blocks||[]).forEach(function(b){(b.rows||[]).forEach(function(r){
+      if(sc.tmx===undefined&&((r.g||'')+'|'+(r.s||''))===sc.k&&(r.tm===0||r.tm===1))sc.tmx=r.tm;});});
+  });}catch(e){}
+}
 function ccResolve(plan,level,progress){
   if(!plan)return null;
   var p=ccNormProg(progress);
   if(/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim()))p='전체 Review';   // 전체 Review는 Review와 따로 편집
   // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
-    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccHwMigSecs(_ot.sections);
+    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccOvTm(plan,_ot);_ccHwMigSecs(_ot.sections);
     _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off&&!i.del;});});
     return _ccAutoLink(_ot);
   }
