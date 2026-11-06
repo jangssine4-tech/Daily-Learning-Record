@@ -1861,7 +1861,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1105-t';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1105-v';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -5473,6 +5473,7 @@ function initYearSelects(which){
 // OPTIMIZED goto - ensures populate only when needed
 function goto(view){
   var _prevView=window._curView;window._curView=view;
+  if(view!=='hwreview'&&typeof hwrStop==='function')hwrStop();
   // 학습일지(write)에서 다른 페이지로 이동 시 카메라 스트림 자동 종료
   if(view!=='write'&&typeof rrStopStream==='function'){
     rrStopStream();
@@ -25702,20 +25703,31 @@ if(document.readyState==='loading'){
    status: 제출 → 확인 / 재제출 ,  keep:true = 영구 보관(keep/ 폴더로 복사) */
 var _hwr={list:[],loaded:false,loading:false,filter:'new',urls:{},cur:null};
 function _hwrBucket(u){var b=u&&u.bucket;return b?firebase.app().storage('gs://'+b):firebase.storage();}
-function hwrInit(){hwrLoad(false);}
-async function hwrLoad(force){
-  if(_hwr.loading)return;
-  if(_hwr.loaded&&!force){hwrRender();return;}
-  _hwr.loading=true;hwrRender();
+function hwrInit(){hwrWatch();}
+var _hwrUnsub=null,_hwrFirst=true;
+/* 실시간: [숙제 사진 확인] 화면을 열어 둔 동안만 연결하고, 다른 화면으로 가면 끊어요.
+   처음에 최근 14일 분량을 한 번 읽고, 이후에는 새로 올라오거나 바뀐 사진만 읽습니다. */
+function hwrWatch(){
+  if(_hwrUnsub)return;
+  _hwr.loading=!_hwr.loaded;_hwrFirst=true;hwrRender();
+  var cut=Date.now()-15*86400000;
   try{
-    var d=new Date();d.setDate(d.getDate()-15);
-    var cut=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
-    var q=await db.collection('homeUploads').where('day','>=',cut).get();
-    var a=[];q.forEach(function(x){var o=x.data();o.id=x.id;a.push(o);});
-    a.sort(function(p,r){return (r.at||0)-(p.at||0);});
-    _hwr.list=a;_hwr.loaded=true;
-  }catch(e){console.warn('[숙제 사진]',e);toast('⚠️ 사진 목록을 불러오지 못했어요: '+((e&&e.code)||(e&&e.message)||e));}
-  _hwr.loading=false;hwrRender();
+    _hwrUnsub=db.collection('homeUploads').where('at','>',cut).orderBy('at','desc').limit(400).onSnapshot(function(q){
+      var a=[],added=0;
+      q.forEach(function(x){var o=x.data();o.id=x.id;a.push(o);});
+      if(!_hwrFirst&&_hwr.loaded){q.docChanges().forEach(function(c){if(c.type==='added'&&!c.doc.metadata.hasPendingWrites)added++;});}
+      _hwr.list=a;_hwr.loaded=true;_hwr.loading=false;_hwrFirst=false;
+      if(added)toast('📸 새 숙제 사진 '+added+'장이 올라왔어요');
+      hwrRender();
+    },function(e){
+      console.warn('[숙제 사진]',e);_hwr.loading=false;_hwrUnsub=null;
+      toast('⚠️ 사진 목록을 불러오지 못했어요: '+((e&&e.code)||(e&&e.message)||e));hwrRender();
+    });
+  }catch(e){console.warn(e);_hwr.loading=false;hwrRender();}
+}
+function hwrStop(){if(_hwrUnsub){try{_hwrUnsub();}catch(e){}_hwrUnsub=null;}}
+async function hwrLoad(force){ /* 수동 새로고침: 연결을 다시 맺어요 */
+  hwrStop();_hwr.loaded=false;hwrWatch();
 }
 function hwrFilter(f){_hwr.filter=f;hwrRender();}
 function _hwrStat(u){return u.keep?'keep':(u.status==='확인'?'ok':(u.status==='재제출'?'re':'new'));}
@@ -25732,7 +25744,7 @@ function hwrRender(){
   var chip=function(k,lb,n){var on=f===k;return '<button type="button" onclick="hwrFilter(\''+k+'\')" style="padding:6px 12px;border-radius:999px;border:1px solid '+(on?'var(--navy)':'var(--border)')+';background:'+(on?'var(--navy)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+';font-size:12px;font-weight:700;cursor:pointer">'+lb+' '+n+'</button>';};
   var h='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 12px">'
     +chip('new','확인 전',cnt.new)+chip('re','재제출 요청',cnt.re)+chip('ok','확인함',cnt.ok)+chip('keep','⭐ 영구 보관',cnt.keep)+chip('all','전체',L.length)
-    +'<button type="button" class="btn btn-outline btn-sm" style="margin-left:auto" onclick="hwrLoad(true)">'+(_hwr.loading?'불러오는 중…':'🔄 새로고침')+'</button></div>';
+    +'<button type="button" class="btn btn-outline btn-sm" style="margin-left:auto" onclick="hwrLoad(true)">'+(_hwr.loading?'불러오는 중…':'🔄 다시 연결')+'</button><span style="font-size:11px;color:#16a34a;font-weight:700">● 실시간</span></div>';
   if(_hwr.loading&&!L.length)h+='<div style="padding:30px;text-align:center;color:var(--txt3)">⏳ 불러오는 중...</div>';
   else if(!vis.length)h+='<div style="padding:30px;text-align:center;color:var(--txt3);font-size:13px">'+(f==='new'?'확인할 사진이 없어요 👍':'해당하는 사진이 없어요')+'</div>';
   else{
@@ -25774,11 +25786,13 @@ async function hwrOpen(id){
   var tm=u.at?new Date(u.at):null;
   var info=_bcEsc(u.name||'')+' · '+_bcEsc(u.itemLabel||'')+(tm?' · '+(tm.getMonth()+1)+'/'+tm.getDate()+' '+('0'+tm.getHours()).slice(-2)+':'+('0'+tm.getMinutes()).slice(-2):'');
   ov.innerHTML='<div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:8px;text-align:center">'+info+'</div>'
-    +'<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;width:100%"><img id="hwr-big" alt="" style="max-width:100%;max-height:100%;border-radius:8px;background:#000"><span id="hwr-bigph" style="color:#cbd5e1">⏳ 사진을 불러오는 중...</span></div>'
+    +'<div id="hwr-box" style="flex:1;min-height:0;width:100%;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center;touch-action:none"><img id="hwr-big" alt="" draggable="false" style="max-width:100%;max-height:100%;border-radius:8px;background:#000;transform-origin:center center;user-select:none;-webkit-user-drag:none;cursor:zoom-in"><span id="hwr-bigph" style="color:#cbd5e1">⏳ 사진을 불러오는 중...</span></div>'
+    +'<div style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:8px"><button class="btn btn-outline btn-sm" style="background:#fff" onclick="hwrZoom(1/1.4)">－</button><button class="btn btn-outline btn-sm" style="background:#fff;min-width:58px" id="hwr-zl" onclick="hwrZoomReset()">100%</button><button class="btn btn-outline btn-sm" style="background:#fff" onclick="hwrZoom(1.4)">＋</button><span style="color:#94a3b8;font-size:11px;margin-left:6px">두 손가락·마우스 휠·더블클릭으로도 확대돼요</span></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px">'
     +'<button class="btn btn-green btn-sm" onclick="hwrSet(\'확인\')">✅ 확인</button>'
     +'<button class="btn btn-outline btn-sm" style="background:#fff" onclick="hwrSet(\'재제출\')">🔁 재제출 요청</button>'
     +'<button class="btn btn-outline btn-sm" style="background:#fff" onclick="hwrKeep()">'+(u.keep?'⭐ 보관 중':'⭐ 영구 보관')+'</button>'
+    +'<button class="btn btn-outline btn-sm" style="background:#fff;color:#dc2626" onclick="hwrDel()">🗑 삭제</button>'
     +'<button class="btn btn-outline btn-sm" style="background:#fff" onclick="hwrNav(-1)">◀ 이전</button>'
     +'<button class="btn btn-outline btn-sm" style="background:#fff" onclick="hwrNav(1)">다음 ▶</button>'
     +'<button class="btn btn-outline btn-sm" style="background:#fff" onclick="hwrClose()">닫기</button></div>';
@@ -25787,8 +25801,58 @@ async function hwrOpen(id){
     var url=_hwr.urls['b:'+id];
     if(!url){url=await _hwrBucket(u).ref(u.path).getDownloadURL();_hwr.urls['b:'+id]=url;}
     if(_hwr.cur!==id)return;
-    var im=document.getElementById('hwr-big');if(im){im.src=url;var p=document.getElementById('hwr-bigph');if(p)p.remove();}
+    var im=document.getElementById('hwr-big');if(im){im.src=url;var p=document.getElementById('hwr-bigph');if(p)p.remove();hwrZoomInit();}
   }catch(e){var p2=document.getElementById('hwr-bigph');if(p2)p2.textContent='사진을 열 수 없어요 ('+((e&&e.code)||'오류')+')';}
+}
+
+var _hwz={s:1,x:0,y:0};
+function _hwzApply(){
+  var im=document.getElementById('hwr-big');if(!im)return;
+  var s=_hwz.s;
+  if(s<=1){_hwz.x=0;_hwz.y=0;}
+  im.style.transform='translate('+_hwz.x+'px,'+_hwz.y+'px) scale('+s+')';
+  im.style.cursor=s>1?'grab':'zoom-in';
+  var l=document.getElementById('hwr-zl');if(l)l.textContent=Math.round(s*100)+'%';
+}
+function hwrZoom(f){_hwz.s=Math.min(6,Math.max(1,_hwz.s*f));_hwzApply();}
+function hwrZoomReset(){_hwz={s:1,x:0,y:0};_hwzApply();}
+function hwrZoomInit(){
+  _hwz={s:1,x:0,y:0};_hwzApply();
+  var box=document.getElementById('hwr-box'),im=document.getElementById('hwr-big');if(!box||!im)return;
+  box.addEventListener('wheel',function(e){e.preventDefault();hwrZoom(e.deltaY<0?1.15:1/1.15);},{passive:false});
+  im.addEventListener('dblclick',function(){if(_hwz.s>1)hwrZoomReset();else{_hwz.s=2.5;_hwzApply();}});
+  var pts={},d0=0,s0=1,drag=null;
+  var dist=function(){var k=Object.keys(pts);if(k.length<2)return 0;var a=pts[k[0]],b=pts[k[1]];return Math.hypot(a.x-b.x,a.y-b.y);};
+  box.addEventListener('pointerdown',function(e){
+    pts[e.pointerId]={x:e.clientX,y:e.clientY};try{box.setPointerCapture(e.pointerId);}catch(x){}
+    if(Object.keys(pts).length===2){d0=dist();s0=_hwz.s;drag=null;}
+    else drag={x:e.clientX,y:e.clientY,ox:_hwz.x,oy:_hwz.y};
+  });
+  box.addEventListener('pointermove',function(e){
+    if(!pts[e.pointerId])return;pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    var n=Object.keys(pts).length;
+    if(n>=2&&d0>0){_hwz.s=Math.min(6,Math.max(1,s0*dist()/d0));_hwzApply();}
+    else if(n===1&&drag&&_hwz.s>1){_hwz.x=drag.ox+(e.clientX-drag.x);_hwz.y=drag.oy+(e.clientY-drag.y);_hwzApply();}
+  });
+  var up=function(e){delete pts[e.pointerId];d0=0;var k=Object.keys(pts);if(k.length===1){var p=pts[k[0]];drag={x:p.x,y:p.y,ox:_hwz.x,oy:_hwz.y};}else drag=null;};
+  box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);
+}
+
+async function hwrDel(){
+  var u=_hwr.list.find(function(x){return x.id===_hwr.cur;});if(!u)return;
+  var msg='이 사진을 삭제할까요?\n삭제하면 되돌릴 수 없어요.';
+  if(u.keep)msg='⭐ 영구 보관한 사진이에요. 보관본까지 모두 삭제할까요?\n삭제하면 되돌릴 수 없어요.';
+  if(!(await showConfirm(msg,'삭제','취소',true)))return;
+  var st=_hwrBucket(u),paths=[u.path,u.thumb,u.keepPath,u.keepThumb].filter(Boolean);
+  for(var i=0;i<paths.length;i++){try{await st.ref(paths[i]).delete();}catch(e){console.warn('[삭제]',paths[i],e);}}
+  try{
+    var f=_hwr.filter,vis=_hwr.list.filter(function(x){return f==='all'||(f==='keep'?!!x.keep:_hwrStat(x)===f);});
+    var i0=vis.findIndex(function(x){return x.id===u.id;}),nx=vis[i0+1]||vis[i0-1];
+    await db.collection('homeUploads').doc(u.id).delete();
+    _hwr.list=_hwr.list.filter(function(x){return x.id!==u.id;});
+    toast('🗑 삭제했어요');hwrRender();
+    if(nx&&nx.id!==u.id)hwrOpen(nx.id);else hwrClose();
+  }catch(e){console.warn(e);toast('❌ 삭제하지 못했어요: '+((e&&e.code)||(e&&e.message)||e));}
 }
 function hwrClose(){var ov=document.getElementById('hwr-ov');if(ov)ov.remove();_hwr.cur=null;}
 function hwrNav(d){
@@ -28107,7 +28171,7 @@ function _hiddenUsersRow(){
    +hid.map(function(u){return '<span style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:4px 8px">'+dgEsc(u.name||'')+' <span style="color:var(--txt3)">'+dgEsc(u.loginId||'')+'</span> <button class="btn btn-outline btn-xs" onclick="restoreAdminUser(\''+u.id+'\')">복구</button> <button class="btn btn-outline btn-xs" style="border-color:#dc2626;color:#dc2626" onclick="purgeAdminUser(\''+u.id+'\')">완전 삭제</button></span>';}).join('')+'</div></td></tr>';
 }
 var _helpTxt={
- hwr:['📸 숙제 사진 확인','학생이 홈체크에 올린 <b>숙제 사진</b>이 모입니다. 사진을 눌러 크게 보고 <b>✅ 확인</b> 또는 <b>🔁 재제출 요청</b>을 눌러 주세요. 확인한 사진은 학생이 지울 수 없고, 재제출을 요청하면 학생 화면에 "다시 올려 주세요"가 보입니다.<br><b>⭐ 영구 보관</b>한 사진만 14일이 지나도 남습니다. 나머지 사진은 14일 뒤 자동으로 삭제됩니다.'],
+ hwr:['📸 숙제 사진 확인','학생이 홈체크에 올린 <b>숙제 사진</b>이 모입니다. 사진을 눌러 크게 보고 <b>✅ 확인</b> 또는 <b>🔁 재제출 요청</b>을 눌러 주세요. 확인한 사진은 학생이 지울 수 없고, 재제출을 요청하면 학생 화면에 "다시 올려 주세요"가 보입니다.<br><b>🗑 삭제</b>를 누르면 사진이 완전히 지워집니다.<br><b>⭐ 영구 보관</b>한 사진만 14일이 지나도 남습니다. 나머지 사진은 14일 뒤 자동으로 삭제됩니다.'],
  trfiles:['📎 파일 업로드 안내','<b>PDF 파일로 올려 주세요.</b> PDF만 [미리보기]와 인쇄가 가능합니다.<br>한글(hwp)·워드 등 다른 형식은 [내려받기]만 되고 미리보기와 인쇄가 되지 않으니, PDF로 저장해서 올려 주시기 바랍니다.'],
  retire:['🚪 퇴사 처리','퇴사일을 정하면 재직 명단에서 빠지고 [퇴사] 탭으로 이동합니다.<br>급여(회계 &gt; 강사)에는 퇴사일이 속한 달까지 계속 보이고, 퇴사일 다음 날부터는 근무시간이 0시간으로 계산됩니다.<br>기록은 지워지지 않습니다. 잘못 눌렀다면 퇴사 탭에서 [재직 복귀]로 되돌릴 수 있습니다.'],
  purge:['🗑 삭제 (영구 삭제)','계정이 완전히 지워지며, 근무 시간표와 시급 설정도 함께 사라집니다. 되돌릴 수 없으므로 다음의 경우에만 사용해 주시기 바랍니다.<ol style="margin:4px 0 6px 16px;padding:0"><li>같은 아이디가 중복 등록된 경우</li><li>잘못 만든 계정인 경우</li><li>급여 자료의 보관기간이 지나 삭제할 필요가 있는 경우</li></ol>삭제 전에 필요한 급여 자료는 [이미지 저장]으로 보관하시기 바랍니다.<br>이미 작성된 보고서 등의 기록은 이름이 남아 있어 그대로 보입니다.'],

@@ -79,12 +79,12 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .itp.on .cb{background:var(--g);border-color:var(--g)}.itp.on .cb svg{opacity:1}
 .ph{display:flex;flex-wrap:wrap;gap:10px;padding:2px 16px 14px}
 .it0{padding-bottom:12px}.it0+.ph{padding-top:0}
-.pc{position:relative;width:78px;border-radius:12px;background:var(--line2);text-align:center;padding:4px 4px 6px;font-size:11px}
+.pc{position:relative;width:84px;border-radius:12px;background:var(--line2);text-align:center;padding:4px 4px 6px;font-size:11px}
 .pc img{width:100%;height:68px;object-fit:cover;border-radius:8px;display:block}
 .pc .pi{display:flex;height:68px;align-items:center;justify-content:center;font-size:26px}
 .pc small{display:block;margin-top:3px;font-weight:700;color:var(--g2);line-height:1.25}
 .pc.re{background:#FDECEC}.pc.re small{color:var(--red)}.pc.ok small{color:#3E63DD}
-.px{position:absolute;top:-7px;right:-7px;width:24px;height:24px;border-radius:50%;background:#14302B;color:#fff;font-size:15px;line-height:1;padding:0}
+.pd{display:block;width:100%;margin-top:5px;padding:5px 0;border-radius:8px;background:#fff;color:var(--red);font-weight:800;font-size:12px;box-shadow:0 0 0 1px #F3C4C6}.pd:active{background:#FDECEC}
 .pbtn{flex:none;display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border-radius:12px;background:#FDEBF3;color:#C2417A;font-weight:800;font-size:inherit;line-height:1.2;cursor:pointer;white-space:nowrap}
 .pbtn:active{background:#F8D3E3}.pbtn.off{background:var(--line2);color:var(--ink3);cursor:default}
 .pbtn input{display:none}
@@ -277,7 +277,10 @@ function watchUp(k){
     if(logKey!==k)return;
     var m={};q.forEach(function(d){var x=d.data();x.id=d.id;(m[x.itemId]=m[x.itemId]||[]).push(x);});
     Object.keys(m).forEach(function(i){m[i].sort(function(a,b){return (a.at||0)-(b.at||0);});});
-    UPL=m;render();
+    var old=UPL;UPL=m;
+    /* 사진이 모두 지워진 항목은 체크도 풀어요 (선생님이 지운 경우 포함) */
+    if(!q.metadata.fromCache)Object.keys(old).forEach(function(i){if(old[i].length&&!(m[i]||[]).length&&LOG.e[i])setChecked(i,false);});
+    render();
   },function(e){console.warn('[업로드 목록]',e);});
 }
 function photoHtml(it){
@@ -290,7 +293,7 @@ function photoHtml(it){
     h+='<div class="ph">';
     ups.forEach(function(u){
       var re=u.status==='재제출',ok=u.status==='확인';
-      h+='<div class="pc'+(re?' re':(ok?' ok':''))+'">'+(LP[u.id]?'<img src="'+LP[u.id]+'" alt="">':'<span class="pi">🖼</span>')+'<small>'+(re?'다시 올려 주세요':(ok?'확인됐어요':'올렸어요'))+'</small>'+((!ok)?'<button class="px" onclick="delPhoto(\''+esc(u.id)+'\')" aria-label="사진 지우기">×</button>':'')+'</div>';
+      h+='<div class="pc'+(re?' re':(ok?' ok':''))+'">'+(LP[u.id]?'<img src="'+LP[u.id]+'" alt="">':'')+'<small>'+(re?'다시 올려 주세요':(ok?'확인됐어요':'올렸어요'))+'</small>'+((!ok)?'<button class="pd" onclick="delPhoto(\''+esc(u.id)+'\')">삭제</button>':'')+'</div>';
     });
     h+='</div>';
   }
