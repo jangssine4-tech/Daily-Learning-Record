@@ -58,6 +58,15 @@ h1{font-size:20px;color:var(--navy);text-align:center;margin:0 0 16px}
 .msg .s{font-size:14px;color:var(--sub);margin-top:6px}
 .err{color:#b91c1c;font-size:13px;text-align:center;margin-top:10px;min-height:18px}
 .note{font-size:12px;color:var(--sub);text-align:center;margin-top:10px}
+.its{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.it{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;padding:12px 13px;border:1.5px solid var(--line);background:#fff;border-radius:12px;font-family:inherit;font-size:14px;color:var(--txt);cursor:pointer}
+.it .l{font-weight:700;color:var(--navy)}
+.it .r{font-size:13px;color:var(--sub);text-align:right}
+.it.act{border-color:var(--accent);background:#eff6ff}
+.it.sel .r{color:var(--accent);font-weight:700}
+.it.cfm .r{color:var(--ok);font-weight:700}
+.it.dis{opacity:.6;cursor:default}
+.mhint{font-size:12.5px;color:var(--sub);text-align:center;margin-top:10px}
 </style>
 </head>
 <body>
@@ -109,6 +118,7 @@ function show(big,title,sub,extra){root.innerHTML='<div class="card msg"><div cl
 /* ── 화면 그리기 ── */
 function render(o){
   S.offer=o;setLogo(o.logo);
+  if(o.state==='multi')return renderMulti(o);
   if(o.state==='done')return show('✅','이미 보강이 완료되었습니다','');
   if(o.state==='confirmed'&&!S.changing)return renderConfirmed(o);
   var cands=o.candidates||[];
@@ -177,13 +187,165 @@ function drawPicker(){
   if(window._notice){document.getElementById('err').textContent=window._notice;window._notice='';}
 }
 
+/* ── 여러 날 결석: 한 링크에서 결석일마다 날짜·시간을 고르고 한 번에 제출 ── */
+function mins(t){return parseInt(t.slice(0,2))*60+parseInt(t.slice(3));}
+function slotEnd(x){return x.end||endOf(x.time,60);}
+function overlapSlots(a,b){if(a.date!==b.date)return false;return mins(a.time)<mins(slotEnd(b))&&mins(b.time)<mins(slotEnd(a));}
+// 다른 결석일에 이미 고른(또는 확정된) 시간
+function mEff(excludeId){
+  var out=[];
+  S.m.items.forEach(function(it){
+    if(it.id===excludeId)return;
+    var s=S.m.sel[it.id];
+    if(s)out.push({date:s.d,time:s.t,end:s.e});
+    else if(it.current&&it.current.time)out.push({date:it.current.date,time:it.current.time,end:endOf(it.current.time,60)});
+  });
+  return out;
+}
+function mCands(it){
+  var eff=mEff(it.id);
+  return (S.offer.candidates||[]).filter(function(c){
+    if(c.date>it.until)return false;
+    return !eff.some(function(x){return overlapSlots(x,c);});
+  });
+}
+function renderMulti(o){
+  var keep=S.keep||{};S.keep=null;
+  var items=o.items||[];
+  S.m={items:items,idx:-1,sel:{},mi:0,date:'',time:''};
+  // 직전에 골라 둔 선택 중 아직 유효한 것은 되살린다
+  items.forEach(function(it){
+    var k=keep[it.id];if(!k||!it.canChange)return;
+    var ok=mCands(it).some(function(c){return c.date===k.d&&c.time===k.t;});
+    if(ok)S.m.sel[it.id]=k;
+  });
+  var first=-1;
+  items.forEach(function(it,i){if(first<0&&it.canChange&&it.status==='open'&&!S.m.sel[it.id])first=i;});
+  mSelect(first);
+}
+function mSelect(i){
+  var M=S.m;M.idx=i;M.date='';M.time='';M.mi=0;
+  if(i>=0){
+    var it=M.items[i],s=M.sel[it.id];
+    var ms={};mCands(it).forEach(function(c){ms[c.date.slice(0,7)]=1;});
+    if(s)ms[s.d.slice(0,7)]=1;
+    M.months=Object.keys(ms).sort();
+    if(s){M.date=s.d;M.time=s.t;M.mi=Math.max(0,M.months.indexOf(s.d.slice(0,7)));}
+  }
+  drawMulti();
+}
+function itemLabel(it){
+  var s=S.m.sel[it.id];
+  if(s)return {cls:'sel',txt:'✔ '+shortDate(s.d)+' '+fmtTime(s.t)};
+  if(it.current&&it.current.date)return {cls:'cfm',txt:'확정 '+shortDate(it.current.date)+' '+(it.current.time?fmtTime(it.current.time):'')};
+  return {cls:'',txt:'미선택'};
+}
+function drawMulti(){
+  var o=S.offer,M=S.m,items=M.items,act=M.idx>=0?items[M.idx]:null;
+  var nSel=Object.keys(M.sel).length;
+  var nOpen=items.filter(function(it){return it.canChange&&it.status==='open'&&!M.sel[it.id];}).length;
+  var h='<div class="card who"><b>'+esc(o.studentName)+'</b> 학생 · 결석 '+items.length+'일'
+    +'<div class="sub" style="margin-top:2px">결석하신 날마다 편하신 보강 날짜와 시간을 선택해 주세요. 모두 고르신 뒤 맨 아래 버튼을 누르시면 한 번에 등록됩니다. 필요하시면 일정마다 최대 2회까지 변경하실 수 있습니다.</div>'
+    +'<div class="its">';
+  items.forEach(function(it,i){
+    var lb=itemLabel(it),dis=!it.canChange;
+    h+='<button class="it'+(i===M.idx?' act':'')+(lb.cls?' '+lb.cls:'')+(dis?' dis':'')+'" data-i="'+i+'"'+(dis?' disabled':'')+'><span class="l">'+shortDate(it.absentDate)+' 결석</span><span class="r">'+esc(lb.txt)+(dis?'<br>변경 불가':'')+'</span></button>';
+  });
+  h+='</div></div>';
+  if(act){
+    var cands=mCands(act),by={};
+    cands.forEach(function(c){(by[c.date]=by[c.date]||[]).push(c);});
+    var ym=(M.months||[])[M.mi];
+    h+='<div class="card"><div class="tt" style="margin-top:0">'+fmtDate(act.absentDate)+' 결석 보강 · 날짜와 시간 선택</div>';
+    if(act.status==='confirmed'&&act.current)h+='<div class="cur" style="margin-top:0;margin-bottom:10px">현재 일정: '+fmtDate(act.current.date)+' '+(act.current.time?fmtTime(act.current.time):'')+'<span style="font-weight:400"> · 변경 '+act.changesLeft+'번 가능</span></div>';
+    if(!cands.length||!ym){
+      h+='<div class="hint">선택 가능한 시간이 없습니다.<br>학원에서 따로 연락드려 일정을 안내해 드리겠습니다.</div>';
+    }else{
+      var y=+ym.slice(0,4),m=+ym.slice(5);
+      var first=new Date(y,m-1,1).getDay(),last=new Date(y,m,0).getDate();
+      var td=new Date();var todayIso=td.getFullYear()+'-'+pad(td.getMonth()+1)+'-'+pad(td.getDate());
+      var hasRec=cands.some(function(c){return c.rec;});
+      h+='<div class="cal-head"><button class="nav" id="pm" '+(M.mi===0?'disabled':'')+'>◀</button><b>'+y+'년 '+m+'월</b><button class="nav" id="nm" '+(M.mi>=M.months.length-1?'disabled':'')+'>▶</button></div><div class="grid">';
+      ['일','월','화','수','목','금','토'].forEach(function(l,i){h+='<div class="dow'+(i===6?' sat':i===0?' sun':'')+'">'+l+'</div>';});
+      for(var i=0;i<first;i++)h+='<div></div>';
+      for(var d=1;d<=last;d++){
+        var iso=y+'-'+pad(m)+'-'+pad(d),col=(first+d-1)%7;
+        var cls='d'+(col===6?' sat':col===0?' sun':'')+(iso===todayIso?' today':'');
+        var can=!!by[iso];
+        if(can)cls+=' ok'+(M.date===iso?' on':'')+(by[iso].some(function(c){return c.rec;})?' rec':'');
+        h+='<button class="'+cls+'" '+(can?'data-d="'+iso+'"':'disabled')+'>'+d+'</button>';
+      }
+      h+='</div><div class="legend"><span><i style="background:#f0f5ff;border:1px solid #c7d7f5"></i>선택 가능</span>'+(hasRec?'<span><span style="color:#f59e0b">★</span> 추천</span>':'')+'<span><i style="background:#fff;border:1px solid #e2e8f0"></i>마감·휴무</span></div>';
+      if(M.date&&by[M.date]){
+        h+='<div class="tt">'+fmtDate(M.date)+' 시간 선택</div><div class="slots">';
+        by[M.date].forEach(function(c){h+='<button class="slot'+(c.rec?' rec':'')+(M.time===c.time?' on':'')+'" data-t="'+c.time+'" data-e="'+(c.end||'')+'">'+range(c.time,c.end)+(c.rec?'<span class="rb">★ 추천</span>':'')+'</button>';});
+        h+='</div>';
+      }else h+='<div class="hint">날짜를 눌러 주세요</div>';
+      if(hasRec)h+='<div class="recinfo"><span class="rbi">★ 추천</span> 버튼이 있는 시간은 학생의 <b>정규 수업 바로 앞·뒤로 이어서</b> 올 수 있는 시간이에요.</div>';
+    }
+    h+='</div>';
+  }
+  h+='<div class="card" style="padding:12px 16px"><button class="btn" id="go" style="margin-top:4px" '+(nSel?'':'disabled')+'>'+(nSel?nSel+'건 한 번에 선택하기':'날짜와 시간을 선택해 주세요')+'</button>'
+    +(nSel&&nOpen?'<div class="mhint">아직 고르지 않은 결석일이 '+nOpen+'건 있어요. 나중에 같은 링크로 이어서 선택하셔도 됩니다.</div>':'')
+    +'<div class="err" id="err"></div></div><div class="note">부족한 부분은 보강 수업에서 빠짐없이 챙겨 지도하도록 하겠습니다.</div>'+diagHtml(o);
+  root.innerHTML=h;
+  root.querySelectorAll('.it').forEach(function(b){b.onclick=function(){if(b.disabled)return;mSelect(+b.dataset.i);
+    var c=root.querySelector('.card:nth-of-type(2)');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'nearest'});};});
+  var pm=document.getElementById('pm'),nm=document.getElementById('nm');
+  if(pm)pm.onclick=function(){M.mi--;M.date='';M.time='';drawMulti();};
+  if(nm)nm.onclick=function(){M.mi++;M.date='';M.time='';drawMulti();};
+  root.querySelectorAll('.d.ok').forEach(function(b){b.onclick=function(){M.date=b.dataset.d;M.time='';drawMulti();
+    var t=root.querySelector('.tt:nth-of-type(1)');var tt=root.querySelectorAll('.tt');if(tt.length>1&&tt[1].scrollIntoView)tt[1].scrollIntoView({behavior:'smooth',block:'nearest'});};});
+  root.querySelectorAll('.slot').forEach(function(b){b.onclick=function(){mPickSlot(b.dataset.t,b.dataset.e);};});
+  document.getElementById('go').onclick=mSubmit;
+  if(window._notice){document.getElementById('err').textContent=window._notice;window._notice='';}
+}
+function mPickSlot(t,e){
+  var M=S.m,it=M.items[M.idx];
+  M.sel[it.id]={d:M.date,t:t,e:e||endOf(t,60)};
+  M.time=t;
+  // 다음으로 아직 고르지 않은 결석일로 자동 이동
+  var nx=-1;
+  M.items.forEach(function(x,i){if(nx<0&&i!==M.idx&&x.canChange&&x.status==='open'&&!M.sel[x.id])nx=i;});
+  if(nx>=0){
+    window._notice='✔ '+shortDate(it.absentDate)+' 결석분 선택 완료 · 다음 결석일을 선택해 주세요';
+    mSelect(nx);
+    window.scrollTo({top:0,behavior:'smooth'});
+  }else drawMulti();
+}
+function mSubmit(){
+  var M=S.m,picks=[];
+  M.items.forEach(function(it){var s=M.sel[it.id];if(s)picks.push({id:it.id,date:s.d,time:s.t});});
+  if(!picks.length)return;
+  var go=document.getElementById('go'),err=document.getElementById('err');
+  go.disabled=true;go.textContent='처리 중…';err.textContent='';
+  var sel=M.sel,items=M.items,name=S.offer.studentName;
+  fnConfirmMulti({makeupId:MID,token:TOKEN,picks:picks}).then(function(r){
+    var d=r.data;
+    if(d.ok){
+      var byId={};items.forEach(function(it){byId[it.id]=it;});
+      var lines=d.results.map(function(x){return shortDate(byId[x.id].absentDate)+' 결석 → <b>'+fmtDate(x.date)+' '+range(x.time,x.end)+'</b>';}).join('<br>');
+      show('🎉','보강 일정이 등록되었습니다','<b>'+esc(name)+'</b> 학생<br><br>'+lines+'<br><br>그 시간에 뵙겠습니다. 감사합니다!',
+        '<button class="btn ghost" id="again">일정 다시 변경하기</button>');
+      document.getElementById('again').onclick=function(){root.innerHTML='<div class="card msg"><div class="s">불러오는 중…</div></div>';load();};
+      return;
+    }
+    var keep={};Object.keys(sel).forEach(function(k){if(k!==d.id)keep[k]=sel[k];});
+    if(d.reason==='full'){S.keep=keep;window._notice='방금 다른 학생이 먼저 선택한 시간이 있습니다. 해당 결석일의 시간을 다시 선택해 주세요.';}
+    else if(d.reason==='overlap'){S.keep=keep;window._notice='같은 날 시간이 겹치는 선택이 있습니다. 해당 결석일의 시간을 다시 선택해 주세요.';}
+    else if(d.reason==='limit'){window._notice='변경 가능 횟수를 모두 사용한 일정이 있습니다. 변경이 필요하시면 학원으로 연락 부탁드립니다.';}
+    else window._notice='';
+    load();
+  }).catch(function(){go.disabled=false;go.textContent='다시 시도';err.textContent='처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';});
+}
+
 var DBG=qs.get('debug')==='1'?'mk-diag-2026':'';
 function diagHtml(o){
   if(!DBG||!o.diag)return '';
   var rows=o.diag.map(function(x){return esc(x.date+' '+x.time+' → '+x.why+(x.info?' ('+x.info+')':''));});
   return '<div class="note" style="text-align:left;margin-top:14px;word-break:break-all">[진단]<br>'+(rows.join('<br>')||'후보 계산 결과 없음')+'</div>';
 }
-var fnGet,fnConfirm;
+var fnGet,fnConfirm,fnConfirmMulti;
 function load(){
   fnGet({makeupId:MID,token:TOKEN,debug:DBG}).then(function(r){render(r.data);})
   .catch(function(){brandText();logoSet=true;show('⚠️','링크를 확인할 수 없습니다','링크가 잘못되었거나 만료되었습니다.<br>학원으로 문의해 주세요.');});
@@ -215,7 +377,7 @@ else{
   try{
     firebase.initializeApp(FIREBASE_CONFIG);
     var fns=firebase.app().functions(REGION);
-    fnGet=fns.httpsCallable('getMakeupOffer');fnConfirm=fns.httpsCallable('confirmMakeupSlot');
+    fnGet=fns.httpsCallable('getMakeupOffer');fnConfirm=fns.httpsCallable('confirmMakeupSlot');fnConfirmMulti=fns.httpsCallable('confirmMakeupSlots');
     load();
   }catch(e){brandText();show('⚠️','설정 오류','Firebase 설정이 필요합니다.');}
 }
