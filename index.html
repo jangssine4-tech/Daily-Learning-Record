@@ -1867,7 +1867,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1106-c';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1106-d';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -28587,29 +28587,8 @@ async function _hcJournal(){
       if(x.j){ch=fill('r-hw-book',x.j.hwBook)||ch;ch=fill('r-hw-video',x.j.hwVideo)||ch;ch=fill('r-hw-photo',x.j.hwPhoto)||ch;}
       if(ch&&typeof combineHw==='function')combineHw();
     }
-    /* 올린 사진 증빙: 건수·확인 상태 + 사진 보기, 재제출 요청이 있으면 사진 숙제 칸을 미제출로 */
-    try{
-      var uq=await db.collection('homeUploads').where('lk','==',_hcLogId(sid,key,les)).get();
-      var ups=[];uq.forEach(function(d2){var o=d2.data();o.id=d2.id;ups.push(o);});
-      ups.sort(function(a,b){return (a.at||0)-(b.at||0);});
-      if(ups.length){
-        var cn={ok:0,re:0,nw:0};ups.forEach(function(u){if(u.status==='확인')cn.ok++;else if(u.status==='재제출')cn.re++;else cn.nw++;});
-        var old14=ups.filter(function(u){return (u.at||0)<Date.now()-14*86400000;}).length;
-        window._hcUps=ups;
-        var ln=document.createElement('div');ln.style.cssText='margin-top:4px';
-        ln.innerHTML='📷 올린 사진 '+ups.length+'장 · 확인 '+cn.ok+' · 재제출 요청 '+cn.re+' · 확인 전 '+cn.nw+' <button type="button" class="btn btn-outline btn-sm" style="padding:1px 8px;font-size:11px;background:#fff" onclick="_hcOpenUps()">사진 보기</button>'+(old14?' <span style="color:#92400e">(14일이 지난 '+old14+'장은 NAS에서 찾아 보세요)</span>':'');
-        box.appendChild(ln);
-        var pe=g('r-hw-photo');
-        if(cn.re&&pe&&(!pe.value||pe.value==='제출')){pe.value='미제출';if(typeof combineHw==='function')combineHw();}
-      }
-    }catch(e3){console.warn('올린 사진 조회 실패',e3);}
-    anchor.parentNode.insertBefore(box,anchor.nextSibling);
+    /* 안내 박스는 화면에 보여 주지 않아요 (숙제 칸 자동 채우기만 함) */
   }catch(e){console.warn('홈체크 일지 표시 실패',e);}
-}
-function _hcOpenUps(){
-  var L=(window._hcUps||[]).slice();if(!L.length)return;
-  _hwr._sv={list:_hwr.list,filter:_hwr.filter};_hwr.list=L;_hwr.filter='all';_hwr._jr=true;
-  hwrOpen(L[0].id);
 }
 (function(){
   var _o=window.startReport;
@@ -28739,8 +28718,7 @@ function _wlAtt(lv){
 }
 function _wlRwHtml(L){
   var c=window._rwCfg;if(!c||c.enabled===0||!_wl.log)return '';
-  var at=L.att||'',h='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:11px"><b style="margin-right:2px">수업 태도</b>'
-    +_ATT_LV.map(function(k){var on=at===k;return '<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 7px;'+(on?'background:#dcfce7;border-color:#16a34a;color:#166534':'')+'" onclick="event.stopPropagation();_wlAtt(\''+k+'\')">'+_ATT_LB[k]+'</button>';}).join('')+(at?'':'<span style="color:#b45309">← 체크하면 학생 카드 조건에 반영돼요</span>')+'</div>';
+  var h='';
   var R=L.rw;
   if(R&&R.pick!==undefined&&R.cards&&R.cards[R.pick]){var pc=R.cards[R.pick],id=_ccDocId(_wl.date,_wl.sid,_wl.sess);
     h+='<div style="margin-top:6px;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">🎴 <b>'+_bcEsc(_rwPrizeText(pc))+'</b>'+(R.streak?' <span style="color:#c2410c">🔥'+R.streak+'일 연속</span>':'')+(pc.t==='stamp'?'':(R.given?' <span style="color:#166534">· 지급 완료</span> <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();_rwGive(\''+id+'\',false)">되돌리기</button>':' <button class="btn btn-navy btn-xs" onclick="event.stopPropagation();_rwGive(\''+id+'\',true)">지급 완료</button>'))+'</div>';
