@@ -446,10 +446,6 @@ tr.drag-over{outline:2px dashed var(--mint);background:#f0fdf4}
 .cm-btn-danger{background:#dc2626;color:#fff}
 @keyframes cmFadeIn{from{opacity:0}to{opacity:1}}
 @keyframes cmSlideUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
-/* 급여 칸은 폭이 줄어도 한 줄에 유지 */
-.pay-row>div{padding:6px 3px!important;min-width:0;overflow:hidden}
-.pay-row>div>div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:clamp(8px,1.1vw,10px)!important}
-.pay-row>div>div:last-child{white-space:nowrap;font-size:clamp(10px,1.4vw,14px)!important}
 </style>
 <script>
 function _cmIcon(msg){
@@ -1871,7 +1867,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1107-d';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1107-e';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -16514,18 +16510,22 @@ function _migrateLegacyStaffDeleted(){
     }
   });
 }
-/* 실제 근무한 첫 달부터 선택한 월까지 보수(세전 총 급여) 합계. 입사 전·퇴사 후, 근무 기록이 없는 달은 0원이라 자연히 빠짐 */
-function _staffYtdFee(u,yr,mo){
-  var sum=0,first=0;
+var _ytdOpen={};
+function toggleYtd(id){_ytdOpen[id]=!_ytdOpen[id];var el=document.getElementById('ytd-'+id);if(el)el.style.display=_ytdOpen[id]?'block':'none';var b=document.getElementById('ytdb-'+id);if(b)b.classList.toggle('on',!!_ytdOpen[id]);}
+function _staffYtdHtml(u,yr,mo){
+  var rows=[],sum=0;
   for(var m=1;m<=mo;m++){
     var ym=yr+'-'+String(m).padStart(2,'0');
     if(u.startDate&&u.startDate.slice(0,7)>ym)continue;
     if(u.endDate&&u.endDate.slice(0,7)<ym)continue;
     var f=0;try{f=calcStaffPay(u,yr,m).fee||0;}catch(e){}
-    if(f>0&&!first)first=m;
-    sum+=f;
+    if(f>0){rows.push([m,f]);sum+=f;}
   }
-  return {sum:sum,first:first};
+  if(!rows.length)return '<div style="color:var(--txt3);font-size:12px">'+yr+'년에 계산된 급여가 아직 없어요</div>';
+  var span=rows[0][0]===rows[rows.length-1][0]?rows[0][0]+'월':rows[0][0]+'~'+rows[rows.length-1][0]+'월';
+  return '<div style="font-size:12px;font-weight:800;color:#1d4ed8;margin-bottom:6px">'+yr+'년 보수총액 ('+span+', 세전 총 급여 합계)</div>'
+    +'<div style="font-size:20px;font-weight:800;color:#1d4ed8;margin-bottom:8px">₩'+sum.toLocaleString()+'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px">'+rows.map(function(r){return '<span style="background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:3px 8px;font-size:11px;color:#1e3a8a">'+r[0]+'월 '+r[1].toLocaleString()+'</span>';}).join('')+'</div>';
 }
 function renderStaffArea(){
   var el=$('staff-area');if(!el)return;
@@ -16569,17 +16569,17 @@ function renderStaffArea(){
     return '<div class="card" style="padding:14px;margin-bottom:12px'+(isDupeName?';border:1.5px solid #f59e0b':'')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
       +'<div style="display:flex;align-items:center;gap:6px"><strong style="font-size:15px">'+u.name+'</strong>'+(isDupeName?'<span class="badge" style="background:#fef3c7;color:#92400e" title="같은 이름의 계정이 2개 이상 있어요. 중복(유령) 계정일 수 있어요 — 근무 기록이 없는 쪽을 확인 후 🗑 삭제하세요.">⚠️ 중복 의심</span>':'')+'</div>'
-      +'<span class="badge bg-blue">교사</span></div>'
+      +'<div style="display:flex;align-items:center;gap:6px"><button type="button" id="ytdb-'+u.id+'" class="btn btn-outline btn-xs'+(_ytdOpen[u.id]?' on':'')+'" style="font-size:11px" onclick="toggleYtd(\''+u.id+'\')">📊 해당년도 보수총액 ▾</button><span class="badge bg-blue">교사</span></div></div>'
+      +'<div id="ytd-'+u.id+'" style="display:'+(_ytdOpen[u.id]?'block':'none')+';background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:10px">'+_staffYtdHtml(u,yr,mo)+'</div>'
       +'<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;flex-wrap:wrap">'+dayBtns+'</div>'
       +'<div style="font-size:10px;color:var(--txt3);margin-bottom:10px">📅 '+(_sch.from?(_sch.from.replace('-','년 ').replace(/ 0?/,' ')+'월부터 적용 중 · 이 달에 바꾸면 이전 달은 그대로예요'):'이 달에 바꾸면 이전 달은 그대로예요')+'</div>'
-      +'<div class="pay-row" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:10px;font-size:12px">'
+      +'<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px;font-size:12px">'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">근무시간</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+totalHours+'h</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">시급</div><div style="font-weight:700;font-size:14px">'+hourlyRate.toLocaleString()+'</div></div>'
       +(juhuEnabled?'<div style="background:#f0fdf4;border:1px solid #86efac;padding:8px;border-radius:6px;text-align:center"><div style="color:#16a34a;font-size:10px">주휴수당 <span onclick="showJuhuExplain(\''+u.id+'\','+yr+','+mo+')" title="계산 방법 보기" style="cursor:pointer;display:inline-block;width:14px;height:14px;line-height:14px;border-radius:50%;background:#16a34a;color:#fff;font-size:10px;font-weight:700">?</span></div><div style="font-weight:700;font-size:14px;color:#16a34a">'+juhuPay.toLocaleString()+'</div></div>':'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">주휴수당</div><div style="font-weight:700;font-size:14px;color:var(--txt3)">미적용</div></div>')
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">총 급여</div><div style="font-weight:700;font-size:14px;color:var(--mint)">'+totalPay.toLocaleString()+'</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">원천세(3.3%)</div><div style="font-weight:700;font-size:14px;color:var(--red)">'+tax33.toLocaleString()+'</div></div>'
       +'<div style="background:var(--surface2);padding:8px;border-radius:6px;text-align:center"><div style="color:var(--txt3);font-size:10px">차감 수령액</div><div style="font-weight:700;font-size:14px;color:var(--navy)">'+net.toLocaleString()+'</div></div>'
-      +(function(){var y=_staffYtdFee(u,yr,mo);return '<div style="background:#eff6ff;border:1px solid #bfdbfe;padding:8px;border-radius:6px;text-align:center" title="실제 근무한 첫 달부터 '+mo+'월까지 총 급여(세전)를 더한 금액이에요"><div style="color:#1d4ed8;font-size:10px;white-space:nowrap">해당년도 보수총액'+(y.first?' <span style="font-weight:400">('+(y.first===mo?mo+'월':y.first+'~'+mo+'월')+')</span>':'')+'</div><div style="font-weight:700;font-size:14px;color:#1d4ed8">'+y.sum.toLocaleString()+'</div></div>';})()
       +'</div>'
       +'<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openPayrollModal(\''+u.id+'\','+yr+','+mo+')">📝 근무 시간표</button>'
       +'<button class="btn btn-outline btn-xs" onclick="openHourlyRateModal(\''+u.id+'\')">⏱ 시급 설정</button>'
