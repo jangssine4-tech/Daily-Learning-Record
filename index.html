@@ -1867,7 +1867,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1106-b';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1106-c';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -25746,7 +25746,7 @@ if(document.readyState==='loading'){
 /* ═══════ 숙제 사진 확인 (학생이 홈체크에 올린 사진) ═══════
    homeUploads: 최근 14일 분량을 한 번만 읽고, [새로고침]으로 다시 읽습니다(읽기 횟수 절약).
    status: 제출 → 확인 / 재제출 ,  keep:true = 영구 보관(keep/ 폴더로 복사) */
-var _hwr={list:[],loaded:false,loading:false,filter:'new',urls:{},cur:null};
+var _hwr={list:[],loaded:false,loading:false,filter:'new',urls:{},cur:null,sel:null};
 function _hwrBucket(u){var b=u&&u.bucket;return b?firebase.app().storage('gs://'+b):firebase.storage();}
 function hwrInit(){hwrWatch();}
 var _hwrUnsub=null,_hwrFirst=true;
@@ -25789,7 +25789,8 @@ function hwrRender(){
   var chip=function(k,lb,n){var on=f===k;return '<button type="button" onclick="hwrFilter(\''+k+'\')" style="padding:6px 12px;border-radius:999px;border:1px solid '+(on?'var(--navy)':'var(--border)')+';background:'+(on?'var(--navy)':'var(--surface)')+';color:'+(on?'#fff':'var(--txt2)')+';font-size:12px;font-weight:700;cursor:pointer">'+lb+' '+n+'</button>';};
   var h='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 12px">'
     +chip('new','확인 전',cnt.new)+chip('re','재제출 요청',cnt.re)+chip('ok','확인함',cnt.ok)+chip('keep','⭐ 영구 보관',cnt.keep)+chip('all','전체',L.length)
-    +'<button type="button" class="btn btn-outline btn-sm" style="margin-left:auto" onclick="hwrLoad(true)">'+(_hwr.loading?'불러오는 중…':'🔄 다시 연결')+'</button><span style="font-size:11px;color:#16a34a;font-weight:700">● 실시간</span></div>';
+    +(_hwr.sel?'<button type="button" class="btn btn-outline btn-sm" style="margin-left:auto" onclick="hwrSelAll()">전체 선택</button><button type="button" class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="hwrSelDel()">🗑 선택 삭제 ('+Object.keys(_hwr.sel).length+')</button><button type="button" class="btn btn-outline btn-sm" onclick="hwrSelMode(false)">취소</button>'
+      :'<button type="button" class="btn btn-outline btn-sm" style="margin-left:auto;color:#dc2626" onclick="hwrSelMode(true)">🗑 삭제</button><button type="button" class="btn btn-outline btn-sm" onclick="hwrLoad(true)">'+(_hwr.loading?'불러오는 중…':'🔄 다시 연결')+'</button><span style="font-size:11px;color:#16a34a;font-weight:700">● 실시간</span>')+'</div>';
   if(_hwr.loading&&!L.length)h+='<div style="padding:30px;text-align:center;color:var(--txt3)">⏳ 불러오는 중...</div>';
   else if(!vis.length)h+='<div style="padding:30px;text-align:center;color:var(--txt3);font-size:13px">'+(f==='new'?'확인할 사진이 없어요 👍':'해당하는 사진이 없어요')+'</div>';
   else{
@@ -25799,7 +25800,9 @@ function hwrRender(){
       days[dy].forEach(function(u){
         var k=_hwrStat(u),bd={new:['#fef3c7','#92400e','확인 전'],ok:['#dcfce7','#166534','확인'],re:['#fee2e2','#991b1b','재제출'],keep:['#e0e7ff','#3730a3','⭐ 보관']}[k];
         var tm=u.at?new Date(u.at):null,ts=tm?('0'+tm.getHours()).slice(-2)+':'+('0'+tm.getMinutes()).slice(-2):'';
-        h+='<button type="button" onclick="hwrOpen(\''+u.id+'\')" style="border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:0;cursor:pointer;text-align:left;overflow:hidden">'
+        var sl=_hwr.sel&&_hwr.sel[u.id];
+        h+='<button type="button" onclick="hwrCard(\''+u.id+'\')" style="position:relative;border:'+(sl?'2px solid #dc2626':'1px solid var(--border)')+';background:var(--surface);border-radius:10px;padding:0;cursor:pointer;text-align:left;overflow:hidden">'
+          +(_hwr.sel?'<span style="position:absolute;top:6px;left:6px;z-index:2;width:22px;height:22px;border-radius:6px;border:2px solid '+(sl?'#dc2626':'#fff')+';background:'+(sl?'#dc2626':'rgba(0,0,0,.35)')+';color:#fff;font-size:15px;font-weight:900;line-height:18px;text-align:center">'+(sl?'✓':'')+'</span>':'')
           +'<div style="height:96px;background:var(--surface2);display:flex;align-items:center;justify-content:center"><img data-hwr="'+u.id+'" alt="" style="width:100%;height:100%;object-fit:cover;display:none"><span class="hwr-ph" style="font-size:22px">🖼</span></div>'
           +'<div style="padding:6px 8px"><div style="font-size:12px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(u.name||'이름 없음')+'</div>'
           +'<div style="font-size:10px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(u.itemLabel||'')+(ts?' · '+ts:'')+'</div>'
@@ -25811,6 +25814,38 @@ function hwrRender(){
   root.innerHTML=h;
   /* 섬네일은 화면에 나온 것만 불러옵니다 */
   vis.forEach(function(u){hwrThumb(u);});
+}
+function hwrSelMode(on){_hwr.sel=on?{}:null;hwrRender();}
+function hwrCard(id){
+  if(!_hwr.sel){hwrOpen(id);return;}
+  if(_hwr.sel[id])delete _hwr.sel[id];else _hwr.sel[id]=1;
+  hwrRender();
+}
+function _hwrVis(){var f=_hwr.filter;return _hwr.list.filter(function(u){return f==='all'||(f==='keep'?!!u.keep:_hwrStat(u)===f);});}
+function hwrSelAll(){
+  var v=_hwrVis(),all=v.length&&v.every(function(u){return _hwr.sel[u.id];});
+  _hwr.sel={};if(!all)v.forEach(function(u){_hwr.sel[u.id]=1;});hwrRender();
+}
+async function hwrSelDel(){
+  var ids=Object.keys(_hwr.sel||{});if(!ids.length){toast('삭제할 사진을 체크해 주세요');return;}
+  var items=_hwr.list.filter(function(u){return _hwr.sel[u.id];});
+  var kp=items.filter(function(u){return u.keep;}).length;
+  if(!(await showConfirm('선택한 사진 '+items.length+'장을 삭제할까요?'+(kp?'\n⭐ 영구 보관 '+kp+'장은 보관본까지 지워져요.':'')+'\n삭제하면 되돌릴 수 없어요.','삭제','취소',true)))return;
+  toast('⏳ 삭제하는 중...',60000);
+  var done=0,fail=0;
+  for(var i=0;i<items.length;i+=10){
+    await Promise.all(items.slice(i,i+10).map(async function(u){
+      try{
+        var st=_hwrBucket(u),ps=[u.path,u.thumb,u.keepPath,u.keepThumb].filter(Boolean);
+        for(var j=0;j<ps.length;j++){try{await st.ref(ps[j]).delete();}catch(e){}}
+        await db.collection('homeUploads').doc(u.id).delete();done++;
+      }catch(e){fail++;console.warn('[삭제]',u.id,e);}
+    }));
+  }
+  var gone={};items.forEach(function(u){gone[u.id]=1;});
+  _hwr.sel=null;
+  hwrRender();
+  toast(fail?('🗑 '+done+'장 삭제, '+fail+'장은 실패했어요'):('🗑 '+done+'장 삭제했어요'));
 }
 async function hwrThumb(u){
   try{
