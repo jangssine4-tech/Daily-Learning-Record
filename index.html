@@ -1867,7 +1867,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1107-e';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1107-f';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3181,6 +3181,13 @@ function _ccAutoLink(t){   // 교재 준비 · 교재 숙제 · 영상 숙제 �
   });});
   return t;
 }
+function _ccNoteOf(plan,p,r,li){   // 항목 오른쪽 범위 표시: L1~L3 → (Lesson 1~3), First Grammar Lesson 4의 Voca·Main book은 자동으로 (Lesson 1~3)
+  var n=r.n&&r.n[String(li)]?String(r.n[String(li)]).trim():'';
+  var m=/^L(?:esson\s*)?(\d+)\s*~\s*(?:L(?:esson\s*)?)?(\d+)$/i.exec(n);
+  if(m)n='Lesson '+m[1]+'~'+m[2];
+  else if(!n&&plan&&plan.key==='First Grammar'&&/Lesson 4$/.test(String(p||''))&&/^(voca|main ?book)$/i.test(String(r.s||'').trim()))n='Lesson 1~3';
+  return n?' ('+n+')':'';
+}
 function _ccOvTm(plan,t){   // 레슨 전용 계획표에도 구역별 시작·끝 설정(tm)을 반영
   try{(t.sections||[]).forEach(function(sc){
     if(!sc||sc.tmx!==undefined||!sc.k)return;
@@ -3248,7 +3255,7 @@ function ccResolve0(plan,level,progress){
     var key=(r.g||'')+'|'+(r.s||''),sec=map[key];
     if(!sec){sec={title:r.s||r.g||'',grp:r.g||'',items:[],_k:key};map[key]=sec;secs.push(sec);}
     if(sec.tmx===undefined&&(r.tm===0||r.tm===1))sec.tmx=r.tm;   // 구역별 시간 측정(시작/끝) 켜기·끄기
-    var note=r.n&&r.n[String(li)]?' ('+r.n[String(li)]+')':'';
+    var note=_ccNoteOf(plan,p,r,li);
     var id='b'+bi+'r'+ri,lab=r.l;
     if(ch==='s'){
       sec.items.push({id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:'점',link:'quiz'});
@@ -5669,12 +5676,12 @@ function _wlPaint(){
         rows+='<div class="wl-row'+cls+'">'+chk+'<span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-t">'+right+'</span></div>';
       }else if(it.t==='number'){
         var nv=v[it.id];var has=nv!==undefined&&nv!==null&&nv!=='';total++;if(has)done++;var skipN=(nv==='skip');if(has&&!skipN)quiz.push(it.l.replace(/\s*점수$/,'')+' '+nv);
-        rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has?' on':'')+'">'+(has?(skipN?'안 봤어요':_bcEsc(nv)+(it.u?_bcEsc(it.u):'점')):'')+'</span></div>';
+        rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has?' on':'')+'">'+(has?(skipN?'시험이 없어요':_bcEsc(nv)+(it.u?_bcEsc(it.u):'점')):'')+'</span></div>';
       }else if(it.t==='ox'){
         var ov2=v[it.id];var hasO=ov2==='O'||ov2==='X';total++;if(hasO){done++;oxS.push(it.l.replace(/\s+/g,'').replace(/^교재/,'')+' '+ov2);}
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(hasO?' on':'')+'" style="'+(ov2==='X'?'color:#c0392b':'')+'">'+(hasO?ov2:'')+'</span></div>';
       }else if(it.t==='dict'){
-        if(v[it.id]==='skip'){total++;done++;rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val on">안 봤어요</span></div>';}
+        if(v[it.id]==='skip'){total++;done++;rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val on">시험이 없어요</span></div>';}
         else{
         var d=v[it.id]||{};var has2=d.c!==undefined&&d.c!==null&&d.c!=='';total++;if(has2&&d.t!==undefined&&d.t!==''){done++;}if(has2)dictS.push(d.c+'/'+(d.t===undefined?'?':d.t));
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has2?' on':'')+'">'+(has2?_bcEsc(d.c)+' / '+_bcEsc(d.t===undefined?'?':d.t)+'개':'')+'</span></div>';
