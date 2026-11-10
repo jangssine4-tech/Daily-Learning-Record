@@ -1877,7 +1877,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-i';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-k';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -5771,9 +5771,9 @@ function _whPaint(){
     if(!secs.length)body='<div class="wl-meta" style="margin-top:8px">이 레슨에는 집에서 할 숙제가 없어요</div>';
   }
   if(_wh.open&&_wh.race){
-    var rc=_wh.race,pzd=(rc.prz||{})[rc.round||1],rb='<div class="wl-meta" style="margin:8px 0">🏁 레이싱 <b>'+(rc.pos||0)+'/12칸</b> · '+(rc.round||1)+'번째 판'+((rc.days||[]).length?' · 숙제 완료 '+(rc.days||[]).length+'일':'');
+    var rc=_wh.race,pzd=(rc.prz||{})[rc.round||1],km=(window._hcCls||{})[_wh.sid],rb='<div class="wl-meta" style="margin:8px 0">🏁 레이싱 <b>'+(rc.pos||0)+'/12칸</b> · '+(rc.round||1)+'번째 판'+((rc.days||[]).length?' · 숙제 완료 '+(rc.days||[]).length+'일':'')+(km&&km.mates.length?' · 반: '+km.mates.map(function(m){return _bcEsc(m.n);}).join(', '):'');
     if(rc.fin){
-      rb+='<div style="margin-top:5px;color:#b45309;font-weight:800">🏆 도착! 증거 사진 '+_wh.ev+'장</div>';
+      rb+='<div style="margin-top:5px;color:#b45309;font-weight:800">🏆 도착! 증거 사진 '+_wh.ev+'장'+((rc.fr||{})[rc.round||1]===1?' · <span style="color:#0f766e">🥇 반에서 제일 먼저 도착 (보너스 대상)</span>':'')+'</div>';
       if(pzd)rb+='<div style="margin-top:3px;color:#0f766e;font-weight:800">🎁 지급 완료: '+_bcEsc(pzd.n)+'</div>';
       else rb+='<div style="margin-top:5px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select id="wh-prize" class="fi" style="font-size:12px;padding:2px 6px">'+_rwRacePrizes().map(function(x){return '<option>'+_bcEsc(x)+'</option>';}).join('')+'</select><button class="btn btn-xs" onclick="_whPay()">지급 처리</button><button class="btn btn-outline btn-xs" onclick="_whPrizeEdit()">상품 목록 편집</button></div>';
     }
@@ -28722,8 +28722,9 @@ function _hcDocFor(s){
   var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return null;
   var r=_hcLatest(s),lv=(r&&r.level)||getStudentLevel(s),key=_hcKey(ccPlanKey(lv,s.grade)),plan=_hcPlan(key);
   var les=r?_hcFindLesson(plan,r.progress):'';
+  var kk=(window._hcCls||{})[s.id]||{cid:'',mates:[]};
   return {name:String(s.name||'').replace(/\s+/g,''),pin:pin,key:key||'',lv:String(lv||''),pg:r?String(r.progress||'').trim():'',les:les,rdate:r?String(r.date||''):'',
-    notice:plan?String(plan.notice||''):'',secs:(plan&&les)?_hcClean(plan.lessons[les],plan.tmSecs):[]};
+    cs:(window._rwCfg&&window._rwCfg.raceChars)||'all',cid:kk.cid,mates:kk.mates,notice:plan?String(plan.notice||''):'',secs:(plan&&les)?_hcClean(plan.lessons[les],plan.tmSecs):[]};
 }
 function _hcStable(v){
   if(Array.isArray(v))return v.map(_hcStable);
@@ -28731,19 +28732,74 @@ function _hcStable(v){
   return v;
 }
 function _hcCanon(d){return JSON.stringify(_hcStable(d));}
+/* ── 레이싱 반 편성: 레벨이 비슷한 4명씩, 4명이 안 차면 남은 학생끼리. 한 번 정해진 반은 유지하고 새 학생만 비슷한 반에 넣어요 ── */
+function _hcLvRank(lv){
+  var l=String(lv||'').trim(),fam=[/^Phonics/i,/^Master Pho/i,/^Joy/i,/^Wise/i,/^Pride/i,/^Grammar/i,/^Prime/i,/^Advanced/i],f=-1,i;
+  for(i=0;i<fam.length;i++)if(fam[i].test(l)){f=i;break;}
+  if(f<0)return 9999;
+  var m=l.match(/(\d)\s*([A-Ca-c])?\s*$/)||l.match(/(\d)/),d=m?+m[1]:0,a=(m&&m[2])?m[2].toUpperCase().charCodeAt(0)-64:0;
+  return f*100+d*3+a;
+}
+function _hcAssign(want,prev){
+  var ids=Object.keys(want),g={},fresh=[];
+  var rk=function(id){return _hcLvRank(want[id].lv);};
+  ids.forEach(function(id){var c=prev[id];if(c){if(!g[c])g[c]=[];if(g[c].length<4){g[c].push(id);return;}}fresh.push(id);});
+  fresh.sort(function(a,b){return rk(a)-rk(b)||String(want[a].name).localeCompare(String(want[b].name),'ko');});
+  var newKey=function(id){var k='c_'+id;while(g[k])k+='_';return k;};
+  if(!Object.keys(g).length){for(var i=0;i<fresh.length;i+=4){var ch=fresh.slice(i,i+4);g[newKey(ch[0])]=ch;}}
+  else fresh.forEach(function(id){
+    var best=null,bd=1e9,r=rk(id);
+    Object.keys(g).forEach(function(c){
+      if(g[c].length>=4)return;
+      var av=g[c].reduce(function(s,y){return s+rk(y);},0)/g[c].length,d=Math.abs(av-r);
+      if((r===9999)!==(av>=9000))d=1e8;else if(r===9999)d=0;
+      if(d<bd){bd=d;best=c;}
+    });
+    if(best&&bd<=6)g[best].push(id);else g[newKey(id)]=[id];
+  });
+  var out={};
+  Object.keys(g).forEach(function(c){g[c].forEach(function(id){out[id]={cid:c,mates:g[c].filter(function(y){return y!==id;}).map(function(y){return {id:y,n:want[y].name};})};});});
+  return out;
+}
+async function _hcReform(){
+  if(!confirm('레이싱 반을 처음부터 다시 편성할까요?\n레벨이 비슷한 4명씩 새로 묶여요. 진행 중인 판의 \'우리 반\' 친구 표시가 바뀌어요.'))return;
+  _hcLast=null;window._hcCls=null;await _hcSyncRoster('reform');
+  try{if(typeof _rwDrawSet==='function')_rwDrawSet();}catch(e){}
+}
+function _hcClsHtml(){
+  var c=window._hcCls,body;
+  if(!c)body='<div style="color:var(--txt3);margin-top:6px">학생 명단을 동기화한 뒤에 표시돼요 (잠시 뒤 이 창을 다시 열어 보세요)</div>';
+  else{
+    var g={};Object.keys(c).forEach(function(id){(g[c[id].cid]=g[c[id].cid]||[]).push(id);});
+    var ks=Object.keys(g);
+    body=ks.length?'<div style="margin-top:6px;display:grid;gap:3px">'+ks.map(function(k,i){
+      return '<div><b>'+(i+1)+'반</b> '+g[k].map(function(id){var s=students.find(function(z){return z.id===id;});return _bcEsc(s?s.name:id)+' <span style="color:var(--txt3)">'+_bcEsc(s?getStudentLevel(s):'')+'</span>';}).join(' · ')+'</div>';
+    }).join('')+'</div>':'<div style="color:var(--txt3);margin-top:6px">편성할 학생이 없어요</div>';
+  }
+  return '<div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--navy)">🏁 레이싱 반</b><span style="color:var(--txt3);flex:1;min-width:200px">레벨이 비슷한 학생 4명이 한 반 · 4명이 안 되면 남은 학생끼리 한 반 · 새 학생은 비슷한 반에 자동 배정</span><button class="btn btn-outline btn-xs" onclick="_hcReform()">반 다시 편성</button></div>'+body+'</div>';
+}
 function _hcSyncSoon(){clearTimeout(_hcTimer);_hcTimer=setTimeout(function(){_hcSyncRoster(false);},3000);}
 async function _hcSyncRoster(manual){
+  var man=(manual===true||manual==='reform');
   if(!db||!currentUser||_hcBusy)return;
-  if(!students.length){if(manual===true)toast('⚠️ 학생 데이터를 아직 못 불러왔어요');return;}
+  if(!students.length){if(man)toast('⚠️ 학생 데이터를 아직 못 불러왔어요');return;}
   _hcBusy=true;
   try{
-    if(_hcLast===null||manual===true){
-      _hcLast={};
-      if(manual!==true){var snap=await db.collection('homeRoster').get();snap.forEach(function(d){_hcLast[d.id]=_hcCanon(d.data());});}
+    if(_hcLast===null||man){
+      _hcLast={};window._hcPrevC=window._hcPrevC||{};
+      var snap=await db.collection('homeRoster').get();
+      snap.forEach(function(d){window._hcPrevC[d.id]=d.data().cid||'';if(!man)_hcLast[d.id]=_hcCanon(d.data());});
     }
     var want={};
     students.forEach(function(s){var d=_hcDocFor(s);if(d)want[s.id]=d;});
-    if(!Object.keys(want).length){if(manual===true)toast('⚠️ 홈체크 조건(재원·신규, 학생번호)에 맞는 학생이 없어요');_hcBusy=false;return;}
+    var prevC={};
+    if(manual!=='reform'){
+      var pc=window._hcPrevC||{};Object.keys(pc).forEach(function(id){prevC[id]=pc[id];});
+      if(window._hcCls)Object.keys(window._hcCls).forEach(function(id){prevC[id]=window._hcCls[id].cid;});
+    }
+    window._hcCls=_hcAssign(want,prevC);window._hcPrevC={};
+    Object.keys(want).forEach(function(id){var k=window._hcCls[id];want[id].cid=k.cid;want[id].mates=k.mates;});
+    if(!Object.keys(want).length){if(man)toast('⚠️ 홈체크 조건(재원·신규, 학생번호)에 맞는 학생이 없어요');_hcBusy=false;return;}
     var ops=[];
     Object.keys(want).forEach(function(id){var c=_hcCanon(want[id]);if(_hcLast[id]!==c)ops.push({t:'set',id:id,d:want[id],c:c});});
     Object.keys(_hcLast).forEach(function(id){if(!want[id])ops.push({t:'del',id:id});});
@@ -28753,8 +28809,8 @@ async function _hcSyncRoster(manual){
       await b.commit();
       ops.slice(i,i+400).forEach(function(o){if(o.t==='set')_hcLast[o.id]=o.c;else delete _hcLast[o.id];});
     }
-    if(manual===true)toast('✅ 홈체크 명단 '+Object.keys(want).length+'명 저장');
-  }catch(e){console.warn('homeRoster 동기화 실패',e);if(manual===true)toast('⚠️ 홈체크 명단 저장 실패: '+((e&&e.message)||e));}
+    if(man)toast('✅ 홈체크 명단 '+Object.keys(want).length+'명 저장'+(manual==='reform'?' · 반 다시 편성':''));
+  }catch(e){console.warn('homeRoster 동기화 실패',e);if(man)toast('⚠️ 홈체크 명단 저장 실패: '+((e&&e.message)||e));}
   _hcBusy=false;
 }
 function _hcStart(){
@@ -28839,7 +28895,7 @@ function _rwW(){if(!_rwEd.work)_rwEd.work=JSON.parse(JSON.stringify(window._rwCf
 function _rwMark(){_rwEd.dirty=true;var b=document.getElementById('rw-dirty');if(b)b.style.display='';}
 function _rwStart(){
   try{db.collection('config').doc('rewards').onSnapshot(function(d){
-    window._rwCfg=(d.exists&&d.data().cfg)||null;try{_bcSyncSoon();}catch(e){}
+    window._rwCfg=(d.exists&&d.data().cfg)||null;try{_bcSyncSoon();}catch(e){}try{_hcSyncSoon();}catch(e){}
     if(!_rwEd.dirty){_rwEd.work=null;if(typeof currentRefTab!=='undefined'&&currentRefTab==='rwset'&&_rwEd.pane==='set'){try{renderRwSet();}catch(e){}}}
   },function(){});}catch(e){}
 }
@@ -28871,6 +28927,7 @@ function _rwDrawSet(){
   var h='<style>.rw-t{border-collapse:collapse;width:100%;font-size:12px}.rw-t td,.rw-t th{padding:3px;border-bottom:1px solid var(--border);text-align:left}.rw-h{font-size:13px;font-weight:800;color:var(--navy);margin:18px 0 6px}</style>';
   h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">학생이 체크콜을 마치면 황금카드 뽑기가 나와요. 저장하기 전에는 학생 태블릿에 아무것도 나오지 않아요.</div>';
   h+='<label style="display:flex;gap:8px;align-items:center;font-weight:800;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:9px 12px;cursor:pointer"><input type="checkbox"'+(w.enabled!==0?' checked':'')+' onchange="_rwTop(\'enabled\',this.checked?1:0)"> 🎁 황금카드 보상 사용 <span style="font-weight:400;font-size:11px;color:var(--txt3)">(끄면 학생 화면에 아무것도 나오지 않아요)</span></label>';
+  h+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;border:1px solid var(--border);border-radius:10px;padding:8px 12px"><b style="color:var(--navy)">🏁 홈체크 레이싱 캐릭터</b><select class="fi" style="width:auto" onchange="_rwTop(\'raceChars\',this.value)">'+[['all','사람 + 자동차 모두'],['people','사람 캐릭터만'],['cars','자동차만']].map(function(o){return '<option value="'+o[0]+'"'+((w.raceChars||'all')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select><span style="color:var(--txt3)">학생은 여기서 정한 종류 안에서 고를 수 있어요 (저장 후 반영)</span></div>'+_hcClsHtml();
   h+='<div class="rw-h">🏆 카드를 뽑을 수 있는 조건 <span style="font-weight:400;font-size:11px;color:var(--txt3)">"필수"인 조건이 모두 맞아야 카드가 나와요 · 필수가 아니면 보너스 줄이에요 · 오늘 수업에 퀴즈·받아쓰기·숙제가 없으면 그 조건은 건너뛰어요</span></div>'+_rwDrawRows('conds');
   h+='<div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px"><label>수업 태도 통과 기준 <select class="fi" style="width:auto" onchange="_rwTop(\'attMin\',this.value)"><option value="우수"'+(w.attMin!=='매우 우수'?' selected':'')+'>우수 이상</option><option value="매우 우수"'+(w.attMin==='매우 우수'?' selected':'')+'>매우 우수만</option></select></label><label style="flex:1;min-width:240px">조건이 안 맞을 때 문구 <input class="fi" style="width:100%" value="'+_bcEsc(w.failMsg||'')+'" onchange="_rwTop(\'failMsg\',this.value)"></label></div>';
   h+='<div class="rw-h">⭐ 스탬프 규칙 <span style="font-weight:400;font-size:11px;color:var(--txt3)">카드와 별개로, 맞는 규칙마다 스탬프를 받아요</span></div>'+_rwDrawRows('stamps');
@@ -28901,7 +28958,7 @@ async function _rwSave(){
   if(!w.prizes.length||!w.prizes.some(function(p){return p.w>0;})){toast('⚠️ 가중치가 있는 상품이 하나는 있어야 해요');return;}
   try{
     await db.collection('config').doc('rewards').set({cfg:JSON.parse(JSON.stringify(w)),updatedAt:new Date().toISOString(),updatedBy:(currentUser&&currentUser.name)||''});
-    window._rwCfg=JSON.parse(JSON.stringify(w));_rwEd.dirty=false;try{_bcSyncSoon();}catch(e){}
+    window._rwCfg=JSON.parse(JSON.stringify(w));_rwEd.dirty=false;try{_bcSyncSoon();}catch(e){}try{_hcSyncSoon();}catch(e){}
     toast('✅ 보상 설정 저장 · 학생 태블릿에 곧 반영돼요');_rwDrawSet();
   }catch(e){toast('⚠️ 저장 실패: '+((e&&e.message)||e));}
 }
