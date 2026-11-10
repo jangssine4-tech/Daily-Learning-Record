@@ -1867,7 +1867,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1110-c';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-d';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3181,6 +3181,7 @@ function _ccAutoLink(t){   // 교재 준비 · 교재 숙제 · 영상 숙제 �
   });});
   return t;
 }
+function _ccLabTy(l){l=String(l||'');return /받아쓰기/.test(l)?'dict':(/선생님/.test(l)?'call':'check');}
 function _ccNoteOf(plan,p,r,li){   // 항목 오른쪽 범위 표시: L1~L3 → (Lesson 1~3), First Grammar Lesson 4의 Voca·Main book은 자동으로 (Lesson 1~3)
   var n=r.n&&r.n[String(li)]?String(r.n[String(li)]).trim():'';
   var m=/^L(?:esson\s*)?(\d+)\s*~\s*(?:L(?:esson\s*)?)?(\d+)$/i.exec(n);
@@ -3257,14 +3258,18 @@ function ccResolve0(plan,level,progress){
     if(sec.tmx===undefined&&(r.tm===0||r.tm===1))sec.tmx=r.tm;   // 구역별 시간 측정(시작/끝) 켜기·끄기
     var note=_ccNoteOf(plan,p,r,li);
     var id='b'+bi+'r'+ri,lab=r.l;
-    if(ch==='s'){
-      sec.items.push({id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:'점',link:'quiz'});
-    }else if(/받아쓰기/.test(lab)){
-      sec.items.push({id:id,t:'dict',l:lab+note,link:'dict'});
-    }else if(/선생님/.test(lab)){
-      sec.items.push({id:id,t:'call',l:lab+note,to:'tablet',hint:r.h||''});
+    var ty=r.ty||(ch==='s'?'number':_ccLabTy(lab));   // 항목 종류: 계획표 줄에 정해 둔 값, 없으면 예전 방식(칸·이름)으로 판단
+    if(ty==='number'){
+      var _nit={id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:r.u||'점'};
+      var _nlk=r.lk!==undefined?r.lk:'quiz';if(_nlk)_nit.link=_nlk;sec.items.push(_nit);
+    }else if(ty==='dict'){
+      var _dit={id:id,t:'dict',l:lab+note};var _dlk=r.lk!==undefined?r.lk:'dict';if(_dlk)_dit.link=_dlk;sec.items.push(_dit);
+    }else if(ty==='call'){
+      sec.items.push({id:id,t:'call',l:lab+note,to:r.to==='book'?'book':'tablet',hint:r.h||''});
     }else{
-      var it={id:id,t:'check',l:lab+note};if(r.h)it.hint=r.h;sec.items.push(it);
+      var it={id:id,t:ty==='ox'?'ox':'check',l:lab+note};if(r.h)it.hint=r.h;
+      if(r.lk)it.link=r.lk;else if(r.lk==='')it.nl=1;
+      sec.items.push(it);
     }
   });
   // 교재 학습 구역 끝에 '검사 받기' 호출 버튼 자동 추가 (선생님 호출 항목이 이미 있으면 생략)
@@ -3933,13 +3938,22 @@ function _ccScoreMig(p){
   });});
   p.qsMig=1;return p;
 }
+// 줄마다 항목 종류(ty)·호출 대상(to)·단위(u)·일지 연동(lk)을 갖게 하고, 칸은 ✕/✓(x/c)만 쓰도록 한 번 바꿔요
+function _ccRowTypeMig(p){
+  if(!p||p.tyMig||!p.blocks)return p;
+  p.blocks.forEach(function(b){(b.rows||[]).forEach(function(r){
+    if(!r.ty)r.ty=String(r.c||'').indexOf('s')>=0?'number':_ccLabTy(r.l);
+    if(r.c&&r.c.indexOf('s')>=0)r.c=r.c.replace(/s/g,'c');
+  });});
+  p.tyMig=1;return p;
+}
 function _ccEffPlan(key){
   var pl=_ccEffPlan0(key);
   if(key==='Grammar Plus'&&pl){
     if(pl.blocks&&pl.blocks.length===2)pl=_ccMergeGp(pl);
     pl=_ccMergePrev(pl);
   }
-  return _ccScoreMig(pl);
+  return _ccRowTypeMig(_ccScoreMig(pl));
 }
 function _ccEffPlan0(key){
   if(!key)return null;var ov=window._ccPlanOv||{};
@@ -4201,9 +4215,9 @@ function _ccPlanDraw(){
     +'<button class="btn btn-outline btn-xs" onclick="_ccPlanSel('+(sel+1)+')"'+(sel>=ls.length-1?' disabled':'')+'>▶</button>'
     +_apply+_more;
   if(_mode==='lesson'){var _tb=document.getElementById('ccp-tbl'),_st=_tb.scrollTop;_tb.innerHTML=_ccLessonView(b,sel);_tb.scrollTop=_st;_ccPlanTab(_ccEd.tab||'edit');return;}
-  var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:230px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
+  var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:400px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
   ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+(_ccCustom(_ccWork(),n)?' ✎':'')+'</th>';});
-  h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
+  h+='<th style="position:sticky;top:0;background:var(--surface2);border-bottom:1px solid var(--border)"></th></tr></thead><tbody>';
   var _pk=null,_ncol=ls.length+2,_run=-1;
   b.rows.forEach(function(r,ri){
     var _k=(r.g||'')+'|'+(r.s||''),_gc=_ccGrpCol(b,r.g);
@@ -4214,12 +4228,12 @@ function _ccPlanDraw(){
         +'<select onchange="_ccSecEdit('+ri+',\'g\',this.value)" title="묶음" style="font-size:11px;padding:3px;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7);color:inherit">'+_gs.map(function(x){return '<option value="'+_bcEsc(x)+'"'+((r.g||'')===x?' selected':'')+'>'+_bcEsc(x||'(묶음 없음)')+'</option>';}).join('')+'</select>'
         +'<label title="켜면 이 구역에 학생 체크콜 \'시작\'·\'끝\' 버튼이 생기고 공부 시간을 재요" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 7px"><input type="checkbox"'+(_ccTmOn(b,r)?' checked':'')+' onchange="_ccSecTm('+ri+',this.checked)">⏱ 시작·끝</label>'
         +'<span style="flex:1"></span><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecRowAdd('+ri+')">＋ 항목 추가</button><button class="mini" style="border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit" onclick="_ccSecDel('+ri+')">구역 삭제</button></div></td></tr>';}
-    h+='<tr data-ccrow="1" data-run="'+_run+'" data-ri="'+ri+'"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3);display:flex;align-items:center;gap:4px"><span class="cc-row-h" draggable="true" data-ri="'+ri+'" title="끌어서 이 구역 안에서 순서를 바꿔요" style="cursor:grab;font-size:14px;line-height:1;user-select:none;color:#64748b">⠿</span>'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px"></td>';
+    h+='<tr data-ccrow="1" data-run="'+_run+'" data-ri="'+ri+'"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+_gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="font-size:9px;color:var(--txt3);display:flex;align-items:center;gap:4px"><span class="cc-row-h" draggable="true" data-ri="'+ri+'" title="끌어서 이 구역 안에서 순서를 바꿔요" style="cursor:grab;font-size:14px;line-height:1;user-select:none;color:#64748b">⠿</span>'+_bcEsc((r.g||'')+' · '+(r.s||''))+'</div><div style="display:flex;gap:3px;align-items:center;margin-top:2px">'+_ccRowFront(r,ri)+'<input class="fi" value="'+_bcEsc(r.l)+'" onchange="_ccPlanLabel('+ri+',this.value)" style="padding:3px 5px;font-size:11px;flex:1;min-width:110px">'+_ccRowCtl(r,ri)+'</div></td>';
     for(var i=0;i<ls.length;i++){
-      var ch=r.c.charAt(i),txt=ch==='c'?'□':(ch==='s'?'점':'×'),bg=ch==='c'?'#ecfdf5':(ch==='s'?'#fef9c3':'#f3f4f6'),col=ch==='x'?'#9ca3af':'#065f46';
+      var ch=r.c.charAt(i),txt=ch==='x'?'✕':'✓',bg=ch==='x'?'#f3f4f6':'#ecfdf5',col=ch==='x'?'#9ca3af':'#065f46';
       h+='<td style="text-align:center;border-bottom:1px solid var(--border);'+(i===sel?'background:#eff6ff;':'')+'"><button onclick="_ccPlanCell('+ri+','+i+')" title="'+_bcEsc(r.n&&r.n[i]?r.n[i]:'')+'" style="width:30px;height:24px;border:1px solid #d1d5db;border-radius:5px;background:'+bg+';color:'+col+';cursor:pointer;font-size:12px">'+txt+'</button></td>';
     }
-    h+='<td style="border-bottom:1px solid var(--border)"><button class="bc-b x" onclick="_ccPlanDelRow('+ri+')" title="줄 삭제">✕</button></td></tr>';
+    h+='<td style="border-bottom:1px solid var(--border)"><button class="bc-b x" onclick="_ccPlanDelRow('+ri+')" title="이 항목 줄을 모든 레슨에서 삭제" style="white-space:nowrap;padding:3px 8px;font-weight:700">삭제</button></td></tr>';
   });
   document.getElementById('ccp-tbl').innerHTML=_ccGridPre(p)+h+'</tbody></table>'+_ccSpCards(p);
   _ccPlanTab(_ccEd.tab||'edit');
@@ -4528,9 +4542,9 @@ function _ccNewItem(secTitle){return _ccIsScoreSec(secTitle)?{id:_bcNewId(),t:'n
 function _ccSecRowAdd(ri){
   if(!_ccTblGuard()){_ccPlanDraw();return;}var p=_ccWork();var b=p.blocks[_ccEd.bi],r0=b.rows[ri];if(!r0)return;
   var at=ri;for(var j=0;j<b.rows.length;j++){if((b.rows[j].g||'')===(r0.g||'')&&(b.rows[j].s||'')===(r0.s||''))at=j;}
-  var sc_=_ccIsScoreSec(r0.s||r0.g),c='';for(var i=0;i<b.lessons.length;i++)c+=sc_?'s':'c';
+  var sc_=_ccIsScoreSec(r0.s||r0.g),c='';for(var i=0;i<b.lessons.length;i++)c+='c';
   _ccRowsShift(p,_ccEd.bi,at+1,1);
-  b.rows.splice(at+1,0,{g:r0.g||'',s:r0.s||'',l:sc_?'점수':'새 항목',c:c});if(r0.tm===0||r0.tm===1)b.rows[at+1].tm=r0.tm;
+  b.rows.splice(at+1,0,sc_?{g:r0.g||'',s:r0.s||'',l:'점수',c:c,ty:'number',u:'점',lk:'quiz'}:{g:r0.g||'',s:r0.s||'',l:'새 항목',c:c,ty:'check'});if(r0.tm===0||r0.tm===1)b.rows[at+1].tm=r0.tm;
   _ccOvSyncRow(at+1);
   _ccMark();_ccPlanDraw();toast('새 항목을 추가했습니다. 이름을 고쳐 주세요 (모든 레슨에 켜져 있으니 필요 없는 레슨은 칸을 눌러 끄세요)');
 }
@@ -5035,12 +5049,51 @@ function _ccPlanScore(ri,i){
   r.c=r.c.slice(0,i)+(ch==='s'?'c':'s')+r.c.slice(i+1);_ccOvSync(ri,i);_ccMark();_ccPlanDraw();
 }
 function _ccMark(){_ccEd.dirty[_ccEd.key]=1;}
+function _ccRowLk(ty){
+  if(ty==='check'||ty==='ox')return [['','일지 연동 안 함'],['hwPrep','일지 연동 · 교재 준비'],['hwBook','일지 연동 · 교재 숙제'],['hwVideo','일지 연동 · 영상 숙제']];
+  if(ty==='number')return [['','일지 연동 안 함'],['quiz','일지 연동 · 퀴즈 점수']];
+  if(ty==='dict')return [['','일지 연동 안 함'],['dict','일지 연동 · 받아쓰기']];
+  return [];
+}
+function _ccRowFront(r,ri){   // 줄 맨 앞: 항목 종류
+  var ty=r.ty||_ccLabTy(r.l);
+  return '<select onchange="_ccRowSet('+ri+',\'ty\',this.value)" title="항목 종류" style="font-size:11px;font-weight:700;padding:3px 2px;border:1px solid #d1d5db;border-radius:5px;background:#f8fafc;color:#1e3a5f;width:112px;flex:none">'+_BCED_TYPES.map(function(x){return '<option value="'+x[0]+'"'+(ty===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
+}
+function _ccRowCtl(r,ri){   // 항목 이름 뒤: 호출 대상/단위 · 일지 연동
+  var ty=r.ty||_ccLabTy(r.l),st='font-size:10px;padding:2px 3px;border:1px solid #d1d5db;border-radius:5px;background:#fff;flex:none';
+  var h='';
+  if(ty==='call')h+='<select onchange="_ccRowSet('+ri+',\'to\',this.value)" title="호출 대상" style="'+st+'"><option value="tablet"'+(r.to!=='book'?' selected':'')+'>태블릿 교사</option><option value="book"'+(r.to==='book'?' selected':'')+'>교재 교사</option></select>';
+  if(ty==='number')h+='<input value="'+_bcEsc(r.u||'점')+'" onchange="_ccRowSet('+ri+',\'u\',this.value)" placeholder="단위" title="단위" style="'+st+';width:38px">';
+  var lk=_ccRowLk(ty);
+  if(lk.length){var cur=r.lk!==undefined?r.lk:(ty==='number'?'quiz':(ty==='dict'?'dict':''));
+    h+='<select onchange="_ccRowSet('+ri+',\'lk\',this.value)" title="일지 연동" style="'+st+'">'+lk.map(function(x){return '<option value="'+x[0]+'"'+(cur===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';}
+  return h;
+}
+function _ccRowSet(ri,f,v){
+  if(!_ccTblGuard()){_ccPlanDraw();return;}
+  var p=_ccWork(),r=p.blocks[_ccEd.bi].rows[ri];if(!r)return;
+  var id='b'+_ccEd.bi+'r'+ri;
+  if(f==='ty'){
+    r.ty=v;delete r.to;delete r.u;delete r.lk;
+    if(v==='number'){r.u='점';r.lk='quiz';}
+    else if(v==='dict'){r.lk='dict';}
+    else if(v==='call'){r.to='tablet';}
+  }else if(f==='lk'){r.lk=v;}
+  else if(f==='u'){r.u=String(v||'').trim()||'점';}
+  else if(f==='to'){r.to=v==='book'?'book':'tablet';}
+  Object.keys(p.ov||{}).forEach(function(ln){((p.ov[ln]||{}).sections||[]).forEach(function(sc){(sc.items||[]).forEach(function(it){
+    if(it.id!==id)return;
+    if(f==='ty'){it.t=v;delete it.to;delete it.u;delete it.link;delete it.nl;if(v==='number'){it.u='점';it.link='quiz';}else if(v==='dict')it.link='dict';else if(v==='call')it.to='tablet';}
+    else if(f==='lk'){if(v){it.link=v;delete it.nl;}else{delete it.link;it.nl=1;}}
+    else if(f==='u')it.u=r.u;else if(f==='to')it.to=r.to;
+  });});});
+  _ccMark();_ccPlanDraw();
+}
 function _ccPlanCell(ri,i){
   if(!_ccTblGuard()){_ccPlanDraw();return;}
-  var r=_ccWork().blocks[_ccEd.bi].rows[ri],ch=r.c.charAt(i),hasS=r.c.indexOf('s')>=0;
-  var nx=ch==='c'?'x':(ch==='x'?(hasS?'s':'c'):'c');
-  if(_ccIsScoreSec(r.s||r.g))nx=(ch==='c')?'x':(ch==='x'?'s':'c');   // Quiz·Test 구역: 체크 → × → 점 → 체크 순서로 바뀌어요
-  r.c=r.c.slice(0,i)+nx+r.c.slice(i+1);_ccOvSync(ri,i);_ccMark();_ccPlanDraw();
+  var r=_ccWork().blocks[_ccEd.bi].rows[ri],ch=r.c.charAt(i);
+  r.c=r.c.slice(0,i)+(ch==='x'?'c':'x')+r.c.slice(i+1);   // ✕ ↔ ✓ (항목의 종류는 줄에서 정해요)
+  _ccOvSync(ri,i);_ccMark();_ccPlanDraw();
 }
 // ── 레슨(열) 추가 · 이름 변경 · 삭제 ──
 function _ccLessonName(v){return ccNormProg(v);}
@@ -5120,7 +5173,7 @@ function _ccPlanAddRow(){
   var l=prompt('항목 이름','');if(!l)return;
   var c='';for(var i=0;i<b.lessons.length;i++)c+='c';
   var at=b.rows.length;for(var j=b.rows.length-1;j>=0;j--){if(b.rows[j].s===s.trim()){at=j+1;break;}}
-  b.rows.splice(at,0,{g:b.rows[Math.max(0,at-1)]?b.rows[Math.max(0,at-1)].g:last.g,s:s.trim(),l:l.trim(),c:c});
+  b.rows.splice(at,0,{g:b.rows[Math.max(0,at-1)]?b.rows[Math.max(0,at-1)].g:last.g,s:s.trim(),l:l.trim(),c:c,ty:_ccLabTy(l)});
   _ccMark();_ccPlanDraw();
 }
 function _ccPlanReset(){
@@ -28805,7 +28858,7 @@ function _wlRwHtml(L){
 }
 
 /* ── 운영 매뉴얼 > 홈체크 Plan 설정 ── */
-var _hcEd={key:'',les:'',work:{},dirty:{},pane:'plan',mode:'lesson'};
+var _hcEd={key:'',les:'',work:{},dirty:{},pane:'plan',mode:'grid'};
 function _hcKeys(){var ks=Object.keys(HC_DEF);Object.keys(window._hcOv||{}).forEach(function(k){if(ks.indexOf(k)<0&&!/^Grammar Plus /.test(k))ks.push(k);});return ks;}
 function _hcWork(){var k=_hcEd.key;if(!_hcEd.work[k])_hcEd.work[k]=JSON.parse(JSON.stringify(_hcPlan(k)||{notice:'',order:[],lessons:{}}));return _hcEd.work[k];}
 function _hcSecs(){var p=_hcWork();if(!p.lessons[_hcEd.les])p.lessons[_hcEd.les]=[];return p.lessons[_hcEd.les];}
@@ -28832,10 +28885,10 @@ function _hcLesStep(d){var o=_hcWork().order,i=o.indexOf(_hcEd.les)+d;if(i<0||i>
 function _hcIsEdited(k){return _hcEd.dirty[k]?true:!!(window._hcOv&&window._hcOv[k]);}
 function _hcDraw(){
   var p=_hcWork(),sk=document.getElementById('hc-key');if(!sk)return;
-  var mode=_hcEd.mode||'lesson';
+  var mode='grid';_hcEd.mode='grid';   // 홈체크는 전체 계획표 하나로 편집해요
   sk.innerHTML=_hcKeys().map(function(k){return '<option value="'+_bcEsc(k)+'"'+(k===_hcEd.key?' selected':'')+'>'+_bcEsc(k)+(_hcIsEdited(k)?'  ✎':'')+'</option>';}).join('');
   if(p.order.indexOf(_hcEd.les)<0)_hcEd.les=p.order[0]||'';
-  document.getElementById('hc-tabs').innerHTML='<span class="ccx-tabs"><button class="ccx-tab'+(mode==='lesson'?' on':'')+'" onclick="_hcMode(\'lesson\')">레슨별 계획표</button><button class="ccx-tab'+(mode==='grid'?' on':'')+'" onclick="_hcMode(\'grid\')">전체 계획표</button></span>';
+  document.getElementById('hc-tabs').innerHTML='';
   var i=p.order.indexOf(_hcEd.les),n=p.order.length;
   var bt=function(t,f,dis){return '<button class="btn btn-outline btn-xs" onclick="'+f+'"'+(dis?' disabled':'')+'>'+t+'</button>';};
   var more='<details style="display:inline-block;position:relative;margin-left:8px"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
@@ -28849,7 +28902,8 @@ function _hcDraw(){
   }else{
     tl.style.display='none';
     var _co=!!_hcEd.colOpen;
-    document.getElementById('hc-body').innerHTML='<div style="margin:0 0 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_hcSecAdd()">＋ 구역 추가</button><button class="btn btn-outline btn-xs" style="'+(_co?'background:#dbeafe;border-color:#93c5fd;':'')+'" onclick="_hcColToggle()" title="레슨(열) 삽입·이동·이름 변경·삭제">＋ 열 추가</button>'
+    document.getElementById('hc-body').innerHTML='<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--txt2)">학습 유의사항 (학생 화면 위쪽에 나옵니다)</summary><textarea class="fi" rows="5" style="width:100%;margin-top:6px;font-size:12px" oninput="_hcNotice(this.value)">'+_bcEsc(p.notice||'')+'</textarea></details>'
+      +'<div style="margin:0 0 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_hcSecAdd()">＋ 구역 추가</button><button class="btn btn-outline btn-xs" style="'+(_co?'background:#dbeafe;border-color:#93c5fd;':'')+'" onclick="_hcColToggle()" title="레슨(열) 삽입·이동·이름 변경·삭제">＋ 열 추가</button>'
       +'<details style="display:inline-block;position:relative"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)"><button class="btn btn-outline btn-xs" onclick="_hcReset()">엑셀 원본으로 되돌리기</button></div></details>'
       +(_co?_hcColBar(p,i,n).replace('margin:0 0 8px;','margin:0;'):'')+'</div>'+_hcGridHtml(p);
   }
@@ -28933,13 +28987,14 @@ function _hcGridHtml(p){
       h+='<tr ondragover="_hcDgOver(event,\'it\')" ondragleave="_hcDgLeave(event)" ondrop="_hcDgDrop(event,\'it\','+si+','+ri+')"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+gc[1]+';padding:2px 6px;border-bottom:1px solid var(--border)"><div style="display:flex;gap:4px;align-items:center">'
         +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'it\','+si+','+ri+')" ondragend="_hcDgEnd()" title="끌어서 이 구역 안에서 순서를 바꿔요">⠿</span>'
         +'<input class="fi" value="'+_bcEsc(R.l)+'" onchange="_hcRowSet('+si+','+ri+',\'l\',this.value)" style="padding:3px 5px;font-size:11px;flex:1;min-width:130px">'
+        +'<input value="'+_bcEsc(R.hint||'')+'" onchange="_hcRowSet('+si+','+ri+',\'hint\',this.value)" placeholder="안내(선택)" title="학생 화면에 보이는 안내 문구" style="width:100px;border:1px solid var(--border);border-radius:6px;padding:3px 5px;font-size:11px">'
         +_hcLinkSel(R.link,'_hcRowSet('+si+','+ri+',\'link\',this.value)',118).replace('<select','<select style="font-size:10px;width:118px"').replace('style="width:118px"','')
         +'</div></td>';
       ls.forEach(function(nm,li){
         var sec=(p.lessons[nm]||[]).find(function(z){return z.title===S.title;}),on=!!(sec&&sec.items.some(function(x){return x.l===R.l;}));
-        h+='<td style="text-align:center;border-bottom:1px solid var(--border);'+(nm===_hcEd.les?'background:#eff6ff;':'')+'"><button onclick="_hcCell('+si+','+ri+','+li+')" style="width:30px;height:24px;border:1px solid #d1d5db;border-radius:5px;background:'+(on?'#ecfdf5':'#f3f4f6')+';color:'+(on?'#065f46':'#9ca3af')+';cursor:pointer;font-size:12px">'+(on?'□':'×')+'</button></td>';
+        h+='<td style="text-align:center;border-bottom:1px solid var(--border);'+(nm===_hcEd.les?'background:#eff6ff;':'')+'"><button onclick="_hcCell('+si+','+ri+','+li+')" style="width:30px;height:24px;border:1px solid #d1d5db;border-radius:5px;background:'+(on?'#ecfdf5':'#f3f4f6')+';color:'+(on?'#065f46':'#9ca3af')+';cursor:pointer;font-size:12px">'+(on?'✓':'✕')+'</button></td>';
       });
-      h+='<td style="border-bottom:1px solid var(--border)"><button class="bc-b x" onclick="_hcRowDel('+si+','+ri+')" title="줄 삭제">✕</button></td></tr>';
+      h+='<td style="border-bottom:1px solid var(--border)"><button class="bc-b x" onclick="_hcRowDel('+si+','+ri+')" title="이 항목 줄을 모든 레슨에서 삭제" style="white-space:nowrap;padding:3px 8px;font-weight:700">삭제</button></td></tr>';
     });
   });
   h+='</tbody></table></div>';

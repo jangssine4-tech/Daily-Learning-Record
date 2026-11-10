@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1110-b</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-a</div>
   </div>
 </div>
 
@@ -428,6 +428,7 @@ function _ccAutoLink(t){   // 교재 준비 · 교재 숙제 · 영상 숙제 �
   });});
   return t;
 }
+function _ccLabTy(l){l=String(l||'');return /받아쓰기/.test(l)?'dict':(/선생님/.test(l)?'call':'check');}
 function _ccNoteOf(plan,p,r,li){   // 항목 오른쪽 범위 표시: L1~L3 → (Lesson 1~3), First Grammar Lesson 4의 Voca·Main book은 자동으로 (Lesson 1~3)
   var n=r.n&&r.n[String(li)]?String(r.n[String(li)]).trim():'';
   var m=/^L(?:esson\s*)?(\d+)\s*~\s*(?:L(?:esson\s*)?)?(\d+)$/i.exec(n);
@@ -504,14 +505,18 @@ function ccResolve0(plan,level,progress){
     if(sec.tmx===undefined&&(r.tm===0||r.tm===1))sec.tmx=r.tm;   // 구역별 시간 측정(시작/끝) 켜기·끄기
     var note=_ccNoteOf(plan,p,r,li);
     var id='b'+bi+'r'+ri,lab=r.l;
-    if(ch==='s'){
-      sec.items.push({id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:'점',link:'quiz'});
-    }else if(/받아쓰기/.test(lab)){
-      sec.items.push({id:id,t:'dict',l:lab+note,link:'dict'});
-    }else if(/선생님/.test(lab)){
-      sec.items.push({id:id,t:'call',l:lab+note,to:'tablet',hint:r.h||''});
+    var ty=r.ty||(ch==='s'?'number':_ccLabTy(lab));   // 항목 종류: 계획표 줄에 정해 둔 값, 없으면 예전 방식(칸·이름)으로 판단
+    if(ty==='number'){
+      var _nit={id:id,t:'number',l:/점수|Quiz|Test/.test(lab)&&lab.length<28?(lab==='점수'?(r.s||'Quiz')+' 점수':lab.replace(/\s*\/\s*Unit Test|\s*\/\s*Level Test/,'')+' 점수'):lab,u:r.u||'점'};
+      var _nlk=r.lk!==undefined?r.lk:'quiz';if(_nlk)_nit.link=_nlk;sec.items.push(_nit);
+    }else if(ty==='dict'){
+      var _dit={id:id,t:'dict',l:lab+note};var _dlk=r.lk!==undefined?r.lk:'dict';if(_dlk)_dit.link=_dlk;sec.items.push(_dit);
+    }else if(ty==='call'){
+      sec.items.push({id:id,t:'call',l:lab+note,to:r.to==='book'?'book':'tablet',hint:r.h||''});
     }else{
-      var it={id:id,t:'check',l:lab+note};if(r.h)it.hint=r.h;sec.items.push(it);
+      var it={id:id,t:ty==='ox'?'ox':'check',l:lab+note};if(r.h)it.hint=r.h;
+      if(r.lk)it.link=r.lk;else if(r.lk==='')it.nl=1;
+      sec.items.push(it);
     }
   });
   // 교재 학습 구역 끝에 '검사 받기' 호출 버튼 자동 추가 (선생님 호출 항목이 이미 있으면 생략)
