@@ -1877,7 +1877,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-k';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-l';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -5719,7 +5719,7 @@ function _rwRacePrizes(){var c=window._rwCfg;return (c&&c.racePrizes&&c.racePriz
 async function _whPrizeEdit(){
   var cur=_rwRacePrizes().join(', '),v=prompt('레이싱 도착 상품 목록을 쉼표(,)로 구분해서 적어 주세요',cur);if(v===null)return;
   var a=v.split(',').map(function(x){return x.trim();}).filter(Boolean);if(!a.length)return;
-  try{await db.collection('config').doc('rewards').set({cfg:{racePrizes:a}},{merge:true});window._rwCfg=window._rwCfg||{};window._rwCfg.racePrizes=a;toast('상품 목록을 저장했어요');_whPaint();}
+  try{await db.collection('config').doc('rewards').set({cfg:{racePrizes:a}},{merge:true});window._rwCfg=window._rwCfg||{};window._rwCfg.racePrizes=a;if(_rwEd.work)_rwEd.work.racePrizes=a;toast('상품 목록을 저장했어요');_whPaint();}
   catch(e){console.warn(e);toast('저장하지 못했어요');}
 }
 async function _whPay(){
@@ -28896,7 +28896,7 @@ function _rwMark(){_rwEd.dirty=true;var b=document.getElementById('rw-dirty');if
 function _rwStart(){
   try{db.collection('config').doc('rewards').onSnapshot(function(d){
     window._rwCfg=(d.exists&&d.data().cfg)||null;try{_bcSyncSoon();}catch(e){}try{_hcSyncSoon();}catch(e){}
-    if(!_rwEd.dirty){_rwEd.work=null;if(typeof currentRefTab!=='undefined'&&currentRefTab==='rwset'&&_rwEd.pane==='set'){try{renderRwSet();}catch(e){}}}
+    if(!_rwEd.dirty){_rwEd.work=null;if(typeof currentRefTab!=='undefined'&&currentRefTab==='rwset'&&(_rwEd.pane==='set'||_rwEd.pane==='home')){try{renderRwSet();}catch(e){}}}
   },function(){});}catch(e){}
 }
 function _rwPrizeText(c){if(!c)return '';return c.t==='stamp'?'스탬프 +'+c.bonus:String(c.n||'');}
@@ -28904,9 +28904,9 @@ function _rwPane(p){_rwEd.pane=p;renderRwSet();}
 function renderRwSet(){
   var host=document.getElementById('ref-panel-rwset');if(!host)return;
   if(!_ccCan('cc_plan')){host.innerHTML='<div class="empty"><div class="et">관리자만 볼 수 있어요</div></div>';return;}
-  var tabs=[['set','⚙ 보상 설정'],['give','🎁 지급 대기'],['stk','⭐ 스탬프 현황']];
+  var tabs=[['set','📱 체크콜 보상 설정'],['home','🏠 홈체크 보상 설정'],['give','🎁 지급 대기'],['stk','⭐ 스탬프 현황']];
   host.innerHTML='<div style="display:flex;gap:6px;padding:12px 16px 0;flex-wrap:wrap">'+tabs.map(function(c){return '<button class="btn '+(c[0]===_rwEd.pane?'btn-navy':'btn-outline')+' btn-sm" onclick="_rwPane(\''+c[0]+'\')">'+c[1]+'</button>';}).join('')+'</div><div id="rw-body" style="padding:12px 16px 40px"></div>';
-  if(_rwEd.pane==='set')_rwDrawSet();else _rwLoadRows();
+  if(_rwEd.pane==='set'||_rwEd.pane==='home')_rwDrawSet();else _rwLoadRows();
 }
 function _rwDrawRows(k){
   var L=_rwW()[k],isS=k==='stamps';
@@ -28920,14 +28920,28 @@ function _rwDrawRows(k){
       +'<td style="white-space:nowrap"><button class="btn btn-outline btn-xs" onclick="_rwMv(\''+k+'\','+i+',-1)">▲</button> <button class="btn btn-outline btn-xs" onclick="_rwMv(\''+k+'\','+i+',1)">▼</button> <button class="btn btn-outline btn-xs" onclick="_rwDel(\''+k+'\','+i+')">✕</button></td></tr>';
   }).join('')+'</tbody></table><button class="btn btn-outline btn-xs" style="margin-top:5px" onclick="_rwAdd(\''+k+'\')">＋ '+(isS?'스탬프 규칙':'조건')+' 추가</button>';
 }
+function _rwBar(){
+  return '<div style="position:sticky;bottom:0;background:var(--surface);padding:10px 0;margin-top:16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--border)"><button class="btn btn-navy" onclick="_rwSave()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="_rwResetDef()">처음 값으로</button><span id="rw-dirty" style="font-size:12px;color:#b45309;display:'+(_rwEd.dirty?'':'none')+'">저장하지 않은 변경이 있어요 (체크콜·홈체크 설정이 함께 저장돼요)</span></div>';
+}
+function _rwPrizeSet(v){var a=String(v).split(',').map(function(s){return s.trim();}).filter(Boolean);_rwTop('racePrizes',a.length?a:null);}
+function _rwDrawHome(w,body){
+  var pz=(w.racePrizes&&w.racePrizes.length)?w.racePrizes:['황금카드 보너스 1장','원장님 특별 상품'];
+  var h='<style>.rw-h{font-size:13px;font-weight:800;color:var(--navy);margin:18px 0 6px}</style>';
+  h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">학생이 <b>홈체크 숙제를 다 하면</b> 레이싱 말이 한 칸 가요 (숙제를 다 한 날 1칸 · 12칸을 돌면 도착). 저장하기 전에는 학생 앱에 반영되지 않아요. 체크콜 황금카드 설정은 옆 「📱 체크콜 보상 설정」 탭에 있어요.</div>';
+  h+='<div class="rw-h" style="margin-top:6px">🏁 레이싱 캐릭터</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;border:1px solid var(--border);border-radius:10px;padding:8px 12px"><select class="fi" style="width:auto" onchange="_rwTop(\'raceChars\',this.value)">'+[['all','사람 + 자동차 모두'],['people','사람 캐릭터만'],['cars','자동차만']].map(function(o){return '<option value="'+o[0]+'"'+((w.raceChars||'all')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select><span style="color:var(--txt3)">학생은 여기서 정한 종류 안에서 고를 수 있어요</span></div>';
+  h+='<div style="margin-top:14px">'+_hcClsHtml()+'</div>';
+  h+='<div class="rw-h">🎁 도착 상품 <span style="font-weight:400;font-size:11px;color:var(--txt3)">12칸을 다 돌면 선생님이 이 중에서 골라 지급해요 (반에서 제일 먼저 도착한 학생은 보너스 대상으로 표시돼요)</span></div><label style="font-size:12px;display:block">쉼표(,)로 구분해서 적어 주세요 <input class="fi" style="width:100%;margin-top:4px" value="'+_bcEsc(pz.join(', '))+'" onchange="_rwPrizeSet(this.value)"></label>';
+  h+=_rwBar();
+  body.innerHTML=h;
+}
 function _rwDrawSet(){
   var w=_rwW(),body=document.getElementById('rw-body');if(!body)return;
+  if(_rwEd.pane==='home'){_rwDrawHome(w,body);return;}
   var E={cards:'카드 장수 늘리기',stampPlus:'스탬프 보너스 추가',special:'특별 상 확정'};
   var tot=w.prizes.reduce(function(a,p){return a+Math.max(0,p.w);},0)||1;
   var h='<style>.rw-t{border-collapse:collapse;width:100%;font-size:12px}.rw-t td,.rw-t th{padding:3px;border-bottom:1px solid var(--border);text-align:left}.rw-h{font-size:13px;font-weight:800;color:var(--navy);margin:18px 0 6px}</style>';
-  h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">학생이 체크콜을 마치면 황금카드 뽑기가 나와요. 저장하기 전에는 학생 태블릿에 아무것도 나오지 않아요.</div>';
+  h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">학생이 <b>체크콜(태블릿 수업 체크)</b>을 마치면 황금카드 뽑기가 나와요. 저장하기 전에는 학생 태블릿에 아무것도 나오지 않아요. 홈체크(레이싱) 설정은 옆 「🏠 홈체크 보상 설정」 탭에 있어요.</div>';
   h+='<label style="display:flex;gap:8px;align-items:center;font-weight:800;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:9px 12px;cursor:pointer"><input type="checkbox"'+(w.enabled!==0?' checked':'')+' onchange="_rwTop(\'enabled\',this.checked?1:0)"> 🎁 황금카드 보상 사용 <span style="font-weight:400;font-size:11px;color:var(--txt3)">(끄면 학생 화면에 아무것도 나오지 않아요)</span></label>';
-  h+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;border:1px solid var(--border);border-radius:10px;padding:8px 12px"><b style="color:var(--navy)">🏁 홈체크 레이싱 캐릭터</b><select class="fi" style="width:auto" onchange="_rwTop(\'raceChars\',this.value)">'+[['all','사람 + 자동차 모두'],['people','사람 캐릭터만'],['cars','자동차만']].map(function(o){return '<option value="'+o[0]+'"'+((w.raceChars||'all')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select><span style="color:var(--txt3)">학생은 여기서 정한 종류 안에서 고를 수 있어요 (저장 후 반영)</span></div>'+_hcClsHtml();
   h+='<div class="rw-h">🏆 카드를 뽑을 수 있는 조건 <span style="font-weight:400;font-size:11px;color:var(--txt3)">"필수"인 조건이 모두 맞아야 카드가 나와요 · 필수가 아니면 보너스 줄이에요 · 오늘 수업에 퀴즈·받아쓰기·숙제가 없으면 그 조건은 건너뛰어요</span></div>'+_rwDrawRows('conds');
   h+='<div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px"><label>수업 태도 통과 기준 <select class="fi" style="width:auto" onchange="_rwTop(\'attMin\',this.value)"><option value="우수"'+(w.attMin!=='매우 우수'?' selected':'')+'>우수 이상</option><option value="매우 우수"'+(w.attMin==='매우 우수'?' selected':'')+'>매우 우수만</option></select></label><label style="flex:1;min-width:240px">조건이 안 맞을 때 문구 <input class="fi" style="width:100%" value="'+_bcEsc(w.failMsg||'')+'" onchange="_rwTop(\'failMsg\',this.value)"></label></div>';
   h+='<div class="rw-h">⭐ 스탬프 규칙 <span style="font-weight:400;font-size:11px;color:var(--txt3)">카드와 별개로, 맞는 규칙마다 스탬프를 받아요</span></div>'+_rwDrawRows('stamps');
@@ -28941,7 +28955,7 @@ function _rwDrawSet(){
   h+='<div class="rw-h">🎴 카드 상품 <span style="font-weight:400;font-size:11px;color:var(--txt3)">확률 = 가중치 ÷ 합계</span></div><table class="rw-t"><thead><tr><th>이름</th><th>종류</th><th>가중치</th><th>확률</th><th></th></tr></thead><tbody>'
     +w.prizes.map(function(p,i){return '<tr><td><input class="fi" style="min-width:150px" value="'+_bcEsc(p.n)+'" onchange="_rwSet(\'prizes\','+i+',\'n\',this.value)"></td><td><select onchange="_rwSet(\'prizes\','+i+',\'t\',this.value,1)"><option value="stamp"'+(p.t==='stamp'?' selected':'')+'>스탬프</option><option value="snack"'+(p.t==='snack'?' selected':'')+'>간식</option><option value="coupon"'+(p.t==='coupon'?' selected':'')+'>쿠폰</option></select></td><td><input class="fi" type="number" style="width:60px" value="'+p.w+'" onchange="_rwSet(\'prizes\','+i+',\'w\',+this.value,1)"></td><td>'+Math.round(Math.max(0,p.w)/tot*100)+'%</td><td><button class="btn btn-outline btn-xs" onclick="_rwDel(\'prizes\','+i+')">✕</button></td></tr>';}).join('')
     +'</tbody></table><div style="margin-top:6px;display:flex;gap:10px;align-items:center;font-size:12px;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_rwAdd(\'prizes\')">＋ 상품 추가</button><label>스탬프 카드 보너스 <input class="fi" type="number" min="1" max="9" style="width:55px" value="'+w.bmin+'" onchange="_rwTop(\'bmin\',+this.value)"> ~ <input class="fi" type="number" min="1" max="9" style="width:55px" value="'+w.bmax+'" onchange="_rwTop(\'bmax\',+this.value)"> 개</label></div>';
-  h+='<div style="position:sticky;bottom:0;background:var(--surface);padding:10px 0;margin-top:16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--border)"><button class="btn btn-navy" onclick="_rwSave()">💾 저장</button><button class="btn btn-outline btn-sm" onclick="_rwResetDef()">처음 값으로</button><span id="rw-dirty" style="font-size:12px;color:#b45309;display:'+(_rwEd.dirty?'':'none')+'">저장하지 않은 변경이 있어요</span></div>';
+  h+=_rwBar();
   body.innerHTML=h;
 }
 function _rwTop(f,v){_rwW()[f]=v;_rwMark();if(f==='enabled'||f==='bmin'||f==='bmax')return;}
