@@ -627,6 +627,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   <!-- 오른쪽: 최근 2주 학습 흐름 패널 -->
   <div id="write-flow-panel" style="flex:1;min-width:260px;max-width:380px;display:none;align-self:flex-start;position:sticky;top:14px;max-height:calc(100vh - 80px);overflow-y:auto">
     <div class="card" id="write-live-panel" style="padding:12px 14px;margin-bottom:10px;display:none"><div id="write-live-content"></div></div>
+    <div class="card" id="write-home-panel" style="padding:12px 14px;margin-bottom:10px;display:none"></div>
     <div class="card" style="padding:14px">
       <div id="write-flow-content"></div>
     </div>
@@ -1876,7 +1877,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-e';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-i';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4896,7 +4897,7 @@ function _ccGridPre(p){
   var cu=Object.keys(p.ov||{}).filter(function(ln){return _ccCustom(p,ln);});
   var h='';
   var _co=!!_ccEd.colOpen;
-  h+=_ccHwCard(p)+'<div style="margin:0 10px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_ccSecAdd()">＋ 구역 추가</button><button class="btn btn-outline btn-xs'+(_co?' on':'')+'" style="'+(_co?'background:#dbeafe;border-color:#93c5fd;':'')+'" onclick="_ccColToggle()" title="레슨(열) 삽입·이동·이름 변경·삭제">＋ 열 추가</button>'+_ccModBtn(p)+(_co?_ccColBar(p).replace('margin:0 10px 8px;','margin:0;'):'')+'</div>';
+  h+=_ccHwCard(p)+'<div style="margin:0 10px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_ccSecAdd()">＋ 구역 추가</button><button class="btn btn-outline btn-xs'+(_co?' on':'')+'" style="'+(_co?'background:#dbeafe;border-color:#93c5fd;':'')+'" onclick="_ccColToggle()" title="레슨(열) 삽입·이동·이름 변경·삭제">＋ 열 추가</button>'+_ccModBtn(p)+_ccMinHtml()+(_co?_ccColBar(p).replace('margin:0 10px 8px;','margin:0;'):'')+'</div>';
   return h;
 }
 function _ccLessonView(b,sel){
@@ -4908,7 +4909,7 @@ function _ccLessonView(b,sel){
   var h='<div style="padding:8px 10px">'
     +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">'
     +'<button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button>'+_ccModBtn(p)
-    +_ccMinHtml()+'</div>';
+    +'</div>';
   if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 기본 점검 항목이 나옵니다.</div>';t={sections:[]};}
   // 계획표에서 꺼진 항목을 해당 구역 안에 흐리게 함께 보여줌
   var offBy={},li=spec?-1:sel;
@@ -5693,7 +5694,95 @@ function _wlOpenToggle(){
   try{localStorage.setItem('wl_open',_wl.open?'1':'0');}catch(e){}
   _wlPaint();
 }
+/* ── 학습 일지: 홈체크 구역 (체크콜 아래, ▼▲로 접고 펴요) ── */
+var _wh={sid:null,open:undefined,data:undefined,les:'',busy:false,race:undefined,ev:0};
+function _whToggle(){_wh.open=!_wh.open;try{localStorage.setItem('wh_open',_wh.open?'1':'0');}catch(e){}_whPaint();}
+function _whCtx(s){
+  var r=_hcLatest(s);if(!r)return null;
+  var key=_hcKey(ccPlanKey(r.level||getStudentLevel(s),s.grade)),plan=_hcPlan(key),les=_hcFindLesson(plan,r.progress);
+  if(!key||!les)return null;return {key:key,plan:plan,les:les,r:r};
+}
+async function _whLoad(force){
+  var s=students.find(function(x){return x.id===_wh.sid;});if(!s||!db)return;
+  var c=_whCtx(s);if(!c){_wh.data=null;_wh.les='';_whPaint();return;}
+  if(!force&&_wh.data!==undefined&&_wh.les===c.les&&_wh.race!==undefined)return;
+  var sid0=s.id;
+  try{var rs=await db.collection('homeRace').doc(sid0).get();if(_wh.sid===sid0){_wh.race=rs.exists?rs.data():null;_wh.ev=0;
+    if(_wh.race&&_wh.race.fin){var eq=await db.collection('homeUploads').where('lk','==','race__'+sid0).get();var n=0;eq.forEach(function(d){if((d.data().itemId||'')==='race'+(_wh.race.round||1))n++;});_wh.ev=n;}}}
+  catch(e){console.warn('홈체크 레이싱',e);if(_wh.sid===sid0)_wh.race=null;}
+  _wh.les=c.les;_wh.busy=true;_whPaint();
+  try{var sn=await db.collection('homeLogs').doc(_hcLogId(s.id,c.key,c.les)).get();if(_wh.sid===s.id)_wh.data=sn.exists?sn.data():null;}
+  catch(e){console.warn('홈체크 기록',e);if(_wh.sid===s.id)_wh.data=null;}
+  _wh.busy=false;_whPaint();
+}
+function _rwRacePrizes(){var c=window._rwCfg;return (c&&c.racePrizes&&c.racePrizes.length)?c.racePrizes:['황금카드 보너스 1장','원장님 특별 상품'];}
+async function _whPrizeEdit(){
+  var cur=_rwRacePrizes().join(', '),v=prompt('레이싱 도착 상품 목록을 쉼표(,)로 구분해서 적어 주세요',cur);if(v===null)return;
+  var a=v.split(',').map(function(x){return x.trim();}).filter(Boolean);if(!a.length)return;
+  try{await db.collection('config').doc('rewards').set({cfg:{racePrizes:a}},{merge:true});window._rwCfg=window._rwCfg||{};window._rwCfg.racePrizes=a;toast('상품 목록을 저장했어요');_whPaint();}
+  catch(e){console.warn(e);toast('저장하지 못했어요');}
+}
+async function _whPay(){
+  var r=_wh.race;if(!r||!r.fin)return;var sel=document.getElementById('wh-prize'),pz=sel?sel.value:'';if(!pz)return;
+  if(!_wh.ev&&!confirm('증거 사진이 아직 없어요. 그래도 지급 처리할까요?'))return;
+  var o={};o['prz.'+(r.round||1)]={n:pz,at:Date.now()};
+  try{await db.collection('homeRace').doc(_wh.sid).update(o);r.prz=r.prz||{};r.prz[r.round||1]={n:pz,at:Date.now()};toast('🎁 지급 처리했어요');_whPaint();}
+  catch(e){console.warn(e);toast('저장하지 못했어요. 다시 눌러 주세요');}
+}
+function _whMin(ms){return Math.max(1,Math.round(ms/60000));}
+function _whShow(sid){
+  var p=$('write-home-panel');if(!p)return;
+  var s=sid&&students.find(function(x){return x.id===sid;});
+  if(!s||!db||(s.status&&s.status!=='재원'&&s.status!=='신규')){p.style.display='none';_wh.sid=null;return;}
+  p.style.display='';
+  if(_wh.open===undefined){try{_wh.open=localStorage.getItem('wh_open')==='1';}catch(e){_wh.open=false;}}
+  if(_wh.sid!==sid){_wh.sid=sid;_wh.data=undefined;_wh.les='';_wh.race=undefined;_wh.ev=0;}
+  _whPaint();_whLoad(false);
+}
+function _whPaint(){
+  var p=$('write-home-panel');if(!p||!_wh.sid)return;
+  var s=students.find(function(x){return x.id===_wh.sid;});if(!s)return;
+  var c=_whCtx(s),x=_wh.data,lbl,body='';
+  if(!c)lbl='<span style="color:var(--txt3)">숙제 정보 없음</span>';
+  else if(_wh.data===undefined)lbl='<span style="color:var(--txt3)">불러오는 중…</span>';
+  else if(!x)lbl='<span style="color:var(--txt3)">아직 체크 전</span>';
+  else lbl='<span style="color:#0f766e;font-weight:700">'+_bcEsc(c.les)+'</span>'+((_wh.race&&_wh.race.fin&&!(_wh.race.prz||{})[_wh.race.round||1])?' <span style="color:#b45309;font-weight:800">🏆 도착</span>':'');
+  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_whToggle()"><b class="wl-head" style="margin:0;flex:1">🏠 '+_bcEsc(s.name)+' · 홈체크</b><span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wh.open?'▲':'▼')+'</span></div>';
+  if(_wh.open&&c){
+    var secs=_hcClean(c.plan.lessons[c.les],c.plan.tmSecs),e=(x&&x.e)||{},tm=(x&&x.tm)||{},now=Date.now(),tot=0,totN=0;
+    body+='<div class="wl-meta" style="margin:8px 0">'+_bcEsc(c.les)+' 숙제'+(x&&x.upd?' · 마지막 체크 '+_wlHM(x.upd):'')+(c.plan.notice?(x&&x.nr?' · 유의사항 읽음 '+_wlHM(x.nr):' · <span style="color:#b45309">유의사항 안 읽음</span>'):'')
+      +' <button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px;margin-left:6px" onclick="_whLoad(true)">'+(_wh.busy?'…':'↻ 새로고침')+'</button></div>';
+    secs.forEach(function(sec){
+      var d=sec.items.filter(function(it){return e[it.id];}).length,n=sec.items.length,t=tm[_hcSafe(sec.title)],ts='';
+      if(sec.tm||(t&&t.s)){
+        if(t&&t.s){
+          var ms=Math.max(0,(t.e||t.ps||now)-t.s-(t.p||0)),pm=Math.round((t.p||0)/60000);
+          ts='⏱ <b>'+_whMin(ms)+'분</b>'+(t.e?'':(t.ps?' (멈춤 중)':' (진행 중)'))+(pm?' · 멈춤 '+pm+'분':'')+(ms>7200000?' <span style="color:#b45309">· 끝을 안 눌렀을 수 있어요</span>':'');
+          if(t.e){tot+=ms;totN++;}
+        }else ts='<span style="color:var(--txt3)">시간 재기 전</span>';
+      }else{
+        var a=sec.items.map(function(it){return e[it.id]||0;}).filter(Boolean).sort();
+        if(a.length>=2){var gap=a[a.length-1]-a[0];ts='<span style="color:var(--txt3)">≈ '+_whMin(gap)+'분 (체크 간격 추정)</span>';}
+      }
+      var rows=sec.items.map(function(it){var on=e[it.id];return '<div class="wl-row'+(on?' on':'')+'"><span class="wl-dot'+(on?' on':'')+'">'+(on?'✓':'')+'</span><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-t">'+(on?_wlHM(on):'')+'</span></div>';}).join('');
+      body+='<div class="wl-sec'+(d===n&&n?' ok':'')+'"><div class="wl-sh">'+_bcEsc(sec.title)+' <span style="font-weight:600;color:var(--txt3)">'+d+'/'+n+'</span>'+(ts?'<span style="float:right;font-weight:600;font-size:11px">'+ts+'</span>':'')+'</div>'+rows+'</div>';
+    });
+    if(totN)body+='<div class="wl-meta">⏱ 시간을 잰 구역 합계 <b>'+_whMin(tot)+'분</b></div>';
+    if(!secs.length)body='<div class="wl-meta" style="margin-top:8px">이 레슨에는 집에서 할 숙제가 없어요</div>';
+  }
+  if(_wh.open&&_wh.race){
+    var rc=_wh.race,pzd=(rc.prz||{})[rc.round||1],rb='<div class="wl-meta" style="margin:8px 0">🏁 레이싱 <b>'+(rc.pos||0)+'/12칸</b> · '+(rc.round||1)+'번째 판'+((rc.days||[]).length?' · 숙제 완료 '+(rc.days||[]).length+'일':'');
+    if(rc.fin){
+      rb+='<div style="margin-top:5px;color:#b45309;font-weight:800">🏆 도착! 증거 사진 '+_wh.ev+'장</div>';
+      if(pzd)rb+='<div style="margin-top:3px;color:#0f766e;font-weight:800">🎁 지급 완료: '+_bcEsc(pzd.n)+'</div>';
+      else rb+='<div style="margin-top:5px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select id="wh-prize" class="fi" style="font-size:12px;padding:2px 6px">'+_rwRacePrizes().map(function(x){return '<option>'+_bcEsc(x)+'</option>';}).join('')+'</select><button class="btn btn-xs" onclick="_whPay()">지급 처리</button><button class="btn btn-outline btn-xs" onclick="_whPrizeEdit()">상품 목록 편집</button></div>';
+    }
+    body+=rb+'</div>';
+  }
+  p.innerHTML=head+body;
+}
 function _wlShow(sid){
+  try{_whShow(sid);}catch(e){console.warn(e);}
   var p=$('write-live-panel');if(!p)return;
   var s=sid&&students.find(function(x){return x.id===sid;});
   if(!s||!db){_wlStop();p.style.display='none';return;}
@@ -28615,9 +28704,9 @@ function _hcLatest(s,beforeDate){
   if(lv&&lv.progress&&(!best||lv.date>=best.date))return {studentId:s.id,date:lv.date,level:lv.level,progress:lv.progress,_t:''};
   return best;
 }
-function _hcClean(secs){
+function _hcClean(secs,tms){
   return (secs||[]).map(function(sec){
-    var o={title:String(sec.title||''),items:[]};
+    var o={title:String(sec.title||''),items:[]};if(tms&&tms[o.title])o.tm=1;
     if(sec.sub)o.sub=String(sec.sub);if(sec.grp)o.grp=String(sec.grp);
     (sec.items||[]).forEach(function(it){
       if(!it||!it.l)return;
@@ -28634,7 +28723,7 @@ function _hcDocFor(s){
   var r=_hcLatest(s),lv=(r&&r.level)||getStudentLevel(s),key=_hcKey(ccPlanKey(lv,s.grade)),plan=_hcPlan(key);
   var les=r?_hcFindLesson(plan,r.progress):'';
   return {name:String(s.name||'').replace(/\s+/g,''),pin:pin,key:key||'',lv:String(lv||''),pg:r?String(r.progress||'').trim():'',les:les,rdate:r?String(r.date||''):'',
-    notice:plan?String(plan.notice||''):'',secs:(plan&&les)?_hcClean(plan.lessons[les]):[]};
+    notice:plan?String(plan.notice||''):'',secs:(plan&&les)?_hcClean(plan.lessons[les],plan.tmSecs):[]};
 }
 function _hcStable(v){
   if(Array.isArray(v))return v.map(_hcStable);
@@ -28991,7 +29080,7 @@ function _hcGridHtml(p){
     h+='<tr ondragover="_hcDgOver(event,\'sec\')" ondragleave="_hcDgLeave(event)" ondrop="_hcDgDrop(event,\'sec\','+si+',0)"><td colspan="'+ncol+'" style="background:'+gc[0]+';color:'+gc[1]+';padding:4px 8px;border-top:2px solid '+gc[1]+'"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;position:sticky;left:6px">'
       +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'sec\','+si+',0)" ondragend="_hcDgEnd()" title="끌어서 구역 전체를 옮겨요">⠿</span>'
       +'<input value="'+_bcEsc(S.title)+'" onchange="_hcSecRename('+si+',this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px">'
-      +'<button style="'+cs[0]+'" onclick="_hcRowAdd('+si+')">＋ 항목 추가</button><button style="'+cs[0]+'" onclick="_hcSecDel('+si+')">구역 삭제</button></div></td></tr>';
+      +'<button style="'+cs[0]+'" onclick="_hcRowAdd('+si+')">＋ 항목 추가</button><label style="'+cs[0]+';display:inline-flex;align-items:center;gap:4px" title="켜면 학생 홈체크에 시작·멈춤·끝 버튼이 생겨요"><input type="checkbox"'+((p.tmSecs&&p.tmSecs[S.title])?' checked':'')+' onchange="_hcTmSet('+si+',this.checked)">⏱ 시간 재기</label><button style="'+cs[0]+'" onclick="_hcSecDel('+si+')">구역 삭제</button></div></td></tr>';
     S.items.forEach(function(R,ri){
       h+='<tr ondragover="_hcDgOver(event,\'it\')" ondragleave="_hcDgLeave(event)" ondrop="_hcDgDrop(event,\'it\','+si+','+ri+')"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+gc[1]+';padding:3px 6px;border-bottom:1px solid var(--border);vertical-align:middle"><div class="pl-row">'
         +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'it\','+si+','+ri+')" ondragend="_hcDgEnd()" title="끌어서 이 구역 안에서 순서를 바꿔요">⠿</span>'
@@ -29079,12 +29168,14 @@ function _hcRowMoveTo(si,from,to){
   var x=S.items.splice(from,1)[0];S.items.splice(to,0,x);_hcRowsCommit(p,rows);
   _hcSortAll(p,'items',ttl);_hcMark();_hcDraw();
 }
+function _hcTmSet(si,on){var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;p.tmSecs=p.tmSecs||{};if(on)p.tmSecs[S.title]=1;else delete p.tmSecs[S.title];_hcMark();_hcDraw();}
 function _hcSecRename(si,v){
   var p=_hcWork(),rows=_hcRows(p),S=rows[si];v=String(v||'').trim();if(!S||v===S.title)return;
   if(!v||rows.some(function(s){return s.title===v;})){toast(v?'같은 이름의 구역이 있어요':'구역 이름을 입력해 주세요');_hcDraw();return;}
   _hcFor(p,function(L){L.forEach(function(sec){if(sec.title===S.title)sec.title=v;});});
   if(p.secOrder){var i=p.secOrder.indexOf(S.title);if(i>=0)p.secOrder[i]=v;}
   if(p.rowOrder&&p.rowOrder[S.title]){p.rowOrder[v]=p.rowOrder[S.title];delete p.rowOrder[S.title];}
+  if(p.tmSecs&&p.tmSecs[S.title]){p.tmSecs[v]=1;delete p.tmSecs[S.title];}
   _hcMark();_hcDraw();
 }
 function _hcRowAdd(si){
