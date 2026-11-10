@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1107-a</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1110-a</div>
   </div>
 </div>
 
@@ -572,7 +572,13 @@ function _authShow(A){
     if(!e||!p){ms.textContent='이메일과 비밀번호를 입력하세요';return;}
     ms.textContent='';bt.disabled=true;bt.textContent='확인 중…';
     A.signInWithEmailAndPassword(e,p).then(function(){try{localStorage.setItem('acad_auth_email',e);}catch(_){}})
-     .catch(function(er){ms.textContent=_AUTH_MSG[er.code]||('로그인 실패: '+(er.code||er.message));bt.disabled=false;bt.textContent='로그인';});
+     .catch(function(er){
+      if(/api-key-not-valid|invalid-api-key/.test(String(er.code||'')+' '+String(er.message||''))){   // 저장된 연결 설정이 잘못됐으면 지우고 설정 화면으로
+        ms.textContent='이 기기에 저장된 연결 설정(apiKey)이 잘못됐어요. 설정을 지우고 다시 입력 화면으로 이동해요…';
+        try{localStorage.removeItem('fb_cfg');localStorage.removeItem('cc_sid');}catch(e){}
+        setTimeout(function(){location.replace(location.pathname);},1800);return;
+      }
+      ms.textContent=_AUTH_MSG[er.code]||('로그인 실패: '+(er.code||er.message));bt.disabled=false;bt.textContent='로그인';});
   };
   setTimeout(function(){(em.value?pw:em).focus();},50);
 }
