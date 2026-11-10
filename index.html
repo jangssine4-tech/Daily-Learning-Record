@@ -1867,7 +1867,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1110-b';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1110-c';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3346,7 +3346,8 @@ async function _bcSyncRoster(manual){
     students.forEach(function(s){
       var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
       var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return;
-      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:_ccMinOf(ccPlanKey(_inf.lvl,s.grade),_ccEffPlan(ccPlanKey(_inf.lvl,s.grade))),level:getStudentLevel(s),lvl:_inf.lvl,pg:_inf.pg||'',ses:_ccSesMap(s),rw:window._rwCfg||null};
+      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:_ccMinOf(ccPlanKey(_inf.lvl,s.grade),_ccEffPlan(ccPlanKey(_inf.lvl,s.grade))),level:getStudentLevel(s),lvl:_inf.lvl,pg:_inf.pg||'',lvl2:'',pg2:'',ses:_ccSesMap(s),rw:window._rwCfg||null};
+      try{var _i2=_bcTodayInfo(s,2);if(_i2&&_i2.pg&&ccPlanKey(_i2.lvl,s.grade)===ccPlanKey(_inf.lvl,s.grade)){want[s.id].lvl2=_i2.lvl;want[s.id].pg2=_i2.pg;}}catch(e){}   // 2회차 진도 (1회차와 따로)
     });
     var ops=[];
     if(!Object.keys(want).length){   // 명단에 넣을 학생이 하나도 없으면 기존 명단을 지우지 않아요
@@ -3355,7 +3356,7 @@ async function _bcSyncRoster(manual){
     }
     Object.keys(want).forEach(function(id){
       var c=have[id];
-      if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,plan:c.plan||null,totalMin:c.totalMin,level:c.level,lvl:c.lvl,pg:c.pg||'',ses:c.ses||{},rw:c.rw||null})===_bcCanon(want[id]))return;
+      if(c&&_bcCanon({name:c.name,pin:c.pin,template:c.template,plan:c.plan||null,totalMin:c.totalMin,level:c.level,lvl:c.lvl,pg:c.pg||'',lvl2:c.lvl2||'',pg2:c.pg2||'',ses:c.ses||{},rw:c.rw||null})===_bcCanon(want[id]))return;
       ops.push({t:'set',id:id,d:want[id]});
     });
     Object.keys(have).forEach(function(id){if(!want[id])ops.push({t:'del',id:id});});
@@ -3948,23 +3949,46 @@ function _ccEffPlan0(key){
   }
   return CC_PLANS[key]||null;
 }
-function _bcTodayInfo(s){
-  var d=todayISO(),best=null;
-  (typeof reports!=='undefined'&&reports||[]).forEach(function(r){
-    if(r.studentId!==s.id||r.date!==d||r.absent||!(r.level||r.progress))return;
+// 한 레슨 앞으로 넘긴 단계·진도 (같은 날 앞 수업을 마친 것으로 보고 다음 수업의 진도를 정할 때)
+function _pgStepInfo(info,n){
+  if(!info||!info.lvl||!info.pg)return null;
+  var lv=info.lvl,ls=CURRICULUM[lv]||[],pos=ls.indexOf(info.pg);if(pos<0)return null;
+  for(var i=0;i<n;i++){
+    if(pos+1<ls.length)pos++;
+    else{var N=_nextLevelNE(lv);if(!N||!(CURRICULUM[N]||[]).length)break;lv=N;ls=CURRICULUM[lv];pos=0;}
+  }
+  return {lvl:lv,pg:ls[pos]};
+}
+function _bcTodayInfo(s,sess){
+  sess=sess===2?2:1;
+  var d=todayISO(),best=null,two=false;
+  try{two=_ccTimesDn(s,_CC_DN[new Date(d+'T12:00:00').getDay()]).length>=2;}catch(e){}
+  if(sess===2&&!two)return null;
+  var mine=function(r){return !two||_ccSess(s,d,r.sessionTime)===sess;};   // 하루 두 번 수업이면 회차별 일지만 사용
+  var _rs=(typeof reports!=='undefined'&&reports||[]);
+  _rs.forEach(function(r){
+    if(r.studentId!==s.id||r.date!==d||r.absent||!(r.level||r.progress)||!mine(r))return;
     if(!best||(r.progress&&!best.progress))best=r;
   });
+  if(sess===2){
+    if(_rs.some(function(r){return r.studentId===s.id&&r.date===d&&r.absent&&mine(r);}))return null;
+    if(best&&best.progress)return {lvl:best.level||getStudentLevel(s),pg:best.progress};
+    if(s.lessonPace>1)return null;
+    return _pgStepInfo(_bcTodayInfo(s,1),1);   // 2회차 일지가 아직 없으면 1회차를 마친 것으로 보고 다음 레슨
+  }
   if(!best&&s.pgPlan&&s.pgPlan.date===d&&s.pgPlan.level&&s.pgPlan.progress){   // 일지를 저장하기 전이라도 오늘 고른 단계·진도를 체크콜에 반영
-    var _abs=(typeof reports!=='undefined'&&reports||[]).some(function(r){return r.studentId===s.id&&r.date===d&&r.absent;});
+    var _abs=_rs.some(function(r){return r.studentId===s.id&&r.date===d&&r.absent;});
     if(!_abs)return {lvl:s.pgPlan.level,pg:s.pgPlan.progress};
   }
   var lv0=(best&&best.level)||getStudentLevel(s);
   if(!(best&&best.progress)){   // 오늘 일지가 없으면 일지 화면과 같은 규칙(마지막 진도 + 지나간 수업일)으로 자동 계산
     try{
-      var _abs2=(typeof reports!=='undefined'&&reports||[]).some(function(r){return r.studentId===s.id&&r.date===d&&r.absent;});
+      var _abs2=_rs.some(function(r){return r.studentId===s.id&&r.date===d&&r.absent;});
+      window._pgNoExtra=true;
       var ar=(!_abs2&&lv0)?_autoNextProgress(s.id,lv0,d,''):null;
+      window._pgNoExtra=false;
       if(ar&&ar.progress)return {lvl:ar.level||lv0,pg:ar.progress};
-    }catch(e){}
+    }catch(e){window._pgNoExtra=false;}
   }
   return {lvl:lv0,pg:(best&&best.progress)||''};
 }
@@ -10369,13 +10393,33 @@ function _nextLevelNE(level){
   return null;
 }
 // 학생의 직전 진도(이전 날짜 + 같은 날 앞 교시)를 찾아 다음 단계/진도를 계산
+// 같은 날 앞 수업의 일지가 아직 저장되지 않았으면(진도가 자동으로 채워진 상태 등) 그 수업을 마친 것으로 보고 그만큼 더 넘겨요
 function _autoNextProgress(sId,level,dt,sessTime,depth){
+  var r=_autoNextProgress0(sId,level,dt,sessTime,depth);
+  try{
+    if(!r||window._pgNoExtra)return r;
+    var cur=window._currentSessionTime||sessTime||'',cm=_ccTM(cur);if(cm<0)return r;
+    var st=students.find(function(x){return x.id===sId;});if(!st||st.lessonPace>1)return r;
+    var ts=_ccTimesDn(st,_CC_DN[new Date(dt+'T12:00:00').getDay()]),n=0;
+    ts.forEach(function(t){
+      var tm=_ccTM(t);if(tm<0||tm>=cm)return;
+      var rs=reports.filter(function(x){return x.studentId===sId&&x.date===dt&&_ccTM(x.sessionTime)===tm;});
+      if(rs.some(function(x){return x.absent||x.earlyLeave;})||rs.some(function(x){return x.progress;}))return;   // 결석이거나 이미 저장된 진도는 위 계산에 반영돼 있어요
+      n++;
+    });
+    if(!n)return r;
+    var st2=_pgStepInfo({lvl:r.level,pg:r.progress},n);if(!st2)return r;
+    var o={};Object.keys(r).forEach(function(k){o[k]=r[k];});o.level=st2.lvl;o.progress=st2.pg;o.extraSess=n;o.jumped=o.jumped||st2.lvl!==level;
+    return o;
+  }catch(e){return r;}
+}
+function _autoNextProgress0(sId,level,dt,sessTime,depth){
   depth=depth||0;
   var lessons=CURRICULUM[level]||[];if(!lessons.length||depth>8)return null;
   var cur=window._currentSessionTime||sessTime||'';
   function before(r){
     if(r.date<dt)return true;
-    if(r.date===dt&&cur&&r.sessionTime&&r.sessionTime<cur)return true;
+    if(r.date===dt&&cur&&r.sessionTime&&(_ccTM(r.sessionTime)>=0&&_ccTM(cur)>=0?_ccTM(r.sessionTime)<_ccTM(cur):r.sessionTime<cur))return true;
     return false;
   }
   var cand=reports.filter(function(r){return r.studentId===sId&&!r.absent&&r.progress&&before(r);});
@@ -10428,7 +10472,7 @@ function _autoNextProgress(sId,level,dt,sessTime,depth){
     var N=_nextLevelNE(level);
     if(!N)return {level:level,progress:lessons[idx]};
     var newer=cand.filter(function(r){return r.level===N&&key(r)>=key(last);})[0];
-    if(newer)return _autoNextProgress(sId,N,dt,sessTime,depth+1)||{level:N,progress:CURRICULUM[N][0]};
+    if(newer)return _autoNextProgress0(sId,N,dt,sessTime,depth+1)||{level:N,progress:CURRICULUM[N][0]};
     res={level:N,progress:CURRICULUM[N][0],jumped:true};
   }
   // 마지막 진도 기록 이후, 일지를 저장하지 않았거나 진도 없이 출석만 처리한 수업일은 수업을 한 것으로 보고 그만큼 더 넘김
@@ -10512,6 +10556,7 @@ function populateProgressDropdown(level,current,refDate,allowJump){
     if(res&&res.prevLevel&&!res.missed)_pgHint('이전 단계 "'+res.prevLevel+'"를 마친 기록('+res.lastDate+' '+res.lastProgress+')이 있어 이 단계의 첫 레슨으로 채웠어요. 다르면 직접 골라 주세요.');
     if(res&&res.pace)_pgHint('진도 속도 "수업 '+res.pace+'회에 1레슨" 설정으로 계산했어요 (마지막 기록 '+res.lastDate+' '+res.lastProgress+(res.missed?', 일지 없는 수업일 '+res.missed+'회 포함':'')+')'+(res.hold?' · 같은 레슨을 이어서 하는 날이에요.':'.')+' 다르면 직접 골라 주세요.');
     else if(res&&res.missed)_pgHint('마지막 진도 기록('+res.lastDate+' '+res.lastProgress+') 이후 일지가 없는 수업일 '+res.missed+'회를 수업한 것으로 보고 넘겼어요. 다르면 직접 골라 주세요.');
+    if(res&&res.extraSess)_pgHint('같은 날 앞 수업의 일지가 아직 저장되지 않아, 그 수업을 마친 것으로 보고 '+res.extraSess+'레슨 더 넘겼어요. 다르면 직접 골라 주세요.');
     if(res){
       if(res.level===level){sel.value=res.progress;}
       else if(allowJump){

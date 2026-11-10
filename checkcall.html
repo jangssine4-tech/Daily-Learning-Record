@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1110-a</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1110-b</div>
   </div>
 </div>
 
@@ -701,7 +701,7 @@ async function startSession(sid,data){
   openSession(sid,data,n);
 }
 function openSession(sid,data,sess){
-  S={sid:sid,data:data,sess:sess,ses:(data.ses&&data.ses[DN[new Date().getDay()]])||null,name:data.name,plan:data.plan||null,lvl:data.lvl||data.level||'',pg0:data.pg||'',fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
+  S={sid:sid,data:data,sess:sess,ses:(data.ses&&data.ses[DN[new Date().getDay()]])||null,name:data.name,plan:data.plan||null,lvl:(sess===2&&data.pg2&&data.lvl2)?data.lvl2:(data.lvl||data.level||''),pg0:(sess===2&&data.pg2&&data.lvl2)?data.pg2:(data.pg||''),fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
   try{localStorage.setItem('cc_sid',sid);}catch(e){}
   shownCall={};checks={};LOG={e:{},v:{}};curSec=0;
   $('hName').textContent=S.name;$('hDate').textContent=dateLabel();
@@ -727,7 +727,7 @@ function openSession(sid,data,sess){
   if(unsubRoster){unsubRoster();unsubRoster=null;}
   unsubRoster=db.collection('checkRoster').doc(sid).onSnapshot(function(d){
     if(!S||!d.exists)return;var x=d.data();
-    S.data=x;S.plan=x.plan||null;S.lvl=x.lvl||x.level||'';S.pg0=x.pg||'';S.fb=x.template||null;S.totalMin=x.totalMin||CC_DEFAULT_MINUTES;
+    S.data=x;S.plan=x.plan||null;var _s2=(S.sess===2&&x.pg2&&x.lvl2);S.lvl=_s2?x.lvl2:(x.lvl||x.level||'');S.pg0=_s2?x.pg2:(x.pg||'');S.fb=x.template||null;S.totalMin=x.totalMin||CC_DEFAULT_MINUTES;
     render();
   },function(e){console.warn(e);});
   setPresence('in');show('sMain');render();
