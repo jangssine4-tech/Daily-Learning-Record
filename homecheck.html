@@ -138,6 +138,27 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .rcm{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;line-height:1.2}
 .rcm span{background:#fff;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700;color:#0F5C4D}
 .rcm i{font-style:normal;color:var(--ink2);font-weight:600}
+.pk{z-index:50}
+.cel.rew{background:linear-gradient(180deg,#123D33,#0B2A23);justify-content:flex-start;align-items:stretch;overflow-y:auto;padding:0;-webkit-overflow-scrolling:touch}
+.rew .cfl{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.rew .rwc{position:relative;display:flex;flex-direction:column;align-items:center;padding:28px 16px 40px;min-height:100%;margin:auto 0}
+.rew .rwst{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px;font-size:13px;font-weight:800}
+.rew .rwst span{background:rgba(255,255,255,.16);border-radius:99px;padding:4px 12px}
+.rew .rwst .fl{background:#fff;color:#C2410C}
+.rew .rcm span{background:rgba(255,255,255,.92)}
+.rew .rfin{width:min(100%,520px);margin-top:12px}
+.rew .rbt{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;justify-content:center}
+.rew .rbt .cb2{margin-top:0}
+.rew .cb3{padding:13px 24px;border-radius:14px;background:transparent;color:#fff;font-weight:800;font-size:16px;box-shadow:0 0 0 2px rgba(255,255,255,.7)}
+.rew .scn .rtk{transition-duration:1s}
+.rring{position:absolute;z-index:1;width:15%;aspect-ratio:1;border-radius:50%;border:4px solid #FFD43B;transform:translate(-50%,-50%);animation:rring 1s ease-in-out infinite;pointer-events:none}
+@keyframes rring{0%,100%{opacity:.35;scale:.8}50%{opacity:1;scale:1.15}}
+.rplus{position:absolute;z-index:4;transform:translate(-50%,-190%);font-weight:900;font-size:22px;line-height:1;color:#FFD43B;text-shadow:0 2px 0 #7a5200,0 0 8px rgba(0,0,0,.5);opacity:0;pointer-events:none;white-space:nowrap}
+.rplus.go{animation:rplus 1.3s ease-out forwards}
+@keyframes rplus{0%{opacity:0;margin-top:10px}20%{opacity:1}100%{opacity:0;margin-top:-34px}}
+.rew .rtk.hop img{animation:rhop2 1s ease-out}
+@keyframes rhop2{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-60%) scale(1.25) rotate(-6deg)}70%{transform:translateY(-10%) scale(1.05)}}
+.rwbtn{display:block;width:100%;margin:0 0 12px;padding:15px;border-radius:18px;background:linear-gradient(180deg,#FFE27A,#FFC83D);color:#5b3b00;font-weight:800;font-size:16px;box-shadow:0 4px 0 #D9A400}
 .cel .scn{width:min(100%,520px);margin:12px auto 0;background:rgba(255,255,255,.1);border-radius:20px;padding:6px}
 @keyframes rhop{0%,100%{transform:translateY(0)}45%{transform:translateY(-34%) scale(1.1)}}
 .rfin{margin-top:10px;background:#FFF3B0;border-radius:14px;padding:10px 12px;font-weight:800;font-size:14px;color:#6B4300;text-align:center;line-height:1.5}
@@ -179,13 +200,13 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-j</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-k</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
 <div class="dlg" id="dlg"><div class="bx"><div class="dt2" id="dlgT"></div><div class="db"><button onclick="dlgNo()">취소</button><button class="dn" onclick="dlgYes()">지우기</button></div></div></div>
 <div class="dlg pk" id="pk"><div class="bx"><div class="dt2">나의 캐릭터를 골라요</div><div class="gr" id="pkG"></div><div class="db"><button onclick="pkClose()">닫기</button></div></div></div>
-<div class="cel" id="cel" onclick="celClose()"></div>
+<div class="cel rew" id="rew"></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -285,18 +306,12 @@ function mateChips(){
   var ks=Object.keys(RACE.cm||{});if(!ks.length)return '';
   return '<div class="rcm">'+ks.map(function(id){var m=RACE.cm[id];return '<span>'+esc(m.n)+' '+(m.st?(m.fin?'🏁 도착':m.pos+'/'+RN+'칸'):'<i>시작 전</i>')+'</span>';}).join('')+'</div>';
 }
-function raceHtml(){
-  if(!RACE.loaded)return '';
-  var h='<div class="race"><div class="rt"><span>🏁 숙제 레이싱 <small>'+RACE.round+'번째 판</small></span><span>'+(raceStreak()?'<span class="fl">🔥 '+raceStreak()+'주 연속</span> ':'')+'<small>'+RACE.pos+' / '+RN+'칸</small></span></div>';
-  h+='<div class="rb"><img class="rbd" src="'+IMGD+'board.webp" alt="말판" draggable="false">'+mateHtml();
-  h+='<div class="rtk" id="rtk" style="'+tokStyle(RS_shown)+'" onclick="pkOpen()" title="캐릭터 바꾸기">'+chImg(myCh())+'</div></div>'+mateChips();
-  if(RACE.fin){
-    var pz=(RACE.prz||{})[RACE.round];
-    h+='<div class="rfin">🏆 한 바퀴를 다 돌았어요!<br>'+(RACE.fr&&RACE.fr[RACE.round]===1?'🥇 우리 반에서 제일 먼저 도착! 보너스 선물이 있어요<br>':'')+(pz?'🎁 선물을 받았어요: <b>'+esc(pz.n)+'</b>':'숙제한 증거 사진을 올리면<br>선생님이 확인하고 선물을 줘요')+'<br>';
-    if(!pz)h+='<label class="rbtn">'+(RACE.up?'올리는 중…':'📷 증거 사진 올리기 ('+(RACE.ev||0)+'/5)')+'<input type="file" accept="image/*" multiple style="display:none" onchange="raceEvPick(this)"></label><br>';
-    h+=(pz?'<button onclick="raceNew()">새 판 시작</button>':'<div style="font-size:12px;font-weight:600;margin-top:6px">선물을 받은 뒤에 새 판을 시작할 수 있어요<br>(앱을 다시 열면 확인돼요)</div>')+'</div>';
-  }
-  return h+'</div>';
+function finHtml(){
+  if(!RACE.fin)return '';
+  var pz=(RACE.prz||{})[RACE.round],h='<div class="rfin">🏆 한 바퀴를 다 돌았어요!<br>'+(RACE.fr&&RACE.fr[RACE.round]===1?'🥇 우리 반에서 제일 먼저 도착! 보너스 선물이 있어요<br>':'')+(pz?'🎁 선물을 받았어요: <b>'+esc(pz.n)+'</b>':'숙제한 증거 사진을 올리면<br>선생님이 확인하고 선물을 줘요')+'<br>';
+  if(!pz)h+='<label class="rbtn">'+(RACE.up?'올리는 중…':'📷 증거 사진 올리기 ('+(RACE.ev||0)+'/5)')+'<input type="file" accept="image/*" multiple style="display:none" onchange="raceEvPick(this)"></label><br>';
+  h+=(pz?'<button onclick="raceNew()">새 판 시작</button>':'<div style="font-size:12px;font-weight:600;margin-top:6px">선물을 받은 뒤에 새 판을 시작할 수 있어요<br>(앱을 다시 열면 확인돼요)</div>')+'</div>';
+  return h;
 }
 function raceMove(){
   if(RS_shown===RACE.pos)return;
@@ -338,21 +353,40 @@ function pkPick(i){RACE.ch=i;pkClose();raceSave();render();toast(CHS[i].n+' 캐�
 /* 앱 안 확인창 */
 var _dlgCb=null;
 var CEL_M=[['🏆','숙제 완료! 오늘의 챔피언','꾸준함이 실력이 돼요'],['🚀','숙제 발사 성공!','다음 수업도 날아올라 봐요'],['🌟','별처럼 빛나는 숙제 끝!','스스로 해낸 게 가장 멋져요'],['🎉','해냈다! 숙제 올 클리어','오늘도 한 걸음 더 성장했어요'],['🦄','전설의 숙제 달성!','정말 대단해요']];
-function celClose(){$('cel').classList.remove('on');$('cel').innerHTML='';RS_shown=RACE.pos;render();}
-function celebrate(rr){
-  var m=CEL_M[Math.floor(Math.random()*CEL_M.length)],cs=['#FFD43B','#FF6B6B','#4DABF7','#69DB7C','#F783AC','#FFA94D'],f='',old=RS_shown,ci=myCh();
-  for(var i=0;i<46;i++)f+='<i style="left:'+Math.round(Math.random()*100)+'%;background:'+cs[i%cs.length]+';animation-duration:'+(1.8+Math.random()*2).toFixed(2)+'s;animation-delay:'+(Math.random()*.9).toFixed(2)+'s"></i>';
-  var scn=RACE.loaded?'<div class="scn rb"><img class="rbd" src="'+IMGD+'board.webp" alt="" draggable="false"><div id="cmt">'+mateHtml()+'</div><div class="rtk" id="ctk" style="'+tokAt(old,ci)+'">'+chImg(ci)+'</div></div>':'';
-  var el=$('cel');
-  el.innerHTML=f+'<div class="em" style="font-size:54px">'+m[0]+'</div><div class="ct">'+esc((R&&R.name)||'')+' 학생, '+m[1]+'</div>'+scn
-    +(rr?'<div class="cs" style="font-weight:800;opacity:1;font-size:17px;margin-top:10px">'+(rr===2?'🏆 한 바퀴 완주! 선생님께 알려 주세요':'🏁 한 칸 앞으로! ('+RACE.pos+'/'+RN+')')+'</div>':'<div class="cs">'+m[2]+'</div>')
-    +'<div class="cs" id="cfr" style="font-weight:800;opacity:1;font-size:16px;margin-top:6px"></div><button class="cb2">확인</button>';
-  el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(celClose,14000);
-  if(rr){setTimeout(function(){var t=$('ctk');if(!t)return;t.setAttribute('style',tokAt(RACE.pos,ci));t.classList.remove('hop');void t.offsetWidth;t.classList.add('hop');},900);}
+/* ── 보상 페이지: 숙제를 다 하면 체크콜의 황금카드 화면처럼 새 화면으로 나와요 ── */
+var _rewAnim=false,_rewT=null;
+function rewClose(){var el=$('rew');el.classList.remove('on');el.innerHTML='';_rewAnim=false;clearTimeout(_rewT);RS_shown=RACE.pos;}
+function rewExit(){rewClose();logout();}
+function rewPaint(){
+  var el=$('rew'),c=$('rewc');if(!c)return;
+  var rr=el._rr||0,ci=myCh(),m=CEL_M[el._m||0],at=(_rewAnim&&rr)?el._old:RACE.pos,h='';
+  h+='<div class="em" style="font-size:54px">'+m[0]+'</div><div class="ct">'+esc((R&&R.name)||'')+' 학생, '+m[1]+'</div>';
+  h+='<div class="rwst">'+(raceStreak()?'<span class="fl">🔥 '+raceStreak()+'주 연속</span>':'')+'<span>'+(RACE.round||1)+'번째 판</span><span>'+Math.min(RACE.pos,RN)+' / '+RN+'칸</span></div>';
+  if(RACE.loaded){
+    h+='<div class="scn rb"><img class="rbd" src="'+IMGD+'board.webp" alt="" draggable="false">'+(_rewAnim&&rr?'<div class="rring" id="rring" style="'+tokAt(RACE.pos,ci).split(';').slice(0,2).join(';')+'"></div>':'')+'<div id="cmt">'+mateHtml()+'</div>'
+      +'<div class="rtk" id="ctk" style="'+tokAt(at,ci)+'" onclick="pkOpen()" title="캐릭터 바꾸기">'+chImg(ci)+'</div><div class="rplus" id="rplus" style="'+tokAt(RACE.pos,ci).split(';').slice(0,2).join(';')+'">+1칸!</div></div>'+mateChips();
+  }
+  h+=(rr?'<div class="cs" style="font-weight:800;opacity:1;font-size:17px;margin-top:10px">'+(rr===2?'🏆 한 바퀴 완주! 선생님께 알려 주세요':'🏁 한 칸 앞으로! ('+RACE.pos+'/'+RN+')')+'</div>':'<div class="cs">'+m[2]+'</div>');
+  h+='<div class="cs" id="cfr" style="font-weight:800;opacity:1;font-size:16px;margin-top:6px">'+((RACE.fr&&RACE.fr[RACE.round]===1)?'🥇 우리 반에서 제일 먼저 도착! 보너스 선물이 있어요':'')+'</div>';
+  h+=finHtml();
+  h+='<div class="rbt"><button class="cb2" onclick="rewExit()">나가기</button><button class="cb3" onclick="rewClose()">숙제 화면 보기</button></div>';
+  c.innerHTML=h;
+}
+function rewOpen(rr){
+  var el=$('rew'),cs=['#FFD43B','#FF6B6B','#4DABF7','#69DB7C','#F783AC','#FFA94D'],f='';
+  el._rr=rr||0;el._m=Math.floor(Math.random()*CEL_M.length);el._old=RS_shown;_rewAnim=!!rr;clearTimeout(_rewT);
+  if(rr)for(var i=0;i<46;i++)f+='<i style="left:'+Math.round(Math.random()*100)+'%;background:'+cs[i%cs.length]+';animation-duration:'+(1.8+Math.random()*2).toFixed(2)+'s;animation-delay:'+(1.2+Math.random()*1.2).toFixed(2)+'s"></i>';
+  el.innerHTML='<div class="cfl">'+f+'</div><div class="rwc" id="rewc"></div>';
+  rewPaint();el.classList.add('on');el.scrollTop=0;
+  if(rr){
+    setTimeout(function(){var t=$('ctk');if(!t||!_rewAnim)return;t.setAttribute('style',tokAt(RACE.pos,myCh())+';cursor:pointer');t.classList.remove('hop');void t.offsetWidth;t.classList.add('hop');
+      var g=$('rring');if(g)g.style.display='none';},1300);
+    setTimeout(function(){var p=$('rplus');if(p&&_rewAnim){p.classList.add('go');}try{if(navigator.vibrate)navigator.vibrate([40,30,40]);}catch(e){}},2000);
+    _rewT=setTimeout(function(){_rewAnim=false;RS_shown=RACE.pos;},3200);
+  }else RS_shown=RACE.pos;
   /* 친구들의 최신 위치 (반 문서 읽기 1번) */
-  raceClassLoad().then(function(){var c=$('cmt');if(c&&$('cel').classList.contains('on'))c.innerHTML=mateHtml();});
+  raceClassLoad().then(function(){var c=$('cmt');if(c&&el.classList.contains('on'))c.innerHTML=mateHtml();});
   if(rr===2)raceClaim().then(function(x){var c=$('cfr');if(c&&x===1)c.textContent='🥇 우리 반에서 제일 먼저 도착! 보너스 선물이 있어요';});
-  try{if(navigator.vibrate)navigator.vibrate([60,40,60]);}catch(e){}
 }
 function ask(t,cb){$('dlgT').textContent=t;_dlgCb=cb;$('dlg').classList.add('on');}
 function dlgNo(){_dlgCb=null;$('dlg').classList.remove('on');}
@@ -474,9 +508,8 @@ function render(){
     $('body').innerHTML=h;return;
   }
   var c=counts(),pc=c.n?Math.round(c.d*100/c.n):0;
-  h+=raceHtml();
   h+='<div class="prog"><div class="t"><span>오늘의 숙제</span><span>'+c.d+' / '+c.n+'</span></div><div class="bar"><i style="width:'+pc+'%"></i></div></div>';
-  if(c.n&&c.d===c.n)h+='<div class="allok" style="display:block">🎉 숙제를 모두 했어요! 잘했어요</div>';
+  if(c.n&&c.d===c.n){h+='<div class="allok" style="display:block">🎉 숙제를 모두 했어요! 잘했어요</div>';if(RACE.loaded)h+='<button class="rwbtn" onclick="rewOpen(0)">🏁 레이싱 판 · 보상 보기</button>';}
   if(R.notice)h+='<details class="notice"'+(noticeOpen?' open':'')+' ontoggle="noticeTog(this)"><summary>📌 학습 유의사항 보기</summary><div>'+esc(R.notice)+'</div></details>';
   R.secs.forEach(function(s,si){
     var d=0;s.items.forEach(function(it){if(LOG.e[it.id])d++;});
@@ -489,7 +522,8 @@ function render(){
   });
   $('body').innerHTML=h;
   if(RACE.loaded&&R&&!chOk(RACE.ch)&&!_pkAuto){_pkAuto=true;setTimeout(pkOpen,500);}
-  var all=!!(c.n&&c.d===c.n);if(all&&!wasAll&&LOG._seen){var rr=raceAdvance();celebrate(rr);}wasAll=all;LOG._seen=true;
+  if($('rew').classList.contains('on')&&!_rewAnim)rewPaint();
+  var all=!!(c.n&&c.d===c.n);if(all&&!wasAll&&LOG._seen){var rr=raceAdvance();rewOpen(rr);}wasAll=all;LOG._seen=true;
 }
 /* ── 숙제 시간 재기 (시간을 재는 구역만) ── */
 function noticeTog(el){
