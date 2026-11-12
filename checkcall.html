@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-b</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-d</div>
   </div>
 </div>
 
@@ -360,9 +360,10 @@ var AC=null, ringTimers=[], shownCall={}, unsubRoster=null;
 // 점검 항목 기본 템플릿 (t: check 체크 / number 숫자 / dict 받아쓰기 맞은수/전체 / call 검사 받기 호출,
 //   to: tablet|book 호출 대상, link: hwPrep|hwBook|hwVideo|quiz|dict 학습일지 자동 연동, u: 숫자 단위)
 var CC_DEFAULT_TEMPLATE={sections:[
- {title:'숙제 했나요?',items:[
-  {id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},
-  {id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}]},
+ {title:'수업 준비는 됐나요?',items:[
+  {id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},
+  {id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},
+  {id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}]},
  {title:'스마트 학습 1',items:[
   {id:'vt',t:'check',l:'어휘트레이닝'}]},
  {title:'단어장',items:[
@@ -401,6 +402,8 @@ function ccPlanKey(level,grade){
   if(/^Grammar Plus/i.test(l))return 'Grammar Plus';
   if((m=l.match(/^(Prime|Advanced) ?\d ?([AB])$/i)))return m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()+' '+m[2].toUpperCase();
   if(/^First Grammar/i.test(l))return 'First Grammar';
+  if(/^Reader['’]?s ?Bank/i.test(l))return "Reader's Bank";
+  if(/^내신 ?콘서트/.test(l))return '내신 콘서트';
   return '';
 }
 function ccNormProg(p){
@@ -443,13 +446,24 @@ function _ccOvTm(plan,t){   // 레슨 전용 계획표에도 구역별 시작·�
       if(sc.tmx===undefined&&((r.g||'')+'|'+(r.s||''))===sc.k&&(r.tm===0||r.tm===1))sc.tmx=r.tm;});});
   });}catch(e){}
 }
+var CC_HW_TITLE='수업 준비는 됐나요?',CC_HW_OLD_TITLE='숙제 했나요?';
+function _ccHwDefault(){return [{id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},{id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}];}
+function _ccHwTitleMig(t){return (!t||t===CC_HW_OLD_TITLE)?CC_HW_TITLE:t;}
+function _ccHwItemsMig(items){   // 원본은 건드리지 않고 복사본을 돌려줘요
+  if(!Array.isArray(items))return items;
+  items=JSON.parse(JSON.stringify(items));
+  if(items.length===2&&items[0]&&items[1]&&items[0].id==='hwb'&&items[1].id==='hwv'&&items[0].t==='check'&&items[1].t==='check'&&items[0].l==='교재 숙제'&&items[1].l==='영상 숙제')return _ccHwDefault();
+  items.forEach(function(it){if(it&&it.t==='check'&&/^(교재준비|교재숙제|영상숙제)/.test(String(it.l||'').replace(/\s+/g,'')))it.t='ox';});
+  return items;
+}
+function _ccHwMigSecs(secs){(secs||[]).forEach(function(sc){if(sc&&sc.k==='hw'){sc.title=_ccHwTitleMig(sc.title);sc.items=_ccHwItemsMig(sc.items||[]);}});return secs;}
 function ccResolve(plan,level,progress){
   if(!plan)return null;
   var p=ccNormProg(progress);
   if(/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim()))p='전체 Review';   // 전체 Review는 Review와 따로 편집
   // 미리보기에서 직접 고친 레슨은 그 내용을 그대로 써요
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
-    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccOvTm(plan,_ot);
+    var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccOvTm(plan,_ot);_ccHwMigSecs(_ot.sections);
     _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off&&!i.del;});});   // 체크를 풀어 숨긴 항목은 학생 화면에서 제외
     return _ccAutoLink(_ot);
   }
@@ -463,7 +477,7 @@ function ccResolve(plan,level,progress){
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
   var p=ccNormProg(progress);if(!p)return null;
-  var hw={k:'hw',title:(plan.hwTitle||'숙제 했나요?'),items:(Array.isArray(plan.hw)?JSON.parse(JSON.stringify(plan.hw)):[{id:'hwb',t:'check',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'check',l:'영상 숙제',link:'hwVideo'}])};
+  var hw={k:'hw',title:_ccHwTitleMig(plan.hwTitle),items:(Array.isArray(plan.hw)?_ccHwItemsMig(plan.hw):_ccHwDefault())};
   var HWS=hw.items.length?[hw]:[];   // 공통 구역(숙제)을 전부 지우면 이 구역은 나오지 않아요
   // 특별 진도(Level Test · Portfolio · Review · 전체 Review): 전체 계획표에서 편집한 내용(plan.sp)이 있으면 그걸 써요
   var _spk=/^전체 ?Review$/i.test(String(progress||'').replace(/\s+/g,' ').trim())?'전체 Review':(/^Review$/i.test(p)?'Review':((p==='Level Test'||p==='Portfolio')?p:''));
