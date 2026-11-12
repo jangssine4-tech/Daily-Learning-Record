@@ -3237,30 +3237,11 @@ function ccResolve0(plan,level,progress){
     _ss.forEach(function(sc,i){if(!sc.k)sc.k='sp'+i;});
     if(_ss.length)return {sections:HWS.concat(_ss)};
   }
-  // 레벨 테스트 / 포트폴리오 (레슨이 아닌 특별 진도)
-  function special(text,title,withScore,idp){
-    var its=[];
-    ccSplitChecks(text).forEach(function(part,i){
-      part=part.replace(/\(\s*나의\s*점수\s*[:：]?[^)]*\)/,'').trim();
-      var m=part.match(/^(.*?)\s*[→>]+\s*검사\s*$/);
-      if(m)its.push({id:idp+i,t:'call',l:m[1].trim()+' 검사 받기',to:'tablet'});
-      else if(part)its.push({id:idp+i,t:'check',l:part});
-    });
-    if(withScore)its.push({id:idp+'sc',t:'number',l:title+' 점수',u:'점',link:'quiz'});
-    return {k:'sp',title:title,items:its};
-  }
-  if(p==='Level Test'){
-    if(!plan.lt)return null;
-    if(plan.ltSuf&&!new RegExp(plan.ltSuf+'$').test(String(level||'').trim()))return null;
-    return {sections:HWS.concat([special(plan.lt,'Level Test',true,'lt')])};
-  }
-  if(p==='Portfolio'){
-    if(!plan.pf)return null;
-    return {sections:HWS.concat([special(plan.pf,'Portfolio',false,'pf')])};
-  }
+  /* 전체 계획표에서 이 레슨(칸)에 켜진 항목들 → 구역 목록 (Level Test 칸도 포함) */
+  function gridSecs(){
   var bi=-1,li=-1;
   for(var b=0;b<plan.blocks.length&&bi<0;b++){var ix=plan.blocks[b].lessons.indexOf(p);if(ix>=0){bi=b;li=ix;}}
-  if(bi<0)return null;
+  if(bi<0)return [];
   var blk=plan.blocks[bi],secs=[],map={};
   blk.rows.forEach(function(r,ri){
     var ch=r.c.charAt(li);if(ch==='x'||!ch)return;
@@ -3295,6 +3276,33 @@ function ccResolve0(plan,level,progress){
   // 같은 이름의 구역이 둘이면 묶음 이름을 붙여 구분
   var cnt={};secs.forEach(function(s){cnt[s.title]=(cnt[s.title]||0)+1;});
   secs.forEach(function(s){if(cnt[s.title]>1&&s.grp)s.title=s.grp.replace(/\s+/g,' ')+' '+s.title;s.k=s._k;delete s._k;});
+  return secs;
+  }
+  // 레벨 테스트 / 포트폴리오 (레슨이 아닌 특별 진도)
+  function special(text,title,withScore,idp){
+    var its=[];
+    ccSplitChecks(text).forEach(function(part,i){
+      part=part.replace(/\(\s*나의\s*점수\s*[:：]?[^)]*\)/,'').trim();
+      var m=part.match(/^(.*?)\s*[→>]+\s*검사\s*$/);
+      if(m)its.push({id:idp+i,t:'call',l:m[1].trim()+' 검사 받기',to:'tablet'});
+      else if(part)its.push({id:idp+i,t:'check',l:part});
+    });
+    if(withScore)its.push({id:idp+'sc',t:'number',l:title+' 점수',u:'점',link:'quiz'});
+    return {k:'sp',title:title,items:its};
+  }
+  if(p==='Level Test'){
+    var _gs=gridSecs();   // 전체 계획표의 'Level Test' 칸에 켜 둔 항목(단어 시험, Main Book 등)도 함께 나와요
+    if(!plan.lt&&!_gs.length)return null;
+    if(plan.ltSuf&&!new RegExp(plan.ltSuf+'$').test(String(level||'').trim()))return null;
+    var _sp=plan.lt?special(plan.lt,'Level Test',true,'lt'):null;
+    if(_sp&&_gs.some(function(sc){return sc.items.some(function(i){return i.t==='number'&&i.link==='quiz';});}))_sp.items=_sp.items.filter(function(i){return i.t!=='number';});   // 점수 칸이 겹치지 않게
+    return {sections:HWS.concat(_gs,(_sp&&_sp.items.length)?[_sp]:[])};
+  }
+  if(p==='Portfolio'){
+    if(!plan.pf)return null;
+    return {sections:HWS.concat([special(plan.pf,'Portfolio',false,'pf')])};
+  }
+  var secs=gridSecs();
   if(!secs.length)return null;
   return {sections:HWS.concat(secs)};
 }
