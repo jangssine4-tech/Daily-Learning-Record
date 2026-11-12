@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-a</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-b</div>
   </div>
 </div>
 
@@ -733,8 +733,10 @@ function openSession(sid,data,sess){
     var u={date:S.date,studentId:sid,studentName:S.name,endAt:firebase.firestore.FieldValue.delete(),fl:{out:false,inc:[],sig:''}};
     if(S.sess===2)u.sess=2;
     if(!snap.exists||!snap.data().startAt)u.startAt=Date.now();
+    u.pl=String(S.lvl||'')+'|'+String(S.pg0||'');   // 이 날 점검한 단계·진도 (다음 날 이어받기 때 같은 진도인지 확인해요)
     var _pl=(snap.exists&&snap.data().ps)||[];if(_pl.length&&!_pl[_pl.length-1].b){var _nn=Date.now();u.ps=_pl.map(function(p){return p.b?{a:p.a,b:p.b}:{a:p.a,b:_nn};});}   // 다시 로그인하면 멈춤 해제
-    return logRef().set(u,{merge:true});
+    var _d0=snap.exists?snap.data():{},_fresh=!_d0.co&&!Object.keys(_d0.e||{}).length&&!Object.keys(_d0.v||{}).length;
+    return logRef().set(u,{merge:true}).then(function(){if(_fresh&&S&&S.sess===1)return carryOver();});
   }).catch(function(e){console.warn(e);});
   // 선생님이 Study Plan을 저장하면 로그인 중인 태블릿에도 바로 반영돼요
   if(unsubRoster){unsubRoster();unsubRoster=null;}
@@ -745,6 +747,47 @@ function openSession(sid,data,sess){
   },function(e){console.warn(e);});
   setPresence('in');show('sMain');render();
   clearInterval(tickT);tickT=setInterval(paintBar,30000);
+}
+/* ── 어제 하다 만 체크콜 이어받기 ──
+   오늘 처음 열었는데 바로 전 수업일(최근 7일 안)의 점검이 끝나지 않았고 같은 진도면,
+   그날 체크한 항목(이름이 같은 것)과 점수를 오늘 화면에 미리 채워 줘요. 숙제·검사 받기·받아쓰기·시작/끝 시간은 오늘 새로 해요. */
+function isoOf(d){var p=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+async function carryOver(){
+  var sid=S.sid,base=null,bd='',n=0,u={date:S.date,studentId:S.sid,studentName:S.name};
+  try{
+    for(var k=1;k<=7&&!base;k++){
+      var d=new Date();d.setDate(d.getDate()-k);var ds=isoOf(d);
+      var sn=await db.collection('checkLogs').doc(ds+'_'+sid).get();
+      if(sn.exists){base=sn.data();bd=ds;}
+    }
+    if(!S||S.sid!==sid)return;
+    var pl=String(S.lvl||'')+'|'+String(S.pg0||'');
+    if(base&&!base.fin&&base.ik&&(!base.pl||base.pl===pl)){
+      try{applySecs();}catch(e){}
+      var by={};
+      (S.secs||[]).forEach(function(sec){
+        if(sec.k==='hw')return;
+        sec.items.forEach(function(it){
+          if(it.role||it.t==='call'||it.t==='dict')return;
+          if(it.link==='hwPrep'||it.link==='hwBook'||it.link==='hwVideo')return;
+          by[_ck(sec,it)]=it;
+        });
+      });
+      var ue={},uv={},ik={},ce={},now=Date.now();
+      Object.keys(base.e||{}).forEach(function(id){
+        var it=by[(base.ik||{})[id]];if(!it||it.t!=='check'||!base.e[id])return;
+        ue[it.id]=now;ik[it.id]=base.ik[id];ce[it.id]=1;n++;
+      });
+      Object.keys(base.v||{}).forEach(function(id){
+        var it=by[(base.ik||{})[id]],v=base.v[id];if(!it)return;
+        if(it.t==='number'&&v!==undefined&&v!==''&&v!=='skip'&&!isNaN(Number(v))){uv[it.id]=v;ik[it.id]=base.ik[id];n++;}
+        else if(it.t==='ox'&&(v==='O'||v==='X')){uv[it.id]=v;ik[it.id]=base.ik[id];n++;}
+      });
+      if(n){u.e=ue;u.v=uv;u.ik=ik;u.ce=ce;}
+    }
+  }catch(e){console.warn('[이어받기]',e);}
+  u.co={d:bd,n:n};   // 시도했다는 표시: 오늘 다시 열어도 또 찾지 않아요
+  try{await logRef().set(u,{merge:true});if(n)toast('어제 하던 것을 이어서 불러왔어요 ('+n+'개)');}catch(e){console.warn(e);}
 }
 function logout(){
   try{rwClose();RW.prev=null;}catch(e){}
@@ -852,6 +895,7 @@ function commit(ePatch,vPatch){
   if(Object.keys(ikU).length){u.ik=ikU;LOG.ik=Object.assign({},LOG.ik||{},ikU);if(S.ikSent)Object.keys(ikU).forEach(function(k){S.ikSent[k]=ikU[k];});}
   if(Object.keys(ue).length)u.e=ue;
   if(Object.keys(uv).length)u.v=uv;
+  var _cd={};Object.keys(ue).forEach(function(k){if(LOG.ce&&LOG.ce[k]){_cd[k]=del;delete LOG.ce[k];}});if(Object.keys(_cd).length)u.ce=_cd;
   var fd=flagsDoc(false);if(!LOG.fl||LOG.fl.sig!==fd.sig||LOG.fl.out){u.fl=fd;LOG.fl=fd;}
   if(_psOpen()){u.ps=_psClosed();LOG.ps=u.ps;}   // 멈춤 중에 항목을 체크하면 다시 시작
   u.j=calcJ();u.tl=calcTL();
@@ -1024,7 +1068,7 @@ function paintTmr(){
 }
 function calcTL(){var o=[];S.secs.forEach(function(sec){var x=_tmOf(sec);if(x){x.p=_psMs(x.s,x.e||Date.now());o.push(x);}});return o;}
 function itemHtml(it,si,ii){
-  var chk='<svg viewBox="0 0 24 24"><use href="#i-check"/></svg>',tm=LOG.e[it.id]?hm(LOG.e[it.id]):'';
+  var chk='<svg viewBox="0 0 24 24"><use href="#i-check"/></svg>',tm=LOG.e[it.id]?((LOG.ce&&LOG.ce[it.id])?'어제':hm(LOG.e[it.id])):'';
   if(it.t==='check'){
     var on=!!LOG.e[it.id];
     return '<div class="bi"><button class="bx'+(on?' on':'')+'" aria-label="'+esc(it.l)+(on?' 완료':' 미완료')+'" onclick="toggle('+si+','+ii+')">'+chk+'</button><span class="lb">'+esc(it.l)+(it.hint?'<small class="hn">'+esc(it.hint)+'</small>':'')+'</span><span class="t">'+tm+'</span></div>';
