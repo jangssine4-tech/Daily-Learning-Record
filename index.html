@@ -1878,7 +1878,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-q';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-s';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3157,14 +3157,41 @@ function _ccMergePrev(plan){
   }catch(e){return plan;}
 }
 CC_PLANS['Grammar Plus']=_ccMergeGp(CC_PLANS['Grammar Plus']);
-// Reader's Bank (1~10권, Lesson 1~50) · 내신 콘서트 (Lesson 1~8 × 대화문·문법·본문 1·2·3·문제풀이): 레벨별 진도 구성 그대로의 빈 계획표예요. 항목은 전체 계획표에서 채워 주세요.
+// Reader's Bank 1~2 · 3~4 (Lesson 1~36, 첨부 Study Plan [리딩북] 기준; 3~4권은 '요약하기' 추가) · 5~10 / 내신 콘서트는 빈 틀(항목은 전체 계획표에서 채우세요)
 (function(){
-  var rb=[],ns=[],i;
-  for(i=1;i<=50;i++)rb.push('Lesson '+i);
+  var rb36=[],rb50=[],ns=[],i;
+  for(i=1;i<=36;i++)rb36.push('Lesson '+i);
+  for(i=1;i<=50;i++)rb50.push('Lesson '+i);
   for(i=1;i<=8;i++)['대화문','문법','본문 1','본문 2','본문 3','문제풀이'].forEach(function(s){ns.push('Lesson '+i+' '+s);});
-  var ones=function(n){return new Array(n+1).join('c');};
-  CC_PLANS["Reader's Bank"]={key:"Reader's Bank",blocks:[{lessons:rb,rows:[{g:"Reader's Bank",s:"Reader's Bank",l:'오늘 분량 학습하기',c:ones(rb.length)}]}]};
-  CC_PLANS['내신 콘서트']={key:'내신 콘서트',blocks:[{lessons:ns,rows:[{g:'내신 콘서트',s:'내신 콘서트',l:'오늘 분량 학습하기',c:ones(ns.length)}]}]};
+  var all=function(n){return new Array(n+1).join('c');};
+  var N=36,G1='복습 / 예습 테스트',G2='수업',G3='교재 학습';
+  var R=function(g,s,l,c){return {g:g,s:s,l:l,c:c||all(N)};};
+  function rbPlan(key,sum){
+    var rows=[
+      R(G1,'단어','단어 (뜻)'),
+      R(G1,'단어','단어 (스펠링)'),
+      R(G1,'문법','문법 백지','x'+all(N-1)),
+      R(G1,'문법','재시험'),
+      R(G2,'수업','수업 내용 필기하기'),
+      R(G3,'문법 정리','문법 노트에 정리하기'),
+      R(G3,'문법 정리','문법 설명해 보기'),
+      R(G3,'문법 정리','백지노트 시험'),
+      R(G3,'문법 정리','문법 정리 검사 받기'),
+      R(G3,'의미 단위로 말하기','형광펜 / 메모한 부분 말하며 익히기'),
+      R(G3,'의미 단위로 말하기','/전치사구/, /VO/, /VC/ 의미단위로 말하기 연습'),
+      R(G3,'의미 단위로 말하기','의미 단위 검사 받기'),
+      R(G3,'듣고 따라 말하기','듣고 따라 말하기'),
+      R(G3,'문장 외워 말하기','본문 내용 영어로 말해보기')
+    ];
+    if(sum){rows.push(R(G3,'요약하기','요약하기'));rows.push(R(G3,'요약하기','요약하기 검사 받기'));}
+    else rows.push(R(G3,'문장 외워 말하기','문장 외워 말하기 검사 받기'));
+    return {key:key,blocks:[{lessons:rb36,rows:rows}]};
+  }
+  CC_PLANS["Reader's Bank 1~2"]=rbPlan("Reader's Bank 1~2",false);
+  CC_PLANS["Reader's Bank 3~4"]=rbPlan("Reader's Bank 3~4",true);
+  var ph=function(key,lessons){return {key:key,blocks:[{lessons:lessons,rows:[{g:"Reader's Bank",s:"Reader's Bank",l:'오늘 분량 학습하기',c:all(lessons.length)}]}]};};
+  CC_PLANS["Reader's Bank 5~10"]=ph("Reader's Bank 5~10",rb50);
+  CC_PLANS['내신 콘서트']=ph('내신 콘서트',ns);
 })();
 function ccPlanKey(level,grade){
   var l=String(level||'').replace(/\s+/g,' ').trim(),m;
@@ -3176,7 +3203,7 @@ function ccPlanKey(level,grade){
   if(/^Grammar Plus/i.test(l))return 'Grammar Plus';   // 초등 저·고학년 구분 없이 계획표 하나
   if((m=l.match(/^(Prime|Advanced) ?\d ?([AB])$/i)))return m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()+' '+m[2].toUpperCase();
   if(/^First Grammar/i.test(l))return 'First Grammar';
-  if(/^Reader['’]?s ?Bank/i.test(l))return "Reader's Bank";
+  if((m=l.match(/^Reader['’]?s ?Bank ?(\d+)?/i)))return (m[1]&&+m[1]<=2)?"Reader's Bank 1~2":(m[1]&&+m[1]<=4)?"Reader's Bank 3~4":"Reader's Bank 5~10";
   if(/^내신 ?콘서트/.test(l))return '내신 콘서트';
   return '';
 }
@@ -4036,7 +4063,7 @@ function _bcTodayInfo(s,sess){
   }
   return {lvl:lv0,pg:(best&&best.progress)||''};
 }
-var _CCP_INFO={'Phonics 1A':'Phonics 1A','Phonics 1B':'Phonics 1B','Phonics 2A~3B':'Phonics 2A·2B·3A·3B','Master Phonics 1':'Master Phonics 1','Master Phonics 2':'Master Phonics 2','Basic':'Joy·Wise·Pride 전체 (Level Test는 C단계만)','First Grammar':'First Grammar 1~3','Grammar Plus':'Grammar Plus 1~6권 전체','Prime A':'Prime 1A~4A','Prime B':'Prime 1B~4B','Advanced A':'Advanced 1A~4A','Advanced B':'Advanced 1B~4B',"Reader's Bank":"Reader's Bank 1~10권 전체 (Lesson 1~50)",'내신 콘서트':'내신 콘서트 (Lesson 1~8 × 대화문·문법·본문·문제풀이)'};
+var _CCP_INFO={'Phonics 1A':'Phonics 1A','Phonics 1B':'Phonics 1B','Phonics 2A~3B':'Phonics 2A·2B·3A·3B','Master Phonics 1':'Master Phonics 1','Master Phonics 2':'Master Phonics 2','Basic':'Joy·Wise·Pride 전체 (Level Test는 C단계만)','First Grammar':'First Grammar 1~3','Grammar Plus':'Grammar Plus 1~6권 전체','Prime A':'Prime 1A~4A','Prime B':'Prime 1B~4B','Advanced A':'Advanced 1A~4A','Advanced B':'Advanced 1B~4B',"Reader's Bank 1~2":"Reader's Bank 1·2권 (Lesson 1~36)","Reader's Bank 3~4":"Reader's Bank 3·4권 (Lesson 1~36)","Reader's Bank 5~10":"Reader's Bank 5~10권 (Lesson 1~50)",'내신 콘서트':'내신 콘서트 (Lesson 1~8 × 대화문·문법·본문·문제풀이)'};
 var _ccEd=null;
 function _ccShort(n){
   var m;
@@ -28699,18 +28726,31 @@ var HC_DEF={"Phonics 1A":{"notice":"1 .Voca : 그날 배운 단어를 그림을 
 window._hcOv={};
 var _hcLast=null,_hcTimer=null,_hcBusy=false;
 HC_DEF['Grammar Plus']=HC_DEF['Grammar Plus 4~6']||HC_DEF['Grammar Plus 2~3'];delete HC_DEF['Grammar Plus 2~3'];delete HC_DEF['Grammar Plus 4~6'];
-// Reader's Bank · 내신 콘서트: 빈 틀(레슨마다 '오늘 분량' 한 줄)만 넣어 둠 → 홈체크 Plan 설정에서 항목을 채워 주세요
+// Reader's Bank 1~2·3~4 (첨부 홈워크 플랜 기준) · Reader's Bank 5~10 / 내신 콘서트는 빈 틀(항목은 홈체크 Plan 설정에서 채우세요)
 (function(){
-  function mk(key,pre,names,notice){
-    var lessons={};
-    names.forEach(function(n,i){lessons[n]=[{k:'h0',title:key,items:[{id:pre+(i+1)+'_1',l:'오늘 분량 숙제 하기',link:'hwBook'}]}];});
-    HC_DEF[key]={notice:notice,order:names.slice(),lessons:lessons};
-  }
-  var rb=[],ns=[],i;
-  for(i=1;i<=50;i++)rb.push('Lesson '+i);
+  var i,rb36=[],rb50=[],ns=[];
+  for(i=1;i<=36;i++)rb36.push('Lesson '+i);
+  for(i=1;i<=50;i++)rb50.push('Lesson '+i);
   for(i=1;i<=8;i++)['대화문','문법','본문 1','본문 2','본문 3','문제풀이'].forEach(function(s){ns.push('Lesson '+i+' '+s);});
-  mk("Reader's Bank",'rb',rb,'');
-  mk('내신 콘서트','ns',ns,'');
+  var NT='모든 과제는 큰소리로 말하며 합니다.\n1. Chapter Test 시 단어는 누적해서 Chapter 전체를 봅니다.\n2. 문법 정리 : 자신의 말로 설명해 보고, 문법 노트 작성하는 과정을 영상으로 찍어 보냅니다.\n3. 문장 말하기 연습 시, 누가, 뭐하는지 생각하며 말하기 연습합니다.';
+  function sec(pre,n,k,title,grp,arr){return {k:'h'+k,title:title,sub:'Lesson '+n,grp:grp,items:arr.map(function(a,j){return {id:pre+n+'_'+k+'_'+(j+1),l:a[0],link:a[1]||'hwBook'};})};}
+  var L={};
+  rb36.forEach(function(nm,i){var n=i+1,p='rb12_';
+    L[nm]=[
+      sec(p,n,0,'단어','복습',[['틀린 단어 외우기']]),
+      sec(p,n,1,'유형 정리','복습',[['문법 내용 복습하기'],['문법 설명하기 (영상)','hwVideo']]),
+      sec(p,n,2,'의미 단위로 말하기','복습',[['형광펜 표시 / 메모 말하며 익히기'],['/전치사구/, /VO/, /VC/ 의미단위로 말하기 연습'],['본문 내용 영어로 말해보기 (영상)','hwVideo']]),
+      sec(p,n,3,'단어','예습',[['단어 예습하기']]),
+      sec(p,n,4,'문장 끊어 읽기','예습',[['문장 끊어 읽기'],['문장성분쓰기']])
+    ];});
+  HC_DEF["Reader's Bank 1~2"]={notice:NT,order:rb36.slice(),lessons:L};
+  HC_DEF["Reader's Bank 3~4"]={notice:NT,order:rb36.slice(),lessons:JSON.parse(JSON.stringify(L).split('rb12_').join('rb34_'))};
+  function ph(key,pre,names){
+    var ls={};names.forEach(function(n,i){ls[n]=[{k:'h0',title:key,items:[{id:pre+(i+1)+'_1',l:'오늘 분량 숙제 하기',link:'hwBook'}]}];});
+    HC_DEF[key]={notice:'',order:names.slice(),lessons:ls};
+  }
+  ph("Reader's Bank 5~10",'rb5_',rb50);
+  ph('내신 콘서트','ns',ns);
 })();
 function _hcKey(k){return /^Grammar Plus/i.test(k||'')?'Grammar Plus':(k||'');}
 function _hcPlan0(key){key=_hcKey(key);if(!key)return null;var o=window._hcOv||{};return o[key]||(key==='Grammar Plus'&&(o['Grammar Plus 4~6']||o['Grammar Plus 2~3']))||HC_DEF[key]||null;}
