@@ -1878,7 +1878,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-t';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-w';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3915,7 +3915,7 @@ function _bcEdRe(){_bcEdSync();_bcEdTouch();
     if(it.t!=='call')delete it.to;else if(!it.to)it.to='tablet';
     if(it.t!=='number')delete it.u;
     var ok={check:['','hwPrep','hwBook','hwVideo'],ox:['','hwPrep','hwBook','hwVideo'],number:['','quiz'],dict:['','dict'],call:['']}[it.t]||[''];
-    if(ok.indexOf(it.link||'')<0)it.link='';
+    if(ok.indexOf(it.link||'')<0)it.link=(it.t==='dict'?'dict':(it.t==='number'?'quiz':''));   // 종류를 바꾸면 그 종류의 기본 일지 연동으로
   });});
   _bcEdDraw();}
 var _bcSecFrom=-1;
@@ -5897,6 +5897,16 @@ function _wlPause(ev){
     .then(function(){toast(on?'시간을 멈췄어요. 학생이 항목을 체크하면 다시 시작돼요':'시간을 다시 시작했어요');})
     .catch(function(e){console.warn(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
+// 체크콜 활용 공부법을 학생에게 몇 번 알려 줬는지 단순 체크 (5칸). 이 기기에만 저장되고 DB와는 무관해요.
+function _wlCiKey(){return 'wl_ci_'+(_wl.sid||'')+'_'+(_wl.date||'')+'_'+(_wl.sess||1);}
+function _wlCiGet(){try{return JSON.parse(localStorage.getItem(_wlCiKey())||'[]');}catch(e){return [];}}
+function _wlCiHtml(){
+  var ci=_wlCiGet(),h='<span style="display:inline-flex;align-items:center;gap:5px" onclick="event.stopPropagation()">';
+  for(var i=0;i<5;i++)h+='<input type="checkbox" style="width:15px;height:15px;margin:0;cursor:pointer;accent-color:#0f766e"'+(ci[i]?' checked':'')+' onclick="event.stopPropagation()" onchange="_wlCiSet('+i+',this.checked)">';
+  return h+'<button type="button" class="btn btn-outline btn-xs" style="font-size:11px;padding:0 6px;border-radius:50%;line-height:16px" onclick="event.stopPropagation();_wlCiHelp(this)">?</button></span>';
+}
+function _wlCiSet(i,on){var c=_wlCiGet();c[i]=on?1:0;try{localStorage.setItem(_wlCiKey(),JSON.stringify(c));}catch(e){}}
+function _wlCiHelp(btn){_ccBubble(btn,'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">✅ 체크콜 활용 확인</div>학생이 체크콜을 활용하여 <b>공부방법 대로 했는지를 확인</b>하는 체크박스예요.','wlci',300);}
 function _wlHM(ms){if(!ms)return '';var d=new Date(ms),p=function(n){return String(n).padStart(2,'0');};return p(d.getHours())+':'+p(d.getMinutes());}
 function _wlPaint(){
   var el=$('write-live-content');if(!el||!_wl.sid)return;
@@ -5970,7 +5980,7 @@ function _wlPaint(){
   var _po=_wlPsOpen(),_pm=_wlPsMin();
   var _pb=(_wl.log&&_wl.log.startAt&&!L.fin)?'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 9px;'+(_po?'background:#fef3c7;border-color:#f59e0b;color:#92400e':'')+'" onclick="_wlPause(event)" title="학생 체크콜의 시간을 멈추거나 다시 시작해요">'+(_po?'▶ 재개':'⏸ 멈춤')+'</button>':'';
   if(_pm>0||_po)chips.unshift('<span style="color:#92400e;font-weight:700">⏸ 멈춤 '+_pm+'분'+(_po?' (멈춤 중)':'')+'</span>');
-  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b>'+_pb+'<span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>';
+  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b>'+_wlCiHtml()+_pb+'<span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>';
   var meta='';
   if(_wl.log){
     meta='<div style="margin-top:7px"><div style="height:7px;border-radius:5px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#0f766e':'#3b82f6')+'"></div></div>'

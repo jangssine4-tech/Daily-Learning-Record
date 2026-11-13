@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-f</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-g</div>
   </div>
 </div>
 
@@ -884,7 +884,7 @@ function _nextBlock(to){
 function calcJ(){
   var del=firebase.firestore.FieldValue.delete(),j={hwPrep:del,hwBook:del,hwVideo:del,quiz:del,dict:del};
   S.secs.forEach(function(sec){sec.items.forEach(function(it){
-    if(!it.link)return;
+    if(!it.link&&!(it.t==='dict'&&!it.nl))return;   // 받아쓰기 칸은 '연동 안 함'을 고르지 않았다면 일지에 연동
     var v=LOG.v[it.id];
     if(it.link==='hwPrep'&&it.t==='check')j.hwPrep=LOG.e[it.id]?'준비':'미준비';
     else if(it.link==='hwBook'&&it.t==='check')j.hwBook=LOG.e[it.id]?'완료':'미완료';
@@ -894,7 +894,7 @@ function calcJ(){
         if(it.link==='hwPrep')j.hwPrep=on?'준비':'미준비';else if(it.link==='hwBook')j.hwBook=on?'완료':'미완료';else j.hwVideo=on?'제출':'미제출';}
     }
     else if(it.link==='quiz'&&it.t==='number'&&v!==undefined&&v!==''&&v!=='skip')j.quiz=String(v);   // '시험이 없어요'는 일지에 점수로 넘기지 않아요
-    else if(it.link==='dict'&&it.t==='dict'&&v&&v.c!==undefined&&v.c!==''&&v.t!==undefined&&v.t!=='')j.dict=v.c+'/'+v.t;
+    else if(it.t==='dict'&&(it.link==='dict'||!it.link)&&v&&v.c!==undefined&&v.c!==''&&v.t!==undefined&&v.t!=='')j.dict=v.c+'/'+v.t;
   });});
   return j;
 }
@@ -1300,7 +1300,7 @@ function rwFacts(){
     var v=LOG.v[it.id];
     if(it.link==='hwBook'||it.link==='hwVideo'){if(it.t==='check')f.hw.push(!!LOG.e[it.id]);else if(it.t==='ox')f.hw.push(v==='O');}
     if(it.link==='quiz'&&it.t==='number'){f.hasQuiz=true;var q=parseFloat(v);if(v!==undefined&&v!==''&&v!=='skip'&&!isNaN(q))f.quiz=f.quiz===null?q:Math.max(f.quiz,q);}
-    if(it.link==='dict'&&it.t==='dict'){f.hasDict=true;if(v&&+v.t>0&&v.c!==undefined&&v.c!=='')f.dict=Math.round(+v.c/+v.t*100);}
+    if(it.t==='dict'&&(it.link==='dict'||(!it.link&&!it.nl))){f.hasDict=true;if(v&&+v.t>0&&v.c!==undefined&&v.c!=='')f.dict=Math.round(+v.c/+v.t*100);}
   });});
   return f;
 }
