@@ -1883,7 +1883,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-z';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ab';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -22202,6 +22202,16 @@ async function _savePlanResult(planId){
 
 async function _deletePlan(planId){
   var _cm=await showConfirm('플랜을 삭제할까요?\n실행업무와 결과 기록도 모두 삭제돼요.',true);if(!_cm)return;
+  try{
+    var _dp=(_plans||[]).find(function(p){return p.id===planId;});
+    if(_dp&&_dp.acalId){
+      await loadAcademicCalendar();
+      var _ae=(_academicCalendar.events||[]).find(function(e){return e.id===_dp.acalId;});
+      if(_ae&&_ae.fromPlan&&await showConfirm('이 플랜으로 자동 등록된 학사 일정 \''+_ae.title+'\'도 함께 삭제할까요?',true)){
+        _academicCalendar.events=_academicCalendar.events.filter(function(e){return e.id!==_ae.id;});saveAcademicCalendar();
+      }
+    }
+  }catch(e){console.warn(e);}
   // 연결된 _dbTasks도 Firestore에서 삭제
   var linkedTasks=(_dbTasks||[]).filter(function(t){return t.planId===planId;});
   var deleteJobs=linkedTasks.map(function(t){return db.collection('dashBoardV2').doc(t.id).delete();});
@@ -22428,6 +22438,7 @@ function _openNewPlanModalInner(editPlan){
     +['예정','진행 중','완료','보류'].map(function(s){return'<option value="'+s+'"'+((p.status||'예정')===s?' selected':'')+'>'+s+'</option>';}).join('')
     +'</select></div>'
     +'</div>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0 10px;cursor:pointer"><input type="checkbox" id="plan-acal"'+(((!isEdit)||(p.acalId&&_acalEvts.some(function(e){return e.id===p.acalId;})))?' checked':'')+'> 📅 학사 일정에도 등록 <span style="color:var(--txt3);font-size:11px">(기준일 하루만 올라가요)</span></label>'
     +(!isEdit?
       '<div class="field">'
       +'<div class="fl" style="display:flex;align-items:center;gap:6px">GPT 플랜 붙여넣기'
@@ -22572,6 +22583,10 @@ function _parsePlanTasks(){
     var manager=parts[4]||'원장';
     var priority=parts[5]||'보통';
     var criterion=parts[6]||'';
+    // 4열 형식(업무 | 일정 | 담당 | 중요도)으로 붙여넣은 경우: 두 번째가 일정(D+7, 11/20)이고 마지막이 중요도면 열 위치를 맞춰 줌
+    if(parts.length===4&&/^(D[+-]?\d+|\d{1,2}\/\d{1,2})/i.test(parts[1])&&/^(높음|보통|낮음)$/.test(parts[3])){
+      taskName=parts[0];stage='실행업무';detail='';manager=parts[2];priority=parts[3];criterion='';
+    }
     if(!taskName)return;
 
     // 날짜 파싱: 9/2, 9/2~3, D-3, D+0 등 다양한 형식 지원
@@ -22641,10 +22656,12 @@ function _savePlan(overlay,editId){
   var dday=($('plan-dday')||{}).value||'';
   var manager=($('plan-manager')||{}).value||'';
   var status=($('plan-status')||{}).value||'예정';
-  var acalLink='';
+  var wantAcal=!!(($('plan-acal')||{}).checked);
+  var prevAcal=editId?((_plans.find(function(p){return p.id===editId;})||{}).acalId||''):'';
   var tasks=window._parsedPlanTasks||null;
   var rawPlan=($('plan-paste')||{}).value||'';
   window._parsedPlanTasks=null;
+  return _planSyncAcal({name:name,area:area,dday:dday,manager:manager},wantAcal,prevAcal).then(function(acalLink){
 
   if(editId){
     // 편집
@@ -22686,6 +22703,36 @@ function _savePlan(overlay,editId){
 
     }).catch(function(e){console.error('플랜 저장 실패:',e);toast('저장 실패: '+e.message);});
   }
+  });
+}
+
+// 실행 계획의 기준일(D-Day)을 학사 일정에 한 줄로 올리고 연결(acalId). 이미 연결돼 있으면 날짜·제목만 맞춰요.
+function _planSyncAcal(f,want,prevId){
+  return loadAcademicCalendar().then(function(){
+    if(!_academicCalendar)_academicCalendar={events:[]};
+    var evs=_academicCalendar.events;
+    var ev=prevId?evs.find(function(e){return e.id===prevId;}):null;
+    if(!want)return prevId||'';
+    if(!f.dday){toast('기준일(D-Day)을 입력해야 학사 일정에도 올라가요');return prevId||'';}
+    if(ev){
+      if(ev.fromPlan){ev.title=f.name;ev.date=f.dday;ev.startMonth=f.dday.slice(5,7);ev.manager=f.manager||ev.manager;ev.cat=_planAcalCat(f);saveAcademicCalendar();}
+      return ev.id;
+    }
+    var id=Date.now().toString(36);
+    evs.push({id:id,acalType:'project',title:f.name,cat:_planAcalCat(f),manager:f.manager||'',manager2:'',note:'실행 계획에서 자동 등록',date:f.dday,startMonth:f.dday.slice(5,7),repeatRule:'',annualRepeat:false,fromPlan:true});
+    saveAcademicCalendar();
+    return id;
+  });
+}
+function _planAcalCat(f){
+  var t=(f.name||'')+' '+(f.area||'');
+  if(/간담회/.test(t))return '간담회';
+  if(/설명회/.test(t))return '설명회';
+  if(/특강/.test(t))return '특강';
+  if(/홍보|캠페인|마케팅/.test(t))return '홍보캠페인';
+  if(/상담/.test(t))return '상담';
+  if(/이벤트/.test(t))return '이벤트';
+  return '내부 운영';
 }
 
 function _acalPlanTypeChange(val){
