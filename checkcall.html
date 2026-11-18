@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-g</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-i</div>
   </div>
 </div>
 
@@ -457,6 +457,27 @@ function _ccHwItemsMig(items){   // 원본은 건드리지 않고 복사본을 �
   return items;
 }
 function _ccHwMigSecs(secs){(secs||[]).forEach(function(sc){if(sc&&sc.k==='hw'){sc.title=_ccHwTitleMig(sc.title);sc.items=_ccHwItemsMig(sc.items||[]);}});return secs;}
+// '문법 복습 & 백지노트 시험' 항목 뒤에 복습 범위를 자동으로 붙여요: Lesson N → (Lesson N-1) / Wrap-Up → (Lesson 1~4)
+function _ccRevRng(plan,p){
+  var m=/^Lesson (\d+)$/i.exec(p||'');
+  if(m)return +m[1]>1?'Lesson '+(m[1]-1):'';
+  if(!/^Wrap-?Up \d+$/i.test(p||''))return '';
+  var out=[];
+  (plan.blocks||[]).forEach(function(b){
+    var a=b.lessons||[],i=a.indexOf(p);if(i<0||out.length)return;
+    for(var j=i-1;j>=0;j--){if(/wrap/i.test(a[j]))break;if(/^Lesson \d+$/i.test(a[j]))out.unshift(a[j]);}
+  });
+  if(!out.length)return '';
+  return out.length<2?out[0]:out[0]+'~'+out[out.length-1].replace(/^Lesson /i,'');
+}
+function _ccRevLbl(t,plan,p){
+  if(!t||!t.sections)return t;
+  var rg=_ccRevRng(plan,p);if(!rg)return t;
+  t.sections.forEach(function(sc){(sc.items||[]).forEach(function(it){
+    if(it&&it.l&&/문법\s*복습\s*&\s*백지\s*노트\s*시험/.test(it.l)&&it.l.indexOf('(')<0)it.l=it.l.replace(/\s+$/,'')+' ('+rg+')';
+  });});
+  return t;
+}
 function ccResolve(plan,level,progress){
   if(!plan)return null;
   var p=ccNormProg(progress);
@@ -465,14 +486,14 @@ function ccResolve(plan,level,progress){
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
     var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccOvTm(plan,_ot);_ccHwMigSecs(_ot.sections);
     _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off&&!i.del;});});   // 체크를 풀어 숨긴 항목은 학생 화면에서 제외
-    return _ccAutoLink(_ot);
+    return _ccRevLbl(_ccAutoLink(_ot),plan,p);
   }
   var t=ccResolve0(plan,level,progress);
   var o=(plan.lord&&plan.lord[p])||plan.sorder;
   if(t&&o&&o.length){   // 레슨별/모든 레슨에 적용한 구역 순서
     t.sections=t.sections.map(function(s,i){return{s:s,i:i,r:o.indexOf(s.k)};}).sort(function(a,b){var x=a.r<0?1e6:a.r,y=b.r<0?1e6:b.r;return x-y||a.i-b.i;}).map(function(z){return z.s;});
   }
-  return _ccAutoLink(t);
+  return _ccRevLbl(_ccAutoLink(t),plan,p);
 }
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
@@ -1010,7 +1031,7 @@ function applySecs(){
   });});
   if(_q100)secs.forEach(function(sec){
     var hasQ=sec.items.some(_isQz);
-    var wrongSec=/오답/.test(String(sec.title||''));
+    var wrongSec=/오답|quiz\s*review|퀴즈\s*리뷰/i.test(String(sec.title||''));   // 'Quiz Review' 구역(First Grammar 등)도 100점이면 통째로 숨겨요
     if(hasQ||wrongSec||/quiz/i.test(String(sec.title||'')))sec.items=sec.items.filter(function(i){
       if(_isQz(i))return true;                         // 점수 칸은 그대로
       var l=String(i.l||'');

@@ -1883,7 +1883,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ab';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ad';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3250,6 +3250,27 @@ function _ccOvTm(plan,t){   // 레슨 전용 계획표에도 구역별 시작·�
       if(sc.tmx===undefined&&((r.g||'')+'|'+(r.s||''))===sc.k&&(r.tm===0||r.tm===1))sc.tmx=r.tm;});});
   });}catch(e){}
 }
+// '문법 복습 & 백지노트 시험' 항목 뒤에 복습 범위를 자동으로 붙여요: Lesson N → (Lesson N-1) / Wrap-Up → (Lesson 1~4)
+function _ccRevRng(plan,p){
+  var m=/^Lesson (\d+)$/i.exec(p||'');
+  if(m)return +m[1]>1?'Lesson '+(m[1]-1):'';
+  if(!/^Wrap-?Up \d+$/i.test(p||''))return '';
+  var out=[];
+  (plan.blocks||[]).forEach(function(b){
+    var a=b.lessons||[],i=a.indexOf(p);if(i<0||out.length)return;
+    for(var j=i-1;j>=0;j--){if(/wrap/i.test(a[j]))break;if(/^Lesson \d+$/i.test(a[j]))out.unshift(a[j]);}
+  });
+  if(!out.length)return '';
+  return out.length<2?out[0]:out[0]+'~'+out[out.length-1].replace(/^Lesson /i,'');
+}
+function _ccRevLbl(t,plan,p){
+  if(!t||!t.sections)return t;
+  var rg=_ccRevRng(plan,p);if(!rg)return t;
+  t.sections.forEach(function(sc){(sc.items||[]).forEach(function(it){
+    if(it&&it.l&&/문법\s*복습\s*&\s*백지\s*노트\s*시험/.test(it.l)&&it.l.indexOf('(')<0)it.l=it.l.replace(/\s+$/,'')+' ('+rg+')';
+  });});
+  return t;
+}
 function ccResolve(plan,level,progress){
   if(!plan)return null;
   var p=ccNormProg(progress);
@@ -3258,14 +3279,14 @@ function ccResolve(plan,level,progress){
   if(p&&plan.ov&&plan.ov[p]&&plan.ov[p].sections&&plan.ov[p].sections.length){
     var _ot=JSON.parse(JSON.stringify(plan.ov[p]));_ccOvTm(plan,_ot);_ccHwMigSecs(_ot.sections);
     _ot.sections.forEach(function(sc){sc.items=sc.items.filter(function(i){return !i.off&&!i.del;});});
-    return _ccAutoLink(_ot);
+    return _ccRevLbl(_ccAutoLink(_ot),plan,p);
   }
   var t=ccResolve0(plan,level,progress);
   var o=(plan.lord&&plan.lord[p])||plan.sorder;
   if(t&&o&&o.length){   // 레슨별/모든 레슨에 적용한 구역 순서
     t.sections=t.sections.map(function(s,i){return{s:s,i:i,r:o.indexOf(s.k)};}).sort(function(a,b){var x=a.r<0?1e6:a.r,y=b.r<0?1e6:b.r;return x-y||a.i-b.i;}).map(function(z){return z.s;});
   }
-  return _ccAutoLink(t);
+  return _ccRevLbl(_ccAutoLink(t),plan,p);
 }
 function ccResolve0(plan,level,progress){
   if(!plan||!plan.blocks)return null;
@@ -5929,6 +5950,7 @@ function _wlPaint(){
   (tpl.sections||[]).forEach(function(sec){
     var items=(sec.items||[]).filter(function(i){return i&&i.l;});
     if(q100&&(items.some(function(i){return i.t==='number'&&i.link==='quiz';})||/quiz|오답/i.test(String(sec.title||''))))items=items.filter(function(i){return !/오답/.test(String(i.l||''));});
+    if(q100&&/quiz\s*review|퀴즈\s*리뷰/i.test(String(sec.title||'')))items=[];   // Quiz 100점이면 Quiz Review 구역은 일지에서도 뺌
     if(!items.length)return;
     var rows='';
     items.forEach(function(it){
