@@ -576,7 +576,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px"><div class="field" style="margin-bottom:0;min-width:0"><div class="fl">교재 준비</div><select class="fi" id="r-review-items"><option value="">-</option><option value="준비">준비</option><option value="미준비">미준비</option></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl">교재 숙제</div><select class="fi" id="r-hw-book" onchange="combineHw()"><option value="">-</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl">영상 숙제</div><select class="fi" id="r-hw-video" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div><div class="field" style="margin-bottom:0;min-width:0"><div class="fl">사진 숙제</div><select class="fi" id="r-hw-photo" onchange="combineHw()"><option value="">-</option><option value="제출">제출</option><option value="미제출">미제출</option></select></div></div>
     <div class="r2"><div class="field"><div class="fl">수업 태도</div><select class="fi" id="r-attitude-level" onchange="onAttitudeLevelChange(this.value)"><option value="">-</option><option value="매우 우수">⭐ 매우 우수</option><option value="우수">✅ 우수</option><option value="산만함">⚠️ 집중 필요</option><option value="수업 방해">🚨 지도 필요</option></select><select class="fi" id="r-attitude" style="margin-top:6px;font-size:11px;display:none"><option value="">세부 항목 선택</option></select></div><div class="field"><div class="fl">Daily Quiz</div><input class="fi" id="r-quiz" placeholder="예: 9/10"></div></div>
       <div id="eval-area-t"></div>
-    <div class="field" style="display:none"><div class="fl">선생님 코멘트 (태블릿)</div><textarea class="fi" id="r-comment-tablet" rows="2" placeholder="태블릿 수업 코멘트"></textarea></div>
+    <div class="field"><div class="fl">선생님 코멘트 (태블릿)</div><textarea class="fi" id="r-comment-tablet" rows="2" placeholder="태블릿 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">칭찬 포인트</div><textarea class="fi" id="r-memo" rows="2"></textarea></div>
     </div>
     <input type="hidden" id="r-hw" value=""><input type="hidden" id="r-study-times" value=""><input type="hidden" id="r-hw-status" value="미확인">
@@ -614,7 +614,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
       <div id="rr-result" style="display:none;margin-top:8px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px;font-size:11px;color:#15803d;line-height:1.6"></div>
     </div>
       <div id="eval-area-b"></div>
-    <div class="field" style="display:none"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
+    <div class="field"><div class="fl">선생님 코멘트 (교재)</div><textarea class="fi" id="r-comment-book" rows="2" placeholder="교재 수업 코멘트"></textarea></div>
     <div class="field"><div class="fl">칭찬 포인트</div><textarea class="fi" id="r-memo-book" rows="2"></textarea></div>
 
     
@@ -1906,7 +1906,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ai';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-aj';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -10366,7 +10366,7 @@ function renderPfReport(sId){
       +(r.reviewTest?'<span>복습: '+r.reviewTest+'</span>':'')
       +'<span>태도: '+(r.attitude||'-')+'</span>'
       +'<span>숙제: '+hwT+'</span></div>'
-      +'<div style="font-size:13px;color:var(--txt);line-height:1.6">'+r.comment+'</div>'
+      +'<div style="font-size:13px;color:var(--txt);line-height:1.6;white-space:pre-wrap">'+_cmText(r.comment)+'</div>'
       +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);white-space:pre-wrap">📢 '+r.memo.replace(/\n/g,'<br>')+'</div>':'')
       +'<div class="pf-report-detail" style="display:none"></div>'
       +'</div>';
@@ -10408,7 +10408,7 @@ function printPfReport(sId){
   var rows=list.map(function(r){
     var _hw2=splitHw(r.homework||'');var hwT2='';if(_hw2.video||_hw2.book){var hp2=[];if(_hw2.video)hp2.push('영상 '+_hw2.video);if(_hw2.book)hp2.push('교재 '+_hw2.book);hwT2=hp2.join('/');}else hwT2=r.homework||'-';
     var dictT2='';if(r.dictation){var dm2=r.dictation.match(/^(\d+)\/(\d+)/);if(dm2){var p2=parseInt(dm2[2])>0?Math.round(parseInt(dm2[1])/parseInt(dm2[2])*100):0;dictT2=p2+'점('+dm2[1]+'/'+dm2[2]+')';}else dictT2=r.dictation;}
-    return '<tr><td>'+r.date+'</td><td>'+(r.teacherTablet||r.teacher||'-')+'</td><td>'+(r.level||'-')+'</td><td>'+(r.progress||'-')+'</td><td>'+(dictT2||'-')+'</td><td>'+(r.attitude||'-')+'</td><td>'+hwT2+'</td><td style="white-space:pre-wrap">'+(r.comment||'').replace(/\n/g,'<br>')+'</td></tr>';
+    return '<tr><td>'+r.date+'</td><td>'+(r.teacherTablet||r.teacher||'-')+'</td><td>'+(r.level||'-')+'</td><td>'+(r.progress||'-')+'</td><td>'+(dictT2||'-')+'</td><td>'+(r.attitude||'-')+'</td><td>'+hwT2+'</td><td style="white-space:pre-wrap">'+_cmText(r.comment).replace(/\n/g,'<br>')+'</td></tr>';
   }).join('');
   var existing=document.getElementById('print-area');if(existing)existing.remove();
   var pd=document.createElement('div');pd.id='print-area';pd.style.display='none';
@@ -10492,6 +10492,7 @@ async function deleteTeacherNote(id){
   renderTeacherNotes();toast('🗑 삭제됨');
 }
 
+function _cmText(c){var sp=_splitComment(c||'');return [sp.t,sp.b].filter(Boolean).join('\n\n');}   // 태블릿·교재 선생님 코멘트를 빈 줄로 문단 나눠 보여줘요
 function _cleanComment(c){return (c||'').replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'');}
 function _combineComment(){var t=$('r-comment-tablet').value.trim();var b=$('r-comment-book').value.trim();var parts=[];if(t)parts.push('[태블릿] '+t);if(b)parts.push('[교재] '+b);return parts.join('\n');}
 
@@ -11035,7 +11036,7 @@ function renderEvalArea(moduleId,savedItems){
       html+='</div></div>';
     });
     var _cv=(window._evalComments||{})[sec.id]||'';
-    html+='<textarea class="fi ev-cm" rows="1" data-sec="'+sec.id+'" placeholder="'+_bcEsc(sec.title)+' 코멘트" oninput="_evCm(this)" style="margin-top:6px;font-size:12px;min-height:36px;resize:vertical">'+_bcEsc(_cv)+'</textarea>';
+    // (영역별 코멘트 입력란은 없앴어요 — 태블릿·교재 코멘트 한 칸씩만 써요)
     parts[_evalZone(sec.id)]+=html;
   });
   var gear='';
@@ -11211,7 +11212,7 @@ function renderHistory(){
   var thead='<tr><th style="width:32px"><input type="checkbox" id="h-check-all" onclick="toggleSelectAllReports()" title="전체선택"></th>';
   ['날짜','이름','단계','진도','숙제','복습테스트','수업태도','코멘트','삭제'].forEach(function(h){thead+='<th>'+h+'</th>';});
   thead+='</tr>';
-  var tbody=list.map(function(r){return'<tr class="'+(r.absent?'absent-row':'')+'" onclick="showReportDetail(\''+r.id+'\')" style="cursor:pointer"><td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox" class="h-row-check" data-id="'+r.id+'" onchange="updateBulkDeleteBtn()"></td><td>'+r.date+'</td><td><strong>'+r.studentName+'</strong>'+(r.absent?'<span style="color:var(--red);font-size:10px"> 결석</span>':'')+'</td><td>'+(r.level||'-')+'</td><td>'+((r.progress||'').substring(0,20))+'</td><td style="text-align:center">'+hwIcon(r.homework)+'</td><td>'+(r.reviewTest||'-')+'</td><td>'+(r.attitude||'-')+'</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis">'+((r.comment||'').substring(0,25))+'</td><td onclick="event.stopPropagation()"><button class="btn btn-red btn-xs" onclick="deleteReport(\''+r.id+'\')">🗑</button></td></tr>';}).join('');
+  var tbody=list.map(function(r){return'<tr class="'+(r.absent?'absent-row':'')+'" onclick="showReportDetail(\''+r.id+'\')" style="cursor:pointer"><td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox" class="h-row-check" data-id="'+r.id+'" onchange="updateBulkDeleteBtn()"></td><td>'+r.date+'</td><td><strong>'+r.studentName+'</strong>'+(r.absent?'<span style="color:var(--red);font-size:10px"> 결석</span>':'')+'</td><td>'+(r.level||'-')+'</td><td>'+((r.progress||'').substring(0,20))+'</td><td style="text-align:center">'+hwIcon(r.homework)+'</td><td>'+(r.reviewTest||'-')+'</td><td>'+(r.attitude||'-')+'</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis">'+(_cmText(r.comment).replace(/\s+/g,' ').substring(0,25))+'</td><td onclick="event.stopPropagation()"><button class="btn btn-red btn-xs" onclick="deleteReport(\''+r.id+'\')">🗑</button></td></tr>';}).join('');
   var summaryRow='';
   if(sId){var tL=list.filter(function(r){return!r.absent;}).length;var tA=list.filter(function(r){return r.absent;}).length;summaryRow='<tr style="background:var(--navy);color:#fff;font-weight:700"><td></td><td colspan="4" style="text-align:right;padding:8px 10px">'+(list[0]?.studentName||'')+' 합계</td><td colspan="3" style="text-align:center;color:#8fffdf">📅 수업 '+tL+'일 ❌ 결석 '+tA+'일</td><td colspan="2"></td></tr>';}
   $('history-scroll-wrap').innerHTML='<table class="hist-table"><thead>'+thead+'</thead><tbody>'+tbody+summaryRow+'</tbody></table>';
@@ -11327,7 +11328,7 @@ function renderCommentView(){
       +'<span>태도: '+(r.attitude||'-')+'</span>'
       +'<span>숙제: '+hwText+'</span>'
       +'</div>'
-      +'<div style="font-size:13px;color:var(--txt);line-height:1.6">'+r.comment+'</div>'
+      +'<div style="font-size:13px;color:var(--txt);line-height:1.6;white-space:pre-wrap">'+_cmText(r.comment)+'</div>'
       +(r.memo?'<div style="font-size:12px;color:var(--blue);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);white-space:pre-wrap">📢 '+r.memo.replace(/\n/g,'<br>')+'</div>':'')
       +'</div>';
   }).join('');
@@ -11348,7 +11349,7 @@ async function printCommentView(){
   var rows=list.map(function(r){
     var _hwP=splitHw(r.homework||'');var hwT='';if(_hwP.video||_hwP.book){var hp2=[];if(_hwP.video)hp2.push('영상 '+_hwP.video);if(_hwP.book)hp2.push('교재 '+_hwP.book);hwT=hp2.join('/');}else hwT=r.homework||'-';
     var dictT='';if(r.dictation){var dm2=r.dictation.match(/^(\d+)\/(\d+)/);if(dm2){var p2=parseInt(dm2[2])>0?Math.round(parseInt(dm2[1])/parseInt(dm2[2])*100):0;dictT=p2+'점('+dm2[1]+'/'+dm2[2]+')';}else dictT=r.dictation;}
-    return '<tr><td style="text-align:center;white-space:nowrap">'+r.date+'</td><td style="text-align:center">'+(r.teacherTablet||r.teacher||'-')+(r.teacherBook?' / '+r.teacherBook:'')+'</td><td style="text-align:center">'+(r.level||'-')+'</td><td style="text-align:center">'+(r.progress||'-')+'</td><td style="text-align:center">'+(dictT||'-')+'</td><td style="text-align:center">'+(r.attitude||'-')+'</td><td style="text-align:center">'+hwT+'</td><td>'+r.comment+'</td><td>'+(r.memo||'-')+'</td></tr>';
+    return '<tr><td style="text-align:center;white-space:nowrap">'+r.date+'</td><td style="text-align:center">'+(r.teacherTablet||r.teacher||'-')+(r.teacherBook?' / '+r.teacherBook:'')+'</td><td style="text-align:center">'+(r.level||'-')+'</td><td style="text-align:center">'+(r.progress||'-')+'</td><td style="text-align:center">'+(dictT||'-')+'</td><td style="text-align:center">'+(r.attitude||'-')+'</td><td style="text-align:center">'+hwT+'</td><td style="white-space:pre-wrap">'+_cmText(r.comment).replace(/\n/g,'<br>')+'</td><td>'+(r.memo||'-')+'</td></tr>';
   }).join('');
   var existing=document.getElementById('print-area');
   if(existing)existing.remove();
@@ -11468,7 +11469,7 @@ function _doSaveReportAsImage(r){
   if(r.comment){
     commentHTML='<div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid #bbf7d0">'
       +'<span style="font-size:12px;font-weight:700;color:#166534">💬 선생님 코멘트</span>'
-      +'<div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6;white-space:pre-wrap">'+r.comment.replace(/\[태블릿\]\s*/g,'').replace(/\[교재\]\s*/g,'').replace(/\n/g,'<br>')+'</div></div>';
+      +'<div style="font-size:13px;color:#14532d;margin-top:4px;line-height:1.6;white-space:pre-wrap">'+_cmText(r.comment).replace(/\n/g,'<br>')+'</div></div>';
   }
   var memoHTML='';
   if(r.memo||r.memoBook){
