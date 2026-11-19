@@ -1290,8 +1290,20 @@ var _levelOrder = null;
 // Grammar Plus: Preview 1·2 / Preview 3·Pre Wrap-Up 는 각각 같은 날 진도를 나가므로 한 칸으로 합쳐 보여줌 (저장돼 있던 옛 목록도 읽을 때 바꿈)
 var _GP_A='Preview 1·2',_GP_B='Preview 3·Pre Wrap-Up';
 function _gpAlias(p){p=String(p||'');return (p==='Preview 1'||p==='Preview 2')?_GP_A:((p==='Preview 3'||p==='Pre Wrap-Up')?_GP_B:p);}
-function _gpNormCurr(C){
-  // Basic(Joy·Wise·Pride) 단계: Level Test 와 Review 순서를 Review → Level Test 로 (저장돼 있던 옛 목록도 읽을 때 바꿈)
+var _tailMig=false;
+function _gpNormCurr(C,skipTail){
+  // 끝부분 순서(한 번만 적용 — 저장하면 _tailMig 표시가 남아 이후 직접 고친 내용은 건드리지 않아요)
+  // Phonics 1A·2A·3A = Review 1·2·Review / Phonics 1B·2B·3B = Review 1·2·Review·Level Test / First Grammar = Review 1·2·Level Test / Grammar Plus = Review 1·2·3·Level Test (전체 Review 대체)
+  if(!skipTail)try{Object.keys(C||{}).forEach(function(k){
+    var tail=null,drop=['Level Test','Review','Review 1','Review 2','Review 3'];
+    if(/^Phonics ?[123]A$/i.test(k))tail=['Review 1','Review 2','Review'];
+    else if(/^Phonics ?[123]B$/i.test(k))tail=['Review 1','Review 2','Review','Level Test'];
+    else if(/^First Grammar \d$/.test(k))tail=['Review 1','Review 2','Level Test'];
+    else if(/^Grammar Plus \d$/.test(k)){tail=['Review 1','Review 2','Review 3','Level Test'];drop.push('전체 Review');}
+    if(!tail||!Array.isArray(C[k]))return;
+    var a=C[k].filter(function(x){return drop.indexOf(x)<0;}).concat(tail);
+    C[k].length=0;a.forEach(function(x){C[k].push(x);});
+  });}catch(e){}
   try{Object.keys(C||{}).forEach(function(k){
     if(!/^(Joy|Wise|Pride) \d[ABC]$/.test(k)||!Array.isArray(C[k]))return;
     var a=C[k],i=a.indexOf('Level Test'),j=a.indexOf('Review');
@@ -1314,7 +1326,8 @@ function loadCurriculumFromFirestore() {
     .then(async function(d) {
       if (d.exists && d.data().data && Object.keys(d.data().data).length > 0) {
         _CURRICULUM = d.data().data;
-        _gpNormCurr(_CURRICULUM);
+        _tailMig = !!d.data().tailMig;
+        _gpNormCurr(_CURRICULUM,_tailMig);
         if (d.data().levelOrder) _levelOrder = d.data().levelOrder;
       } else {
         getCURRICULUM(); // 기본값 사용
@@ -1325,8 +1338,8 @@ function loadCurriculumFromFirestore() {
 function saveCurriculumToFirestore() {
   var order = getLevelOrder();
   return db.collection('config').doc('curriculum')
-    .set({ data: _CURRICULUM, levelOrder: order, updatedAt: new Date().toISOString() })
-    .then(async function() { toast('✅ 커리큘럼 저장됨'); })
+    .set({ data: _CURRICULUM, levelOrder: order, tailMig: 4, updatedAt: new Date().toISOString() })
+    .then(async function() { _tailMig = true; toast('✅ 커리큘럼 저장됨'); })
     .catch(function(e) { toast('저장 실패: ' + e.message); });
 }
 // Backward compatible
@@ -1912,7 +1925,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ak';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-an';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4136,6 +4149,7 @@ var _ccEd=null;
 function _ccShort(n){
   var m;
   if(n==='Review')return 'R';
+  if((m=n.match(/^Review ?(\d+)$/)))return 'R '+m[1];
   if(n==='Preview 1·2')return 'P 1.2';
   if(n==='Preview 3·Pre Wrap-Up')return 'P3.PW';
   if((m=n.match(/^Unit (\d+) Lesson (\d+)$/)))return 'U'+m[1]+'·L'+m[2];
@@ -4343,7 +4357,7 @@ function _ccPlanDraw(){
     +_apply+_more;
   if(_mode==='lesson'){var _tb=document.getElementById('ccp-tbl'),_st=_tb.scrollTop;_tb.innerHTML=_ccLessonView(b,sel);_tb.scrollTop=_st;_ccPlanTab(_ccEd.tab||'edit');return;}
   var h='<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:400px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
-  ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_ccPlanSel('+i+')" title="'+_bcEsc(n)+' (끌어서 순서 변경)" class="pl-th" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+(_ccCustom(_ccWork(),n)?' ✎':'')+'</th>';});
+  ls.forEach(function(n,i){h+='<th draggable="true" ondragstart="_ccDrag(event,'+i+')" ondragover="_ccDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="if(event.detail<2)_ccPlanSel('+i+')" ondblclick="_ccColEdit(event,'+i+')" data-tip="'+_bcEsc(n)+'" class="pl-th" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(i===sel?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(_ccShort(n))+(_ccCustom(_ccWork(),n)?' ✎':'')+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2);border-bottom:1px solid var(--border)"></th></tr></thead><tbody>';
   var _pk=null,_ncol=ls.length+2,_run=-1;
   b.rows.forEach(function(r,ri){
@@ -5247,6 +5261,44 @@ function _ccPlanCell(ri,i){
 }
 // ── 레슨(열) 추가 · 이름 변경 · 삭제 ──
 function _ccLessonName(v){return ccNormProg(v);}
+// 열 이름(머리글)을 더블클릭하면 그 자리에서 바로 고쳐요
+function _ccColEdit(ev,i){
+  try{ev.preventDefault();ev.stopPropagation();}catch(e){}
+  var th=ev.currentTarget,b=_ccWork().blocks[_ccEd.bi],old=b.lessons[i];if(old===undefined)return;
+  _ccBubbleHide();
+  th.draggable=false;th.onclick=null;th.ondblclick=null;
+  th.innerHTML='<input type="text" value="'+_bcEsc(old)+'" style="width:86px;font-size:11px;padding:2px 4px;border:1.5px solid var(--navy);border-radius:4px" aria-label="레슨 이름">';
+  var inp=th.firstChild,done=false;
+  function fin(ok){if(done)return;done=true;if(ok)_ccLessonRenameAt(i,inp.value);else _ccPlanDraw();}
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();fin(true);}else if(e.key==='Escape'){e.preventDefault();fin(false);}e.stopPropagation();});
+  inp.addEventListener('blur',function(){fin(true);});
+  inp.addEventListener('click',function(e){e.stopPropagation();});
+  inp.focus();inp.select();
+}
+function _ccLessonRenameAt(i,v){
+  var pp=_ccWork(),b=pp.blocks[_ccEd.bi],old=b.lessons[i],nm=_ccLessonName(v);
+  if(!nm||nm===old){_ccPlanDraw();return;}
+  if(b.lessons.indexOf(nm)>=0){toast('이미 있는 레슨 이름이에요');_ccPlanDraw();return;}
+  if(pp.ov&&pp.ov[old]){pp.ov[nm]=pp.ov[old];delete pp.ov[old];}
+  if(pp.lord&&pp.lord[old]){pp.lord[nm]=pp.lord[old];delete pp.lord[old];}
+  b.lessons[i]=nm;_ccMark();_ccPlanDraw();
+}
+// 열 이름 말풍선 (마우스를 올리면 전체 이름이 보여요)
+var _ccBubbleEl=null;
+function _ccBubbleHide(){if(_ccBubbleEl)_ccBubbleEl.style.display='none';}
+document.addEventListener('mouseover',function(e){
+  var th=e.target&&e.target.closest?e.target.closest('.pl-th'):null;
+  if(!th){_ccBubbleHide();return;}
+  if(th.querySelector('input'))return;
+  if(!_ccBubbleEl){_ccBubbleEl=document.createElement('div');_ccBubbleEl.style.cssText='position:fixed;z-index:99999;pointer-events:none;background:#1e293b;color:#fff;font-size:12px;line-height:1.4;padding:6px 10px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:260px;text-align:center';document.body.appendChild(_ccBubbleEl);}
+  _ccBubbleEl.innerHTML='<b>'+_bcEsc(th.getAttribute('data-tip')||'')+'</b><div style="font-size:10.5px;opacity:.75;margin-top:2px">더블클릭: 이름 수정 · 끌어서 순서 변경</div><span style="position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:#1e293b"></span>';
+  _ccBubbleEl.style.display='block';
+  var r=th.getBoundingClientRect(),w=_ccBubbleEl.offsetWidth,h=_ccBubbleEl.offsetHeight;
+  var x=Math.max(6,Math.min(window.innerWidth-w-6,r.left+r.width/2-w/2)),y=r.top-h-8;
+  if(y<4){y=r.bottom+8;var ar=_ccBubbleEl.lastChild;ar.style.bottom='auto';ar.style.top='-5px';ar.style.borderTop='0';ar.style.borderBottom='5px solid #1e293b';}
+  _ccBubbleEl.style.left=x+'px';_ccBubbleEl.style.top=y+'px';
+});
+document.addEventListener('scroll',function(){_ccBubbleHide();},true);
 function _ccShiftNotes(b,at,delta){
   b.rows.forEach(function(r){
     if(!r.n)return;var nn={};
@@ -24635,6 +24687,58 @@ function _curRenameLevel(oldName) {
   renderRefCurriculum();
 }
 
+// ── 같은 계열 끝부분(Review·Level Test 등) 한꺼번에 고치기 ──
+var _CUR_FAMS=[
+  {id:'pa',label:'Phonics 1A·2A·3A',re:/^Phonics ?[123]A$/i},
+  {id:'pb',label:'Phonics 1B·2B·3B',re:/^Phonics ?[123]B$/i},
+  {id:'fg',label:'First Grammar 1~3',re:/^First Grammar \d$/},
+  {id:'gp',label:'Grammar Plus 1~6',re:/^Grammar Plus \d$/},
+  {id:'bab',label:'Basic A·B (Joy·Wise·Pride 1A~2B)',re:/^(Joy|Wise|Pride) \d[AB]$/},
+  {id:'bc',label:'Basic C (Joy·Wise·Pride 1C~2C)',re:/^(Joy|Wise|Pride) \dC$/}
+];
+function _curFamOf(level){for(var i=0;i<_CUR_FAMS.length;i++)if(_CUR_FAMS[i].re.test(level))return _CUR_FAMS[i];return null;}
+function _curFamMembers(fam){return getLevelOrder().filter(function(k){return _CURRICULUM[k]&&fam.re.test(k);});}
+var _CUR_TAILRE=/^(Level Test|Portfolio|Review( \d+)?|전체 Review)$/;
+function _curTailOf(list){var n=0;for(var i=list.length-1;i>=0&&_CUR_TAILRE.test(list[i]);i--)n++;return list.slice(list.length-n);}
+function _curSetTail(level,tail){var a=_CURRICULUM[level],n=_curTailOf(a).length;a.splice(a.length-n,n);tail.forEach(function(x){a.push(x);});}
+// 카드의 끝부분을 같은 계열 다른 레벨에도 복사
+function _curApplyFamily(level){
+  var fam=_curFamOf(level);if(!fam){toast('같은 계열이 정해지지 않은 레벨이에요');return;}
+  var tail=_curTailOf(_CURRICULUM[level]),targets=_curFamMembers(fam).filter(function(k){return k!==level;});
+  if(!targets.length){toast('같은 계열의 다른 레벨이 없어요');return;}
+  if(!confirm('['+fam.label+']\n"'+level+'"의 끝부분  ‹ '+(tail.join(' → ')||'(없음)')+' ›  을(를)\n아래 레벨에도 똑같이 적용할까요?\n\n'+targets.join(', ')+'\n\n(Unit·Lesson 등 앞부분은 그대로 두고 끝부분만 바꿔요)'))return;
+  targets.forEach(function(k){_curSetTail(k,tail);});
+  renderRefCurriculum();toast('✅ '+targets.length+'개 레벨에 적용했어요 — 💾 저장을 눌러야 확정돼요');
+}
+// 계열을 골라 끝부분을 직접 입력해 한 번에 적용
+function _curBulkTail(){
+  var old=document.getElementById('cur-bulk-mo');if(old)old.remove();
+  var m=document.createElement('div');m.id='cur-bulk-mo';m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML='<div style="background:var(--surface);border-radius:14px;max-width:460px;width:100%;padding:18px;max-height:90vh;overflow:auto">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:10px">⚡ 끝부분 일괄 편집</div>'
+    +'<div class="fl">계열</div><select class="fi" id="cb-fam" style="margin-bottom:10px">'+_CUR_FAMS.map(function(f){return '<option value="'+f.id+'">'+f.label+'</option>';}).join('')+'</select>'
+    +'<div class="fl">끝부분 (쉼표로 구분, 순서대로)</div><input class="fi" id="cb-tail" placeholder="예: Review 1, Review 2, Review, Level Test" style="margin-bottom:6px">'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">Unit·Lesson 등 앞부분은 그대로 두고, 끝의 Review·Level Test·Portfolio·전체 Review 부분만 바꿔요.</div>'
+    +'<div id="cb-prev" style="font-size:12px;background:var(--surface2);border-radius:8px;padding:8px 10px;margin-bottom:12px;line-height:1.6"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline btn-sm" id="cb-x">취소</button><button class="btn btn-navy btn-sm" id="cb-ok">적용</button></div></div>';
+  document.body.appendChild(m);
+  var fs=m.querySelector('#cb-fam'),ti=m.querySelector('#cb-tail'),pv=m.querySelector('#cb-prev');
+  function fam(){return _CUR_FAMS.filter(function(f){return f.id===fs.value;})[0];}
+  function parse(){return ti.value.split(',').map(function(x){return x.trim();}).filter(Boolean);}
+  function prev(){var mem=_curFamMembers(fam());pv.innerHTML='<b>적용 대상 ('+mem.length+'개)</b><br>'+(mem.join(', ')||'없음')+'<br><b>결과 끝부분</b><br>'+(parse().join(' → ')||'(비어 있음 — 끝부분이 삭제돼요)');}
+  fs.onchange=function(){var mem=_curFamMembers(fam());ti.value=mem.length?_curTailOf(_CURRICULUM[mem[0]]).join(', '):'';prev();};
+  ti.oninput=prev;fs.onchange();
+  m.querySelector('#cb-x').onclick=function(){m.remove();};
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.querySelector('#cb-ok').onclick=function(){
+    var mem=_curFamMembers(fam()),tail=parse();
+    if(!mem.length){toast('적용할 레벨이 없어요');return;}
+    if(!tail.length&&!confirm('끝부분을 비우면 '+mem.length+'개 레벨의 Review·Level Test가 모두 삭제돼요. 계속할까요?'))return;
+    mem.forEach(function(k){_curSetTail(k,tail);});
+    m.remove();renderRefCurriculum();toast('✅ '+mem.length+'개 레벨에 적용했어요 — 💾 저장을 눌러야 확정돼요');
+  };
+}
+
 // lesson 추가
 function _curAddLesson(level) {
   var name = prompt('"' + level + '"에 추가할 lesson 이름');
@@ -24719,6 +24823,7 @@ function renderRefCurriculum() {
     + (_curEditMode ? '✏️ 편집 중' : '✏️ 편집') + '</button>'
     + (_curEditMode
       ? '<button class="btn btn-outline btn-sm" onclick="_curAddLevel()">+ 레벨 추가</button>'
+        + '<button class="btn btn-outline btn-sm" onclick="_curBulkTail()" title="같은 계열의 Review·Level Test 순서를 한 번에 바꿔요">⚡ 끝부분 일괄 편집</button>'
         + '<button class="btn btn-green btn-sm" onclick="saveCurriculumToFirestore()">💾 저장</button>'
       : '')
     + '</div>';
@@ -24734,6 +24839,7 @@ function renderRefCurriculum() {
       + '<div style="font-size:13px;font-weight:700;color:var(--navy)">' + (_curEditMode ? '⠿ ' : '') + level + '</div>'
       + '<div style="display:flex;gap:4px">';
     if (_curEditMode) {
+      if (_curFamOf(level)) html += '<button onclick="_curApplyFamily(\'' + level.replace(/'/g,"\\'") + '\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--blue)" title="이 레벨의 끝부분(Review·Level Test)을 같은 계열 전체에 적용">🔗</button>';
       html += '<button onclick="_curRenameLevel(\'' + level.replace(/'/g,"\\'") + '\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--txt3)" title="이름 변경">✏️</button>'
         + '<button onclick="_curDeleteLevel(\'' + level.replace(/'/g,"\\'") + '\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:#ef4444" title="레벨 삭제">🗑</button>';
     }
