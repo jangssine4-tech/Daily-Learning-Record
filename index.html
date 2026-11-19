@@ -1925,7 +1925,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ap';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ar';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4179,7 +4179,9 @@ function _ccPlanMinSet(v){
 function _ccOpenPlans(host){
   if(!_ccCan('cc_plan')){toast('관리자만 편집할 수 있어요');return;}
   var old=document.getElementById('modal-ccplan');if(old)old.remove();
-  _ccEd={key:Object.keys(CC_PLANS)[0],bi:0,sel:0,work:{},dirty:{}};
+  // 탭에 다시 들어와도 하던 곳(단계·열·편집 중인 내용)을 그대로 유지해요 (홈체크 Plan 설정과 같은 방식)
+  var _keep=(host&&_ccEd&&_ccEd.work&&CC_PLANS[_ccEd.key])?_ccEd:null;
+  _ccEd=_keep||{key:Object.keys(CC_PLANS)[0],bi:0,sel:0,work:{},dirty:{}};
   var m=host||document.createElement('div');
   if(!host){m.id='modal-ccplan';m.className='mo';m.dataset.dynamic='1';m.style.display='flex';
   m.onclick=function(e){if(e.target===m)m.remove();};}
@@ -4196,6 +4198,7 @@ function _ccOpenPlans(host){
     +'<div style="display:flex;gap:8px;margin-top:12px">'+(host?'':'<button class="btn btn-outline" style="flex:1;justify-content:center;padding:11px" onclick="document.getElementById(\'modal-ccplan\').remove()">닫기</button>')
     +'<button class="btn btn-navy" style="flex:2;justify-content:center;padding:11px" onclick="_ccPlanSave()">저장 (태블릿에 반영)</button></div></div>';
   if(!host)document.body.appendChild(m);
+  if(_keep){document.getElementById('ccp-key').value=_ccEd.key;_ccPlanDraw();return;}
   _ccEd.tab='edit';_ccPlanKey(_ccEd.key);
 }
 var _CCG_COL=[['#dbeafe','#1d4ed8'],['#fce7f3','#be185d'],['#dcfce7','#15803d'],['#fef3c7','#b45309'],['#ede9fe','#6d28d9'],['#cffafe','#0e7490']];
@@ -4997,7 +5000,7 @@ function _ccSpCards(p){
     var e=_ccSpGet(p,name),own=!!(p.sp&&p.sp[name]);
     var note='';
     if(name==='Level Test'&&p.ltSuf)note='단계 이름이 "'+p.ltSuf+'"로 끝나는 학생에게만 나옵니다';
-    h+='<div style="margin:0 10px 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden"><div style="background:#fce7f3;color:#9d174d;padding:5px 9px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+_bcEsc(name)+(note?' <small style="font-weight:600;opacity:.8">'+_bcEsc(note)+'</small>':'')+'<span style="flex:1"></span>'
+    h+='<div style="margin:0 10px 10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;width:560px;max-width:calc(100vw - 40px);position:sticky;left:10px;background:var(--surface)"><div style="background:#fce7f3;color:#9d174d;padding:5px 9px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+_bcEsc(name)+(note?' <small style="font-weight:600;opacity:.8">'+_bcEsc(note)+'</small>':'')+'<span style="flex:1"></span>'
       +(e?'<button class="btn btn-outline btn-xs" onclick="_ccSpOp(\''+name+'\',\'secadd\')">＋ 구역 추가</button>':'')
       +(own?'<button class="btn btn-outline btn-xs" onclick="_ccSpOp(\''+name+'\',\'reset\')">기본으로 되돌리기</button>':'')+'</div>';
     if(!e){
