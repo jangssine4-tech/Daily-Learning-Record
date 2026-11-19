@@ -1925,7 +1925,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-an';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ao';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4957,6 +4957,11 @@ function _ccSpSet(name,f,si,ii,v){
   }
   _ccMark();_ccPlanDraw();
 }
+function _ccSpTm(name,si,on){
+  if(!_ccTblGuard()){_ccPlanDraw();return;}
+  var p=_ccWork(),e=_ccSpEnsure(p,name),sc=e.sections[si];if(!sc){_ccPlanDraw();return;}
+  sc.tmx=on?1:0;_ccMark();_ccPlanDraw();
+}
 function _ccSpOp(name,op,si,ii){
   if(op==='reset'){if(!confirm('"'+name+'" 편집 내용을 지우고 기본으로 되돌릴까요?'))return;}
   if(op==='secdel'&&!confirm('이 구역을 삭제할까요?'))return;
@@ -4999,7 +5004,9 @@ function _ccSpCards(p){
       h+='<div style="padding:10px 12px;font-size:12px;color:var(--txt2);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">아직 없습니다. 지금은 기본 점검 항목이 학생에게 나옵니다.</span><button class="btn btn-navy btn-xs" onclick="_ccSpMake(\''+name+'\')">＋ 만들기 (기본 점검 항목 복사)</button></div>';
     }else{
       e.sections.forEach(function(sc,si){
-        h+='<div class="ccx-sec" style="background:#dbeafe;color:#1d4ed8;margin:8px 9px 2px"><input value="'+_bcEsc(sc.title||'')+'" onchange="_ccSpSet(\''+name+'\',\'title\','+si+',0,this.value)" style="color:inherit">'
+        var _tmOn=sc.tmx===1||(sc.tmx!==0&&CC_TM_RE.test(String(sc.title||'').trim()));
+        h+='<div class="ccx-sec" style="background:#dbeafe;color:#1d4ed8;margin:8px 9px 2px"><input value="'+_bcEsc(sc.title||'')+'" onchange="_ccSpSet(\''+name+'\',\'title\','+si+',0,this.value)" style="color:inherit;flex:none;width:170px">'
+          +'<label title="켜면 이 구역에 학생 체크콜 \'시작\'·\'끝\' 버튼이 생기고 공부 시간을 재요" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 7px;font-weight:600"><input type="checkbox" style="flex:none;width:auto;padding:0;margin:0"'+(_tmOn?' checked':'')+' onchange="_ccSpTm(\''+name+'\','+si+',this.checked)">⏱ 시작·끝</label>'
           +'<button class="mini" onclick="_ccSpOp(\''+name+'\',\'add\','+si+')">＋ 항목 추가</button><button class="mini" onclick="_ccSpOp(\''+name+'\',\'secdel\','+si+')">구역 삭제</button></div><div style="padding:0 9px">';
         (sc.items||[]).forEach(function(it,ii){h+=_ccSpRow(name,si,ii,it);});
         h+='</div>';
