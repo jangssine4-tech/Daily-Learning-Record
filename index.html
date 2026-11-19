@@ -1906,7 +1906,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ah';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ai';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4059,7 +4059,20 @@ function _ccEffPlan(key){
     if(pl.blocks&&pl.blocks.length===2)pl=_ccMergeGp(pl);
     pl=_ccMergePrev(pl);
   }
-  return _ccRowTypeMig(_ccScoreMig(pl));
+  return _ccRvMig(_ccRowTypeMig(_ccScoreMig(pl)));
+}
+// Basic 계획표의 'Review 1' 열 → 'Review' 로 이름 변경 (저장된 계획표도 불러올 때 자동 변환, 이미 Review 열이 있으면 건드리지 않음)
+function _ccRvMig(p){
+  if(!p||p.key!=='Basic'||!p.blocks)return p;
+  var has=p.blocks.some(function(b){return b.lessons.indexOf('Review')>=0;});
+  if(has)return p;
+  p.blocks.forEach(function(b){
+    var i=b.lessons.indexOf('Review 1');if(i<0)return;
+    b.lessons[i]='Review';
+    if(p.ov&&p.ov['Review 1']){p.ov['Review']=p.ov['Review 1'];delete p.ov['Review 1'];}
+    if(p.lord&&p.lord['Review 1']){p.lord['Review']=p.lord['Review 1'];delete p.lord['Review 1'];}
+  });
+  return p;
 }
 function _ccEffPlan0(key){
   if(!key)return null;var ov=window._ccPlanOv||{};
@@ -4116,6 +4129,7 @@ var _CCP_INFO={'Phonics 1A':'Phonics 1A','Phonics 1B':'Phonics 1B','Phonics 2A~3
 var _ccEd=null;
 function _ccShort(n){
   var m;
+  if(n==='Review')return 'R';
   if(n==='Preview 1·2')return 'P 1.2';
   if(n==='Preview 3·Pre Wrap-Up')return 'P3.PW';
   if((m=n.match(/^Unit (\d+) Lesson (\d+)$/)))return 'U'+m[1]+'·L'+m[2];
