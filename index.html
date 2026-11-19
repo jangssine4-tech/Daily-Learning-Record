@@ -1291,6 +1291,12 @@ var _levelOrder = null;
 var _GP_A='Preview 1·2',_GP_B='Preview 3·Pre Wrap-Up';
 function _gpAlias(p){p=String(p||'');return (p==='Preview 1'||p==='Preview 2')?_GP_A:((p==='Preview 3'||p==='Pre Wrap-Up')?_GP_B:p);}
 function _gpNormCurr(C){
+  // Basic(Joy·Wise·Pride) 단계: Level Test 와 Review 순서를 Review → Level Test 로 (저장돼 있던 옛 목록도 읽을 때 바꿈)
+  try{Object.keys(C||{}).forEach(function(k){
+    if(!/^(Joy|Wise|Pride) \d[ABC]$/.test(k)||!Array.isArray(C[k]))return;
+    var a=C[k],i=a.indexOf('Level Test'),j=a.indexOf('Review');
+    if(i>=0&&j>i){a.splice(j,1);a.splice(i,0,'Review');}
+  });}catch(e){}
   try{Object.keys(C||{}).forEach(function(k){
     if(!/^Grammar Plus/.test(k)||!Array.isArray(C[k]))return;
     var out=[];C[k].forEach(function(x){var y=_gpAlias(x);if(out.indexOf(y)<0)out.push(y);});C[k]=out;
@@ -1360,7 +1366,7 @@ function _buildCurriculum() {
   ['Hello Phonics 1','Hello Phonics 2','Phonics1A','Phonics1B','Phonics 2A','Phonics 2B','Phonics 3A','Phonics 3B'].forEach(function(n) { c[n] = ul(4, 4, ['Level Test','Review']); });
   ['Master Phoics 1','Master Phoics 2'].forEach(function(n) { c[n] = lessons(16).concat(['Level Test','전체 Review']); });
   // Basic (Joy, Wise, Pride: 4 units x 4 lessons + Level Test)
-  ['Joy 1A','Joy 1B','Joy 1C','Joy 2A','Joy 2B','Joy 2C','Wise 1A','Wise 1B','Wise 1C','Wise 2A','Wise 2B','Wise 2C','Pride 1A','Pride 1B','Pride 1C','Pride 2A','Pride 2B','Pride 2C'].forEach(function(n) { c[n] = ul(4, 4, ['Level Test','Review']); });
+  ['Joy 1A','Joy 1B','Joy 1C','Joy 2A','Joy 2B','Joy 2C','Wise 1A','Wise 1B','Wise 1C','Wise 2A','Wise 2B','Wise 2C','Pride 1A','Pride 1B','Pride 1C','Pride 2A','Pride 2B','Pride 2C'].forEach(function(n) { c[n] = ul(4, 4, ['Review','Level Test']); });
   // Grammar Plus 1-6
   for (var g = 1; g <= 6; g++) c['Grammar Plus ' + g] = gp();
   // Prime 1A-4B, Advanced 1A-4B
@@ -1906,7 +1912,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-aj';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ak';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
