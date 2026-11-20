@@ -1925,7 +1925,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-at';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-av';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -5297,7 +5297,45 @@ function _ccLessonRenameAt(i,v){
   if(b.lessons.indexOf(nm)>=0){toast('이미 있는 레슨 이름이에요');_ccPlanDraw();return;}
   if(pp.ov&&pp.ov[old]){pp.ov[nm]=pp.ov[old];delete pp.ov[old];}
   if(pp.lord&&pp.lord[old]){pp.lord[nm]=pp.lord[old];delete pp.lord[old];}
-  b.lessons[i]=nm;_ccMark();_ccPlanDraw();
+  b.lessons[i]=nm;_ccMark();
+  var fh=_hcFollowRename(_ccEd.key,old,nm);
+  _ccPlanDraw();
+  if(fh)toast('홈체크 플랜의 같은 열 이름도 함께 바꿨어요 — 홈체크 플랜 설정에서도 저장해 주세요');
+}
+// 홈체크 플랜의 같은 이름 열을 따라서 바꿔요 (체크콜 ↔ 홈체크 열 이름 연동)
+function _hcFollowRename(key,old,nm){
+  try{
+    if(typeof _hcEd==='undefined'||!_hcEd||!HC_DEF[key])return false;
+    var prev=_hcEd.key;_hcEd.key=key;
+    try{
+      var p=_hcWork();
+      if(!p||!p.order||p.order.indexOf(old)<0||p.order.indexOf(nm)>=0)return false;
+      p.order[p.order.indexOf(old)]=nm;
+      if(p.lessons&&p.lessons[old]){p.lessons[nm]=p.lessons[old];delete p.lessons[old];}
+      if(_hcEd.les===old)_hcEd.les=nm;
+      _hcEd.dirty[key]=_hcEd.dirty[key]==='reset'?'reset':1;
+      return true;
+    }finally{_hcEd.key=prev;}
+  }catch(e){console.warn(e);return false;}
+}
+// 체크콜 스터디 플랜의 같은 이름 열을 따라서 바꿔요
+function _ccFollowRename(key,old,nm){
+  try{
+    if(!CC_PLANS[key])return false;
+    if(!_ccEd)_ccEd={key:key,bi:0,sel:0,work:{},dirty:{}};
+    var prev=_ccEd.key;_ccEd.key=key;
+    try{
+      var pp=_ccWork(),hit=false;
+      (pp.blocks||[]).forEach(function(b){
+        var i=b.lessons.indexOf(old);if(i<0||b.lessons.indexOf(nm)>=0)return;
+        b.lessons[i]=nm;hit=true;
+        if(pp.ov&&pp.ov[old]){pp.ov[nm]=pp.ov[old];delete pp.ov[old];}
+        if(pp.lord&&pp.lord[old]){pp.lord[nm]=pp.lord[old];delete pp.lord[old];}
+      });
+      if(hit)_ccEd.dirty[key]=1;
+      return hit;
+    }finally{_ccEd.key=prev;}
+  }catch(e){console.warn(e);return false;}
 }
 // 열 이름 말풍선 (마우스를 올리면 전체 이름이 보여요)
 var _ccBubbleEl=null;
@@ -5307,7 +5345,7 @@ document.addEventListener('mouseover',function(e){
   if(!th){_ccBubbleHide();return;}
   if(th.querySelector('input'))return;
   if(!_ccBubbleEl){_ccBubbleEl=document.createElement('div');_ccBubbleEl.style.cssText='position:fixed;z-index:99999;pointer-events:none;background:#1e293b;color:#fff;font-size:12px;line-height:1.4;padding:6px 10px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:260px;text-align:center';document.body.appendChild(_ccBubbleEl);}
-  _ccBubbleEl.innerHTML='<b>'+_bcEsc(th.getAttribute('data-tip')||'')+'</b><div style="font-size:10.5px;opacity:.75;margin-top:2px">더블클릭: 이름 수정 · 끌어서 순서 변경</div><span style="position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:#1e293b"></span>';
+  _ccBubbleEl.innerHTML='<b>'+_bcEsc(th.getAttribute('data-tip')||'')+'</b><div style="font-size:10.5px;opacity:.75;margin-top:2px">더블클릭: 이름 수정(체크콜↔홈체크 연동) · 끌어서 순서 변경</div><span style="position:absolute;left:50%;bottom:-5px;margin-left:-5px;border:5px solid transparent;border-bottom:0;border-top-color:#1e293b"></span>';
   _ccBubbleEl.style.display='block';
   var r=th.getBoundingClientRect(),w=_ccBubbleEl.offsetWidth,h=_ccBubbleEl.offsetHeight;
   var x=Math.max(6,Math.min(window.innerWidth-w-6,r.left+r.width/2-w/2)),y=r.top-h-8;
@@ -5938,6 +5976,18 @@ async function _whPay(){
   try{await db.collection('homeRace').doc(_wh.sid).update(o);r.prz=r.prz||{};r.prz[r.round||1]={n:pz,at:Date.now()};toast('🎁 지급 처리했어요');_whPaint();}
   catch(e){console.warn(e);toast('저장하지 못했어요. 다시 눌러 주세요');}
 }
+// 이 학생의 이 레슨 홈체크 기록(체크·시간·유의사항 읽음)을 지워서 처음부터 다시 하게 해요
+async function _whReset(){
+  var s=students.find(function(x){return x.id===_wh.sid;});if(!s||!db)return;
+  var c=_whCtx(s);if(!c)return;
+  if(!confirm(s.name+' 학생의 "'+c.les+'" 홈체크 기록(체크·시간 재기·유의사항 읽음)을 모두 지우고 처음부터 다시 하게 할까요?\n\n※ 이미 올린 사진·영상과 레이싱 칸 수는 그대로예요.\n※ 되돌릴 수 없어요.'))return;
+  var sid0=s.id;
+  try{
+    await db.collection('homeLogs').doc(_hcLogId(sid0,c.key,c.les)).delete();
+    if(_wh.sid===sid0)_wh.data=null;
+    _whPaint();toast('🗑 홈체크 기록을 초기화했어요');
+  }catch(e){console.warn(e);toast('⚠️ 초기화하지 못했어요: '+((e&&e.message)||e));}
+}
 function _whMin(ms){return Math.max(1,Math.round(ms/60000));}
 function _whShow(sid){
   var p=$('write-home-panel');if(!p)return;
@@ -5960,7 +6010,7 @@ function _whPaint(){
   if(_wh.open&&c){
     var secs=_hcClean(c.plan.lessons[c.les],c.plan.tmSecs),e=(x&&x.e)||{},tm=(x&&x.tm)||{},now=Date.now(),tot=0,totN=0;
     body+='<div class="wl-meta" style="margin:8px 0">'+_bcEsc(c.les)+' 숙제'+(x&&x.upd?' · 마지막 체크 '+_wlHM(x.upd):'')+(c.plan.notice?(x&&x.nr?' · 유의사항 읽음 '+_wlHM(x.nr):' · <span style="color:#b45309">유의사항 안 읽음</span>'):'')
-      +' <button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px;margin-left:6px" onclick="_whLoad(true)">'+(_wh.busy?'…':'↻ 새로고침')+'</button></div>';
+      +' <button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px;margin-left:6px" onclick="_whLoad(true)">'+(_wh.busy?'…':'↻ 새로고침')+'</button>'+(x?' <button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px;margin-left:4px;color:#b91c1c;border-color:#fca5a5" onclick="_whReset()">🗑 초기화</button>':'')+'</div>';
     secs.forEach(function(sec){
       var d=sec.items.filter(function(it){return e[it.id];}).length,n=sec.items.length,t=tm[_hcSafe(sec.title)],ts='';
       if(sec.tm||(t&&t.s)){
@@ -30035,7 +30085,7 @@ function _hcGridHtml(p){
   var rows=_hcRows(p),ls=p.order,cs=['border:0;background:rgba(255,255,255,.75);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:inherit'];
   var sh=(typeof _ccShort==='function')?_ccShort:function(x){return x;};
   var h='<div style="overflow:auto;max-height:70vh;border:1px solid var(--border);border-radius:8px"><table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="position:sticky;left:0;top:0;z-index:3;background:var(--surface2);padding:4px 6px;text-align:left;min-width:300px;border-bottom:1px solid var(--border)">항목 (구역)</th>';
-  ls.forEach(function(nm,i){h+='<th draggable="true" ondragstart="_hcDrag(event,'+i+')" ondragover="_hcDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_hcDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="_hcPickLes(\''+_bcEsc(nm).replace(/'/g,'&#39;')+'\')" title="'+_bcEsc(nm)+' (끌어서 순서 변경)" class="pl-th" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(nm===_hcEd.les?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(sh(nm))+'</th>';});
+  ls.forEach(function(nm,i){h+='<th draggable="true" ondragstart="_hcDrag(event,'+i+')" ondragover="_hcDragOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_hcDrop(event,'+i+')" ondragend="this.style.boxShadow=\'\'" onclick="if(event.detail<2)_hcPickLes(\''+_bcEsc(nm).replace(/'/g,'&#39;')+'\')" ondblclick="_hcColEdit(event,'+i+')" data-tip="'+_bcEsc(nm)+'" class="pl-th" style="user-select:none;position:sticky;top:0;z-index:2;cursor:grab;padding:4px 2px;min-width:34px;border-bottom:1px solid var(--border);background:'+(nm===_hcEd.les?'#dbeafe':'var(--surface2)')+'">'+_bcEsc(sh(nm))+'</th>';});
   h+='<th style="position:sticky;top:0;background:var(--surface2)"></th></tr></thead><tbody>';
   var ncol=ls.length+2;
   rows.forEach(function(S,si){
@@ -30193,11 +30243,33 @@ function _hcLessonAdd(where){
   p.order.splice(p.order.indexOf(_hcEd.les)+(where==='before'?0:1),0,nm);p.lessons[nm]=JSON.parse(JSON.stringify(p.lessons[_hcEd.les]||[]));
   _hcEd.les=nm;_hcMark();_hcDraw();
 }
+function _hcRenameCore(old,nm){
+  var p=_hcWork();nm=_hcNorm(nm);
+  if(!nm||nm===old)return false;
+  if(p.order.indexOf(nm)>=0){toast('이미 있는 레슨 이름이에요');return false;}
+  p.order[p.order.indexOf(old)]=nm;p.lessons[nm]=p.lessons[old];delete p.lessons[old];if(_hcEd.les===old)_hcEd.les=nm;
+  _hcMark();
+  if(_ccFollowRename(_hcEd.key,old,nm))toast('체크콜 스터디 플랜의 같은 열 이름도 함께 바꿨어요 — 체크콜 스터디 플랜 설정에서도 저장해 주세요');
+  return true;
+}
 function _hcLessonRename(){
-  var p=_hcWork(),nm=prompt('레슨 이름 변경 (학습 일지 진도와 똑같이)',_hcEd.les);
-  if(nm===null)return;nm=_hcNorm(nm);if(!nm||nm===_hcEd.les)return;
-  if(p.order.indexOf(nm)>=0){toast('이미 있는 레슨 이름이에요');return;}
-  p.order[p.order.indexOf(_hcEd.les)]=nm;p.lessons[nm]=p.lessons[_hcEd.les];delete p.lessons[_hcEd.les];_hcEd.les=nm;_hcMark();_hcDraw();
+  var nm=prompt('레슨 이름 변경 (학습 일지 진도와 똑같이)\n체크콜 스터디 플랜의 같은 열 이름도 함께 바뀝니다.',_hcEd.les);
+  if(nm===null)return;
+  _hcRenameCore(_hcEd.les,nm);_hcDraw();
+}
+// 열 이름(머리글)을 더블클릭하면 그 자리에서 바로 고쳐요
+function _hcColEdit(ev,i){
+  try{ev.preventDefault();ev.stopPropagation();}catch(e){}
+  var th=ev.currentTarget,old=_hcWork().order[i];if(old===undefined)return;
+  _ccBubbleHide();
+  th.draggable=false;th.onclick=null;th.ondblclick=null;
+  th.innerHTML='<input type="text" value="'+_bcEsc(old)+'" style="width:86px;font-size:11px;padding:2px 4px;border:1.5px solid var(--navy);border-radius:4px" aria-label="레슨 이름">';
+  var inp=th.firstChild,done=false;
+  function fin(ok){if(done)return;done=true;if(ok)_hcRenameCore(old,inp.value);_hcDraw();}
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();fin(true);}else if(e.key==='Escape'){e.preventDefault();fin(false);}e.stopPropagation();});
+  inp.addEventListener('blur',function(){fin(true);});
+  inp.addEventListener('click',function(e){e.stopPropagation();});
+  inp.focus();inp.select();
 }
 function _hcLessonDel(){
   var p=_hcWork();if(p.order.length<=1){toast('레슨이 하나뿐이라 지울 수 없어요');return;}
