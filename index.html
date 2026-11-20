@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bj';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bk';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3401,6 +3401,8 @@ function ccResolve0(plan,level,progress){
       var _nlk=r.lk!==undefined?r.lk:'quiz';if(_nlk)_nit.link=_nlk;sec.items.push(_nit);
     }else if(ty==='dict'){
       var _dit={id:id,t:'dict',l:lab+note};var _dlk=r.lk!==undefined?r.lk:'dict';if(_dlk)_dit.link=_dlk;sec.items.push(_dit);
+    }else if(ty==='test'){
+      sec.items.push({id:id,t:'test',l:lab+note});
     }else if(ty==='call'){
       sec.items.push({id:id,t:'call',l:lab+note,to:r.to==='book'?'book':'tablet',hint:r.h||''});
     }else{
@@ -3886,7 +3888,7 @@ function _bcRemove(id){
 
 // ── 점검 항목 편집 모달 (단계별) ──
 var _bcEd=null;
-var _BCED_TYPES=[['check','체크칸'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['call','검사 받기(호출)'],['ox','O/X 선택']];
+var _BCED_TYPES=[['check','체크칸'],['number','숫자 입력'],['dict','받아쓰기(맞은/전체)'],['test','Test(맞은/전체)'],['call','검사 받기(호출)'],['ox','O/X 선택']];
 // 체크콜 편집 권한: 관리자는 항상 가능, 교사는 관리자가 메뉴 권한에서 허용한 경우만 가능
 function _ccCan(k){return !!currentUser&&(currentUser.role==='admin'||!!(currentUser.menuPerms&&currentUser.menuPerms[k]===true));}
 // ── 운영 매뉴얼 > 체크콜 Study Plan 설정 탭 ──
@@ -4033,7 +4035,7 @@ function _bcEdRe(){_bcEdSync();_bcEdTouch();
   _bcEd.view.sections.forEach(function(sec){sec.items.forEach(function(it){   // 종류가 바뀌면 맞지 않는 옵션 정리
     if(it.t!=='call')delete it.to;else if(!it.to)it.to='tablet';
     if(it.t!=='number')delete it.u;
-    var ok={check:['','hwPrep','hwBook','hwVideo'],ox:['','hwPrep','hwBook','hwVideo'],number:['','quiz'],dict:['','dict'],call:['']}[it.t]||[''];
+    var ok={check:['','hwPrep','hwBook','hwVideo'],ox:['','hwPrep','hwBook','hwVideo'],number:['','quiz'],dict:['','dict'],test:[''],call:['']}[it.t]||[''];
     if(ok.indexOf(it.link||'')<0)it.link=(it.t==='dict'?'dict':(it.t==='number'?'quiz':''));   // 종류를 바꾸면 그 종류의 기본 일지 연동으로
   });});
   _bcEdDraw();}
@@ -4527,7 +4529,7 @@ function _ccHelp(){
    +'<li>학생의 <b>단계·진도</b>(일지에서 입력)에 맞는 항목만 체크콜에 나타납니다. 레슨을 고르면 그 레슨의 점검 항목이 아래에 나옵니다.</li>'
    +'<li><b>표시 체크</b>(맨 앞 파란 칸): 체크를 풀면 글씨가 흐려지고 그 레슨의 체크콜 화면에서 빠집니다. 다시 체크하면 되살아납니다.</li>'
    +'<li><b>순서 변경</b>: 구역 제목 앞 ⠿ 을 끌면 구역 순서, 항목 앞 ⠿ 을 끌면 항목 순서가 바뀝니다.</li>'
-   +'<li><b>종류</b>: 체크칸(학생이 체크) / 숫자 입력 / 받아쓰기(맞은 개수/전체) / 검사 받기(선생님 호출 — 태블릿 교사 또는 교재 교사) / O/X 선택(학생이 O 또는 X를 고름)</li>'
+   +'<li><b>종류</b>: 체크칸(학생이 체크) / 숫자 입력 / 받아쓰기(맞은 개수/전체) / Test(맞은 개수/전체 — 받아쓰기와 같은 입력 칸, 일지 연동 없음) / 검사 받기(선생님 호출 — 태블릿 교사 또는 교재 교사) / O/X 선택(학생이 O 또는 X를 고름)</li>'
    +'<li><b>일지 연동</b>: 학생이 체크콜에 입력하면 학습 일지의 해당 칸에 자동으로 들어갑니다. 예) "→ 교재 숙제"는 일지의 교재 숙제 칸, "→ Daily Quiz"는 Daily Quiz 칸, "→ 받아쓰기"는 받아쓰기 칸입니다. (일지에서 옅은 회색으로 표시되는 칸)</li>'
    +'<li><b>항목 이름</b>은 칸에서 바로 고칩니다. 이름·종류·순서를 고치면 그 레슨 전용 내용(✎)으로 저장됩니다. 맨 위 "전체 계획표 내용으로 되돌리기"로 되돌립니다.</li>'
    +'<li><b>항목 삭제</b>: 항목 오른쪽 "삭제" 버튼을 누르면 그 항목이 흐리게 바뀌어 이 레슨의 체크콜에서 빠집니다. 같은 자리의 "복원" 버튼을 누르면 바로 되돌아옵니다.</li>'
@@ -4546,6 +4548,7 @@ function _ccChip(it){
   var t=it.t||'check';
   if(t==='number')return '<span class="ccx-chip n">숫자'+(it.u?' · '+_bcEsc(it.u):'')+'</span>';
   if(t==='dict')return '<span class="ccx-chip d">받아쓰기</span>';
+  if(t==='test')return '<span class="ccx-chip d">Test</span>';
   if(t==='ox')return '<span class="ccx-chip n">O/X</span>';
   if(t==='call')return '<span class="ccx-chip c">검사 받기 · '+(it.to==='book'?'교재':'태블릿')+' 교사</span>';
   return '<span class="ccx-chip">체크</span>';
@@ -5177,10 +5180,10 @@ function _ccLessonView(b,sel){
     });
     if(e.real){/* 구역 끝 */}
     (offBy[sec.k]||[]).forEach(function(ri){
-      var r=b.rows[ri],lab=r.l||'',ty=/받아쓰기/.test(lab)?'dict':(/선생님/.test(lab)?'call':'check');
+      var r=b.rows[ri],lab=r.l||'',ty=r.ty||(/받아쓰기/.test(lab)?'dict':(/선생님/.test(lab)?'call':'check'));
       h+='<div class="ccx-row offrow"><div class="ccx-line"><span class="ccx-grip" style="visibility:hidden">⠿</span>'
         +'<button class="ccx-cb" title="눌러서 체크콜에 다시 표시" onclick="_ccPlanTog('+ri+','+sel+')"></button>'
-        +'<select disabled style="width:96px"><option>'+(ty==='dict'?'받아쓰기':(ty==='call'?'검사 받기':'체크칸'))+'</option></select><input class="ccx-nm" value="'+_bcEsc(lab)+'" readonly></div></div>';
+        +'<select disabled style="width:96px"><option>'+(ty==='dict'?'받아쓰기':(ty==='test'?'Test':(ty==='call'?'검사 받기':(ty==='number'?'숫자 입력':(ty==='ox'?'O/X 선택':'체크칸')))))+'</option></select><input class="ccx-nm" value="'+_bcEsc(lab)+'" readonly></div></div>';
     });
     h+='</div>';
   });
@@ -6211,10 +6214,10 @@ function _wlPaint(){
       }else if(it.t==='ox'){
         var ov2=v[it.id];var hasO=ov2==='O'||ov2==='X';total++;if(hasO){done++;oxS.push(it.l.replace(/\s+/g,'').replace(/^교재/,'')+' '+ov2);}
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(hasO?' on':'')+'" style="'+(ov2==='X'?'color:#c0392b':'')+'">'+(hasO?ov2:'')+'</span></div>';
-      }else if(it.t==='dict'){
+      }else if(it.t==='dict'||it.t==='test'){
         if(v[it.id]==='skip'){total++;done++;rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val on">시험이 없어요</span></div>';}
         else{
-        var d=v[it.id]||{};var has2=d.c!==undefined&&d.c!==null&&d.c!=='';total++;if(has2&&d.t!==undefined&&d.t!==''){done++;}if(has2)dictS.push(d.c+'/'+(d.t===undefined?'?':d.t));
+        var d=v[it.id]||{};var has2=d.c!==undefined&&d.c!==null&&d.c!=='';total++;if(has2&&d.t!==undefined&&d.t!==''){done++;}if(has2&&it.t==='dict')dictS.push(d.c+'/'+(d.t===undefined?'?':d.t));
         rows+='<div class="wl-row"><span class="wl-lb">'+_bcEsc(it.l)+'</span><span class="wl-val'+(has2?' on':'')+'">'+(has2?_bcEsc(d.c)+' / '+_bcEsc(d.t===undefined?'?':d.t)+'개':'')+'</span></div>';
         }
       }else{
@@ -6230,7 +6233,7 @@ function _wlPaint(){
       if(it.t==='check')return !!e[it.id];
       if(it.t==='number'){var nv0=v[it.id];return nv0!==undefined&&nv0!==null&&nv0!=='';}
       if(it.t==='ox'){var o0=v[it.id];return o0==='O'||o0==='X';}
-      if(it.t==='dict'){if(v[it.id]==='skip')return true;var d0=v[it.id]||{};return d0.c!==undefined&&d0.c!==''&&d0.t!==undefined&&d0.t!=='';}
+      if(it.t==='dict'||it.t==='test'){if(v[it.id]==='skip')return true;var d0=v[it.id]||{};return d0.c!==undefined&&d0.c!==''&&d0.t!==undefined&&d0.t!=='';}
       var c0=_wl.checks[it.l];return !!(c0&&c0.status&&c0.status!=='none');   // 검사 받기: 눌렀으면 학생 몫은 끝
     });
     var _sk=!!(L.sk&&L.sk[String(sec.title||'').trim()]),_tk=encodeURIComponent(String(sec.title||'').trim());
