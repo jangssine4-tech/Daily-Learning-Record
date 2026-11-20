@@ -321,7 +321,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-p</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-q</div>
   </div>
 </div>
 
@@ -857,7 +857,18 @@ async function carryOver(){
 }
 function logout(){
   try{rwClose();RW.prev=null;}catch(e){}
-  if(S){try{var lu={fl:flagsDoc(true)};if(!LOG.endAt)lu.endAt=Date.now();if(_psOpen())lu.ps=_psClosed();logRef().set(lu,{merge:true});}catch(e){}}
+  if(S){try{
+    var lu={fl:flagsDoc(true)};if(!LOG.endAt)lu.endAt=Date.now();
+    if(!LOG.fin){
+      // 다 마치지 못하고 나갔어요: ① 공부 시간을 멈춤 상태로 두고(선생님 일지에도 '멈춤 중'으로 보여요) ② 다음 수업 진도를 넘기지 않게 표시해요
+      // (체크한 내용은 누를 때마다 이미 저장돼 있고, 다음 수업에 '이어받기'로 다시 채워져요)
+      var _now=Date.now(),_inProg=false;
+      (S.secs||[]).forEach(function(sec){if(!sec.tm)return;var a=sec.items.filter(function(i){return i.role==='ts';})[0],b=sec.items.filter(function(i){return i.role==='te';})[0];if(a&&LOG.e[a.id]&&!(b&&LOG.e[b.id]))_inProg=true;});
+      if(_inProg&&!_psOpen()){lu.ps=_psList().map(function(p){return p.b?{a:p.a,b:p.b}:{a:p.a};}).concat([{a:_now}]);}
+      lu.ho=true;lu.hold={lv:String(LOG.lv||S.lvl||''),pg:String(LOG.pg||S.pg0||''),at:_now};
+    }else if(_psOpen())lu.ps=_psClosed();
+    logRef().set(lu,{merge:true});
+  }catch(e){}}
   setPresence('out');
   if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}if(unsubRoster){unsubRoster();unsubRoster=null;}
   clearInterval(tickT);
@@ -1493,7 +1504,7 @@ function rwClose(){RW.open=false;RW.busy=false;rwClearTm();var o=$('rw');if(o)o.
 function finishAll(){
   $('dName').textContent=S.name+', 수고했어요';
   if(!LOG.endAt){LOG.endAt=Date.now();}
-  try{var _fu={endAt:LOG.endAt,fin:true};if(_psOpen()){_fu.ps=_psClosed();LOG.ps=_fu.ps;}logRef().set(_fu,{merge:true});}catch(e){}   // fin: 이 회차 점검을 모두 마침
+  try{var _fu={endAt:LOG.endAt,fin:true,ho:firebase.firestore.FieldValue.delete(),hold:firebase.firestore.FieldValue.delete()};if(_psOpen()){_fu.ps=_psClosed();LOG.ps=_fu.ps;}logRef().set(_fu,{merge:true});}catch(e){}   // fin: 이 회차 점검을 모두 마침
   show('sDone');
   try{var _rb=$('rwBtn');if(_rb)_rb.style.display=rwOn()?'':'none';if(rwOn())setTimeout(rwOpen,500);}catch(e){console.warn(e);}
 }

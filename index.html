@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bf';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bg';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3599,6 +3599,12 @@ function _bcSubscribeToday(){
   // 체크콜 진행 기록 (학습 일지 자동 연동용)
   if(window._ccLUnsub){try{window._ccLUnsub();}catch(e){}}
   try{
+    // 다 마치지 못하고 나간 체크콜 (다음 수업 진도를 넘기지 않고 이어서 하게 해요)
+    if(window._ccHoldU){try{window._ccHoldU();}catch(e){}}
+    window._ccHoldU=db.collection('checkLogs').where('ho','==',true).onSnapshot(function(snap){
+      var m={};snap.forEach(function(d){var x=d.data(),h=x.hold||{};if(x.studentId)m[x.studentId]={date:x.date,lv:h.lv,pg:h.pg,sess:x.sess===2?2:1};});
+      window._ccHold=m;
+    },function(e){console.warn('hold',e);});
     window._ccLUnsub=db.collection('checkLogs').where('date','==',_bcDate).onSnapshot(function(snap){
       var m={};snap.forEach(function(d){var x=d.data();m[_ccKey(x.studentId,x.sess===2?2:1)]=x;});
       window._ccLogs=m;
@@ -10904,7 +10910,7 @@ function _autoNextProgress0(sId,level,dt,sessTime,depth){
   var cand=reports.filter(function(r){return r.studentId===sId&&!r.absent&&r.progress&&before(r);});
   function key(r){return r.date+' '+(r.sessionTime||'');}
   cand.sort(function(a,b){return key(b).localeCompare(key(a));});
-  var last=cand.filter(function(r){return r.level===level;})[0],prevLv='',planNotDone=false;
+  var last=cand.filter(function(r){return r.level===level;})[0],prevLv='',planNotDone=false,heldCc=false;
   try{   // 일지 없이 고른 단계·진도(출발점)가 마지막 일지보다 최근이면 그것을 기준으로 삼음
     var stP=students.find(function(x){return x.id===sId;}),pl=stP&&stP.pgPlan;
     if(pl&&pl.level===level&&pl.date<dt&&lessons.indexOf(pl.progress)>=0&&(!last||pl.date>last.date)){
@@ -10912,6 +10918,10 @@ function _autoNextProgress0(sId,level,dt,sessTime,depth){
       var heldP=!(rsP.some(function(r){return r.absent||r.earlyLeave;})||(window._closed||{})[pl.date]!==undefined);
       last={date:pl.date,progress:pl.progress,level:level};planNotDone=!heldP;
     }
+  }catch(e){}
+  try{   // 체크콜을 다 마치지 못하고 나간 날의 진도라면, 다음 시간에도 같은 진도를 이어서 해요
+    var _H=(window._ccHold||{})[sId];
+    if(_H&&last&&!prevLv&&_H.date===last.date&&_H.lv===last.level&&_H.pg===last.progress&&lessons.indexOf(last.progress)>=0)planNotDone=true,heldCc=true;
   }catch(e){}
   if(!last){   // 이 단계 기록이 없으면: 바로 앞 단계를 마친(마지막 레슨·Level Test·Review) 기록이 있을 때 이 단계 첫 레슨부터 시작
     var any=cand.filter(function(r){return r.level!==level&&CURRICULUM[r.level];})[0];
@@ -10966,6 +10976,7 @@ function _autoNextProgress0(sId,level,dt,sessTime,depth){
     res.missed=miss;res.lastDate=last.date;res.lastProgress=last.progress;
   }
   if(prevLv){res.lastDate=last.date;res.lastProgress=last.progress;}
+  if(heldCc){res.cc=1;res.lastDate=last.date;res.lastProgress=last.progress;}
   return res;
 }
 // from(마지막 진도 기록일) 다음 날부터 to(오늘) 전날까지, 학생의 수업 요일 중 결석·조퇴·공휴일이 아닌 날 수
@@ -11035,6 +11046,7 @@ function populateProgressDropdown(level,current,refDate,allowJump){
     if(res&&res.prevLevel&&!res.missed)_pgHint('이전 단계 "'+res.prevLevel+'"를 마친 기록('+res.lastDate+' '+res.lastProgress+')이 있어 이 단계의 첫 레슨으로 채웠어요. 다르면 직접 골라 주세요.');
     if(res&&res.pace)_pgHint('진도 속도 "수업 '+res.pace+'회에 1레슨" 설정으로 계산했어요 (마지막 기록 '+res.lastDate+' '+res.lastProgress+(res.missed?', 일지 없는 수업일 '+res.missed+'회 포함':'')+')'+(res.hold?' · 같은 레슨을 이어서 하는 날이에요.':'.')+' 다르면 직접 골라 주세요.');
     else if(res&&res.missed)_pgHint('마지막 진도 기록('+res.lastDate+' '+res.lastProgress+') 이후 일지가 없는 수업일 '+res.missed+'회를 수업한 것으로 보고 넘겼어요. 다르면 직접 골라 주세요.');
+    if(res&&res.cc)_pgHint('지난 수업('+res.lastDate+' '+res.lastProgress+')에 체크콜을 다 마치지 못하고 나가서, 같은 진도를 이어서 하도록 채웠어요. 다르면 직접 골라 주세요.');
     if(res&&res.extraSess)_pgHint('같은 날 앞 수업의 일지가 아직 저장되지 않아, 그 수업을 마친 것으로 보고 '+res.extraSess+'레슨 더 넘겼어요. 다르면 직접 골라 주세요.');
     if(res){
       if(res.level===level){sel.value=res.progress;}
