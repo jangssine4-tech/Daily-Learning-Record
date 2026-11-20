@@ -106,7 +106,16 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .lg{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;background:#fff;border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--ink2);box-shadow:0 0 0 1px var(--line)}
 .lg b{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:8px;background:var(--g2);color:#fff;font-size:12px;margin-right:5px;padding:0 4px}
 .tmb button.ic{width:46px;height:46px;padding:0;font-size:20px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center}
-.tmb.wait{background:#FFF6CC}
+.sh .tmh{display:flex;align-items:center;gap:8px;flex:none}
+.sh .tmh .tv{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#fff;margin:0}
+.sh .tmh .tv.ps{color:#FFE066}
+.sh .tmh button{padding:6px 14px;border-radius:12px;font-weight:800;font-size:14px;background:#fff;color:var(--g2);box-shadow:none}
+.sh .tmh button.pz{background:#FFF1D6;color:#7A4B00}
+.sh .tmh button.go{background:#fff;color:var(--g2)}
+.sh .tmh button.ic{width:40px;height:40px;padding:0;font-size:18px;display:inline-flex;align-items:center;justify-content:center}
+.sh .tmh button.stb{background:#FFE066;color:#5A4300;box-shadow:0 0 0 2px #F5B800;padding:8px 18px;font-size:17px;border-radius:14px;animation:hcb 1.1s ease-in-out infinite}
+.pbtn.ic{width:44px;height:44px;padding:0;font-size:22px;border-radius:14px}
+.pbtn.ic small{font-size:11px;font-weight:800;margin-left:2px}
 .tmb button.st{background:#FFE066;color:#5A4300;box-shadow:0 0 0 2px #F5B800;padding:12px 30px;font-size:20px;border-radius:16px;animation:hcb 1.1s ease-in-out infinite}
 @keyframes hcb{0%,100%{box-shadow:0 0 0 2px #F5B800}50%{box-shadow:0 0 0 7px rgba(245,184,0,.35)}}
 @keyframes hcp{0%,100%{box-shadow:inset 0 0 0 3px #F5B800}50%{box-shadow:inset 0 0 0 3px #FFF1B8}}
@@ -238,7 +247,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-n</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-o</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -566,11 +575,12 @@ function render(){
   h+='<div class="prog"><div class="t"><span>오늘의 숙제</span><span>'+c.d+' / '+c.n+'</span></div><div class="bar"><i style="width:'+pc+'%"></i></div></div>';
   if(R.notice)h+='<details class="notice"'+(noticeOpen?' open':'')+' ontoggle="noticeTog(this)"><summary>📌 학습 유의사항 보기</summary><div>'+esc(R.notice)+'</div></details>';
   var G=gate();
-  if(R.secs.some(function(s){return s.tm;}))h+='<div class="lg"><span><b>▶</b>시작</span><span><b>⏸</b>잠깐 멈춤</span><span><b>■</b>끝내기</span></div>';
+  var hasV=false,hasP=false;R.secs.forEach(function(s){s.items.forEach(function(it){if(it.link==='hwVideo')hasV=true;else if(it.link==='hwPhoto')hasP=true;});});
+  if(hasV||hasP)h+='<div class="lg">'+(hasV?'<span>🎥 영상 녹화</span>':'')+(hasP?'<span>📷 사진 올리기</span>':'')+'</div>';
   R.secs.forEach(function(s,si){
     var d=0;s.items.forEach(function(it){if(LOG.e[it.id])d++;});
     var sl=secLock(s);
-    h+='<div class="sec"><div class="sh"><span class="st">'+esc(s.title)+(s.sub?'<small>'+esc(s.sub)+'</small>':'')+'</span><span class="cn">'+d+'/'+s.items.length+'</span></div>'+(s.tm?tmBar(s,si,G):'');
+    h+='<div class="sec"><div class="sh"><span class="st">'+esc(s.title)+(s.sub?'<small>'+esc(s.sub)+'</small>':'')+'</span>'+(s.tm?tmBar(s,si,G):'')+'<span class="cn">'+d+'/'+s.items.length+'</span></div>';
     s.items.forEach(function(it){
       var done=!!LOG.e[it.id],open=done||(it.id===G.cur&&!sl),cls=done?'':(open?' cur':' lk');
       if(it.link==='hwPhoto'||it.link==='hwVideo'){h+=photoHtml(it,cls,open);return;}
@@ -599,15 +609,15 @@ function itemOpen(id,G){
   return !(sec&&secLock(sec));
 }
 function tmBar(s,si,G){
-  var t=tmOf(s),now=Date.now(),b='',cls='tmb';
+  var t=tmOf(s),now=Date.now(),b='',cls='tmh';
   if(!t||!t.s){
     if(!G||si!==G.si)return '';   // 아직 차례가 아닌 구역은 시작 버튼을 숨겨요
-    cls+=' wait';b='<button class="st" aria-label="시작" onclick="tmDo('+si+',\'start\')">▶ 시작</button>';
+    b='<button class="stb" aria-label="시작" onclick="tmDo('+si+',\'start\')">▶ 시작</button>';
   }
   else if(t.e)b='<span class="tv">✅ '+Math.max(1,Math.round(tmAct(t,now)/60000))+'분 걸렸어요</span>';
   else if(t.ps)b='<span class="tv ps" data-tk="'+si+'">⏸ '+fmtT(tmAct(t,now)/1000)+'</span><button class="go ic" aria-label="계속" onclick="tmDo('+si+',\'resume\')">▶</button><button class="ic" aria-label="끝" onclick="tmDo('+si+',\'end\')">■</button>';
   else b='<span class="tv" data-tk="'+si+'">⏱ '+fmtT(tmAct(t,now)/1000)+'</span><button class="pz ic" aria-label="잠깐 멈춤" onclick="tmDo('+si+',\'pause\')">⏸</button><button class="ic" aria-label="끝" onclick="tmDo('+si+',\'end\')">■</button>';
-  return '<div class="'+cls+'">'+b+'</div>';
+  return '<span class="'+cls+'">'+b+'</span>';
 }
 function tmPut(k,t){
   var m=Object.assign({},LOG.tm||{});m[k]=t;LOG.tm=m;
@@ -683,8 +693,8 @@ function photoHtml(it,cls,open){
   var isV=it.link==='hwVideo',MX=isV?MAXV:MAXP;
   var ups=UPL[it.id]||[],on=!!LOG.e[it.id],n=ups.length,ub=!!UPB[it.id];
   var btn=ub?'<span class="pbtn off">올리는 중 '+(UPP[it.id]||0)+'%</span>'
-    :(n<MX?(isV?'<button type="button" class="pbtn" style="background:#E8EEFC;color:#3E63DD" onclick="vrecOpen(\''+esc(it.id)+'\')">🎥 영상 녹화'+(n?' '+n+'/'+MX:'')+'</button>'
-      :'<label class="pbtn">사진 올리기'+(n?' '+n+'/'+MX:'')+'<input type="file" accept="image/*" multiple onchange="pickPhotos(this,\''+esc(it.id)+'\')"></label>')
+    :(n<MX?(isV?'<button type="button" class="pbtn ic" style="background:#E8EEFC;color:#3E63DD" aria-label="영상 녹화" onclick="vrecOpen(\''+esc(it.id)+'\')">🎥'+(n?'<small>'+n+'/'+MX+'</small>':'')+'</button>'
+      :'<label class="pbtn ic" aria-label="사진 올리기">📷'+(n?'<small>'+n+'/'+MX+'</small>':'')+'<input type="file" accept="image/*" multiple onchange="pickPhotos(this,\''+esc(it.id)+'\')"></label>')
     :'<span class="pbtn off">'+(isV?'영상 ':'사진 ')+MX+'/'+MX+'</span>');
   var h='<div class="itp'+(on?' on':'')+cls+'"><div class="it0"><span class="cb"'+tg+'><svg><use href="#i-check"/></svg></span><span class="tx"'+tg+'>'+esc(it.l)+(it.hint?'<em>'+esc(it.hint)+'</em>':'')+'</span>'+btn+'</div>';
   if(isV&&!ub&&n<MX)h+='<div style="padding:0 16px 8px;text-align:right"><label style="font-size:12px;color:#51675F;font-weight:700;text-decoration:underline">녹화가 안 되면 파일 선택<input type="file" accept="video/*" style="display:none" onchange="pickVideo(this,\''+esc(it.id)+'\')"></label></div>';
