@@ -1925,7 +1925,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-av';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-aw';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -30014,8 +30014,8 @@ function _hcDraw(){
     tl.style.display='none';
     var _co=!!_hcEd.colOpen;
     document.getElementById('hc-body').innerHTML='<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--txt2)">학습 유의사항 (학생 화면 위쪽에 나옵니다)</summary><textarea class="fi" rows="5" style="width:100%;margin-top:6px;font-size:12px" oninput="_hcNotice(this.value)">'+_bcEsc(p.notice||'')+'</textarea></details>'
-      +'<div style="margin:0 0 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_hcSecAdd()">＋ 구역 추가</button><button class="btn btn-outline btn-xs" style="'+(_co?'background:#dbeafe;border-color:#93c5fd;':'')+'" onclick="_hcColToggle()" title="레슨(열) 삽입·이동·이름 변경·삭제">＋ 열 추가</button>'
-      +'<details style="display:inline-block;position:relative"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)"><button class="btn btn-outline btn-xs" onclick="_hcReset()">엑셀 원본으로 되돌리기</button></div></details>'
+      +'<div style="margin:0 0 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_hcSecAdd()">＋ 구역 추가</button><button class="btn btn-outline btn-xs" style="'+(_co?'background:#dbeafe;border-color:#93c5fd;':'')+'" onclick="_hcColToggle()" title="레슨(열) 삽입·이동·이름 변경·삭제">＋ 열 추가</button><button class="btn btn-outline btn-xs" onclick="_hcAlign(false)" title="열 제목·순서를 체크콜 스터디 플랜과 똑같이 맞춰요">🔗 체크콜 열 맞추기</button>'
+      +'<details style="display:inline-block;position:relative"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)"><button class="btn btn-outline btn-xs" onclick="_hcAlign(true)">🔗 모든 단계 체크콜 열 맞추기</button><button class="btn btn-outline btn-xs" onclick="_hcReset()">엑셀 원본으로 되돌리기</button></div></details>'
       +(_co?_hcColBar(p,i,n).replace('margin:0 0 8px;','margin:0;'):'')+'</div>'+_hcGridHtml(p);
   }
   _hcSaveBar();
@@ -30258,6 +30258,70 @@ function _hcLessonRename(){
   _hcRenameCore(_hcEd.les,nm);_hcDraw();
 }
 // 열 이름(머리글)을 더블클릭하면 그 자리에서 바로 고쳐요
+// ── 체크콜 스터디 플랜의 열(레슨) 구성에 홈체크 플랜을 맞춰요 ──
+function _hcCcNames(key){
+  var pp=(typeof _ccEd!=='undefined'&&_ccEd&&_ccEd.work&&_ccEd.work[key])||_ccEffPlan(key);
+  var a=[];((pp&&pp.blocks)||[]).forEach(function(b){(b.lessons||[]).forEach(function(n){if(a.indexOf(n)<0)a.push(n);});});
+  return a;
+}
+// 계획만 세워요 (바꾸지 않음): [{t:'keep'|'ren'|'ins'|'del', from, to}]
+function _hcAlignPlan(key){
+  if(!CC_PLANS[key]||!HC_DEF[key])return null;
+  var prev=_hcEd.key;_hcEd.key=key;var ho;
+  try{ho=_hcWork().order.slice();}finally{_hcEd.key=prev;}
+  var co=_hcCcNames(key),ops=[];
+  if(!co.length)return null;
+  var hSet={},cSet={};ho.forEach(function(n){hSet[n]=1;});co.forEach(function(n){cSet[n]=1;});
+  var hi=0;
+  // 이름이 같은 열을 기준점으로 삼고, 기준점 사이에서 남는 열끼리 순서대로 짝지어요
+  var anchors=[];co.forEach(function(n,ci){if(hSet[n])anchors.push([ci,ho.indexOf(n)]);});
+  anchors.push([co.length,ho.length]);
+  var c0=0,h0=0;
+  anchors.forEach(function(a){
+    var cs=co.slice(c0,a[0]).filter(function(n){return !hSet[n];}),hs=ho.slice(h0,a[1]).filter(function(n){return !cSet[n];});
+    var m=Math.max(cs.length,hs.length);
+    co.slice(c0,a[0]).forEach(function(n){
+      var k=cs.indexOf(n);
+      if(!hSet[n]){ops.push(k<hs.length?{t:'ren',from:hs[k],to:n}:{t:'ins',to:n});}
+    });
+    for(var k=cs.length;k<hs.length;k++)ops.push({t:'del',from:hs[k]});
+    if(a[0]<co.length)ops.push({t:'keep',to:co[a[0]]});
+    c0=a[0]+1;h0=a[1]+1;
+  });
+  var fin=co.concat(ops.filter(function(o){return o.t==='del';}).map(function(o){return o.from;}));
+  var same=ho.length===fin.length&&ho.every(function(n,i){return n===fin[i];});
+  if(same)ops=[];
+  else if(!ops.some(function(o){return o.t!=='keep';}))ops.push({t:'ord'});
+  return {ops:ops,order:co};
+}
+function _hcAlignApply(key,pl){
+  var prev=_hcEd.key;_hcEd.key=key;
+  try{
+    var p=_hcWork(),old=p.lessons,nl={};
+    pl.ops.forEach(function(o){if(o.t==='ren'){nl[o.to]=old[o.from]||[];}});
+    pl.order.forEach(function(n){if(!nl[n])nl[n]=old[n]||[];});
+    var ord=pl.order.slice();
+    pl.ops.forEach(function(o){if(o.t==='del'&&old[o.from]){ord.push(o.from);nl[o.from]=old[o.from];}});
+    p.order=ord;p.lessons=nl;
+    _hcEd.dirty[key]=_hcEd.dirty[key]==='reset'?'reset':1;
+    if(p.order.indexOf(_hcEd.les)<0)_hcEd.les=p.order[0]||'';
+  }finally{_hcEd.key=prev;}
+}
+function _hcAlignDesc(key,pl){
+  var r=pl.ops.filter(function(o){return o.t==='ren';}).map(function(o){return '  이름 변경: '+o.from+' → '+o.to;}),
+      i=pl.ops.filter(function(o){return o.t==='ins';}).map(function(o){return '  열 삽입: '+o.to+' (숙제 항목은 비어 있어요)';}),
+      d=pl.ops.filter(function(o){return o.t==='del';}).map(function(o){return '  체크콜에 없는 열: '+o.from+' (지우지 않고 맨 뒤에 그대로 둠)';}),
+      od=pl.ops.some(function(o){return o.t==='ord';})?['  열 순서를 체크콜과 같게 정리']:[];
+  var all=r.concat(i,d,od);return all.length?'['+key+']\n'+all.join('\n'):'';
+}
+function _hcAlign(all){
+  var keys=all?Object.keys(HC_DEF):[_hcEd.key],txt=[],pls={};
+  keys.forEach(function(k){var pl=_hcAlignPlan(k);if(!pl)return;var d=_hcAlignDesc(k,pl);if(d){txt.push(d);pls[k]=pl;}});
+  if(!txt.length){toast('이미 체크콜 스터디 플랜과 열이 똑같아요');return;}
+  if(!confirm('체크콜 스터디 플랜의 열 제목·순서에 맞춰 홈체크 플랜을 고칩니다.\n\n'+txt.join('\n\n')+'\n\n진행할까요? (저장 전까지는 되돌릴 수 있어요)'))return;
+  Object.keys(pls).forEach(function(k){_hcAlignApply(k,pls[k]);});
+  _hcSaveBar();_hcDraw();toast('열을 맞췄어요 — 확인 후 저장해 주세요');
+}
 function _hcColEdit(ev,i){
   try{ev.preventDefault();ev.stopPropagation();}catch(e){}
   var th=ev.currentTarget,old=_hcWork().order[i];if(old===undefined)return;
