@@ -1925,7 +1925,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-aw';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ay';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3303,6 +3303,40 @@ function _ccRevRng(plan,p){
   if(!out.length)return '';
   return out.length<2?out[0]:out[0]+'~'+out[out.length-1].replace(/^Lesson /i,'');
 }
+// Review 복습 범위: 단계의 전체 진도(Review·Level Test·Portfolio 제외)를 Review 1, 2…로 똑같이 나눠요. 'Review'·'전체 Review'는 전체.
+// 나누어 떨어지지 않으면 앞쪽 Review가 한 개씩 더 맡아요 (예: 15개 · Review 2개 → 8개 + 7개)
+// 레벨별 진도(운영 매뉴얼)에 있는 번호 붙은 Review 개수
+function _curRevN(lv){var L=(typeof _CURRICULUM!=='undefined'&&_CURRICULUM&&_CURRICULUM[lv])||[],m=0;
+  (L||[]).forEach(function(x){var q=/^Review (\d+)$/i.exec(String((x&&x.name)||x||'').replace(/\s+/g,' ').trim());if(q)m=Math.max(m,+q[1]);});return m;}
+// 학생 체크콜 명단에 실을 계획표: 이 학생 단계의 Review 개수(rvm)를 함께 담아요
+function _ccPlanRv(plan,lv){if(!plan)return plan;var m=_curRevN(lv);if(!m)return plan;var c=Object.assign({},plan);c.rvm=m;return c;}
+function _ccRevScope(plan,progress,m0){
+  try{
+    var raw=String(progress||'').replace(/\s+/g,' ').trim();
+    var mm=/^(전체 ?)?Review(?: (\d+))?$/i.exec(raw);if(!mm||!plan||!plan.blocks)return '';
+    var n=mm[2]&&!mm[1]?+mm[2]:0,blk=null;
+    if(n){plan.blocks.forEach(function(b){if(!blk&&(b.lessons||[]).indexOf('Review '+n)>=0)blk=b;});}
+    if(!blk)blk=plan.blocks.length===1?plan.blocks[0]:null;
+    var src=blk?[blk]:plan.blocks,ls=[],m=0,gp=false;
+    src.forEach(function(b){(b.lessons||[]).forEach(function(x){
+      var rm=/^Review (\d+)$/i.exec(x);if(rm){m=Math.max(m,+rm[1]);return;}
+      if(/^(전체 ?)?Review$|^Level Test$|^Portfolio$/i.test(x))return;
+      if(/^Preview|^Pre Wrap|^Wrap-?Up/i.test(x)){gp=true;return;}   // Grammar Plus: Preview·Pre Wrap-Up·Wrap-Up은 복습 진도에서 빼요 (Lesson 12개)
+      ls.push(x);
+    });});
+    if(gp)m=2;   // Grammar Plus는 Review 1(1~6) · Review 2(7~12)
+    if(!gp)m=Math.max(m,+m0||0,+plan.rvm||0);
+    if(!ls.length)return '';
+    var a=0,z=ls.length-1;
+    if(n){
+      if(m<1||n>m)return '';
+      var base=Math.floor(ls.length/m),ex=ls.length%m;
+      a=(n-1)*base+Math.min(n-1,ex);z=a+base+(n<=ex?1:0)-1;
+      if(z<a)return '';
+    }
+    return ls[a]+(z>a?' ~ '+ls[z]:'')+' (진도 '+(a+1)+(z>a?'~'+(z+1):'')+'번)';
+  }catch(e){return '';}
+}
 function _ccRevLbl(t,plan,p){
   if(!t||!t.sections)return t;
   var rg=_ccRevRng(plan,p);if(!rg)return t;
@@ -3474,7 +3508,7 @@ async function _bcSyncRoster(manual){
     students.forEach(function(s){
       var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return;
       var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return;
-      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),totalMin:_ccMinOf(ccPlanKey(_inf.lvl,s.grade),_ccEffPlan(ccPlanKey(_inf.lvl,s.grade))),level:getStudentLevel(s),lvl:_inf.lvl,pg:_inf.pg||'',lvl2:'',pg2:'',ses:_ccSesMap(s),rw:window._rwCfg||null};
+      var _inf=_bcTodayInfo(s);want[s.id]={name:String(s.name||'').replace(/\s+/g,''),pin:pin,template:_bcTplFor(s),plan:_ccPlanRv(_ccEffPlan(ccPlanKey(_inf.lvl,s.grade)),_inf.lvl),totalMin:_ccMinOf(ccPlanKey(_inf.lvl,s.grade),_ccEffPlan(ccPlanKey(_inf.lvl,s.grade))),level:getStudentLevel(s),lvl:_inf.lvl,pg:_inf.pg||'',lvl2:'',pg2:'',ses:_ccSesMap(s),rw:window._rwCfg||null};
       try{var _i2=_bcTodayInfo(s,2);if(_i2&&_i2.pg&&ccPlanKey(_i2.lvl,s.grade)===ccPlanKey(_inf.lvl,s.grade)){want[s.id].lvl2=_i2.lvl;want[s.id].pg2=_i2.pg;}}catch(e){}   // 2회차 진도 (1회차와 따로)
     });
     var ops=[];
@@ -29666,7 +29700,7 @@ function _hcDocFor(s){
   var les=r?_hcFindLesson(plan,r.progress):'';
   var kk=(window._hcCls||{})[s.id]||{cid:'',mates:[]};
   return {name:String(s.name||'').replace(/\s+/g,''),pin:pin,key:key||'',lv:String(lv||''),pg:r?String(r.progress||'').trim():'',les:les,rdate:r?String(r.date||''):'',
-    cs:(window._rwCfg&&window._rwCfg.raceChars)||'all',cid:kk.cid,mates:kk.mates,notice:plan?String(plan.notice||''):'',secs:(plan&&les)?_hcClean(plan.lessons[les],plan.tmSecs):[]};
+    cs:(window._rwCfg&&window._rwCfg.raceChars)||'all',cid:kk.cid,mates:kk.mates,rv:(function(){try{return r?_ccRevScope(_ccEffPlan(ccPlanKey(lv,s.grade)),r.progress,_curRevN(lv)):'';}catch(e){return '';}})(),notice:plan?String(plan.notice||''):'',secs:(plan&&les)?_hcClean(plan.lessons[les],plan.tmSecs):[]};
 }
 function _hcStable(v){
   if(Array.isArray(v))return v.map(_hcStable);

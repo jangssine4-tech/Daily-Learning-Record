@@ -316,12 +316,13 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
       <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span><span class="sw" id="hSess" style="display:none"></span></div></div>
       <button class="out" onclick="logout()">나가기</button>
     </div>
+    <div id="revBan" style="display:none;margin:6px 0;padding:10px 12px;border-radius:12px;background:#E8EEFC;color:#2F4EB5;font-weight:800;font-size:15px;text-align:center;line-height:1.4"></div>
     <div id="pauseBan" style="display:none;margin:6px 0;padding:10px 12px;border-radius:12px;background:#FEF3C7;color:#92400E;font-weight:800;font-size:15px;text-align:center">⏸ 시간이 멈춰 있어요. 항목을 체크하면 다시 시작돼요</div>
     <div class="tbar"><span>시작 <b id="tStart">--:--</b></span><div class="tr"><i id="tFill"></i></div><span>끝 <b id="tEnd">--:--</b></span></div>
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-k</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-n</div>
   </div>
 </div>
 
@@ -402,7 +403,7 @@ function ccPlanKey(level,grade){
   if(/^Grammar Plus/i.test(l))return 'Grammar Plus';
   if((m=l.match(/^(Prime|Advanced) ?\d ?([AB])$/i)))return m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()+' '+m[2].toUpperCase();
   if(/^First Grammar/i.test(l))return 'First Grammar';
-  if((m=l.match(/^Reader['’]?s ?Bank ?(\d+)?/i)))return (m[1]&&+m[1]<=2)?"Reader's Bank 1~2":(m[1]&&+m[1]<=4)?"Reader's Bank 3~4":"Reader's Bank 5~10";
+  if((m=l.match(/^Reader['’]?s ?Bank ?(\d+)?/i)))return "Reader's Bank";
   if(/^내신 ?콘서트/.test(l))return '내신 콘서트';
   return '';
 }
@@ -469,6 +470,35 @@ function _ccRevRng(plan,p){
   });
   if(!out.length)return '';
   return out.length<2?out[0]:out[0]+'~'+out[out.length-1].replace(/^Lesson /i,'');
+}
+// Review 복습 범위: 단계의 전체 진도(Review·Level Test·Portfolio 제외)를 Review 1, 2…로 똑같이 나눠요. 'Review'·'전체 Review'는 전체.
+// 나누어 떨어지지 않으면 앞쪽 Review가 한 개씩 더 맡아요 (예: 15개 · Review 2개 → 8개 + 7개)
+function _ccRevScope(plan,progress,m0){
+  try{
+    var raw=String(progress||'').replace(/\s+/g,' ').trim();
+    var mm=/^(전체 ?)?Review(?: (\d+))?$/i.exec(raw);if(!mm||!plan||!plan.blocks)return '';
+    var n=mm[2]&&!mm[1]?+mm[2]:0,blk=null;
+    if(n){plan.blocks.forEach(function(b){if(!blk&&(b.lessons||[]).indexOf('Review '+n)>=0)blk=b;});}
+    if(!blk)blk=plan.blocks.length===1?plan.blocks[0]:null;
+    var src=blk?[blk]:plan.blocks,ls=[],m=0,gp=false;
+    src.forEach(function(b){(b.lessons||[]).forEach(function(x){
+      var rm=/^Review (\d+)$/i.exec(x);if(rm){m=Math.max(m,+rm[1]);return;}
+      if(/^(전체 ?)?Review$|^Level Test$|^Portfolio$/i.test(x))return;
+      if(/^Preview|^Pre Wrap|^Wrap-?Up/i.test(x)){gp=true;return;}   // Grammar Plus: Preview·Pre Wrap-Up·Wrap-Up은 복습 진도에서 빼요 (Lesson 12개)
+      ls.push(x);
+    });});
+    if(gp)m=2;   // Grammar Plus는 Review 1(1~6) · Review 2(7~12)
+    if(!gp)m=Math.max(m,+m0||0,+plan.rvm||0);
+    if(!ls.length)return '';
+    var a=0,z=ls.length-1;
+    if(n){
+      if(m<1||n>m)return '';
+      var base=Math.floor(ls.length/m),ex=ls.length%m;
+      a=(n-1)*base+Math.min(n-1,ex);z=a+base+(n<=ex?1:0)-1;
+      if(z<a)return '';
+    }
+    return ls[a]+(z>a?' ~ '+ls[z]:'')+' (진도 '+(a+1)+(z>a?'~'+(z+1):'')+'번)';
+  }catch(e){return '';}
 }
 function _ccRevLbl(t,plan,p){
   if(!t||!t.sections)return t;
@@ -1146,6 +1176,7 @@ function paintBar(){
   }
   var lv=[LOG.lv||S.lvl,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:'')].filter(function(x){return x&&String(x).trim();}).join(' · '),el=$('hLv');
   if(el){el.textContent=lv;el.style.display=lv?'inline-flex':'none';}
+  var rvb=$('revBan');if(rvb){var _rv=_ccRevScope(S.plan,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:''));rvb.innerHTML=_rv?'📖 복습 범위<br><span style="font-size:17px">'+esc(_rv)+'</span>':'';rvb.style.display=_rv?'':'none';}
   var st=LOG.startAt,en=LOG.endAt;
   $('tStart').textContent=st?hm(st):'--:--';
   $('tEnd').textContent=en?hm(en):'--:--';
