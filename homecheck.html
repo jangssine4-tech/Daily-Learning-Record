@@ -61,7 +61,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .notice div{padding:0 16px 14px;font-size:14px;line-height:1.7;color:#5C4510;white-space:pre-wrap}
 .sec{background:#fff;border-radius:20px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.03)}
 .sh{padding:12px 16px;background:var(--g2);color:#fff;font-weight:800;font-size:16px;display:flex;justify-content:space-between;gap:8px;align-items:center}
-.sh .st{flex:1;min-width:0}.sh .st small{display:block;margin-top:2px}
+.sh .st{flex:0 1 auto;min-width:0}.sh .cn{margin-left:auto}.sh .st small{display:block;margin-top:2px}
 .sh small{font-weight:600;opacity:.85;font-size:13px}
 .sh .cn{font-size:13px;font-weight:700;opacity:.9;white-space:nowrap}
 .it{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:15px 16px;background:#fff;border-top:1px solid var(--line2);font-size:clamp(16px,4.2vw,18px);font-weight:600;line-height:1.35}
@@ -104,6 +104,11 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .tmb button{padding:8px 16px;border-radius:12px;font-weight:800;font-size:14px;background:#fff;box-shadow:0 0 0 1px var(--line);color:var(--ink)}
 .tmb button.go{background:var(--g2);color:#fff;box-shadow:none}.tmb button.pz{background:#FFF1D6;color:#7A4B00;box-shadow:none}
 .lg{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;background:#fff;border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--ink2);box-shadow:0 0 0 1px var(--line)}
+.rvb{background:#E8EEFC;color:#2F4EB5;border-radius:14px;padding:11px 12px;margin-bottom:12px;text-align:center;font-weight:800;font-size:14px;line-height:1.45}.rvb b{font-size:16px}
+.lg2{display:flex;gap:8px;margin-bottom:10px;justify-content:center;flex-wrap:wrap}
+.lgb{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:4px 12px;border-radius:12px;font-weight:800;font-size:13px;white-space:nowrap}
+.lgb i{font-style:normal;font-size:16px;line-height:1}
+.lgb.v{background:#E8EEFC;color:#3E63DD}.lgb.p{background:#FDEBF3;color:#C2417A}
 .lg b{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:8px;background:var(--g2);color:#fff;font-size:12px;margin-right:5px;padding:0 4px}
 .tmb button.ic{width:46px;height:46px;padding:0;font-size:20px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center}
 .sh .tmh{display:flex;align-items:center;gap:8px;flex:none}
@@ -247,7 +252,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-o</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-r</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -280,6 +285,14 @@ var RACE={ch:-1,pos:0,round:1,days:[],fin:0,loaded:false,prz:{},ev:0,fr:{},cm:{}
 function chOk(i){var s=(R&&R.cs)||'all';if(i==null||i<0||i>=CHS.length)return false;return s==='cars'?i>=4:(s==='people'?i<4:true);}
 function chList(){var a=[];CHS.forEach(function(c,i){if(chOk(i))a.push(i);});return a;}
 var _pkAuto=false;
+// 캐릭터 고르기: 숙제를 다 한 뒤, 처음 한 번만 저절로 떠요 (이후엔 말판의 내 캐릭터를 눌러 바꿔요)
+function pkFirst(){
+  if(_pkAuto||!RACE.loaded||!R||chOk(RACE.ch))return;
+  var k='hc_pk_'+S,seen=false;try{seen=localStorage.getItem(k)==='1';}catch(e){}
+  if(seen)return;
+  _pkAuto=true;try{localStorage.setItem(k,'1');}catch(e){}
+  setTimeout(pkOpen,700);
+}
 function chImg(i,css){var c=CHS[i];if(!c)return '';return '<img src="'+IMGD+c.f+'.webp" alt="'+c.n+'" draggable="false" style="'+(css||'')+'">';}
 function rkey(){return 'hc_race_'+S;}
 async function raceLoad(){
@@ -560,6 +573,21 @@ function counts(){
   });});
   return {n:n,d:d,L:L};
 }
+// 항목 글씨가 길어 두 줄이 되면, 한 줄에 들어갈 때까지 글자 크기를 조금씩 줄여요 (최소 12px)
+function rvBan(){return (R&&R.rv)?'<div class="rvb">📖 복습 범위<br><b>'+esc(R.rv).replace(/ \(([^)]*)\)\s*$/,'</b><br><span style="font-size:13px;font-weight:700">($1)</span>')+(/\)\s*$/.test(R.rv)?'':'</b>')+'</div>':'';}
+function fitTx(){
+  try{
+    document.querySelectorAll('#body .tx').forEach(function(el){
+      var tn=el.firstChild;if(!tn||tn.nodeType!==3)return;
+      el.style.fontSize='';
+      var r=document.createRange();r.selectNodeContents(tn);
+      var fs=parseFloat(getComputedStyle(el).fontSize)||16,min=12;
+      function lines(){var m={};Array.prototype.forEach.call(r.getClientRects(),function(q){m[Math.round(q.top)]=1;});return Object.keys(m).length;}
+      if(lines()<=1)return;
+      while(fs>min&&lines()>1){fs-=0.5;el.style.fontSize=fs+'px';}
+    });
+  }catch(e){}
+}
 function render(){
   if(!R)return;
   $('hName').textContent=R.name+' 학생';
@@ -568,15 +596,16 @@ function render(){
   var lv=$('hLv');lv.textContent=[R.lv,R.les].filter(function(x){return x&&String(x).trim();}).join(' · ');lv.style.display=lv.textContent?'':'none';
   var h='';
   if(!R.secs||!R.secs.length){
-    h='<div class="empty">'+(R.les?'이번 레슨에는 집에서 할 숙제가 없어요 👍':'아직 숙제가 정해지지 않았어요.<br>수업을 하고 나면 숙제가 나와요.')+'</div>';
+    h=rvBan()+'<div class="empty">'+(R.les?'이번 레슨에는 집에서 할 숙제가 없어요 👍':'아직 숙제가 정해지지 않았어요.<br>수업을 하고 나면 숙제가 나와요.')+'</div>';
     $('body').innerHTML=h;return;
   }
   var c=counts(),pc=c.n?Math.round(c.d*100/c.n):0;
   h+='<div class="prog"><div class="t"><span>오늘의 숙제</span><span>'+c.d+' / '+c.n+'</span></div><div class="bar"><i style="width:'+pc+'%"></i></div></div>';
   if(R.notice)h+='<details class="notice"'+(noticeOpen?' open':'')+' ontoggle="noticeTog(this)"><summary>📌 학습 유의사항 보기</summary><div>'+esc(R.notice)+'</div></details>';
+  h+=rvBan();
   var G=gate();
   var hasV=false,hasP=false;R.secs.forEach(function(s){s.items.forEach(function(it){if(it.link==='hwVideo')hasV=true;else if(it.link==='hwPhoto')hasP=true;});});
-  if(hasV||hasP)h+='<div class="lg">'+(hasV?'<span>🎥 영상 녹화</span>':'')+(hasP?'<span>📷 사진 올리기</span>':'')+'</div>';
+  if(hasV||hasP)h+='<div class="lg2">'+(hasV?'<span class="lgb v"><i>🎥</i>영상 녹화</span>':'')+(hasP?'<span class="lgb p"><i>📷</i>사진 올리기</span>':'')+'</div>';
   R.secs.forEach(function(s,si){
     var d=0;s.items.forEach(function(it){if(LOG.e[it.id])d++;});
     var sl=secLock(s);
@@ -588,10 +617,9 @@ function render(){
     });
     h+='</div>';
   });
-  $('body').innerHTML=h;
-  if(RACE.loaded&&R&&!chOk(RACE.ch)&&!_pkAuto){_pkAuto=true;setTimeout(pkOpen,500);}
+  $('body').innerHTML=h;fitTx();
   if($('rew').classList.contains('on')&&!_rewAnim)rewPaint();
-  var all=!!(c.n&&c.d===c.n);if(all&&!wasAll&&LOG._seen){var rr=raceAdvance();rewOpen(rr);}wasAll=all;LOG._seen=true;
+  var all=!!(c.n&&c.d===c.n);if(all&&!wasAll&&LOG._seen){var rr=raceAdvance();rewOpen(rr);pkFirst();}wasAll=all;LOG._seen=true;
 }
 /* ── 숙제 시간 재기 (시간을 재는 구역만) ── */
 function noticeTog(el){
