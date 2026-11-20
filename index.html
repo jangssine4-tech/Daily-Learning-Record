@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bd';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-be';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4380,7 +4380,22 @@ function _ccPlanKey(k){_ccEd.spec=null;_ccEd.key=k;_ccEd.bi=0;_ccEd.sel=0;docume
 function _ccPlanBlk(i){_ccEd.spec=null;_ccEd.bi=i;_ccEd.sel=0;_ccPlanDraw();}
 function _ccPlanSel(i){_ccEd.spec=null;_ccEd.sel=i;_ccPlanDraw();}
 function _ccPlanPick(v){if(String(v).indexOf('s:')===0){_ccEd.spec=v.slice(2);}else{_ccEd.spec=null;_ccEd.sel=+v;}_ccPlanDraw();}
-function _ccPlanDraw(){
+// 계획표를 다시 그려도 스크롤 위치가 그대로 있게 해요 (표 안쪽 스크롤 + 바깥 화면 스크롤)
+function _keepScroll(rootId,innerSel,fn){
+  var saved=[];
+  function add(e){if(e&&(e.scrollTop||e.scrollLeft))saved.push([e,e.scrollTop,e.scrollLeft]);}
+  var root=document.getElementById(rootId);
+  var inner=innerSel?Array.prototype.slice.call(document.querySelectorAll(innerSel)):[];
+  var idx=inner.map(function(e){return [e.scrollTop,e.scrollLeft];});
+  for(var e=root;e;e=e.parentElement)add(e);
+  add(document.scrollingElement);
+  try{fn();}finally{
+    saved.forEach(function(a){a[0].scrollTop=a[1];a[0].scrollLeft=a[2];});
+    if(innerSel)Array.prototype.slice.call(document.querySelectorAll(innerSel)).forEach(function(e,i){if(idx[i]){e.scrollTop=idx[i][0];e.scrollLeft=idx[i][1];}});
+  }
+}
+function _ccPlanDraw(){var _r;_keepScroll('ccp-tbl',null,function(){_r=_ccPlanDraw0();});return _r;}
+function _ccPlanDraw0(){
   var p=_ccWork(),b=p.blocks[_ccEd.bi],k=_ccEd.key;
     _ccStatusDraw(p);_ccKeyOptsDraw();
   var sb=document.getElementById('ccp-blk');
@@ -4738,6 +4753,7 @@ function _ccSecRowAdd(ri){
   b.rows.splice(at+1,0,sc_?{g:r0.g||'',s:r0.s||'',l:'점수',c:c,ty:'number',u:'점',lk:'quiz'}:{g:r0.g||'',s:r0.s||'',l:'새 항목',c:c,ty:'check'});if(r0.tm===0||r0.tm===1)b.rows[at+1].tm=r0.tm;
   _ccOvSyncRow(at+1);
   _ccMark();_ccPlanDraw();toast('새 항목을 추가했습니다. 이름을 고쳐 주세요 (모든 레슨에 켜져 있으니 필요 없는 레슨은 칸을 눌러 끄세요)');
+  try{var _nr=document.querySelector('#ccp-tbl tr[data-ccrow][data-ri="'+(at+1)+'"]');if(_nr){_nr.scrollIntoView({block:'nearest'});var _ni=_nr.querySelector('input[type=text],input:not([type])');if(_ni){_ni.focus({preventScroll:true});_ni.select();}}}catch(e){}
 }
 function _ccSecDel(ri){
   var p=_ccWork(),b=p.blocks[_ccEd.bi],r0=b.rows[ri];if(!r0)return;
@@ -30034,7 +30050,8 @@ function _hcColToggle(){_hcEd.colOpen=!_hcEd.colOpen;_hcDraw();}
 function _hcMode(m){_hcEd.mode=m;_hcDraw();}
 function _hcLesStep(d){var o=_hcWork().order,i=o.indexOf(_hcEd.les)+d;if(i<0||i>=o.length)return;_hcEd.les=o[i];_hcDraw();}
 function _hcIsEdited(k){return _hcEd.dirty[k]?true:!!(window._hcOv&&window._hcOv[k]);}
-function _hcDraw(){
+function _hcDraw(){var _r;_keepScroll('hc-body','#hc-body div[style*="overflow:auto"]',function(){_r=_hcDraw0();});return _r;}
+function _hcDraw0(){
   var p=_hcWork(),sk=document.getElementById('hc-key');if(!sk)return;
   var mode='grid';_hcEd.mode='grid';   // 홈체크는 전체 계획표 하나로 편집해요
   sk.innerHTML=_hcKeys().map(function(k){return '<option value="'+_bcEsc(k)+'"'+(k===_hcEd.key?' selected':'')+'>'+_bcEsc(k)+(_hcIsEdited(k)?'  ✎':'')+'</option>';}).join('');
@@ -30235,6 +30252,7 @@ function _hcRowAdd(si){
   var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;
   _hcFor(p,function(L){L.forEach(function(sec){if(sec.title===S.title&&!sec.items.some(function(x){return x.l==='새 항목';}))sec.items.push({id:'g'+_bcNewId(),l:'새 항목',link:'hwBook'});});});
   _hcMark();_hcDraw();toast('이 구역이 있는 모든 레슨에 "새 항목"을 넣었습니다. 이름을 고치고 필요 없는 칸은 ×로 바꿔 주세요');
+  try{var _ns=document.querySelectorAll('#hc-body input[value="새 항목"]');var _ni=_ns[_ns.length-1];if(_ni){_ni.scrollIntoView({block:'nearest'});_ni.focus({preventScroll:true});_ni.select();}}catch(e){}
 }
 function _hcRowDel(si,ri){
   var p=_hcWork(),S=_hcRows(p)[si],R=S&&S.items[ri];if(!R)return;
