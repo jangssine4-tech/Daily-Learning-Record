@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bk';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bm';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3610,7 +3610,8 @@ function _bcSubscribeToday(){
     if(window._ccHoldU){try{window._ccHoldU();}catch(e){}}
     window._ccHoldU=db.collection('checkLogs').where('ho','==',true).onSnapshot(function(snap){
       var m={};snap.forEach(function(d){var x=d.data(),h=x.hold||{};if(x.studentId)m[x.studentId]={date:x.date,lv:h.lv,pg:h.pg,sess:x.sess===2?2:1};});
-      window._ccHold=m;
+      var _old=window._ccHold;window._ccHold=m;
+      try{if(_old&&JSON.stringify(_old)!==JSON.stringify(m))_bcSyncSoon();}catch(e){}   // 이어하기 표시가 바뀌면 체크콜 명단의 진도도 다시 계산
     },function(e){console.warn('hold',e);});
     window._ccLUnsub=db.collection('checkLogs').where('date','==',_bcDate).onSnapshot(function(snap){
       var m={};snap.forEach(function(d){var x=d.data();m[_ccKey(x.studentId,x.sess===2?2:1)]=x;});
@@ -3902,7 +3903,7 @@ function _ccPaneGo(k){_ccPaneCur=k;renderCcSet();}
 function _ccTabletHtml(){
   return '<div style="max-width:640px;font-size:13px;line-height:1.7;color:var(--txt2)">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn btn-navy btn-sm" onclick="_bcCopyTabletLink()">🔗 태블릿 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR()">📷 QR 코드 보기</button><span style="position:relative;display:inline-flex;gap:4px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_bcSyncRoster(true)">🔄 체크콜 명단 갱신</button><button type="button" onclick="event.stopPropagation();_ccRostHelp()" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--txt2);font-weight:800;font-size:13px;cursor:pointer;padding:0" aria-label="도움말">?</button>'
-    +'<div id="ccrost-help" onclick="event.stopPropagation()" style="display:none;position:absolute;left:0;top:36px;z-index:20;width:320px;max-width:80vw;background:#1f2433;color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;box-shadow:0 10px 24px rgba(0,0,0,.3)"><b style="color:#7cdfb5">언제 쓰는 버튼인가요?</b><br>평소에는 누를 필요가 없어요. 이 관리 앱이 켜져 있으면 플랜·커리큘럼을 저장하거나 학생 정보·진도를 바꿀 때 몇 초 뒤 명단이 자동으로 갱신돼요.<br><br><b>이럴 때 누르세요</b><br>· 학생이 태블릿에서 <b>"없는 번호예요"</b>가 계속 나올 때 (학생번호 5자리, 재원·신규 상태를 먼저 확인)<br>· 관리 앱을 닫아 둔 사이에 바뀐 내용을 바로 반영하고 싶을 때<br>· 플랜을 저장했는데 태블릿에 안 바뀌었을 때<br><br>누르면 모든 학생의 명단을 다시 저장해요.</div></span></div>'
+    +'<div id="ccrost-help" onclick="event.stopPropagation()" style="display:none;position:absolute;left:0;top:36px;z-index:20;width:max-content;max-width:calc(100vw - 32px);white-space:nowrap;background:#1f2433;color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;box-shadow:0 10px 24px rgba(0,0,0,.3)"><b style="color:#7cdfb5">언제 쓰는 버튼인가요?</b><br>평소에는 누를 필요가 없어요.<br>이 관리 앱이 켜져 있으면 플랜·커리큘럼을 저장하거나<br>학생 정보·진도를 바꿀 때 몇 초 뒤 명단이 자동으로 갱신돼요.<br><br><b>이럴 때 누르세요</b><br>· 학생이 태블릿에서 <b>"없는 번호예요"</b>가 계속 나올 때<br>&nbsp;&nbsp;(학생번호 5자리, 재원·신규 상태를 먼저 확인)<br>· 관리 앱을 닫아 둔 사이에 바뀐 내용을 바로 반영하고 싶을 때<br>· 플랜을 저장했는데 태블릿에 안 바뀌었을 때<br><br>누르면 모든 학생의 명단을 다시 저장해요.</div></span></div>'
     +'<ol style="padding-left:18px;margin:0">'
     +'<li>🔗 <b>태블릿 링크 복사</b>를 누르면 링크가 복사돼요. 카카오톡 "나에게 보내기" 등으로 태블릿에 옮기세요.</li>'
     +'<li>태블릿 브라우저에서 그 링크를 열면 설정이 저장되고 로그인 화면이 나와요. 링크를 보내는 대신 <b>📷 QR 코드 보기</b>를 열어 학생 폰으로 찍게 해도 됩니다.</li>'
@@ -10943,6 +10944,10 @@ function _autoNextProgress0(sId,level,dt,sessTime,depth){
       var heldP=!(rsP.some(function(r){return r.absent||r.earlyLeave;})||(window._closed||{})[pl.date]!==undefined);
       last={date:pl.date,progress:pl.progress,level:level};planNotDone=!heldP;
     }
+  }catch(e){}
+  try{   // 일지를 아직 안 쓴 날이라도, 체크콜을 다 마치지 못하고 나간 진도가 마지막 일지보다 최근이면 그 진도를 기준으로 삼아요
+    var _H0=(window._ccHold||{})[sId];
+    if(_H0&&!prevLv&&_H0.lv===level&&_H0.date<dt&&(!last||_H0.date>last.date)&&lessons.indexOf(_H0.pg)>=0){last={date:_H0.date,progress:_H0.pg,level:level};planNotDone=true;heldCc=true;}
   }catch(e){}
   try{   // 체크콜을 다 마치지 못하고 나간 날의 진도라면, 다음 시간에도 같은 진도를 이어서 해요
     var _H=(window._ccHold||{})[sId];
@@ -30528,7 +30533,7 @@ async function _hcSave(){
 /* 연결 방법 (링크 · QR · 명단 갱신) */
 function _hcLinkHtml(){
   return '<div style="max-width:640px;font-size:13px;line-height:1.7;color:var(--txt2)">'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn btn-navy btn-sm" onclick="_hcCopyLink()">🔗 홈체크 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR(\'homecheck.html\',\'홈체크 연결 QR 코드\')">📷 QR 코드 보기</button><span style="position:relative;display:inline-flex;gap:4px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_hcSyncRoster(true)">🔄 홈체크 명단 갱신</button><button type="button" onclick="event.stopPropagation();_hcRostHelp()" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--txt2);font-weight:800;font-size:13px;cursor:pointer;padding:0" aria-label="언제 쓰는 버튼인가요?">?</button><div id="hcrost-help" onclick="event.stopPropagation()" style="display:none;position:absolute;left:0;top:36px;z-index:20;width:320px;max-width:80vw;background:#1f2433;color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;box-shadow:0 10px 24px rgba(0,0,0,.3)"><b style="color:#7cdfb5">언제 쓰는 버튼인가요?</b><br>평소에는 누를 필요가 없어요. 이 관리 앱이 켜져 있으면 플랜·커리큘럼을 저장하거나 학생 정보·수업 일지를 바꿀 때 몇 초 뒤 명단이 자동으로 갱신돼요.<br><br><b>이럴 때 누르세요</b><br>· 학생이 홈체크에서 <b>"없는 번호예요"</b>가 나올 때 (학생번호 5자리, 재원·신규 상태를 먼저 확인)<br>· 관리 앱을 닫아 둔 사이에 바뀐 내용을 바로 반영하고 싶을 때<br>· 플랜을 저장했는데 학생 화면에 안 바뀌었을 때<br><br>누르면 모든 학생의 명단을 다시 저장하고 반 편성도 다시 해요.</div></span></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn btn-navy btn-sm" onclick="_hcCopyLink()">🔗 홈체크 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR(\'homecheck.html\',\'홈체크 연결 QR 코드\')">📷 QR 코드 보기</button><span style="position:relative;display:inline-flex;gap:4px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_hcSyncRoster(true)">🔄 홈체크 명단 갱신</button><button type="button" onclick="event.stopPropagation();_hcRostHelp()" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--txt2);font-weight:800;font-size:13px;cursor:pointer;padding:0" aria-label="언제 쓰는 버튼인가요?">?</button><div id="hcrost-help" onclick="event.stopPropagation()" style="display:none;position:absolute;left:0;top:36px;z-index:20;width:max-content;max-width:calc(100vw - 32px);white-space:nowrap;background:#1f2433;color:#fff;border-radius:12px;padding:12px 14px;font-size:12px;line-height:1.6;box-shadow:0 10px 24px rgba(0,0,0,.3)"><b style="color:#7cdfb5">언제 쓰는 버튼인가요?</b><br>평소에는 누를 필요가 없어요.<br>이 관리 앱이 켜져 있으면 플랜·커리큘럼을 저장하거나<br>학생 정보·수업 일지를 바꿀 때 몇 초 뒤 명단이 자동으로 갱신돼요.<br><br><b>이럴 때 누르세요</b><br>· 학생이 홈체크에서 <b>"없는 번호예요"</b>가 나올 때<br>&nbsp;&nbsp;(학생번호 5자리, 재원·신규 상태를 먼저 확인)<br>· 관리 앱을 닫아 둔 사이에 바뀐 내용을 바로 반영하고 싶을 때<br>· 플랜을 저장했는데 학생 화면에 안 바뀌었을 때<br><br>누르면 모든 학생의 명단을 다시 저장하고 반 편성도 다시 해요.</div></span></div>'
     +'<ol style="padding-left:18px;margin:0">'
     +'<li>🔗 <b>홈체크 링크 복사</b>를 눌러 학생(학부모)에게 카카오톡 등으로 보내거나, <b>📷 QR 코드</b>를 보여 줍니다. 로그인 번호는 체크콜과 같은 <b>학생 번호 5자리</b>입니다.</li>'
     +'<li>핸드폰에서 링크를 열고 <b>"홈 화면에 추가"</b>를 하면 홈 화면에 홈체크 아이콘이 생깁니다. (안드로이드는 크롬 ⋮ 메뉴, 아이폰은 사파리 공유 버튼)</li>'
