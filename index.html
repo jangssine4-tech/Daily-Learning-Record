@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bo';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bp';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -29763,8 +29763,17 @@ function _hcDocFor(s){
   var r=_hcLatest(s),lv=(r&&r.level)||getStudentLevel(s),key=_hcKey(ccPlanKey(lv,s.grade)),plan=_hcPlan(key);
   var les=r?_hcFindLesson(plan,r.progress):'';
   var kk=(window._hcCls||{})[s.id]||{cid:'',mates:[]};
-  return {name:String(s.name||'').replace(/\s+/g,''),pin:pin,key:key||'',lv:String(lv||''),pg:r?String(r.progress||'').trim():'',les:les,rdate:r?String(r.date||''):'',
+  var _o={name:String(s.name||'').replace(/\s+/g,''),pin:pin,key:key||'',lv:String(lv||''),pg:r?String(r.progress||'').trim():'',les:les,rdate:r?String(r.date||''):'',
     cs:(window._rwCfg&&window._rwCfg.raceChars)||'all',cid:kk.cid,mates:kk.mates,rv:(function(){try{return r?_ccRevShort(_ccRevScope(_ccEffPlan(ccPlanKey(lv,s.grade)),r.progress,_curRevN(lv))):'';}catch(e){return '';}})(),notice:plan?String(plan.notice||''):'',secs:(plan&&les)?_hcApplyEx(_hcClean(plan.lessons[les],plan.tmSecs),s.hcEx):[]};
+  var _sp=_hcSpFor(lv,les);if(_sp)_o.sp=_sp;return _o;
+}
+// Speak Pop 세트를 학생 홈체크 명단에 실어 보내요 (홈체크 앱은 config를 읽지 않아요)
+window._spCfg=window._spCfg||{};
+function _hcSpNorm(x){return String(x||'').toLowerCase().replace(/[\s_\-]+/g,'');}
+function _hcSpFor(lv,les){
+  try{var d=window._spCfg[_spDocId(lv)];if(!d||!les)return null;var ps=d[les];
+    if(!ps){var n=_hcSpNorm(les);Object.keys(d).some(function(k){if(_hcSpNorm(k)===n){ps=d[k];return true;}return false;});}
+    return (ps&&ps.ps&&ps.ps.length)?ps.ps:null;}catch(e){return null;}
 }
 // 이 학생만 빼 둔 숙제(구역 이름|항목 이름)를 학생 홈체크 화면에서 아예 없애요. 항목이 다 빠진 구역도 함께 없애요
 function _hcApplyEx(secs,ex){
@@ -29859,6 +29868,12 @@ async function _hcSyncRoster(manual){
   _hcBusy=false;
 }
 function _hcStart(){
+  try{
+    var _F=firebase.firestore.FieldPath.documentId();
+    db.collection('config').where(_F,'>=','sp_').where(_F,'<','sp`').onSnapshot(function(q){
+      var m={};q.forEach(function(d){m[d.id]=(d.data().lessons)||{};});window._spCfg=m;_hcSyncSoon();
+    },function(e){console.warn('[Speak Pop 세트]',e);});
+  }catch(e){console.warn(e);}
   try{
     db.collection('config').doc('homePlans').onSnapshot(function(d){
       window._hcOv=(d.exists&&d.data().plans)||{};_hcSyncSoon();

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Speak Pop!</title>
+<style>
+:root{--bg:#f6f1e7;--card:#fff;--ink:#1d2433;--sub:#6b7280;--line:#e5dfd2;--ac:#0f9d7a;--ac2:#e8f6f1;--warn:#e8590c;--warn2:#fff1e8;--navy:#1d2a44}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+body{min-height:100vh;min-height:100dvh;display:flex;justify-content:center}
+#app{width:100%;max-width:520px;padding:14px 16px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;min-height:100dvh}
+button{font:inherit;cursor:pointer;border:0;color:inherit}
+.top{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.top h1{font-size:18px;margin:0;flex:1}
+.ib{width:38px;height:38px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:18px}
+.hrow{position:relative;display:flex;justify-content:center;margin-bottom:14px}
+.hero{display:block;text-align:center;padding:2px 44px}
+.hero h1{margin:0;font-size:16px;line-height:1.05;font-weight:800;color:#b5401a;letter-spacing:-.5px}
+.hero .s1{margin-top:2px;font-size:10px;font-weight:600;color:#a14a2b}
+.hero .s2{margin-top:1px;font-size:9.5px;color:#8a4a33}
+.add{position:absolute;right:0;top:0;width:34px;height:34px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:20px;color:#b5401a}
+.chips{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap}
+.chip{padding:7px 13px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--sub)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.set{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:10px}
+.set b{font-size:16px;display:block}.set small{color:var(--sub);font-size:13px}
+.set .tg{float:right;font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:var(--ac2);color:var(--ac)}
+.set .tg.m{background:#eef1ff;color:#4357d6}
+.opt{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:6px 0 12px}
+.opt .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0}
+.opt label{font-size:14px;display:flex;align-items:center;gap:6px}
+.seg{display:flex;background:#efe9db;border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;padding:8px 4px;border-radius:9px;background:transparent;font-size:14px;font-weight:700;color:var(--sub)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.pbox{background:var(--card);border:2px dashed #c8bfa8;border-radius:18px;padding:22px 14px;text-align:center;margin:6px 0 14px}
+.pbox .en{font-size:26px;font-weight:800}.pbox .ko{font-size:19px;margin-top:6px;color:var(--ink)}
+.words{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.w{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-align:left}
+.w .e{font-size:20px}.w b{display:block;font-size:17px}.w small{color:var(--sub);font-size:14px}
+.big{display:block;width:100%;padding:16px;border-radius:16px;font-size:17px;font-weight:800;background:var(--ac);color:#fff;margin-top:auto}
+.big.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line);margin-top:8px}
+.big:disabled{opacity:.4}
+.prog{height:8px;background:#e6dfcf;border-radius:99px;overflow:hidden;margin-bottom:6px}.prog i{display:block;height:100%;background:var(--ac);width:0;transition:width .3s}
+.meta{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);margin-bottom:10px}
+.card{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:22px 18px;min-height:240px;margin-bottom:14px;box-shadow:0 6px 18px rgba(60,50,20,.08)}
+.card .tag{font-size:12px;font-weight:800;color:var(--ac);background:var(--ac2);padding:4px 10px;border-radius:99px;margin-bottom:14px}
+.card .ic{font-size:44px;margin-bottom:6px}
+.card .q{font-size:28px;font-weight:800;line-height:1.35;word-break:keep-all}
+.card.mid .q{font-size:24px}
+.card .hint{margin-top:12px;font-size:14px;color:var(--sub)}
+.card .ans{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);width:100%}
+.card .ans .a{font-size:26px;font-weight:600;line-height:1.35;word-break:keep-all}
+.card.mid .ans .a{font-size:22px}.card .ans .a b{font-weight:900;color:var(--ac)}
+.spk{margin-top:10px;padding:8px 16px;border-radius:99px;background:var(--ac2);color:var(--ac);font-weight:800;font-size:14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two button{padding:16px 8px;border-radius:16px;font-size:16px;font-weight:800}
+.no{background:var(--warn2);color:var(--warn)}.ok{background:var(--ac);color:#fff}
+.done{text-align:center;margin:auto 0}.done .st{font-size:54px;letter-spacing:4px}.done h2{font-size:24px;margin:8px 0}.done p{color:var(--sub);margin:4px 0}
+.imp textarea,.imp input{width:100%;font:inherit;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);margin:6px 0}
+.imp textarea{min-height:170px}
+.note{font-size:12px;color:var(--sub);line-height:1.5}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+var BUILD='Speak Pop 0004-a';
+/* ───────── 연습 세트 (예시) ─────────
+   lv: 'basic'(초등) | 'middle'(중등), pat: 패턴 영어, pk: 패턴 뜻, w: 단어 [한글,영어,이모지], c: 문장 [한글,영어,이모지] */
+var BASE_SETS=[
+ {id:'e-u4-l2',lv:'basic',title:'Unit 4 · Lesson 2',ps:[
+  {pat:'There are',pk:'(~들이) 있어요',
+   w:[['연필들','pencils','✏️'],['자들','rulers','📏'],['공책들','notebooks','📓'],['책들','books','📚']],
+   c:[['연필들이 있어.','There are pencils.','✏️'],['자들이 있어.','There are rulers.','📏'],['공책들이 있어.','There are notebooks.','📓'],['책들이 있어.','There are books.','📚']]},
+  {pat:'I have',pk:'나는 ~이 있어요 / 가지고 있어요',
+   w:[['고양이','a cat','🐱'],['강아지','a dog','🐶'],['자전거','a bike','🚲']],
+   c:[['나는 고양이가 있어.','I have a cat.','🐱'],['나는 강아지가 있어.','I have a dog.','🐶'],['나는 자전거가 있어.','I have a bike.','🚲']]}]},
+ {id:'m-u3-l1',lv:'middle',title:'Unit 3 · Lesson 1',ps:[
+  {pat:"I'm going to",pk:'나는 ~할 거야 (계획)',w:[],
+   c:[['나는 내일 영화를 볼 거야.',"I'm going to watch a movie tomorrow."],['나는 오늘 밤 숙제를 끝낼 거야.',"I'm going to finish my homework tonight."],['나는 주말에 친구를 만날 거야.',"I'm going to meet my friend this weekend."]]},
+  {pat:'How about',pk:'~하는 게 어때?',w:[],
+   c:[['같이 점심 먹는 게 어때?','How about having lunch together?'],['공원에서 산책하는 게 어때?','How about taking a walk in the park?'],['영화 보러 가는 게 어때?','How about going to the movies?']]}]}
+];
+var $=function(s){return document.querySelector(s);};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function lsGet(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+var MY=lsGet('sp_my',[]),PREF=lsGet('sp_pref',{dir:'ko',lv:'all',words:false,shuf:true,voice:'f1'});
+function cnt(s){var n=0;s.ps.forEach(function(p){n+=p.c.length;});return n;}
+function allSets(){return BASE_SETS.concat(MY);}
+var G={scr:'home',set:null,deck:[],i:0,show:false,first:0,retry:0,seen:{}};
+
+/* ───────── 목소리 4가지 (en-US): 여자 2 · 남자 2, 밝은 톤 ─────────
+   폰마다 들어 있는 목소리가 달라서, 이름으로 여자/남자를 골라요. 해당 목소리가 없으면 기본 목소리의 높낮이(pitch)로 대신해요. */
+var VSLOTS=[
+ {id:'f1',ic:'👩',lb:'여자 A',pn:['aria','samantha','allison','zira'],fb:1.25},
+ {id:'f2',ic:'👩',lb:'여자 B',pn:['jenny','ava','michelle','emma','susan','nicky','joanna','google us english'],fb:1.1},
+ {id:'m1',ic:'👨',lb:'남자 A',pn:['guy','aaron','eric','christopher','evan'],fb:.95},
+ {id:'m2',ic:'👨',lb:'남자 B',pn:['davis','tom','alex','david','roger','mark','fred'],fb:.8}
+];
+function vResolve(){
+  var vs=[];try{vs=speechSynthesis.getVoices().filter(function(v){return /^en[-_]US/i.test(v.lang);});}catch(e){}
+  var used={},out={};
+  VSLOTS.forEach(function(s){
+    var hit=null;
+    for(var i=0;i<s.pn.length&&!hit;i++){hit=vs.filter(function(v){return !used[v.name]&&v.name.toLowerCase().indexOf(s.pn[i])>=0;})[0]||null;}
+    if(hit){used[hit.name]=1;out[s.id]={voice:hit,pitch:1.05,fb:false};}
+    else out[s.id]={voice:null,pitch:s.fb,fb:true};
+  });
+  return out;
+}
+function speak(t){
+  try{
+    if(!window.speechSynthesis)return;
+    speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=.85;
+    var r=vResolve()[PREF.voice||'f1']||{voice:null,pitch:1};
+    if(r.voice)u.voice=r.voice;u.pitch=r.pitch;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function hl(en,pat){   // 패턴 부분을 굵게 (사진처럼)
+  var e=esc(en),p=esc(pat||'');
+  if(p&&e.toLowerCase().indexOf(p.toLowerCase())===0)return '<b>'+e.slice(0,p.length)+'</b>'+e.slice(p.length);
+  return e;
+}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+
+/* ───────── 화면 ───────── */
+function render(){
+  var h='';
+  if(G.scr==='home')h=vHome();
+  else if(G.scr==='learn')h=vLearn();
+  else if(G.scr==='play')h=vPlay();
+  else if(G.scr==='done')h=vDone();
+  else if(G.scr==='import')h=vImport();
+  $('#app').innerHTML=h;
+}
+function vHome(){
+  var list=allSets();
+  var h='<div class="hrow"><div class="hero"><h1>Speak Pop!</h1><div class="s1">Automatic Speaking Cards</div><div class="s2">생각하는 순간, 영어가 바로!</div></div><button class="add" onclick="go(\'import\')" title="내 문장 추가">＋</button></div>';
+  list.forEach(function(s){
+    h+='<button class="set" onclick="openSet(\''+esc(s.id)+'\')"><span class="tg'+(s.lv==='middle'?' m':'')+'">'+(s.lv==='middle'?'중등':'초등')+'</span><b>'+esc(s.title)+'</b><small>'+s.ps.map(function(p){return esc(p.pat)+' ~';}).join('  ·  ')+' · 문장 '+cnt(s)+'개</small></button>';
+  });
+  if(!list.length)h+='<p class="note">이 단계에는 아직 세트가 없어요.</p>';
+  h+='<p class="note" style="margin-top:auto;text-align:center">'+BUILD+'</p>';
+  return h;
+}
+function vLearn(){
+  var s=G.set;
+  var h='<div class="top">'+(EMBED?'<button class="ib" onclick="parent.postMessage({type:\'speak-close\'},\'*\')">✕</button>':(G.direct?'':'<button class="ib" onclick="go(\'home\')">←</button>'))+'<h1>'+esc(s.title)+'</h1></div>';
+  s.ps.forEach(function(p,pi){
+    h+='<div class="pbox"><div class="en">'+esc(p.pat)+' ~</div><div class="ko">'+esc(p.pk||'')+'</div></div>';
+    if(p.w&&p.w.length)h+='<div class="words">'+p.w.map(function(w,i){return '<button class="w" onclick="sayW('+pi+','+i+')"><span class="e">'+(w[2]||'')+'</span><b>'+esc(w[1])+'</b><small>'+esc(w[0])+'</small></button>';}).join('')+'</div>';
+    else h+='<div class="words" style="grid-template-columns:1fr">'+p.c.slice(0,2).map(function(c,i){return '<button class="w" onclick="sayC('+pi+','+i+')"><b>'+hl(c[1],p.pat)+'</b><small>'+esc(c[0])+'</small></button>';}).join('')+'</div>';
+  });
+  h+='<div class="opt"><div class="note" style="margin-bottom:4px">영어 목소리</div><div class="seg" style="margin-bottom:10px">'+VSLOTS.map(function(v){return '<button class="'+((PREF.voice||'f1')===v.id?'on':'')+'" onclick="setVoice(\''+v.id+'\')">'+v.ic+' '+v.lb+'</button>';}).join('')+'</div><div class="note" style="margin-bottom:4px">연습 방향</div><div class="seg">'
+   +[['ko','한글 → 영어'],['en','영어 → 한글'],['mix','섞어서']].map(function(x){return '<button class="'+(PREF.dir===x[0]?'on':'')+'" onclick="setDir(\''+x[0]+'\')">'+x[1]+'</button>';}).join('')+'</div>'
+   +'<div class="row" style="margin-top:8px"><label><input type="checkbox" '+(PREF.words?'checked':'')+' onchange="PREF.words=this.checked;lsSet(\'sp_pref\',PREF)"> 단어도 연습</label>'
+   +'<label><input type="checkbox" '+(PREF.shuf?'checked':'')+' onchange="PREF.shuf=this.checked;lsSet(\'sp_pref\',PREF)"> 순서 섞기</label></div></div>'
+   +'<button class="big" onclick="start()">연습 시작 ▶</button>';
+  return h;
+}
+function vPlay(){
+  var c=G.deck[G.i],s=G.set,total=G.deck.length,mid=s.lv==='middle';
+  var pt=c.pat;
+  var q=c.q,a=c.a,aIsEn=c.dir==='ko';
+  var h='<div class="top"><button class="ib" onclick="quit()">'+(G.direct?'←':'✕')+'</button><h1 style="font-size:15px;color:var(--sub)">'+esc(s.title)+'</h1><button class="ib" onclick="go(\'learn\')" title="패턴 다시 보기">📖</button></div>'
+   +'<div class="prog"><i style="width:'+Math.round(G.i/total*100)+'%"></i></div><div class="meta"><span>'+(G.i+1)+' / '+total+'</span><span>'+(G.retry?'다시 볼 카드 '+G.retry+'개':'')+'</span></div>'
+   +'<div class="card'+(mid?' mid':'')+'"><span class="tag">'+esc(pt)+' ~ · '+(c.dir==='ko'?'한글 → 영어':'영어 → 우리말')+'</span>'
+   +(c.ic?'<div class="ic">'+c.ic+'</div>':'')+'<div class="q">'+(c.dir==='ko'?esc(q):hl(q,pt))+'</div>';
+  if(!G.show){
+    h+='<div class="hint">소리 내어 말해 본 다음, 정답을 확인해요</div>'+(c.dir==='en'?'<button class="spk" onclick="speak(G.deck[G.i].q)">🔊 다시 듣기</button>':'');
+  }else{
+    h+='<div class="ans"><div class="a">'+(aIsEn?hl(a,pt):esc(a))+'</div>'+(aIsEn?'<button class="spk" onclick="speak(G.deck[G.i].a)">🔊 듣기</button>':'')+'</div>';
+  }
+  h+='</div>';
+  if(!G.show)h+='<button class="big" style="margin-top:0" onclick="reveal()">정답 보기</button>';
+  else h+='<div class="two"><button class="no" onclick="mark(false)">🔁 다시 볼래요</button><button class="ok" onclick="mark(true)">✓ 말했어요</button></div>';
+  return h;
+}
+function vDone(){
+  var n=G.total,f=G.first,st=f>=n?'⭐⭐⭐':(f>=n*0.6?'⭐⭐':'⭐');
+  return '<div class="done"><div class="st">'+st+'</div><h2>'+(f>=n?'모두 한 번에 말했어요!':'끝까지 해냈어요!')+'</h2>'
+   +'<p>'+esc(G.set.title)+' · 패턴 '+G.set.ps.length+'개 · 카드 '+n+'장</p><p>한 번에 말한 카드 <b>'+f+'</b>장'+(n-f?' · 다시 본 카드 '+(n-f)+'장':'')+'</p></div>'
+   +'<button class="big" style="margin-top:0" onclick="start()">한 번 더 ↻</button>'+(EMBED?'<button class="big ghost" onclick="parent.postMessage({type:\'speak-close\'},\'*\')">숙제로 돌아가기</button>':(G.direct?'':'<button class="big ghost" onclick="go(\'home\')">목록으로</button>'))+'';
+}
+function vImport(){
+  return '<div class="top"><button class="ib" onclick="go(\'home\')">←</button><h1>내 문장 추가</h1></div><div class="imp">'
+   +'<input id="im-t" placeholder="세트 이름 (예: Unit 4 · Lesson 2)">'
+   +'<div class="seg" style="margin:6px 0"><button id="im-b" class="on" onclick="this.className=\'on\';$(\'#im-m\').className=\'\'">초등 Basic</button><button id="im-m" onclick="this.className=\'on\';$(\'#im-b\').className=\'\'">중등</button></div>'
+   +'<textarea id="im-x" placeholder="# 패턴 | 뜻  으로 패턴을 시작하고, 그 아래에 한 줄에 한 문장씩  한글 | 영어\n\n예)\n# There are | (~들이) 있어요\n연필들이 있어. | There are pencils.\n자들이 있어. | There are rulers.\n# I have | 나는 ~이 있어요\n나는 고양이가 있어. | I have a cat."></textarea>'
+   +'<p class="note">엑셀에서 두 열(한글, 영어)을 복사해 붙여 넣어도 돼요. 이 폰(브라우저)에만 저장돼요.</p></div>'
+   +'<button class="big" style="margin-top:8px" onclick="saveImp()">저장</button>';
+}
+
+/* ───────── 동작 ───────── */
+function go(s){G.scr=s;render();}
+function setVoice(v){PREF.voice=v;lsSet('sp_pref',PREF);render();speak('There are pencils.');}
+function setDir(d){PREF.dir=d;lsSet('sp_pref',PREF);render();}
+function openSet(id){G.set=allSets().filter(function(s){return s.id===id;})[0];if(G.set)go('learn');}
+function sayW(p,i){speak(G.set.ps[p].w[i][1]);}
+function sayC(p,i){speak(G.set.ps[p].c[i][1]);}
+function mkDeck(){
+  var s=G.set,d=[],k=0;
+  s.ps.forEach(function(p){
+    var part=[];
+    function add(ko,en,ic){var dir=PREF.dir==='mix'?((k++%2)?'en':'ko'):PREF.dir;part.push(dir==='ko'?{q:ko,a:en,ic:ic,dir:'ko',key:en,pat:p.pat}:{q:en,a:ko,ic:ic,dir:'en',key:en,pat:p.pat});}
+    if(PREF.words&&p.w)p.w.forEach(function(w){add(w[0],w[1],w[2]);});
+    p.c.forEach(function(c){add(c[0],c[1],c[2]);});
+    d=d.concat(PREF.shuf?shuffle(part):part);   // 패턴 순서는 유지하고, 패턴 안에서만 섞어요
+  });
+  return d;
+}
+function start(){
+  G.deck=mkDeck();G.i=0;G.show=false;G.first=0;G.retry=0;G.total=G.deck.length;G.seen={};
+  if(!G.deck.length)return;
+  G.scr='play';render();autoSpeak();
+}
+function autoSpeak(){var c=G.deck[G.i];if(c&&c.dir==='en'&&!G.show)speak(c.q);}
+function reveal(){G.show=true;render();var c=G.deck[G.i];if(c.dir==='ko')speak(c.a);}
+function mark(ok){
+  var c=G.deck[G.i];
+  if(ok){if(!G.seen[c.key+'|'+c.dir])G.first++;G.seen[c.key+'|'+c.dir]=1;}
+  else{if(!G.seen[c.key+'|'+c.dir]){G.seen[c.key+'|'+c.dir]=2;}G.deck.push({q:c.q,a:c.a,ic:c.ic,dir:c.dir,key:c.key,pat:c.pat,re:1});if(!c.re)G.retry++;}
+  if(ok&&c.re)G.retry=Math.max(0,G.retry-1);
+  G.i++;G.show=false;
+  if(G.i>=G.deck.length){finish();return;}
+  render();autoSpeak();
+}
+function finish(){G.scr='done';render();try{window.parent!==window&&window.parent.postMessage({type:'speak-done',set:G.set.id,total:G.total,first:G.first},'*');}catch(e){}}
+function quit(){if(confirm('연습을 그만할까요?')){if(G.direct){G.scr='learn';render();}else go('home');}}
+function saveImp(){
+  var t=($('#im-t').value||'').trim(),x=$('#im-x').value||'',ps=[],cur=null;
+  x.split(/\r?\n/).forEach(function(l){
+    l=l.trim();if(!l)return;
+    if(l.charAt(0)==='#'){var q=l.slice(1).split(/\||=|\t/);cur={pat:(q[0]||'').trim(),pk:(q[1]||'').trim(),w:[],c:[]};ps.push(cur);return;}
+    var m=l.split(/\t|\||=/);if(m.length<2)return;
+    var a=m[0].trim(),b=m.slice(1).join('|').trim();if(!a||!b)return;
+    if(!cur){cur={pat:'',pk:'',w:[],c:[]};ps.push(cur);}cur.c.push([a,b]);
+  });
+  ps=ps.filter(function(p){return p.c.length;});
+  if(!t||!ps.length){alert('세트 이름과 문장을 넣어 주세요.');return;}
+  var lv=$('#im-m').className==='on'?'middle':'basic';
+  MY.push({id:'my'+Date.now(),lv:lv,title:t,ps:ps});lsSet('sp_my',MY);go('home');
+}
+if(window.speechSynthesis){try{speechSynthesis.getVoices();}catch(e){}}
+(function(){try{var q=new URLSearchParams(location.search),id=q.get('set');if(id){var st=allSets().filter(function(x){return x.id===id;})[0];if(st){G.set=st;G.direct=true;G.scr='learn';}}}catch(e){}})();
+var EMBED=false;try{EMBED=new URLSearchParams(location.search).get('embed')==='1';}catch(e){}
+function _row(r){return Array.isArray(r)?r:[r.k||'',r.e||'',r.i||''];}
+window.addEventListener('message',function(ev){
+  var d=ev.data;if(!d||d.type!=='speak-set'||!d.set)return;
+  var ps=(d.set.ps||[]).map(function(p){return {pat:p.pat,pk:p.pk,w:(p.w||[]).map(_row),c:(p.c||[]).map(_row)};});
+  G.set={id:d.set.id||'hc',lv:'x',title:d.set.title||'Speak Pop!',ps:ps};G.direct=true;G.scr='learn';render();
+});
+if(EMBED){G.direct=true;try{window.parent.postMessage({type:'speak-ready'},'*');}catch(e){}}
+render();
+</script>
+</body>
+</html>

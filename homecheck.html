@@ -59,6 +59,11 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .notice summary{padding:12px 16px;font-weight:800;font-size:15px;color:#7A4B00;cursor:pointer;list-style:none}
 .notice summary::-webkit-details-marker{display:none}
 .notice div{padding:0 16px 14px;font-size:14px;line-height:1.7;color:#5C4510;white-space:pre-wrap}
+.spb{display:block;width:100%;padding:16px;margin-bottom:6px;border-radius:18px;background:linear-gradient(180deg,#FFD84D,#F5B800);box-shadow:0 4px 0 #C99400;font-size:22px;font-weight:900;letter-spacing:-.02em;color:#3A2A00}
+.spb.sdn{background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.05);color:var(--g2);font-size:18px}
+.spn{text-align:center;color:var(--ink2);font-size:13px;font-weight:700;margin:2px 0 12px}
+.spb.sdn{margin-bottom:12px}
+.spf{position:fixed;inset:0;width:100%;height:100%;border:0;z-index:50;background:#fff}
 .sec{background:#fff;border-radius:20px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.03)}
 .sh{flex-wrap:wrap;padding:9px 16px;min-height:46px;background:var(--g2);color:#fff;font-weight:800;font-size:16px;display:flex;justify-content:space-between;gap:8px;align-items:center}
 .sh{justify-content:flex-start}.sh .st{flex:0 1 auto;min-width:0}.sh .sr{font-size:13px;font-weight:700;color:#CFEFE2;line-height:1.3;min-width:0}.sh .st small{display:block;margin-top:2px}
@@ -252,7 +257,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-v</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-w</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -479,7 +484,7 @@ function netPaint(){
 }
 window.addEventListener('online',function(){if(pendingE){clearTimeout(saveT);saveT=setTimeout(saveLog,300);}netPaint();});
 window.addEventListener('offline',netPaint);
-function mkP(){pendingE={k:logKey,e:LOG.e,tm:LOG.tm||{},nr:LOG.nr||0};netPaint();}
+function mkP(){pendingE={k:logKey,e:LOG.e,tm:LOG.tm||{},nr:LOG.nr||0,sp:LOG.sp||null};netPaint();}
 function safe(s){return String(s||'').replace(/[^\w가-힣]/g,'_');}
 
 function ensureFirebase(){return Promise.resolve(typeof firebase!=='undefined');}
@@ -557,7 +562,7 @@ function watchLog(){
   if(!k)return;
   unsubL=db.collection('homeLogs').doc(k).onSnapshot(function(d){
     if(logKey!==k)return;
-    var data=d.exists?d.data():{};var pe=(pendingE&&pendingE.k===k)?pendingE:null;LOG={e:pe?pe.e:(data.e||{}),tm:pe?pe.tm:(data.tm||{}),nr:pe?pe.nr:(data.nr||0)};render();
+    var data=d.exists?d.data():{};var pe=(pendingE&&pendingE.k===k)?pendingE:null;LOG={e:pe?pe.e:(data.e||{}),tm:pe?pe.tm:(data.tm||{}),nr:pe?pe.nr:(data.nr||0),sp:pe?pe.sp:(data.sp||null)};render();
   },function(){});
 }
 function logout(){
@@ -588,6 +593,27 @@ function fitTx(){
     });
   }catch(e){}
 }
+function spBtn(){
+  if(!spSet())return '';var dn=LOG.sp&&LOG.sp.at;
+  return '<button class="spb'+(dn?' sdn':'')+'" onclick="spOpen()">Speak Pop!'+(dn?' <span>✓</span>':'')+'</button>'+(dn?'':'<div class="spn">🔒 Speak Pop을 먼저 해요</div>');
+}
+var spFrame=null;
+function spOpen(){
+  var st=spSet();if(!st||spFrame)return;
+  var f=document.createElement('iframe');f.className='spf';f.setAttribute('allow','autoplay');f.src='speakpop.html?embed=1';
+  document.body.appendChild(f);spFrame=f;
+  f._set={id:'hc',title:R.les||'Speak Pop!',ps:st};
+}
+function spClose(){if(spFrame){spFrame.remove();spFrame=null;}}
+window.addEventListener('message',function(ev){
+  var d=ev.data;if(!d||!spFrame||ev.source!==spFrame.contentWindow)return;
+  if(d.type==='speak-ready'){try{spFrame.contentWindow.postMessage({type:'speak-set',set:spFrame._set},'*');}catch(e){}}
+  else if(d.type==='speak-close')spClose();
+  else if(d.type==='speak-done'&&R&&R.les){
+    LOG.sp={at:Date.now(),total:+d.total||0,first:+d.first||0};mkP();render();
+    clearTimeout(saveT);saveT=setTimeout(saveLog,350);
+  }
+});
 function render(){
   if(!R)return;
   $('hName').textContent=R.name+' 학생';
@@ -597,9 +623,10 @@ function render(){
   var h='';
   if(!R.secs||!R.secs.length){
     h=rvBan()+'<div class="empty">'+(R.les?'이번 레슨에는 집에서 할 숙제가 없어요 👍':'아직 숙제가 정해지지 않았어요.<br>수업을 하고 나면 숙제가 나와요.')+'</div>';
-    $('body').innerHTML=h;return;
+    $('body').innerHTML=spBtn()+h;return;
   }
   var c=counts(),pc=c.n?Math.round(c.d*100/c.n):0;
+  h=spBtn()+h;
   h+='<div class="prog"><div class="t"><span>오늘의 숙제</span><span>'+c.d+' / '+c.n+'</span></div><div class="bar"><i style="width:'+pc+'%"></i></div></div>';
   if(R.notice)h+='<details class="notice"'+(noticeOpen?' open':'')+' ontoggle="noticeTog(this)"><summary>📌 학습 유의사항 보기</summary><div>'+esc(R.notice)+'</div></details>';
   h+=rvBan();
@@ -628,7 +655,9 @@ function noticeTog(el){
 }
 function tmOf(s){return (LOG.tm||{})[safe(s.title)]||null;}
 function tmAct(t,now){if(!t||!t.s)return 0;return Math.max(0,(t.e||t.ps||now)-t.s-(t.p||0));}
-function gate(){var cur=null,ci=-1;((R&&R.secs)||[]).some(function(s,si){return (s.items||[]).some(function(it){if(!LOG.e[it.id]){cur=it.id;ci=si;return true;}return false;});});return {cur:cur,si:ci};}
+function spSet(){return (R&&R.les&&R.sp&&R.sp.length)?R.sp:null;}
+function spLocked(){return !!(spSet()&&!(LOG.sp&&LOG.sp.at));}
+function gate(){if(spLocked())return {cur:null,si:-1};var cur=null,ci=-1;((R&&R.secs)||[]).some(function(s,si){return (s.items||[]).some(function(it){if(!LOG.e[it.id]){cur=it.id;ci=si;return true;}return false;});});return {cur:cur,si:ci};}
 /* 시간을 재는 구역은 '시작'을 눌러야 항목을 할 수 있어요 (멈춘 동안에도 잠겨요) */
 function secLock(s){if(!s.tm)return false;var t=tmOf(s);if(!t||!t.s)return true;if(t.e)return false;return !!t.ps;}
 function itemOpen(id,G){
@@ -694,7 +723,7 @@ async function saveLog(){
   if(c.L.hwVideo.n){n.hwVideo=c.L.hwVideo;j.hwVideo=c.L.hwVideo.d===c.L.hwVideo.n?'제출':'미제출';}
   if(c.L.hwPhoto.n){n.hwPhoto=c.L.hwPhoto;j.hwPhoto=c.L.hwPhoto.d===c.L.hwPhoto.n?'제출':'미제출';}
   try{
-    await db.collection('homeLogs').doc(k).set({sid:S,key:R.key||'',les:R.les,e:e,tm:P.tm||{},nr:P.nr||0,j:j,n:n,upd:Date.now()});
+    await db.collection('homeLogs').doc(k).set({sid:S,key:R.key||'',les:R.les,e:e,tm:P.tm||{},nr:P.nr||0,sp:P.sp||null,j:j,n:n,upd:Date.now()});
     if(pendingE===P)pendingE=null;saveFail=false;netPaint();
   }catch(err){console.error(err);saveFail=true;netPaint();clearTimeout(saveT);saveT=setTimeout(saveLog,4000);}
 }
