@@ -79,7 +79,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(228,87,46,.55)}50%{box-shadow:0 0 0 8px rgba(228,87,46,0)}}
 .now{margin:0 4px 2px;font-size:15px;font-weight:700;color:#E4572E}
 .sttw{display:flex;align-items:baseline;justify-content:space-between;gap:6px 14px;flex-wrap:wrap;margin:0 4px 14px}.sttw .stt{margin:0}
-.sttw{justify-content:flex-start;align-items:center}.sttw .tmr{margin-left:auto}
+.sttw{justify-content:flex-start;align-items:center}.sttw .tmr{margin-left:auto}.sttw .rgp{font-size:clamp(14px,3.4vw,17px);font-weight:700;color:#2F4EB5;line-height:1.3}
 .sttw .tbs{display:flex;gap:8px;margin:0 0 0 6px}
 .tbn{min-height:48px;min-width:92px;padding:0 18px;border-radius:14px;border:2px solid #E4572E;background:#fff;color:#B83A14;font-size:clamp(15px,3.2vw,18px);font-weight:900;letter-spacing:-.02em}
 .tbn.pulse{animation:pulse 1.2s ease-in-out infinite}
@@ -316,13 +316,12 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
       <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span><span class="sw" id="hSess" style="display:none"></span></div></div>
       <button class="out" onclick="logout()">나가기</button>
     </div>
-    <div id="revBan" style="display:none;margin:6px 0;padding:10px 12px;border-radius:12px;background:#E8EEFC;color:#2F4EB5;font-weight:800;font-size:15px;text-align:center;line-height:1.4"></div>
     <div id="pauseBan" style="display:none;margin:6px 0;padding:10px 12px;border-radius:12px;background:#FEF3C7;color:#92400E;font-weight:800;font-size:15px;text-align:center">⏸ 시간이 멈춰 있어요. 항목을 체크하면 다시 시작돼요</div>
     <div class="tbar"><span>시작 <b id="tStart">--:--</b></span><div class="tr"><i id="tFill"></i></div><span>끝 <b id="tEnd">--:--</b></span></div>
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-o</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-p</div>
   </div>
 </div>
 
@@ -500,12 +499,10 @@ function _ccRevScope(plan,progress,m0){
     return ls[a]+(z>a?' ~ '+ls[z]:'')+' (진도 '+(a+1)+(z>a?'~'+(z+1):'')+'번)';
   }catch(e){return '';}
 }
+// 복습 범위를 화면용으로 줄여요: '(진도 1~8번)' 제거, Lesson → L
+function _ccRevShort(rs){return String(rs||'').replace(/\s*\(진도[^)]*\)\s*$/,'').replace(/Lesson (\d+)/g,'L$1');}
 function _ccRevLbl(t,plan,p){
   if(!t||!t.sections)return t;
-  // Review(1·2…/전체): 단어(Voca) 구역 항목 뒤에 복습할 범위를 붙여요
-  try{var _rs=_ccRevScope(plan,p);if(_rs){var _rr=_rs.replace(/\s*\(진도[^)]*\)\s*$/,'');
-    t.sections.forEach(function(sc){if(!/voca|단어/i.test(String(sc.title||sc.s||'')+' '+String(sc.grp||'')))return;
-      (sc.items||[]).forEach(function(it){if(it&&it.l&&String(it.l).indexOf('(')<0)it.l=String(it.l).replace(/\s+$/,'')+' ('+_rr+')';});});}}catch(e){}
   var rg=_ccRevRng(plan,p);if(!rg)return t;
   t.sections.forEach(function(sc){(sc.items||[]).forEach(function(it){
     if(it&&it.l&&/문법\s*복습\s*&\s*백지\s*노트\s*시험/.test(it.l)&&it.l.indexOf('(')<0)it.l=it.l.replace(/\s+$/,'')+' ('+rg+')';
@@ -1004,7 +1001,8 @@ function render(){
       _tb='<div class="tbs"><button class="tbn'+(_son?' on':' pulse')+'" onclick="toggle('+curSec+','+_ti+')" aria-label="시작'+(_son?' 완료':'')+'">'+(_son?'✓ 시작':'▶ 시작')+'</button>'
         +'<button class="tbn end'+(_eon?' on':'')+(!_son&&!_eon?' dis':'')+'" onclick="toggle('+curSec+','+_ei+')" aria-label="끝'+(_eon?' 완료':'')+'">'+(_eon?'✓ 끝':'■ 끝')+'</button></div>';
     }
-    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="sttw"><div class="stt">'+esc(_hdTitle(sec))+'</div>'+_tb+'<div class="tmr" id="tmr" style="display:none"></div></div>';
+    var _rvT='';try{_rvT=_ccRevShort(_ccRevScope(S.plan,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:'')));}catch(e){}
+    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="sttw"><div class="stt">'+esc(_hdTitle(sec))+'</div>'+((_rvT&&sec.k!=='hw'&&!/수업 준비/.test(String(sec.title||'')))?'<span class="rgp">'+esc(_rvT)+'</span>':'')+_tb+'<div class="tmr" id="tmr" style="display:none"></div></div>';
     sec.items.forEach(function(it,ii){if(it.role)return;h+=itemHtml(it,curSec,ii);});
   }
   $('list').innerHTML=h;
@@ -1180,7 +1178,6 @@ function paintBar(){
   }
   var lv=[LOG.lv||S.lvl,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:'')].filter(function(x){return x&&String(x).trim();}).join(' · '),el=$('hLv');
   if(el){el.textContent=lv;el.style.display=lv?'inline-flex':'none';}
-  var rvb=$('revBan');if(rvb){var _rv=_ccRevScope(S.plan,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:''));rvb.innerHTML=_rv?'📖 복습 범위<br><span style="font-size:17px">'+esc(_rv)+'</span>':'';rvb.style.display=_rv?'':'none';}
   var st=LOG.startAt,en=LOG.endAt;
   $('tStart').textContent=st?hm(st):'--:--';
   $('tEnd').textContent=en?hm(en):'--:--';
