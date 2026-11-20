@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bn';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bo';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -29951,9 +29951,11 @@ function _spLoad(lv,cb){
   }).catch(function(e){_spEd.busy=false;console.warn(e);toast('불러오지 못했어요: '+((e&&e.message)||e));});
 }
 /* 세트 ↔ 편집용 글자 */
-function _spToWork(ps){return (ps||[]).map(function(p){return {pat:p.pat||'',pk:p.pk||'',wtx:(p.w||[]).map(function(r){return r.join(' | ');}).join('\n'),tx:(p.c||[]).map(function(r){return r.join(' | ');}).join('\n')};});}
+function _spToWork(ps){return (ps||[]).map(function(p){return {pat:p.pat||'',pk:p.pk||'',wtx:(p.w||[]).map(_spRowTx).join('\n'),tx:(p.c||[]).map(_spRowTx).join('\n')};});}
+function _spRowTx(r){if(Array.isArray(r))return r.join(' | ');return (r.k||'')+' | '+(r.e||'')+(r.i?' | '+r.i:'');}
+function _spRowObj(r){var o={k:r[0],e:r[1]};if(r[2])o.i=r[2];return o;}   // Firestore는 배열 안의 배열을 저장할 수 없어서 {k:한글,e:영어,i:이모지} 형태로 저장해요
 function _spParseRows(tx){var ok=[],bad=0;String(tx||'').split(/\r?\n/).forEach(function(l){l=l.trim();if(!l)return;var m=l.split(/\t|\|/).map(function(x){return x.trim();});var ko=m[0],en=m[1],ic=m[2]||'';if(ko&&en)ok.push(ic?[ko,en,ic]:[ko,en]);else bad++;});return {ok:ok,bad:bad};}
-function _spFromWork(work){return work.map(function(p){return {pat:p.pat.trim(),pk:p.pk.trim(),w:_spParseRows(p.wtx).ok,c:_spParseRows(p.tx).ok};}).filter(function(p){return p.c.length||p.w.length;});}
+function _spFromWork(work){return work.map(function(p){return {pat:p.pat.trim(),pk:p.pk.trim(),w:_spParseRows(p.wtx).ok.map(_spRowObj),c:_spParseRows(p.tx).ok.map(_spRowObj)};}).filter(function(p){return p.c.length||p.w.length;});}
 /* 엑셀에서 복사한 표/한 줄 형식을 패턴으로 나눠요: '# 패턴 | 뜻' 줄은 새 패턴, 앞에 숫자가 있는 줄은 단어, 나머지는 문장 */
 function _spParseBulk(raw){
   var ps=[],cur=null;
@@ -30033,7 +30035,8 @@ function _spLv(v){if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어
 function _spLes(i){var les=_spLessons(_spEd.lv);if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어요. 이동할까요?'))return;_spEd.les=les[i];_spEd.work=null;_spEd.dirty=false;_spEd.bulk=false;renderSpSet();}
 function _spWrite(lessons,okMsg){
   var lv=_spEd.lv;
-  return db.collection('config').doc(_spDocId(lv)).set({level:lv,lessons:lessons,upd:Date.now()}).then(function(){_spEd.docs[lv]=lessons;_spEd.dirty=false;toast(okMsg);}).catch(function(e){console.warn(e);toast('저장하지 못했어요: '+((e&&e.message)||e));throw e;});
+  var pr;try{pr=db.collection('config').doc(_spDocId(lv)).set({level:lv,lessons:lessons,upd:Date.now()});}catch(e){console.warn(e);toast('저장하지 못했어요: '+((e&&e.message)||e));return Promise.reject(e);}
+  return pr.then(function(){_spEd.docs[lv]=lessons;_spEd.dirty=false;toast(okMsg);}).catch(function(e){console.warn(e);toast('저장하지 못했어요: '+((e&&e.message)||e));throw e;});
 }
 function _spSave(){
   var ps=_spFromWork(_spWork());
