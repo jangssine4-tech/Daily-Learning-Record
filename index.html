@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-be';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bf';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -30250,9 +30250,12 @@ function _hcSecRename(si,v){
 }
 function _hcRowAdd(si){
   var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;
-  _hcFor(p,function(L){L.forEach(function(sec){if(sec.title===S.title&&!sec.items.some(function(x){return x.l==='새 항목';}))sec.items.push({id:'g'+_bcNewId(),l:'새 항목',link:'hwBook'});});});
-  _hcMark();_hcDraw();toast('이 구역이 있는 모든 레슨에 "새 항목"을 넣었습니다. 이름을 고치고 필요 없는 칸은 ×로 바꿔 주세요');
-  try{var _ns=document.querySelectorAll('#hc-body input[value="새 항목"]');var _ni=_ns[_ns.length-1];if(_ni){_ni.scrollIntoView({block:'nearest'});_ni.focus({preventScroll:true});_ni.select();}}catch(e){}
+  // 같은 이름의 항목은 한 줄로 합쳐지므로, 이미 '새 항목'이 있으면 '새 항목 2', '새 항목 3'…으로 이름을 달리해서 계속 추가돼요
+  var _used={};_hcFor(p,function(L){L.forEach(function(sec){if(sec.title===S.title)sec.items.forEach(function(x){_used[x.l]=1;});});});
+  var _nm='새 항목',_n=1;while(_used[_nm]){_n++;_nm='새 항목 '+_n;}
+  _hcFor(p,function(L){L.forEach(function(sec){if(sec.title===S.title)sec.items.push({id:'g'+_bcNewId(),l:_nm,link:'hwBook'});});});
+  _hcMark();_hcDraw();toast('이 구역이 있는 모든 레슨에 "'+_nm+'"을 넣었습니다. 이름을 고치고 필요 없는 칸은 ×로 바꿔 주세요');
+  try{var _ns=document.querySelectorAll('#hc-body input[value="'+_nm+'"]');var _ni=_ns[_ns.length-1];if(_ni){_ni.scrollIntoView({block:'nearest'});_ni.focus({preventScroll:true});_ni.select();}}catch(e){}
 }
 function _hcRowDel(si,ri){
   var p=_hcWork(),S=_hcRows(p)[si],R=S&&S.items[ri];if(!R)return;
