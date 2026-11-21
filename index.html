@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bq';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-br';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6117,6 +6117,26 @@ function _whPaint(){
     });
     if(totN)body+='<div class="wl-meta">⏱ 시간을 잰 구역 합계 <b>'+_whMin(tot)+'분</b></div>';
     if(!secs.length)body='<div class="wl-meta" style="margin-top:8px">이 레슨에는 집에서 할 숙제가 없어요</div>';
+  }
+  if(_wh.open&&c){
+    try{
+      var _lv=(c.r&&c.r.level)||getStudentLevel(s),_cf=_hcSpFor(_lv,c.les),_sp=x&&x.sp;
+      if(_cf||_sp){
+        var _cs=[];if(_cf&&_cf.ch)_cs.push('ch');if(_cf&&_cf.ps)_cs.push('pt');if(_cf&&_cf.th)_cs.push('th');
+        if(!_cs.length&&_sp&&_sp.c)Object.keys(_sp.c).forEach(function(k){_cs.push(k);});
+        var _nm={ch:'3초 챌린지',pt:'패턴 말하기',th:'내 생각 말하기'},_cc=(_sp&&_sp.c)||{},_st=(_sp&&_sp.st)||{};
+        var _dn=_cs.filter(function(k){return _cc[k];}).length;
+        var sb='<div class="wl-meta" style="margin:8px 0;padding:6px 8px;border-radius:8px;background:#f5f3ff">🗣️ <b>Speak Pop</b> '+(_cs.length&&_dn===_cs.length?'<span style="color:#0f766e;font-weight:800">완료</span>':'<span style="color:#b45309;font-weight:700">'+_dn+'/'+_cs.length+' 코너</span>')+(_sp&&_sp.at?' · '+_wlHM(_sp.at):'');
+        _cs.forEach(function(k){
+          var t=_cc[k],q=_st[k],ex='';
+          if(q&&q.n)ex=' · 한 번에 '+(q.f||0)+'/'+q.n;
+          if(k==='th'&&_sp&&_sp.vid)ex+=' · 🎥 영상 제출';
+          sb+='<div style="margin-top:3px">'+(t?'<span style="color:#0f766e">✓</span>':'<span style="color:var(--txt3)">○</span>')+' '+_nm[k]+(t?' <span style="color:var(--txt3)">'+_wlHM(t)+'</span>':' <span style="color:var(--txt3)">아직</span>')+ex+'</div>';
+        });
+        if(_sp&&_sp.tx&&_sp.tx.some(Boolean))sb+='<div style="margin-top:4px;color:var(--txt2)">💭 '+_sp.tx.filter(Boolean).map(_bcEsc).join(' / ')+'</div>';
+        body+=sb+'</div>';
+      }
+    }catch(e){console.warn('Speak Pop 표시',e);}
   }
   if(_wh.open&&_wh.race){
     var rc=_wh.race,pzd=(rc.prz||{})[rc.round||1],km=(window._hcCls||{})[_wh.sid],rb='<div class="wl-meta" style="margin:8px 0">🏁 레이싱 <b>'+(rc.pos||0)+'/12칸</b> · '+(rc.round||1)+'번째 판'+((rc.days||[]).length?' · 숙제 완료 '+(rc.days||[]).length+'일':'')+(km&&km.mates.length?' · 반: '+km.mates.map(function(m){return _bcEsc(m.n);}).join(', '):'');
