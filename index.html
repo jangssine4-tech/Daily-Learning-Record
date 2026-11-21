@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bp';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bq';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -29773,7 +29773,8 @@ function _hcSpNorm(x){return String(x||'').toLowerCase().replace(/[\s_\-]+/g,'')
 function _hcSpFor(lv,les){
   try{var d=window._spCfg[_spDocId(lv)];if(!d||!les)return null;var ps=d[les];
     if(!ps){var n=_hcSpNorm(les);Object.keys(d).some(function(k){if(_hcSpNorm(k)===n){ps=d[k];return true;}return false;});}
-    return (ps&&ps.ps&&ps.ps.length)?ps.ps:null;}catch(e){return null;}
+    if(!ps)return null;var o={};if(ps.ps&&ps.ps.length)o.ps=ps.ps;if(ps.ch&&ps.ch.length)o.ch=ps.ch;if(ps.th&&ps.th.on)o.th=ps.th;
+    return (o.ps||o.ch||o.th)?o:null;}catch(e){return null;}
 }
 // 이 학생만 빼 둔 숙제(구역 이름|항목 이름)를 학생 홈체크 화면에서 아예 없애요. 항목이 다 빠진 구역도 함께 없애요
 function _hcApplyEx(secs,ex){
@@ -29953,7 +29954,45 @@ window._rwCfg=null;
 /* ── 운영 매뉴얼 > 🗣️ Speak Pop 설정 ──
    레벨마다 문서 하나(config/sp_<레벨>)에 {lessons:{레슨이름:{ps:[{pat,pk,w:[[한글,영어,이모지]],c:[[한글,영어,이모지]]}]}}} 로 저장해요.
    학생 홈체크는 자기 레벨 문서 한 개만 읽어요. */
-var _spEd={lv:'',les:'',docs:{},work:null,dirty:false,bulk:false,busy:false};
+/*SPGEN*/
+var SP_SUBJ=[['I','나는'],['You','너는·너희는'],['We','우리는'],['They','그들은'],['He','그는'],['She','그녀는'],['It','그것은']];
+var SP_FORMS=['pr+','pr-','pr?','pa+','pa-','pa?','fu+','fu-','fu?'];
+function spFLabel(f,modal){var t={pr:'현재',pa:'과거',fu:'미래'}[f.slice(0,2)],p={'+':'긍정','-':'부정','?':'의문'}[f.charAt(2)];return modal?p:t+' · '+p;}
+function spS3(v){v=String(v||'').trim();if(v==='have')return 'has';if(/(s|x|z|ch|sh|o)$/.test(v))return v+'es';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ies';return v+'s';}
+function spEdV(v){v=String(v||'').trim();if(/e$/.test(v))return v+'d';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ied';return v+'ed';}
+/* 주어 s, 형태 f(예: 'pr-')에 맞는 정답을 만들어요. 반환 {a:화면에 보이는 정답, say:읽어 줄 말} */
+function spGen(d,s,f){
+  var th=/^(He|She|It)$/.test(s),lc=s==='I'?'I':s.toLowerCase(),t=f.slice(0,2),p=f.charAt(2),v=String(d.v||'').trim(),r;
+  if(d.t==='be'){
+    if(t==='pr'){var b=s==='I'?'am':(th?'is':'are');r=p==='+'?s+' '+b:p==='-'?s+' '+b+' not':cap(b)+' '+lc;}
+    else if(t==='pa'){var b2=(s==='I'||th)?'was':'were';r=p==='+'?s+' '+b2:p==='-'?s+' '+b2+' not':cap(b2)+' '+lc;}
+    else r=p==='+'?s+' will be':p==='-'?s+' will not be':'Will '+lc+' be';
+  }else if(d.t==='do'){
+    if(t==='pr')r=p==='+'?s+' '+(th?spS3(v):v):p==='-'?s+' '+(th?'does':'do')+' not '+v:(th?'Does ':'Do ')+lc+' '+v;
+    else if(t==='pa')r=p==='+'?s+' '+(String(d.vp||'').trim()||spEdV(v)):p==='-'?s+' did not '+v:'Did '+lc+' '+v;
+    else r=p==='+'?s+' will '+v:p==='-'?s+' will not '+v:'Will '+lc+' '+v;
+  }else{ // modal
+    r=p==='+'?s+' '+v:p==='-'?s+' '+(v==='can'?'cannot':v+' not'):cap(v)+' '+lc;
+  }
+  r=r.replace(/\s+/g,' ').trim();
+  return {a:p==='?'?r+' …?':r,say:r};
+}
+function cap(x){x=String(x||'');return x.charAt(0).toUpperCase()+x.slice(1);}
+function spKo(s){for(var i=0;i<SP_SUBJ.length;i++)if(SP_SUBJ[i][0]===s)return SP_SUBJ[i][1];return '';}
+/* 연습 하나(d)를 '형태별 묶음'으로 펼쳐요: [{label,rows:[{s,ko,a,say}]}] */
+function spUnits(d){
+  var out=[];
+  if(d.t==='custom'){var rows=(d.rows||[]).filter(function(r){return r&&r.s&&r.a;}).map(function(r){return {s:r.s,ko:r.k||'',a:r.a,say:r.a.replace(/[…?]+$/,'').trim()};});
+    if(rows.length)out.push({label:d.nm||'직접 입력',rows:rows});return out;}
+  var modal=d.t==='modal',subs=(d.subj&&d.subj.length?d.subj:SP_SUBJ.map(function(x){return x[0];}));
+  SP_FORMS.forEach(function(f){if((d.f||[]).indexOf(f)<0)return;
+    out.push({label:spFLabel(f,modal),kind:({be:'be동사',do:'일반동사',modal:'조동사'})[d.t],rows:subs.map(function(s){var g=spGen(d,s,f);return {s:s,ko:spKo(s),a:g.a,say:g.say};})});});
+  return out;
+}
+function spDName(d){if(d.nm)return d.nm;if(d.t==='be')return 'be동사';if(d.t==='do')return '일반동사'+(d.v?' ('+d.v+')':'');if(d.t==='modal')return '조동사'+(d.v?' ('+d.v+')':'');return '직접 입력';}
+/*/SPGEN*/
+
+var _spEd={lv:'',les:'',docs:{},work:null,cw:null,tw:null,tab:'pt',dirty:false,bulk:false,busy:false};
 function _spDocId(lv){return 'sp_'+String(lv).replace(/[\/\s]+/g,'_');}
 function _spLevels(){try{return getLevelOrder();}catch(e){return Object.keys(CURRICULUM||{});}}
 function _spLessons(lv){try{return (CURRICULUM[lv]||[]).slice();}catch(e){return [];}}
@@ -29999,13 +30038,17 @@ function renderSpSet(){
   var lv=_spEd.lv;
   if(!_spEd.docs[lv]){host.innerHTML='<div style="padding:20px;color:var(--txt3)">불러오는 중…</div>';_spLoad(lv,renderSpSet);return;}
   var les=_spLessons(lv),doc=_spEd.docs[lv];
-  if(!_spEd.les||les.indexOf(_spEd.les)<0){_spEd.les=les[0]||'';_spEd.work=null;_spEd.dirty=false;}
+  if(!_spEd.les||les.indexOf(_spEd.les)<0){_spEd.les=les[0]||'';_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.dirty=false;}
   if(!_spEd.work)_spEd.work=_spToWork((doc[_spEd.les]||{}).ps);
+  if(!_spEd.cw)_spEd.cw=JSON.parse(JSON.stringify((doc[_spEd.les]||{}).ch||[]));
+  if(!_spEd.tw){var _t0=(doc[_spEd.les]||{}).th;_spEd.tw=_t0?JSON.parse(JSON.stringify(_t0)):{on:0,hints:[]};}
   var h='<style>.sp-g{display:grid;grid-template-columns:230px 1fr 270px;gap:14px;padding:16px;align-items:start}.sp-l div{display:flex;justify-content:space-between;padding:7px 10px;border-radius:9px;cursor:pointer;font-size:13px}.sp-l div:hover{background:var(--surface2,#f1f3f8)}.sp-l .cur{background:var(--navy);color:#fff}.sp-l .ok{color:#0f9d7a;font-weight:800}.sp-l .cur .ok{color:#7cdfb5}.sp-p{border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px}.sp-p textarea,#sp-bulk{box-sizing:border-box}.sp-p input.fi{width:100%;box-sizing:border-box}.sp-p textarea{width:100%;min-height:96px;line-height:1.6}.sp-lab{font-size:12px;font-weight:700;color:var(--txt3);margin:8px 0 4px}.sp-ct{font-size:12px;color:#0f9d7a;font-weight:700;margin-top:3px}@media(max-width:980px){.sp-g{grid-template-columns:1fr}}</style>';
+  h+=_spTabsHtml();
   h+='<div class="sp-g"><div class="card" style="padding:12px"><b style="font-size:14px">레벨 · 레슨</b>'
    +'<select class="fi" style="margin-top:8px" onchange="_spLv(this.value)">'+lvs.map(function(x){return '<option'+(x===lv?' selected':'')+'>'+_bcEsc(x)+'</option>';}).join('')+'</select>'
    +'<div style="font-size:11px;color:var(--txt3);margin:8px 0">세트가 있는 레슨에는 ✓가 보여요. 세트가 없는 레슨은 학생 홈체크에 Speak Pop 버튼이 나오지 않아요.</div>'
-   +'<div class="sp-l" style="max-height:520px;overflow:auto">'+les.map(function(l,i){var has=!!(doc[l]&&doc[l].ps&&doc[l].ps.length);return '<div class="'+(l===_spEd.les?'cur':'')+'" onclick="_spLes('+i+')"><span>'+_bcEsc(l)+'</span><span class="'+(has?'ok':'')+'" style="'+(has?'':'color:#b8bdc9')+'">'+(has?'✓':'—')+'</span></div>';}).join('')+'</div></div>';
+   +'<div class="sp-l" style="max-height:520px;overflow:auto">'+les.map(function(l,i){var has=_spHas(doc[l]);return '<div class="'+(l===_spEd.les?'cur':'')+'" onclick="_spLes('+i+')"><span>'+_bcEsc(l)+'</span><span class="'+(has?'ok':'')+'" style="'+(has?'':'color:#b8bdc9')+'">'+(has?'✓':'—')+'</span></div>';}).join('')+'</div></div>';
+  if(_spEd.tab==='ch')h+=_spChHtml(lv);else if(_spEd.tab==='th')h+=_spThHtml(lv);else{
   h+='<div class="card" style="padding:14px"><b style="font-size:15px">'+_bcEsc(lv)+' · '+_bcEsc(_spEd.les)+'</b> <span style="font-size:12px;color:var(--txt3)">— 이 레슨의 Speak Pop 세트</span>'
    +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">패턴마다 <b>영어 패턴 · 뜻 · 문장</b>을 넣어요. 문장은 엑셀 표를 그대로 붙여 넣거나, 한 줄에 <b>한글 | 영어</b>로 써요. 끝에 <b>| ✏️</b>처럼 이모지를 붙이면 초등 카드에 그림으로 나와요(선택). <b>단어</b>는 패턴 소개 화면의 단어 카드로 쓰여요(선택).</div>';
   h+=_spWork().map(function(p,i){var r=_spParseRows(p.tx),w=_spParseRows(p.wtx);
@@ -30018,9 +30061,84 @@ function renderSpSet(){
    +'<button class="btn btn-navy btn-sm" onclick="_spSave()">💾 저장</button></div>'
    +(_spEd.bulk?'<div style="margin-top:12px"><div class="sp-lab">한 번에 붙여넣기 — 엑셀 표를 그대로 붙여 넣으면 돼요. 패턴은 <b># 패턴 | 뜻</b> 줄로 나눠요 (없으면 패턴 1개로 만들어요)</div><textarea id="sp-bulk" class="fi" style="width:100%;min-height:150px" placeholder="# are | ~들이다&#10;1\t공책들\t\t→\t\tnotebooks&#10;\t공책들이다\t\t→\t\tare notebooks"></textarea><div style="margin-top:6px"><button class="btn btn-navy btn-sm" onclick="_spBulkGo()">패턴으로 나누기</button></div></div>':'')
    +'</div>';
-  h+='<div class="card" style="padding:12px"><b style="font-size:14px">미리보기</b> <span style="font-size:11px;color:var(--txt3)">(학생 폰 화면)</span><div id="sp-pv" style="margin-top:10px">'+_spPv()+'</div></div></div>';
+  }
+  h+='<div class="card" style="padding:12px"><b style="font-size:14px">미리보기</b> <span style="font-size:11px;color:var(--txt3)">(학생 폰 화면)</span><div id="sp-pv" style="margin-top:10px">'+(_spEd.tab==='pt'?_spPv():_spPvOther())+'</div></div></div>';
   host.innerHTML=h;
 }
+function _spHas(x){return !!(x&&((x.ps&&x.ps.length)||(x.ch&&x.ch.length)||(x.th&&x.th.on)));}
+function _spTab(t){_spEd.tab=t;renderSpSet();}
+function _spTabsHtml(){
+  var T=[['pt','🧩 패턴 말하기'],['ch','⏱ 3초 말하기 챌린지'],['th','💡 내 생각 말하기']];
+  return '<div style="display:flex;gap:6px;padding:14px 16px 0">'+T.map(function(t){var on=_spEd.tab===t[0];return '<button class="btn btn-sm '+(on?'btn-navy':'btn-outline')+'" onclick="_spTab(\''+t[0]+'\')">'+t[1]+'</button>';}).join('')+'<span style="font-size:11px;color:var(--txt3);align-self:center;margin-left:8px">코너마다 따로 저장되지 않고, 아래 💾 저장 한 번으로 세 코너가 같이 저장돼요</span></div>';
+}
+/* 저장할 레슨 내용을 만들어요. 검사에 걸리면 false */
+function _spCompose(ps){
+  var L={},ch=(_spEd.cw||[]).filter(function(d){return d;}),th=_spEd.tw||{on:0,hints:[]};
+  for(var i=0;i<ch.length;i++){var d=ch[i];
+    if(d.t==='custom'){d.rows=_spChRows(d._tx!=null?d._tx:_spChTx(d));delete d._tx;if(!d.rows.length){toast('3초 챌린지 '+(i+1)+'번: 직접 입력 줄을 넣어 주세요');return false;}}
+    else{if((d.t==='do'||d.t==='modal')&&!String(d.v||'').trim()){toast('3초 챌린지 '+(i+1)+'번: 동사를 써 주세요');return false;}
+      if(!(d.f||[]).length||!(d.subj||[]).length){toast('3초 챌린지 '+(i+1)+'번: 주어와 말할 형태를 한 개 이상 골라 주세요');return false;}}}
+  if(ps.length)L.ps=ps;
+  if(ch.length)L.ch=ch.map(function(d){var o={t:d.t,sec:+d.sec||3,sh:d.sh===0?0:1};if(d.nm)o.nm=d.nm;
+    if(d.t==='custom')o.rows=d.rows;else{o.v=String(d.v||'').trim();if(d.t==='do')o.vp=String(d.vp||'').trim();o.subj=d.subj.slice();o.f=d.f.slice();}return o;});
+  if(th.on)L.th={on:1,hints:(th.hints||[]).map(function(x){return String(x||'').trim();}).filter(Boolean).slice(0,5)};
+  return (L.ps||L.ch||L.th)?L:null;
+}
+function _spChTx(d){return (d.rows||[]).map(function(r){return r.s+' | '+r.a+(r.k?' | '+r.k:'');}).join('\n');}
+function _spChRows(tx){var o=[];String(tx||'').split(/\r?\n/).forEach(function(l){l=l.trim();if(!l)return;var m=l.split(/\t|\|/).map(function(x){return x.trim();});if(m[0]&&m[1])o.push(m[2]?{s:m[0],a:m[1],k:m[2]}:{s:m[0],a:m[1]});});return o;}
+function _spChNew(){_spEd.cw.push({t:'be',v:'',vp:'',subj:SP_SUBJ.map(function(x){return x[0];}),f:['pr+'],sec:3,sh:1});_spEd.dirty=true;renderSpSet();}
+function _spChDel(i){if(!confirm('이 연습을 지울까요?'))return;_spEd.cw.splice(i,1);_spEd.dirty=true;renderSpSet();}
+function _spChKind(i,t){var d=_spEd.cw[i];d.t=t;if(t==='modal'){d.f=(d.f||[]).filter(function(f){return f.slice(0,2)==='pr';});if(!d.f.length)d.f=['pr+'];if(!d.v)d.v='can';}if(t==='custom'&&!d.rows)d.rows=[];_spEd.dirty=true;renderSpSet();}
+function _spChTog(i,key,val){var d=_spEd.cw[i],a=d[key]||(d[key]=[]),p=a.indexOf(val);if(p<0)a.push(val);else a.splice(p,1);if(key==='subj')d.subj=SP_SUBJ.map(function(x){return x[0];}).filter(function(x){return d.subj.indexOf(x)>=0;});_spEd.dirty=true;renderSpSet();}
+function _spChIn(i,f,v){var d=_spEd.cw[i];d[f]=v;_spEd.dirty=true;var el=document.getElementById('sp-chpv'+i);if(el)el.innerHTML=_spChPv(d);}
+function _spChHtml(lv){
+  var cw=_spEd.cw,h='<div class="card" style="padding:14px"><b style="font-size:15px">'+_bcEsc(lv)+' · '+_bcEsc(_spEd.les)+'</b> <span style="font-size:12px;color:var(--txt3)">— ⏱ 3초 말하기 챌린지</span>'
+   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">주어와 동사를 3초 안에 말하는 매일 연습이에요. <b>연습을 여러 개</b> 만들 수 있고(예: be동사 현재 · be동사 과거), 학생은 형태마다 <b>Step 1(전부 보고 따라 말하기) → Step 2(주어만 보고 3초 안에 말하기)</b>를 해요. 정답은 자동으로 만들어져요.</div>';
+  if(!cw.length)h+='<div style="padding:18px;text-align:center;color:var(--txt3);font-size:13px">아직 연습이 없어요. 아래 ＋ 연습 추가를 눌러 보세요. 이 코너를 비워 두면 학생 화면에 나오지 않아요.</div>';
+  var KS=[['be','be동사'],['do','일반동사'],['modal','조동사'],['custom','직접 입력']];
+  cw.forEach(function(d,i){
+    var modal=d.t==='modal';
+    h+='<div class="sp-p"><div style="display:flex;align-items:center;gap:8px"><b style="background:var(--navy);color:#fff;border-radius:99px;padding:2px 10px;font-size:12px">연습 '+(i+1)+'</b><span style="flex:1"></span><button class="btn btn-outline btn-xs" style="color:#b91c1c;border-color:#fca5a5" onclick="_spChDel('+i+')">삭제</button></div>'
+     +'<div class="sp-lab">종류</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+KS.map(function(k){return '<button class="btn btn-xs '+(d.t===k[0]?'btn-navy':'btn-outline')+'" onclick="_spChKind('+i+',\''+k[0]+'\')">'+k[1]+'</button>';}).join('')+'</div>';
+    if(d.t==='custom'){
+      h+='<div class="sp-lab">이름 (학생 화면 위쪽에 보여요)</div><input class="fi" value="'+_bcEsc(d.nm||'')+'" placeholder="예: 인칭대명사 + 조동사" oninput="_spChIn('+i+',\'nm\',this.value)">'
+       +'<div class="sp-lab">한 줄에 <b>주어 | 정답 | 우리말(선택)</b> — 엑셀 표를 붙여 넣어도 돼요</div><textarea class="fi" style="min-height:110px" oninput="_spChIn('+i+',\'_tx\',this.value)">'+_bcEsc(d._tx!=null?d._tx:_spChTx(d))+'</textarea>';
+    }else{
+      if(d.t!=='be')h+='<div style="display:flex;gap:10px;flex-wrap:wrap"><div><div class="sp-lab">'+(modal?'조동사 (can, will, may, must…)':'동사 원형 (like, study…)')+'</div><input class="fi" style="width:150px" value="'+_bcEsc(d.v||'')+'" oninput="_spChIn('+i+',\'v\',this.value)"></div>'
+        +(d.t==='do'?'<div><div class="sp-lab">과거형 (비워 두면 -ed 자동)</div><input class="fi" style="width:150px" value="'+_bcEsc(d.vp||'')+'" placeholder="예: went" oninput="_spChIn('+i+',\'vp\',this.value)"></div>':'')+'</div>';
+      h+='<div class="sp-lab">주어 (눌러서 켜고 끄기)</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+SP_SUBJ.map(function(x){var on=(d.subj||[]).indexOf(x[0])>=0;return '<button class="btn btn-xs '+(on?'btn-navy':'btn-outline')+'" onclick="_spChTog('+i+',\'subj\',\''+x[0]+'\')">'+x[0]+'</button>';}).join('')+'</div>'
+       +'<div class="sp-lab">말할 형태'+(modal?' (조동사는 현재만)':'')+'</div><table style="border-collapse:collapse;font-size:12px"><tr><th></th><th style="padding:3px 10px">긍정</th><th style="padding:3px 10px">부정</th><th style="padding:3px 10px">의문</th></tr>'
+       +(modal?['pr']:['pr','pa','fu']).map(function(t){return '<tr><th style="padding:3px 10px;text-align:left">'+({pr:'현재',pa:'과거',fu:'미래'})[t]+'</th>'+['+','-','?'].map(function(p){var f=t+p,on=(d.f||[]).indexOf(f)>=0;return '<td style="text-align:center;padding:2px"><button class="btn btn-xs '+(on?'btn-navy':'btn-outline')+'" style="min-width:44px" onclick="_spChTog('+i+',\'f\',\''+f+'\')">'+(on?'✓':'·')+'</button></td>';}).join('')+'</tr>';}).join('')+'</table>';
+    }
+    h+='<div style="display:flex;gap:14px;align-items:center;margin-top:8px;flex-wrap:wrap"><label style="font-size:12px">제한 시간 <input class="fi" type="number" min="1" max="10" style="width:56px" value="'+(+d.sec||3)+'" oninput="_spChIn('+i+',\'sec\',this.value)"> 초</label>'
+     +'<label style="font-size:12px"><input type="checkbox" '+(d.sh===0?'':'checked')+' onchange="_spChIn('+i+',\'sh\',this.checked?1:0)"> Step 2에서 순서 섞기</label></div>'
+     +'<div class="sp-lab">미리보기 (정답은 자동 · 형태마다 Step 1 → Step 2)</div><div id="sp-chpv'+i+'">'+_spChPv(d)+'</div></div>';
+  });
+  h+='<div style="display:flex;gap:8px;align-items:center;margin-top:4px"><button class="btn btn-outline btn-sm" onclick="_spChNew()">＋ 연습 추가</button><span style="flex:1"></span><button class="btn btn-navy btn-sm" onclick="_spSave()">💾 저장</button></div></div>';
+  return h;
+}
+function _spChPv(d){
+  var dd=JSON.parse(JSON.stringify(d));if(dd.t==='custom'){dd.rows=_spChRows(dd._tx!=null?dd._tx:_spChTx(d));}
+  var u=[];try{u=spUnits(dd);}catch(e){}
+  if(!u.length)return '<div style="font-size:12px;color:var(--txt3)">내용을 채우면 여기에 정답이 보여요</div>';
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px">'+u.map(function(x){return '<div style="background:#f6fbf8;border-radius:9px;padding:7px 9px;font-size:12px;line-height:1.55"><b style="color:#0f5c4d">'+_bcEsc(x.label)+'</b><br>'+x.rows.map(function(r){return _bcEsc(r.a);}).join(' · ')+'</div>';}).join('')+'</div>';
+}
+function _spThHtml(lv){
+  var t=_spEd.tw,hs=t.hints||[];
+  var h='<div class="card" style="padding:14px"><b style="font-size:15px">'+_bcEsc(lv)+' · '+_bcEsc(_spEd.les)+'</b> <span style="font-size:12px;color:var(--txt3)">— 💡 내 생각 말하기</span>'
+   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">익힌 패턴을 <b>어떤 상황에서 쓸 수 있을지</b> 생각해서 학생이 5가지 문장을 말해 보는 코너예요. 학생은 상황마다 말하고 ✓를 눌러요(원하면 글로 적어 두기도 해요). 상황 힌트를 비워 두면 기본 상황 5개가 나와요.</div>'
+   +'<label style="font-size:13px;font-weight:700"><input type="checkbox" '+(t.on?'checked':'')+' onchange="_spThOn(this.checked)"> 이 레슨에서 내 생각 말하기를 해요</label>';
+  if(t.on){
+    h+='<div class="sp-lab">상황 힌트 (최대 5개 · 비우면 기본값: 우리 교실에서 / 우리 집에서 / 친구와 함께 / 내가 좋아하는 것 / 오늘 하루 중에)</div>';
+    for(var i=0;i<5;i++)h+='<input class="fi" style="margin-bottom:6px" placeholder="'+(['우리 교실에서','우리 집에서','친구와 함께','내가 좋아하는 것','오늘 하루 중에'])[i]+'" value="'+_bcEsc(hs[i]||'')+'" oninput="_spThHint('+i+',this.value)">';
+    h+='<div style="font-size:11px;color:var(--txt3)">패턴은 이 레슨의 패턴 말하기에 넣은 패턴이 자동으로 위에 보여요.</div>';
+  }
+  h+='<div style="display:flex;margin-top:10px"><span style="flex:1"></span><button class="btn btn-navy btn-sm" onclick="_spSave()">💾 저장</button></div></div>';
+  return h;
+}
+function _spThOn(v){_spEd.tw.on=v?1:0;_spEd.dirty=true;renderSpSet();}
+function _spThHint(i,v){var h=_spEd.tw.hints||(_spEd.tw.hints=[]);while(h.length<5)h.push('');h[i]=v;_spEd.dirty=true;}
+function _spPvOther(){return '<div style="font-size:12px;line-height:1.7;color:var(--txt2)">'+(_spEd.tab==='ch'?'학생 화면 순서<br>① 형태 이름 칩(예: be동사 · 현재 의문)<br>② Step 1 — 주어 + 동사를 한꺼번에 보고 따라 말하기<br>③ Step 2 — 주어만 보고 3초 안에 말하기<br>④ 정답 확인 → ✓ 말했어요 / 🔁 다시 볼래요':'학생 화면<br>패턴(예: are ~)이 위에 보이고,<br>상황 5칸마다 문장을 말한 뒤 ✓를 눌러요.')+'</div>';}
 function _spWork(){return _spEd.work||[];}
 function _spCt(r,lb){return (lb||'문장')+' '+r.ok.length+'개'+(r.bad?' <span style="color:#e8590c">· 형식이 맞지 않는 줄 '+r.bad+'개</span>':'');}
 function _spPv(){
@@ -30046,8 +30164,8 @@ function _spBulkGo(){
   _spEd.work=(_spEd.work||[]).filter(function(p){return p.pat||p.pk||p.tx||p.wtx;}).concat(ps);_spEd.dirty=true;_spEd.bulk=false;renderSpSet();
   toast('패턴 '+ps.length+'개로 나눴어요. 패턴 이름과 뜻을 채워 주세요');
 }
-function _spLv(v){if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어요. 이동할까요?')){renderSpSet();return;}_spEd.lv=v;_spEd.les='';_spEd.work=null;_spEd.dirty=false;renderSpSet();}
-function _spLes(i){var les=_spLessons(_spEd.lv);if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어요. 이동할까요?'))return;_spEd.les=les[i];_spEd.work=null;_spEd.dirty=false;_spEd.bulk=false;renderSpSet();}
+function _spLv(v){if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어요. 이동할까요?')){renderSpSet();return;}_spEd.lv=v;_spEd.les='';_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.dirty=false;renderSpSet();}
+function _spLes(i){var les=_spLessons(_spEd.lv);if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어요. 이동할까요?'))return;_spEd.les=les[i];_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.dirty=false;_spEd.bulk=false;renderSpSet();}
 function _spWrite(lessons,okMsg){
   var lv=_spEd.lv;
   var pr;try{pr=db.collection('config').doc(_spDocId(lv)).set({level:lv,lessons:lessons,upd:Date.now()});}catch(e){console.warn(e);toast('저장하지 못했어요: '+((e&&e.message)||e));return Promise.reject(e);}
@@ -30058,13 +30176,14 @@ function _spSave(){
   var bad=ps.filter(function(p){return !p.pat;});
   if(ps.length&&bad.length){toast('영어 패턴을 비워 두었어요. 패턴 이름을 써 주세요');return;}
   var lessons={};Object.keys(_spEd.docs[_spEd.lv]||{}).forEach(function(k){lessons[k]=_spEd.docs[_spEd.lv][k];});
-  if(ps.length)lessons[_spEd.les]={ps:ps};else delete lessons[_spEd.les];
-  _spWrite(lessons,ps.length?'✅ 저장했어요 · 학생 홈체크에 Speak Pop이 나와요':'세트를 비워 저장했어요 (이 레슨은 Speak Pop이 나오지 않아요)').then(function(){_spEd.work=null;renderSpSet();}).catch(function(){});
+  var _L=_spCompose(ps);if(_L===false)return;
+  if(_L)lessons[_spEd.les]=_L;else delete lessons[_spEd.les];
+  _spWrite(lessons,_L?'✅ 저장했어요 · 학생 홈체크에 Speak Pop이 나와요':'세트를 비워 저장했어요 (이 레슨은 Speak Pop이 나오지 않아요)').then(function(){_spEd.work=_spEd.cw=_spEd.tw=null;renderSpSet();}).catch(function(){});
 }
 function _spDelSet(){
   if(!confirm('"'+_spEd.les+'" 레슨의 Speak Pop 세트를 지울까요?'))return;
   var lessons={};Object.keys(_spEd.docs[_spEd.lv]||{}).forEach(function(k){if(k!==_spEd.les)lessons[k]=_spEd.docs[_spEd.lv][k];});
-  _spWrite(lessons,'지웠어요').then(function(){_spEd.work=null;renderSpSet();}).catch(function(){});
+  _spWrite(lessons,'지웠어요').then(function(){_spEd.work=_spEd.cw=_spEd.tw=null;renderSpSet();}).catch(function(){});
 }
 
 var _rwEd={work:null,dirty:false,pane:'set',rows:null};
