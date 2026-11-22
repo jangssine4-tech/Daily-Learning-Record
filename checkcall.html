@@ -61,6 +61,8 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .dt{margin-top:4px;font-size:clamp(14px,3vw,18px);color:#4A4F5E;font-weight:500;letter-spacing:-.01em}
 .out{margin-left:auto;display:inline-flex;align-items:center;background:transparent;color:#1F2433;font-size:15px;font-weight:600;padding:10px 16px;border-radius:12px;border:1.5px solid #A59E8E;white-space:nowrap}
 .out:active{background:rgba(0,0,0,.06)}
+.rf{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;background:transparent;color:#1F2433;font-size:22px;font-weight:700;border-radius:12px;border:1.5px solid #A59E8E;flex:none;line-height:1}
+.rf:active{background:rgba(0,0,0,.06)}.rf+.out{margin-left:0}
 .tbar{display:flex;align-items:center;gap:14px;margin-bottom:16px;color:#1F2433;font-size:clamp(13px,2.8vw,17px);white-space:nowrap}
 .tbar b{font-size:clamp(17px,4vw,22px);font-variant-numeric:tabular-nums}
 .tbar .tr{flex:1;height:12px;border-radius:6px;background:#DDD6C6;overflow:hidden}
@@ -318,6 +320,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div id="snd" style="display:none;position:fixed;left:12px;right:12px;bottom:70px;z-index:40;pointer-events:none;margin:0;padding:9px 14px;border-radius:12px;background:#FFF1D6;color:#7A4B00;font-size:14px;font-weight:700;text-align:center">소리가 꺼져 있어요. 화면을 한 번 터치하면 벨 소리가 켜져요</div>
     <div class="top">
       <div><div class="hello" id="hName"></div><div class="dt"><span id="hDate"></span><span class="lv" id="hLv" style="display:none"></span><span class="sw" id="hSess" style="display:none"></span></div></div>
+      <button class="rf" onclick="rfApp()" aria-label="새로고침" title="새로고침">↻</button>
       <button class="out" onclick="logout()">나가기</button>
     </div>
     <div id="pauseBan" style="display:none;margin:6px 0;padding:10px 12px;border-radius:12px;background:#FEF3C7;color:#92400E;font-weight:800;font-size:15px;text-align:center">⏸ 시간이 멈춰 있어요. 항목을 체크하면 다시 시작돼요</div>
@@ -325,7 +328,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-v</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-w</div>
   </div>
 </div>
 
@@ -798,7 +801,7 @@ function openSession(sid,data,sess){
     S.gotChk=true;render();
   },function(e){console.error(e);toast('연결이 끊겼어요. 잠시만 기다려 주세요');});
   unsubLog=logRef().onSnapshot(function(d){
-    if(!S)return;var x=d.exists?d.data():{};x.e=x.e||{};x.v=x.v||{};LOG=x;S.gotLog=true;render();try{rwRefresh();}catch(e){}
+    if(!S)return;var x=d.exists?d.data():{};x.e=x.e||{};x.v=x.v||{};LOG=x;S.gotLog=true;if(!x.rw){SB.ok={};SB.res=null;}if(!x.fin){try{if($('sDone').classList.contains('on'))show('sMain');if(RW.open&&!x.rw)rwClose();}catch(e){}}render();try{rwRefresh();}catch(e){}
   },function(e){console.error(e);});
   // 시작 시간 = 오늘 처음 로그인한 순간 (이미 있으면 유지), 끝 시간은 다시 비움
   logRef().get().then(function(snap){
@@ -861,6 +864,7 @@ async function carryOver(){
   u.co={d:bd,n:n};   // 시도했다는 표시: 오늘 다시 열어도 또 찾지 않아요
   try{await logRef().set(u,{merge:true});if(n)toast('어제 하던 것을 이어서 불러왔어요 ('+n+'개)');}catch(e){console.warn(e);}
 }
+function rfApp(){try{toast('새로고침 중이에요…');}catch(e){}setTimeout(function(){location.reload();},250);}
 function logout(){
   try{rwClose();RW.prev=null;}catch(e){}
   if(S){try{

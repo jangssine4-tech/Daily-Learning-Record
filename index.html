@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-cb';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cc';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6070,11 +6070,26 @@ function _wlStop(){
   if(_wl.unsubC){try{_wl.unsubC();}catch(e){}}
   _wl.unsubL=_wl.unsubC=null;_wl.sid=_wl.date=null;_wl.sess=1;_wl.log=null;_wl.checks={};
 }
-function _wlRefresh(ev){   // 수동 새로고침: 체크콜 연결을 끊었다가 다시 맺어요
+async function _wlRefresh(ev){   // 처음부터 다시: 학생 체크·점수·마무리·황금카드·오늘 검사 기록을 지우고, 받은 스탬프는 스탬프북에서 빼요
   if(ev)ev.stopPropagation();
-  var sid=_wl.sid;if(!sid||_wl.rf)return;
-  _wl.rf=true;_wlStop();_wlShow(sid);
-  setTimeout(function(){_wl.rf=false;try{_wlPaint();}catch(e){}toast('↻ 체크콜을 새로 불러왔어요');},900);
+  var sid=_wl.sid,date=_wl.date,sess=_wl.sess;if(!sid||!db||_wl.rf)return;
+  var s=students.find(function(x){return x.id===sid;}),nm=(s&&s.name)||'',ref=date+'_'+sid+(sess===2?'_2':''),got=0;
+  try{var sd=await db.collection('stampBook').doc(sid).get();if(sd.exists&&sd.data().since)got=((sd.data().got||{})[ref])|0;}catch(e){}
+  if(!confirm(nm+' 학생의 '+date+(sess===2?' 2회차':'')+' 체크콜을 처음부터 다시 시작할까요?\n\n지워지는 것: 학생이 체크한 항목·점수·마무리 기록·황금카드, 이 날짜의 검사 받기 기록(요청·통과·점수)\n'+(got>0?'스탬프북에서 이번 체크콜로 받은 '+got+'개를 뺍니다.':'이번 체크콜로 받은 스탬프는 없어서 스탬프북은 그대로예요.')+'\n\n되돌릴 수 없어요.'))return;
+  _wl.rf=true;try{_wlPaint();}catch(e){}
+  try{
+    var ded=0;
+    if(got>0)await _sbChange(sid,function(f){var g=f.got[ref]|0;if(!g)return;ded=Math.min(g,f.bal);f.bal-=ded;delete f.got[ref];var m=f.mo[date.slice(0,7)];if(m)m.in=Math.max(0,(m.in||0)-g);if(ded>0)f.log.push({t:Date.now(),d:todayISO(),k:'adj',n:-ded,m:'체크콜 다시 하기'});});
+    var q=await db.collection('bookChecks').where('studentId','==',sid).where('date','==',date).get(),bt=db.batch(),n=0;
+    q.forEach(function(d){var x=d.data();if((x.sess===2?2:1)!==sess)return;bt.delete(d.ref);n++;});
+    if(n)await bt.commit();
+    var lr=db.collection('checkLogs').doc(_ccDocId(date,sid,sess)),od=await lr.get(),o=od.exists?od.data():{};
+    var nd={date:date,studentId:sid,studentName:o.studentName||nm,startAt:Date.now(),co:{d:'',n:0}};if(o.pl)nd.pl=o.pl;if(sess===2)nd.sess=2;
+    await lr.set(nd);
+    try{_sbReload();}catch(e){}
+    toast('↻ 처음부터 다시 할 수 있게 초기화했어요'+(got>0?' (스탬프 '+ded+'개 차감'+(ded<got?', 잔액이 모자라 '+(got-ded)+'개는 못 뺐어요':'')+')':''));
+  }catch(e){console.warn(e);toast('⚠️ 초기화하지 못했어요: '+((e&&e.message)||e));}
+  _wl.rf=false;try{_wlPaint();}catch(e){}
 }
 function _wlOpenToggle(){
   _wl.open=!_wl.open;
@@ -6347,7 +6362,7 @@ function _wlPaint(){
   var _po=_wlPsOpen(),_pm=_wlPsMin();
   var _pb=(_wl.log&&_wl.log.startAt&&!L.fin)?'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 9px;'+(_po?'background:#fef3c7;border-color:#f59e0b;color:#92400e':'')+'" onclick="_wlPause(event)" title="학생 체크콜의 시간을 멈추거나 다시 시작해요">'+(_po?'▶ 재개':'⏸ 멈춤')+'</button>':'';
   if(_pm>0||_po)chips.unshift('<span style="color:#92400e;font-weight:700">⏸ 멈춤 '+_pm+'분'+(_po?' (멈춤 중)':'')+'</span>');
-  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b>'+_wlUnpBadge(L)+_wlCiHtml()+_pb+'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px" onclick="_wlRefresh(event)" title="체크콜 연결을 다시 맺고 최신 상태를 불러와요">'+(_wl.rf?'…':'↻ 새로고침')+'</button><span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>';
+  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b>'+_wlUnpBadge(L)+_wlCiHtml()+_pb+'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px" onclick="_wlRefresh(event)" title="학생 체크콜을 처음부터 다시 하게 초기화해요 (받은 스탬프는 빼요)">'+(_wl.rf?'…':'↻ 처음부터 다시')+'</button><span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>';
   var meta='';
   if(_wl.log){
     meta='<div style="margin-top:7px"><div style="height:7px;border-radius:5px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#0f766e':'#3b82f6')+'"></div></div>'
