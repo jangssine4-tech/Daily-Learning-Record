@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ca';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cb';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6070,6 +6070,12 @@ function _wlStop(){
   if(_wl.unsubC){try{_wl.unsubC();}catch(e){}}
   _wl.unsubL=_wl.unsubC=null;_wl.sid=_wl.date=null;_wl.sess=1;_wl.log=null;_wl.checks={};
 }
+function _wlRefresh(ev){   // 수동 새로고침: 체크콜 연결을 끊었다가 다시 맺어요
+  if(ev)ev.stopPropagation();
+  var sid=_wl.sid;if(!sid||_wl.rf)return;
+  _wl.rf=true;_wlStop();_wlShow(sid);
+  setTimeout(function(){_wl.rf=false;try{_wlPaint();}catch(e){}toast('↻ 체크콜을 새로 불러왔어요');},900);
+}
 function _wlOpenToggle(){
   _wl.open=!_wl.open;
   try{localStorage.setItem('wl_open',_wl.open?'1':'0');}catch(e){}
@@ -6341,7 +6347,7 @@ function _wlPaint(){
   var _po=_wlPsOpen(),_pm=_wlPsMin();
   var _pb=(_wl.log&&_wl.log.startAt&&!L.fin)?'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 9px;'+(_po?'background:#fef3c7;border-color:#f59e0b;color:#92400e':'')+'" onclick="_wlPause(event)" title="학생 체크콜의 시간을 멈추거나 다시 시작해요">'+(_po?'▶ 재개':'⏸ 멈춤')+'</button>':'';
   if(_pm>0||_po)chips.unshift('<span style="color:#92400e;font-weight:700">⏸ 멈춤 '+_pm+'분'+(_po?' (멈춤 중)':'')+'</span>');
-  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b>'+_wlUnpBadge(L)+_wlCiHtml()+_pb+'<span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>';
+  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b>'+_wlUnpBadge(L)+_wlCiHtml()+_pb+'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px" onclick="_wlRefresh(event)" title="체크콜 연결을 다시 맺고 최신 상태를 불러와요">'+(_wl.rf?'…':'↻ 새로고침')+'</button><span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>';
   var meta='';
   if(_wl.log){
     meta='<div style="margin-top:7px"><div style="height:7px;border-radius:5px;background:var(--surface2);overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'#0f766e':'#3b82f6')+'"></div></div>'
