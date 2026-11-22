@@ -1977,7 +1977,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bu';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bv';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6213,7 +6213,6 @@ function _wlShow(sid){
   var date=($('r-date')&&$('r-date').value)||todayISO();
   var sess=1;try{sess=_ccSess(s,date,window._currentSessionTime||'');}catch(e){}
   p.style.display='';
-  try{_wlUnpLoad(sid);}catch(e){}
   if(_wl.open===undefined){try{_wl.open=localStorage.getItem('wl_open')==='1';}catch(e){_wl.open=false;}}
   if(_wl.sid===sid&&_wl.date===date&&_wl.sess===sess){_wlPaint();return;}
   _wlStop();_wl.sid=sid;_wl.date=date;_wl.sess=sess;
@@ -6345,7 +6344,7 @@ function _wlPaint(){
   }else{
     meta='<div class="wl-meta" style="color:var(--txt3);margin:7px 0 0">아직 체크콜을 시작하지 않았어요 ('+_wl.date+')</div>';
   }
-  el.innerHTML=head+meta+_wlRwHtml(L)+(_wl.open?_wlUnpPastHtml():'')+(_wl.open?'<div style="margin-top:8px">'+h+'</div>':'');
+  el.innerHTML=head+meta+_wlRwHtml(L)+(_wl.open?'<div style="margin-top:8px">'+h+'</div>':'');
 }
 (function(){
   var st=document.createElement('style');
@@ -30380,7 +30379,6 @@ function _rwDrawRows2(){
 function _rwGive(docId,on,fromList){
   db.collection('checkLogs').doc(docId).set({rw:{given:!!on,givenAt:Date.now()}},{merge:true}).then(function(){
     toast(on?'지급 완료로 표시했어요':'되돌렸어요');
-    try{_wlUnpDrop(docId,on);}catch(e){}
     if(fromList){var r=(_rwEd.rows||[]).filter(function(x){return x.id===docId;})[0];if(r){r.R.given=!!on;_rwDrawRows2();}}
   }).catch(function(e){toast('⚠️ 저장 실패');console.warn(e);});
 }
@@ -30393,30 +30391,11 @@ function _wlAtt(lv){
   db.collection('checkLogs').doc(_ccDocId(_wl.date,_wl.sid,_wl.sess)).set(u,{merge:true}).then(function(){toast(cur===lv?'수업 태도 표시를 지웠어요':'수업 태도: '+lv);}).catch(function(e){console.warn(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
 /* ── 학습 일지: 미지급 카드 상품 표시 (지급 대기 탭 대신 체크콜 · 홈체크 이름 오른편에 보여요) ── */
-var _wlUnp={sid:null,list:[],busy:false};
 function _wlUnpText(R){return _rwPicked(R).filter(function(c){return c.t!=='stamp';}).map(_rwPrizeText).join(' + ');}
-function _wlUnpLoad(sid){
-  if(!db||!sid)return;if(_wlUnp.sid===sid&&(_wlUnp.busy||_wlUnp.ok))return;
-  _wlUnp={sid:sid,list:[],busy:true,ok:false};
-  db.collection('checkLogs').where('studentId','==',sid).get().then(function(q){
-    if(_wlUnp.sid!==sid)return;var L=[];
-    q.forEach(function(d){var x=d.data(),R=x.rw;if(R&&R.pick!==undefined&&R.cards&&R.cards[R.pick]&&!R.given){var t=_wlUnpText(R);if(t)L.push({id:d.id,date:x.date,text:t});}});
-    L.sort(function(a,b){return a.date<b.date?1:-1;});_wlUnp={sid:sid,list:L,busy:false,ok:true};try{_wlPaint();}catch(e){}
-  }).catch(function(e){console.warn('미지급 조회',e);_wlUnp.busy=false;});
-}
-function _wlUnpDrop(id,given){
-  if(_wlUnp.ok){var L=_wlUnp.list.filter(function(x){return x.id!==id;});if(!given){/* 되돌리기: 다시 목록에 넣으려고 다시 읽어요 */_wlUnp.ok=false;_wlUnp.sid=null;_wlUnpLoad(_wl.sid);return;}_wlUnp.list=L;}
-  try{_wlPaint();}catch(e){}
-}
-function _wlUnpPast(){var cur=_ccDocId(_wl.date,_wl.sid,_wl.sess);return (_wlUnp.sid===_wl.sid?_wlUnp.list:[]).filter(function(x){return x.id!==cur;});}
-function _wlUnpBadge(L){
+function _wlUnpBadge(L){   // 이미 읽고 있는 오늘 기록만 써요 (추가 읽기 없음)
   var R=L&&L.rw,t='';if(R&&R.pick!==undefined&&R.cards&&R.cards[R.pick]&&!R.given)t=_wlUnpText(R);
-  var n=_wlUnpPast().length;if(!t&&!n)return '';
-  return '<span style="font-size:11px;font-weight:800;color:#b45309;background:#fef3c7;border-radius:8px;padding:1px 7px;white-space:nowrap">🎁 미지급'+(t?' · '+_bcEsc(t):'')+(n?(t?' 외 ':' · 지난 수업 ')+n+'건':'')+'</span>';
-}
-function _wlUnpPastHtml(){
-  var P=_wlUnpPast();if(!P.length)return '';
-  return '<div style="margin-top:6px;font-size:12px;background:#fffbeb;border-radius:8px;padding:6px 8px"><div style="font-weight:800;color:#92400e;margin-bottom:3px">🎁 아직 안 준 지난 상품</div>'+P.map(function(x){return '<div style="display:flex;gap:6px;align-items:center;margin-top:2px"><span style="color:var(--txt3)">'+_bcEsc(String(x.date||'').slice(5))+'</span><b style="flex:1">'+_bcEsc(x.text)+'</b><button class="btn btn-navy btn-xs" onclick="event.stopPropagation();_rwGive(\''+x.id+'\',true)">지급 완료</button></div>';}).join('')+'</div>';
+  if(!t)return '';
+  return '<span style="font-size:11px;font-weight:800;color:#b45309;background:#fef3c7;border-radius:8px;padding:1px 7px;white-space:nowrap">🎁 미지급 · '+_bcEsc(t)+'</span>';
 }
 function _wlRwHtml(L){
   var c=window._rwCfg;if(!c||c.enabled===0||!_wl.log)return '';
