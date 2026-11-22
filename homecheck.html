@@ -358,7 +358,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zk</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zl</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -730,6 +730,7 @@ function sbOpen(){
   Promise.all([sbLoad(true),sbImgLoad()]).then(sbPaint);
 }
 function sbClose(){var el=$('sbk');if(el)el.classList.remove('on');if(R)render();}
+function sbMonth(l){var m=function(t){var d=new Date(t||0);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');},k=m(Date.now());return (l||[]).filter(function(e){return m(e.t)===k;});}   /* 내역은 이번 달에 기록된 것만 보관해요 (다음 달 1일이면 초기화) */
 function sbMD(d){var m=/^\d{4}-(\d\d)-(\d\d)/.exec(d||'');return m?(+m[1])+'/'+(+m[2]):'';}
 function skGem(p){
   var C=110,R=84,P=[],i,cl=['#ff7db0','#ff4d8d','#e8206a','#ff5c9a','#f0357a','#ff86b5'],f='',a;
@@ -765,7 +766,7 @@ function sbPaint(){
     h+='<div class="sk-hero">'+skGem('a')+''
       +'<div class="sk-pt">'+skParts()+'</div><div class="sk-num"><b id="skN" style="font-size:'+fs+'px">'+bal+'</b><span>스탬프</span></div></div>'
       +'<div class="sk-sh"><h2>모은 스탬프 <em>'+bal+'개</em></h2><div class="sk-sl">'+sl+'</div>';
-    var L=(d.log||[]).slice().reverse().slice(0,15);
+    var L=sbMonth(d.log).reverse().slice(0,15);
     h+='<h2>최근 내역</h2>'+(L.length?L.map(function(e,k){
       var n=e.n|0,lb=e.m||SB_KIND[e.k]||'';
       return '<div class="sk-li'+(e.u?' u':'')+'" style="--i:'+Math.min(k,12)+'"><span>'+esc(sbMD(e.d))+'</span>'+esc(lb)+'<em class="'+(n>=0?'p':'m')+'">'+(n>0?'+':'')+n+'</em></div>';
@@ -829,7 +830,7 @@ function sbBuyGo(){
   db.runTransaction(function(tx){return tx.get(dr).then(function(d){
     if(!d.exists||!d.data().since)throw new Error('nobook');
     var b=d.data(),bal=b.bal||0;if(bal<cost)throw new Error('short');
-    var log=(b.log||[]).concat([{t:Date.now(),d:today,k:'buy',n:-cost,m:it.name+' 교환',i:it.id}]);if(log.length>30)log=log.slice(-30);
+    var log=sbMonth(b.log).concat([{t:Date.now(),d:today,k:'buy',n:-cost,m:it.name+' 교환',i:it.id}]);if(log.length>30)log=log.slice(-30);
     var mo=JSON.parse(JSON.stringify(b.mo||{})),m=mo[mk]||{in:0,out:0};m.out=(m.out||0)+cost;mo[mk]=m;
     tx.set(dr,{bal:bal-cost,log:log,mo:mo,upd:Date.now()},{mergeFields:['bal','log','mo','upd']});
     return bal-cost;
