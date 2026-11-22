@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ce';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cf';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6070,6 +6070,26 @@ function _wlStop(){
   if(_wl.unsubC){try{_wl.unsubC();}catch(e){}}
   _wl.unsubL=_wl.unsubC=null;_wl.sid=_wl.date=null;_wl.sess=1;_wl.log=null;_wl.checks={};
 }
+/* 선생님이 수업 태도를 평가하면, 그걸 기다리던 체크콜 스탬프를 학생 화면이 없어도 스탬프북에 자동으로 넣어요 (체크콜이 남겨 둔 rwx 값으로 계산) */
+var _wlRwBusy={};
+function _wlRwAuto(L,sid,date,sess){
+  var x=L&&L.rwx;if(!x||!x.pend||x.done||!L.att||!db)return;
+  var A={'매우 우수':3,'우수':2,'산만함':1,'수업 방해':0},ref=date+'_'+sid+(sess===2?'_2':''),lk='k'+ref;if(_wlRwBusy[lk])return;_wlRwBusy[lk]=1;
+  var ok=A[L.att]!==undefined&&A[L.att]>=A[x.attMin||'우수'],total=(x.n0|0)+(ok?(x.na|0):0),all=!!x.allNA&&(!x.attReq||ok),dr=db.collection('stampBook').doc(sid),res=0;
+  db.runTransaction(function(tx){return tx.get(dr).then(function(d){
+    if(!d.exists)return;var b=d.data();if(!b.since||date<b.since)return;
+    var bal=b.bal||0,got=Object.assign({},b.got||{}),prev=got[ref]||0,delta=total-prev;if(delta===0)return;
+    got[ref]=total;var cd=new Date();cd.setDate(cd.getDate()-14);var cut=cd.getFullYear()+'-'+String(cd.getMonth()+1).padStart(2,'0')+'-'+String(cd.getDate()).padStart(2,'0');
+    Object.keys(got).forEach(function(k){if(k!==ref&&k.slice(0,10)<cut)delete got[k];});
+    var log=(b.log||[]).concat([{t:Date.now(),d:date,k:'cc',n:delta,r:ref}]);if(log.length>30)log=log.slice(-30);
+    var mo=Object.assign({},b.mo||{}),mk=date.slice(0,7),m=Object.assign({in:0,out:0},mo[mk]||{});m.in+=delta;mo[mk]=m;
+    tx.set(dr,{bal:bal+delta,log:log,got:got,mo:mo,upd:Date.now()},{mergeFields:['bal','log','got','mo','upd']});res=delta;
+  });}).then(function(){
+    var u={rwx:{done:true,total:total}};if(!(L.rw&&L.rw.pick!==undefined))u.rw={ok:all,at:Date.now()};
+    var lr=db.collection('checkLogs').doc(_ccDocId(date,sid,sess));
+    return lr.set(u,{merge:true}).then(function(){if(res>0)toast('⭐ 체크콜 스탬프 '+res+'개를 스탬프북에 넣었어요');try{_sbReload();}catch(e){}});
+  }).catch(function(e){console.warn('[rwAuto]',e);}).then(function(){delete _wlRwBusy[lk];});
+}
 async function _wlRefresh(ev){   // 처음부터 다시: 학생 체크·점수·마무리·황금카드·오늘 검사 기록을 지우고, 받은 스탬프는 스탬프북에서 빼요
   if(ev)ev.stopPropagation();
   var sid=_wl.sid,date=_wl.date,sess=_wl.sess;if(!sid||!db||_wl.rf)return;
@@ -6245,7 +6265,7 @@ function _wlShow(sid){
   _wlStop();_wl.sid=sid;_wl.date=date;_wl.sess=sess;
   try{
     _wl.unsubL=db.collection('checkLogs').doc(_ccDocId(date,sid,sess)).onSnapshot(function(snap){
-      if(_wl.sid!==sid)return;_wl.log=snap.exists?snap.data():null;_wlPaint();try{_sbOnLog();}catch(e){}
+      if(_wl.sid!==sid)return;_wl.log=snap.exists?snap.data():null;_wlPaint();try{_sbOnLog();}catch(e){}try{_wlRwAuto(_wl.log,sid,date,sess);}catch(e){console.warn(e);}
     },function(e){console.warn('wl log',e);});
     _wl.unsubC=db.collection('bookChecks').where('studentId','==',sid).where('date','==',date).onSnapshot(function(snap){
       if(_wl.sid!==sid)return;_wl.checks={};snap.forEach(function(d){var x=d.data();if((x.sess===2?2:1)!==sess)return;_wl.checks[x.item]=x;});_wlPaint();

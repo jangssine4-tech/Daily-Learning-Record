@@ -328,7 +328,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-x</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-y</div>
   </div>
 </div>
 
@@ -1445,8 +1445,9 @@ function rwEval(){
   }
   var rows=c.conds.filter(function(x){return x.on;}).map(function(x){var r=t(x.t,x.min);r.c=x;return r;}).filter(function(r){return !r.na;});
   var pend=rows.some(function(r){return r.c.req&&r.pend;}),all=!pend&&rows.filter(function(r){return r.c.req;}).every(function(r){return r.ok;});
-  var n=0;(c.stamps||[]).forEach(function(s){if(!s.on)return;var r=t(s.t,s.min);if(!r.na&&r.ok)n+=(s.n||1);});
-  return {rows:rows,all:all,pend:pend,n:n};
+  var n=0,n0=0,na=0;(c.stamps||[]).forEach(function(s){if(!s.on)return;var r=t(s.t,s.min);if(!r.na&&r.ok)n+=(s.n||1);if(s.t==='att')na+=(s.n||1);else if(!r.na&&r.ok)n0+=(s.n||1);});
+  var allNA=rows.filter(function(r){return r.c.req&&r.c.t!=='att';}).every(function(r){return r.ok;}),attReq=rows.some(function(r){return r.c.req&&r.c.t==='att';});
+  return {rows:rows,all:all,pend:pend,n:n,n0:n0,na:na,allNA:allNA,attReq:attReq,attMin:c.attMin||'우수'};
 }
 function rwLoadPrev(cb){
   if(RW.prev){cb();return;}
@@ -1511,6 +1512,11 @@ function rwFinal(st){
    +'<div class="cards'+(nc>3?' c'+nc:'')+'">'+st.cards.map(function(c,i){return '<div class="card flip '+(pks.indexOf(i)>=0?'pick':'dim')+'">'+rwFront()+rwBack(c)+'</div>';}).join('')+'</div>'
    +'<div class="msg">'+(bonus?'⭐ 오늘 스탬프 '+st.base+' + '+bonus+' = <b>'+(st.base+bonus)+'개</b>'+(hasGift?' · 상품은 선생님께 보여 주세요':''):'⭐ 오늘 스탬프 <b>'+st.base+'개</b> · 선생님께 보여 주세요')+'</div>'+sbStrip();
 }
+function rwxSave(ev){   // 선생님 태도 평가를 기다리는 중이면, 선생님 화면이 대신 스탬프를 넣을 수 있게 계산에 필요한 값을 남겨요
+  if(!ev.pend||(LOG.rwx&&LOG.rwx.pend))return;
+  var x={pend:true,n0:ev.n0|0,na:ev.na|0,allNA:!!ev.allNA,attReq:!!ev.attReq,attMin:ev.attMin,at:Date.now()};
+  LOG.rwx=x;try{logRef().set({rwx:x},{merge:true});}catch(e){}
+}
 function rwSaveOk(ev){   // 연속 계산에 쓰이도록 오늘 조건 달성 여부를 기록
   if(ev.pend||(LOG.rw&&LOG.rw.ok===ev.all))return;
   LOG.rw=Object.assign({},LOG.rw||{},{ok:ev.all});
@@ -1521,7 +1527,7 @@ function rwRender(animate){
   if(!c){rwClose();return;}
   var st=LOG.rw;
   if(st&&st.pick!==undefined&&st.cards&&st.cards[st.pick]){RW.busy=false;el.innerHTML=rwFinal(st);sbEnsure(rwTotal(st));return;}
-  var ev=rwEval();rwSaveOk(ev);
+  var ev=rwEval();rwSaveOk(ev);rwxSave(ev);
   if(!ev.pend&&!ev.all&&ev.n>0)sbEnsure(ev.n);
   var area=ev.pend?'<div class="fade"><div class="ttl sm">⏳ 선생님이 확인하고 있어요</div><div class="msg">조금만 기다려 주세요!</div></div>':(ev.all?rwCardsArea(ev):rwFailArea(ev));
   if(!animate){RW.busy=false;el.innerHTML='<div class="ttl sm">오늘의 약속 확인!</div>'+rwRows(ev,true)+area;return;}
