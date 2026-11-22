@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bz';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ca';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -30479,10 +30479,7 @@ function _sbTDraw(){
       +L.map(function(s){var d=docs[s.id],v=_sbT.vals[s.id];return '<tr><td>'+_bcEsc(s.name)+'</td><td>'+(d&&d.since?'⭐ '+(d.bal|0):'<span style="color:var(--txt3)">시작 전</span>')+'</td><td><input type="number" min="0" class="fi sbt-in" value="'+(v===undefined?(d&&d.since?(d.bal|0):''):v)+'" oninput="_sbTIn(\''+s.id+'\',this.value)"></td></tr>';}).join('')+'</tbody></table>'
       +'<div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-green" onclick="_sbTSave()" '+(_sbT.busy?'disabled':'')+'>💾 시작 잔액으로 저장</button><button class="btn btn-outline" onclick="_sbTMode()">닫기</button></div>';
   }else{
-    h+=(L.length?'<table class="rw-t" style="max-width:640px"><thead><tr><th>학생</th><th>스탬프 잔액</th><th>이번 달 받음</th><th>이번 달 씀</th><th>마지막 활동</th></tr></thead><tbody>'
-      +L.map(function(s){var d=docs[s.id];if(!d||!d.since)return '<tr><td>'+_bcEsc(s.name)+'</td><td colspan="4" style="color:var(--txt3)">시작 전</td></tr>';
-        var m=(d.mo||{})[mk]||{},lg=(d.log||[]).filter(function(e){return e.k!=='undo'&&!e.u;}),la=lg.length?lg[lg.length-1]:null;
-        return '<tr><td>'+_bcEsc(s.name)+'</td><td><b>⭐ '+(d.bal|0)+'</b></td><td>'+(m.in|0)+'</td><td>'+(m.out|0)+'</td><td style="color:var(--txt2)">'+(la?_bcEsc(_sbMD(la.d)+' '+(la.m||_SB_KIND[la.k]||'')):'-')+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="et">학생이 없어요</div></div>');
+    h+=_sbTStats(L,docs);
   }
   /* 스탬프 그림 */
   var cur=_sbT.pend||_sbT.img;
@@ -30494,6 +30491,45 @@ function _sbTDraw(){
     +(_sbT.img&&!_sbT.pend?'<button class="btn btn-outline btn-xs" onclick="_sbImgReset()">기본 별 모양으로</button>':'')+'</div></div></div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-top:8px">큰 그림은 자동으로 128px로 줄여서 저장해요. 모든 학생이 같은 그림을 써요. 학생 화면은 다음에 열 때 바뀌어요.</div></div>';
   b.innerHTML=h;
+}
+/* ── 월간 통계 (월 선택 · 정렬 · 합계 · 복사 · 학생별 내역) ── */
+function _sbTMonths(docs){var set={},k;set[todayISO().slice(0,7)]=1;Object.keys(docs).forEach(function(id){var mo=(docs[id]||{}).mo||{};for(k in mo)set[k]=1;});return Object.keys(set).sort();}
+function _sbTRows(L,docs,mk){
+  return L.map(function(s){var d=docs[s.id];if(!d||!d.since)return {s:s,no:true};
+    var m=(d.mo||{})[mk]||{},lg=(d.log||[]).filter(function(e){return e.k!=='undo'&&!e.u;}),la=lg.length?lg[lg.length-1]:null;
+    return {s:s,d:d,bal:d.bal|0,in:m.in|0,out:m.out|0,la:la};});
+}
+function _sbTStats(L,docs){
+  var ms=_sbTMonths(docs),mk=_sbT.mk&&ms.indexOf(_sbT.mk)>=0?_sbT.mk:ms[ms.length-1];_sbT.mk=mk;
+  var i=ms.indexOf(mk),rows=_sbTRows(L,docs,mk),st=_sbT.sort||'name',dr=_sbT.dir||1;
+  if(st!=='name')rows.sort(function(a,b){if(a.no&&b.no)return 0;if(a.no)return 1;if(b.no)return -1;return (b[st]-a[st])*dr;});
+  var tot={bal:0,in:0,out:0,n:0};rows.forEach(function(r){if(!r.no){tot.bal+=r.bal;tot.in+=r.in;tot.out+=r.out;tot.n++;}});
+  var ic='<img src="'+_SHOP_ST+'" alt="" style="width:14px;height:14px;vertical-align:-2px;margin-right:3px">';
+  function th(k,t){return '<th style="cursor:pointer;white-space:nowrap" onclick="_sbTSort(\''+k+'\')">'+t+(st===k&&k!=='name'?' ▼':'')+'</th>';}
+  var h='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">'
+    +'<button class="btn btn-outline btn-xs" '+(i<=0?'disabled':'')+' onclick="_sbTMonth(-1)">◀</button><b style="font-size:14px">'+mk.replace('-','년 ')+'월</b>'
+    +'<button class="btn btn-outline btn-xs" '+(i>=ms.length-1?'disabled':'')+' onclick="_sbTMonth(1)">▶</button>'
+    +'<span style="flex:1"></span><button class="btn btn-outline btn-xs" onclick="_sbTCopy()">📋 엑셀용 복사</button></div>';
+  h+='<div style="font-size:11px;color:var(--txt3);margin-bottom:6px">받음 = 체크콜 자동 적립(되돌린 건 제외), 씀 = 상품 교환. 선생님이 직접 가감한 개수는 월 통계에 넣지 않고 잔액에만 반영돼요. 머리글을 누르면 정렬돼요.</div>';
+  if(!L.length)return h+'<div class="empty"><div class="et">학생이 없어요</div></div>';
+  h+='<table class="rw-t" style="max-width:720px"><thead><tr>'+th('name','학생')+th('bal','현재 잔액')+th('in','받음')+th('out','씀')+'<th>마지막 활동</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    if(r.no){h+='<tr><td>'+_bcEsc(r.s.name)+'</td><td colspan="4" style="color:var(--txt3)">시작 전</td></tr>';return;}
+    var la=r.la,open=_sbT.open===r.s.id;
+    h+='<tr style="cursor:pointer" onclick="_sbTOpen(\''+r.s.id+'\')"><td>'+(open?'▾ ':'▸ ')+_bcEsc(r.s.name)+'</td><td><b>'+ic+r.bal+'</b></td><td>'+r.in+'</td><td>'+r.out+'</td><td style="color:var(--txt2)">'+(la?_bcEsc(_sbMD(la.d)+' '+(la.m||_SB_KIND[la.k]||'')):'-')+'</td></tr>';
+    if(open){var L2=(r.d.log||[]).slice().reverse();
+      h+='<tr><td colspan="5" style="background:var(--surface2)">'+(L2.length?L2.map(function(e){var n=e.n|0;return '<div style="display:flex;gap:10px;font-size:12px;padding:2px 0'+(e.u?';opacity:.45;text-decoration:line-through':'')+'"><span style="color:var(--txt3);width:44px">'+_bcEsc(_sbMD(e.d))+'</span><span style="flex:1">'+_bcEsc(e.m||_SB_KIND[e.k]||'')+'</span><b style="color:'+(n>=0?'#158a4a':'#dc2626')+'">'+(n>0?'+':'')+n+'</b></div>';}).join('')+'<div style="font-size:10px;color:var(--txt3);margin-top:4px">최근 30건까지만 보관돼요</div>':'<span style="color:var(--txt3);font-size:12px">내역이 없어요</span>')+'</td></tr>';}
+  });
+  h+='<tr style="font-weight:700;background:var(--surface2)"><td>합계 ('+tot.n+'명)</td><td>'+ic+tot.bal+'</td><td>'+tot.in+'</td><td>'+tot.out+'</td><td></td></tr></tbody></table>';
+  return h;
+}
+function _sbTMonth(dv){var docs=_sbT.docs||{},ms=_sbTMonths(docs),i=ms.indexOf(_sbT.mk)+dv;if(i<0||i>=ms.length)return;_sbT.mk=ms[i];_sbT.open=null;_sbTDraw();}
+function _sbTSort(k){if(k==='name'){_sbT.sort='name';}else{_sbT.sort=k;_sbT.dir=1;}_sbTDraw();}
+function _sbTOpen(id){_sbT.open=_sbT.open===id?null:id;_sbTDraw();}
+function _sbTCopy(){
+  var docs=_sbT.docs||{},rows=_sbTRows(_sbTList(),docs,_sbT.mk),t='학생\t현재 잔액\t'+_sbT.mk+' 받음\t'+_sbT.mk+' 씀\n';
+  rows.forEach(function(r){t+=r.no?r.s.name+'\t시작 전\t\t\n':r.s.name+'\t'+r.bal+'\t'+r.in+'\t'+r.out+'\n';});
+  try{navigator.clipboard.writeText(t).then(function(){toast('📋 복사했어요. 엑셀에 붙여넣으세요');},function(){toast('복사하지 못했어요');});}catch(e){toast('복사하지 못했어요');}
 }
 function _sbTMode(){
   if(_sbT.mode&&_sbT.dirty&&!confirm('입력한 내용이 저장되지 않았어요. 닫을까요?'))return;
