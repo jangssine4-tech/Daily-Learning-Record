@@ -1454,6 +1454,53 @@ var _DB_TASK_TYPE_ICONS={'일반 업무':'📋','이달의 할 일':'📅'};
 var _dbTypeFilter='';
 var _promoLoaded=false;
 var currentGoalsTab='annual', currentSummaryTab='summary', currentRefTab='fees';
+/* ── 저장하지 않은 변경 알림: 저장 없이 다른 화면·탭으로 넘어가면 사라지는 편집 화면을 한곳에서 확인해요 ── */
+function _unsavedList(){
+  var L=[];
+  try{if(_rwEd&&_rwEd.dirty)L.push('보상 설정');}catch(e){}
+  try{if(_hcEd&&Object.keys(_hcEd.dirty||{}).length)L.push('홈체크 Plan 설정');}catch(e){}
+  try{if(_ccEd&&Object.keys(_ccEd.dirty||{}).length)L.push('체크콜 단계별 계획표');}catch(e){}
+  try{if(_spEd&&_spEd.dirty)L.push('Speak Pop 설정');}catch(e){}
+  try{if(window._brandDirty)L.push('앱 로고 설정');}catch(e){}
+  try{if(_bcDirty())L.push('체크콜 기본 점검 항목');}catch(e){}
+  return L;
+}
+function _unsavedDiscard(){
+  try{_rwEd.dirty=false;_rwEd.work=null;}catch(e){}
+  try{_hcEd.dirty={};_hcEd.work={};}catch(e){}
+  try{if(_ccEd){_ccEd.dirty={};_ccEd.work={};}}catch(e){}
+  try{_spEd.dirty=false;_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.bulk=false;}catch(e){}
+  try{window._brandDirty=false;}catch(e){}
+  try{_bcEd=null;}catch(e){}
+}
+function _bcSnap(){return JSON.stringify([_bcEd.tpl,_bcEd.totalMin]);}
+function _bcDirty(){
+  if(!_bcEd||!_bcEd.snap)return false;
+  if(document.getElementById('bced-body'))_bcEdSync();
+  return _bcSnap()!==_bcEd.snap;
+}
+function _unsavedBubble(list,onGo){
+  var old=document.getElementById('unsaved-bub');if(old)old.remove();
+  var o=document.createElement('div');o.id='unsaved-bub';
+  o.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.28);display:flex;align-items:center;justify-content:center;padding:16px';
+  o.innerHTML='<style>@keyframes ubPop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}</style>'
+   +'<div style="position:relative;background:#fff;border:2px solid #f59e0b;border-radius:22px;padding:22px 22px 18px;max-width:340px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.28);text-align:center;animation:ubPop .18s ease-out">'
+   +'<div style="font-size:30px;line-height:1">⚠️</div>'
+   +'<div style="font-size:17px;font-weight:800;color:#92400e;margin:8px 0 4px">저장하지 않은 변경이 있어요</div>'
+   +'<div style="font-size:13px;color:#475569;line-height:1.6">저장을 누르고 이동해 주세요.<br>그냥 이동하면 바꾼 내용이 사라져요.</div>'
+   +'<div style="margin:10px 0 14px;font-size:12px;font-weight:700;color:#b45309;background:#fffbeb;border-radius:10px;padding:7px 10px">'+list.map(function(x){return '· '+String(x).replace(/</g,'&lt;');}).join('<br>')+'</div>'
+   +'<button id="ub-stay" style="width:100%;border:0;border-radius:12px;padding:12px;font-size:15px;font-weight:800;background:#0f766e;color:#fff;cursor:pointer">돌아가서 저장하기</button>'
+   +'<button id="ub-go" style="width:100%;border:0;background:transparent;margin-top:8px;font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:underline">저장 안 하고 이동</button></div>';
+  document.body.appendChild(o);
+  var close=function(){o.remove();};
+  o.onclick=function(e){if(e.target===o)close();};
+  o.querySelector('#ub-stay').onclick=close;
+  o.querySelector('#ub-go').onclick=function(){close();try{onGo&&onGo();}catch(e){console.warn(e);}};
+}
+window.addEventListener('beforeunload',function(e){
+  if(_unsavedList().length){e.preventDefault();e.returnValue='저장하지 않은 변경이 있어요';return e.returnValue;}
+});
+
 var makeupViewYear=new Date().getFullYear(), makeupViewMonth=new Date().getMonth();
 var siblingCount=0, _goalTargets={};
 
@@ -1930,7 +1977,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bs';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bt';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3899,7 +3946,7 @@ function _ccTabVis(){var sb=document.getElementById('reftab-spset');if(sb)sb.sty
 document.addEventListener('click',function(){var h=document.getElementById('ccrost-help');if(h)h.style.display='none';h=document.getElementById('hcrost-help');if(h)h.style.display='none';});
 function _hcRostHelp(){var b=document.getElementById('hcrost-help');if(b)b.style.display=b.style.display==='block'?'none':'block';}
 function _ccRostHelp(){var b=document.getElementById('ccrost-help');if(b)b.style.display=b.style.display==='block'?'none':'block';}
-function _ccPaneGo(k){_ccPaneCur=k;renderCcSet();}
+function _ccPaneGo(k){if(k!==_ccPaneCur&&!window._unsavedPass){var _ul=_unsavedList();if(_ul.length){_unsavedBubble(_ul,function(){_unsavedDiscard();_ccPaneCur=k;renderCcSet();});return;}}_ccPaneCur=k;renderCcSet();}
 function _ccTabletHtml(){
   return '<div style="max-width:640px;font-size:13px;line-height:1.7;color:var(--txt2)">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn btn-navy btn-sm" onclick="_bcCopyTabletLink()">🔗 태블릿 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR()">📷 QR 코드 보기</button><span style="position:relative;display:inline-flex;gap:4px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_bcSyncRoster(true)">🔄 체크콜 명단 갱신</button><button type="button" onclick="event.stopPropagation();_ccRostHelp()" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--txt2);font-weight:800;font-size:13px;cursor:pointer;padding:0" aria-label="도움말">?</button>'
@@ -3961,7 +4008,7 @@ function _bcOpenSettings(host){
   if(!_ccCan('cc_common')){toast('관리자만 편집할 수 있어요');return;}
   var old=document.getElementById('modal-bcset');if(old)old.remove();
   var cfg=window._bcConfig||{};
-  _bcEd={key:'default',tpl:_bcClone(cfg.templates||{}),view:null,totalMin:cfg.totalMin||CC_DEFAULT_MINUTES};
+  _bcEd={key:'default',tpl:_bcClone(cfg.templates||{}),view:null,totalMin:cfg.totalMin||CC_DEFAULT_MINUTES};_bcEd.snap=_bcSnap();
   var m=host||document.createElement('div');
   if(!host){m.id='modal-bcset';m.className='mo';m.dataset.dynamic='1';m.style.display='flex';
   m.onclick=function(e){if(e.target===m)m.remove();};}
@@ -4102,6 +4149,7 @@ async function _bcSaveSettings(){
   try{
     await db.collection('config').doc('checkTemplates').set({templates:templates,totalMin:_bcEd.totalMin||CC_DEFAULT_MINUTES});
     var m=document.getElementById('modal-bcset');if(m)m.remove();
+    try{_bcEd.snap=_bcSnap();}catch(e){}
     toast('✅ 저장 — 태블릿에 자동 반영돼요');
   }catch(e){toast('⚠️ 저장 실패');console.warn(e);}
 }
@@ -5891,6 +5939,14 @@ function initYearSelects(which){
 
 // OPTIMIZED goto - ensures populate only when needed
 function goto(view){
+  if(view!==window._curView&&!window._unsavedPass){
+    var _ul=_unsavedList();
+    if(_ul.length){
+      if(window._gotoFromPop){try{window.history.pushState({view:window._curView},'',window.location.pathname+'#'+window._curView);}catch(e){}}
+      _unsavedBubble(_ul,function(){_unsavedDiscard();window._unsavedPass=1;try{goto(view);}finally{window._unsavedPass=0;}});
+      return;
+    }
+  }
   var _prevView=window._curView;window._curView=view;
   if(view!=='hwreview'&&typeof hwrStop==='function')hwrStop();
   // 학습일지(write)에서 다른 페이지로 이동 시 카메라 스트림 자동 종료
@@ -23808,7 +23864,7 @@ function renderTuitionTable(){
   el.innerHTML='<div style="font-size:13px;color:var(--txt3);margin-bottom:10px">교육비 기준표를 한눈에 확인할 수 있습니다. 수정은 <b>교육비 기준</b> 탭에서 하세요.</div>'
     +'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:13px">'+thead+tbody+'</table></div>';
 }
-function switchRefTab(tab){_ccTabVis();if(tab==='ccset'&&!_ccCanAny())tab='fees';if(tab==='hcset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='rwset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='spset'&&!_ccCan('cc_plan'))tab='fees';currentRefTab=tab;['fees','tuitiontable','curriculum','eval','classes','guides','ccset','hcset','rwset','spset'].forEach(function(t){var btn=$('reftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('ref-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='fees')renderRefFees();else if(tab==='tuitiontable')renderTuitionTable();else if(tab==='curriculum')renderRefCurriculum();else if(tab==='eval')renderEvalModulesPage();else if(tab==='guides')renderRefGuides();else if(tab==='ccset')renderCcSet();else if(tab==='hcset')renderHcSet();else if(tab==='rwset')renderRwSet();else if(tab==='spset')renderSpSet();else if(tab==='classes'){var el=$('class-list-ref');if(el){if(!classes.length){el.innerHTML='<div class="empty"><div class="ei">🏫</div><div class="et">모듈이 없습니다</div></div>';}else{el.innerHTML=classes.map(function(cls2){var stuCount=students.filter(function(s){return s.classId===cls2.id;}).length;return'<div class="card" style="padding:14px;cursor:pointer;margin-bottom:10px" onclick="openClassModal(\''+cls2.id+'\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:14px;font-weight:700">'+cls2.name+'</div><div style="font-size:11px;color:var(--txt3);margin-top:2px">담임: '+(cls2.teacher||'-')+' · 학생: '+stuCount+'명</div></div><span class="badge bg-gray">'+(cls2.evalModule||'평가 없음')+'</span></div></div>';}).join('');}};}}
+function switchRefTab(tab){if(tab!==currentRefTab&&!window._unsavedPass){var _ul=_unsavedList();if(_ul.length){_unsavedBubble(_ul,function(){_unsavedDiscard();window._unsavedPass=1;try{switchRefTab(tab);}finally{window._unsavedPass=0;}});return;}}_ccTabVis();if(tab==='ccset'&&!_ccCanAny())tab='fees';if(tab==='hcset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='rwset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='spset'&&!_ccCan('cc_plan'))tab='fees';currentRefTab=tab;['fees','tuitiontable','curriculum','eval','classes','guides','ccset','hcset','rwset','spset'].forEach(function(t){var btn=$('reftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('ref-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='fees')renderRefFees();else if(tab==='tuitiontable')renderTuitionTable();else if(tab==='curriculum')renderRefCurriculum();else if(tab==='eval')renderEvalModulesPage();else if(tab==='guides')renderRefGuides();else if(tab==='ccset')renderCcSet();else if(tab==='hcset')renderHcSet();else if(tab==='rwset')renderRwSet();else if(tab==='spset')renderSpSet();else if(tab==='classes'){var el=$('class-list-ref');if(el){if(!classes.length){el.innerHTML='<div class="empty"><div class="ei">🏫</div><div class="et">모듈이 없습니다</div></div>';}else{el.innerHTML=classes.map(function(cls2){var stuCount=students.filter(function(s){return s.classId===cls2.id;}).length;return'<div class="card" style="padding:14px;cursor:pointer;margin-bottom:10px" onclick="openClassModal(\''+cls2.id+'\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:14px;font-weight:700">'+cls2.name+'</div><div style="font-size:11px;color:var(--txt3);margin-top:2px">담임: '+(cls2.teacher||'-')+' · 학생: '+stuCount+'명</div></div><span class="badge bg-gray">'+(cls2.evalModule||'평가 없음')+'</span></div></div>';}).join('');}};}}
 // ── 운영안 Firestore 연동 ──────────────────────────────
 var _opGuides = null; // Firestore에서 불러온 운영안 목록
 var _opGuidesLoaded = false;
@@ -30186,8 +30242,8 @@ function _spBulkGo(){
   _spEd.work=(_spEd.work||[]).filter(function(p){return p.pat||p.pk||p.tx||p.wtx;}).concat(ps);_spEd.dirty=true;_spEd.bulk=false;renderSpSet();
   toast('패턴 '+ps.length+'개로 나눴어요. 패턴 이름과 뜻을 채워 주세요');
 }
-function _spLv(v){if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어요. 이동할까요?')){renderSpSet();return;}_spEd.lv=v;_spEd.les='';_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.dirty=false;renderSpSet();}
-function _spLes(i){var les=_spLessons(_spEd.lv);if(_spEd.dirty&&!confirm('저장하지 않은 내용이 있어요. 이동할까요?'))return;_spEd.les=les[i];_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.dirty=false;_spEd.bulk=false;renderSpSet();}
+function _spLv(v){if(_spEd.dirty){renderSpSet();_unsavedBubble(['Speak Pop 설정'],function(){_spEd.dirty=false;_spLv(v);});return;}_spEd.lv=v;_spEd.les='';_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.dirty=false;renderSpSet();}
+function _spLes(i){var les=_spLessons(_spEd.lv);if(_spEd.dirty){_unsavedBubble(['Speak Pop 설정'],function(){_spEd.dirty=false;_spLes(i);});return;}_spEd.les=les[i];_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.dirty=false;_spEd.bulk=false;renderSpSet();}
 function _spWrite(lessons,okMsg){
   var lv=_spEd.lv;
   var pr;try{pr=db.collection('config').doc(_spDocId(lv)).set({level:lv,lessons:lessons,upd:Date.now()});}catch(e){console.warn(e);toast('저장하지 못했어요: '+((e&&e.message)||e));return Promise.reject(e);}
@@ -30961,7 +31017,7 @@ function _brandOpen(){
   var p=document.getElementById('ref-panel-brand');if(p)p.innerHTML='';
   _brandRedraw();
 }
-function _brandClose(){var m=document.getElementById('modal-brand');if(m)m.remove();window._brandDirty=false;_brandDraft=null;var p=document.getElementById('ref-panel-brand');if(p&&p.style.display!=='none')_brandRedraw();}
+function _brandClose(force){if(window._brandDirty&&force!==true){_unsavedBubble(['앱 로고 설정'],function(){_brandClose(true);});return;}var m=document.getElementById('modal-brand');if(m)m.remove();window._brandDirty=false;_brandDraft=null;var p=document.getElementById('ref-panel-brand');if(p&&p.style.display!=='none')_brandRedraw();}
 function _brandRedraw(){
   var host=_brandHost();if(!host)return;
   if(!currentUser||currentUser.role!=='admin'){host.innerHTML='<div class="empty"><div class="et">관리자만 볼 수 있어요</div></div>';return;}
