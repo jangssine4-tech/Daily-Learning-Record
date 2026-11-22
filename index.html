@@ -1930,7 +1930,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-br';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bs';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -29963,10 +29963,12 @@ async function _hcJournal(){
 /* ── 운영 매뉴얼 > 보상 설정 (황금카드) ── */
 var RW_TYPES={cc:'체크콜 자동 판정',hw:'숙제 완료',quiz:'Quiz 점수',dict:'받아쓰기 점수',att:'수업 태도(일지)'};
 var RW_DAYN=['일','월','화','수','목','금','토'];
+var _RW_FAILS=['조금만 더 힘내요! 내일은 꼭 뽑을 수 있어요 🌈','오늘은 아쉬웠지만 괜찮아요! 내일 다시 도전해요 💪','카드까지 한 걸음 남았어요. 내일은 꼭 해낼 수 있어요 ✨','실수해도 괜찮아요. 포기하지 않는 우리가 멋져요 🌟','오늘 배운 것도 큰 성장이에요! 내일 또 만나요 🐣','내일은 황금카드가 기다리고 있을 거예요. 힘내요 🎴'];
+function _rwFailList(w){var L=Array.isArray(w.failMsgs)?w.failMsgs.slice():[];if(!L.length&&w.failMsg)L=[w.failMsg];_RW_FAILS.forEach(function(m){if(L.length<6&&L.indexOf(m)<0)L.push(m);});while(L.length<6)L.push('');return L.slice(0,6);}
 function _rwDefault(){return {enabled:1,days:[1,2,3,4,5,6,0],bmin:1,bmax:5,grace:1,attMin:'우수',minGap:3,pct:60,
-  failMsg:'조금만 더 힘내요! 내일은 꼭 뽑을 수 있어요 🌈',special:'특별 상 (원장님이 정해요)',
+  failMsg:'조금만 더 힘내요! 내일은 꼭 뽑을 수 있어요 🌈',failMsgs:_RW_FAILS.slice(),special:'특별 상 (원장님이 정해요)',
   std:{'Phonics':[15,15],'Basic':[25,25],'Grammar Plus':[25,25],'Prime':[35,30],'Advanced':[35,30],'First Grammar':[35,30],'Elite':[35,30]},
-  tiers:[{days:3,eff:'cards',val:4},{days:5,eff:'stampPlus',val:2},{days:10,eff:'special',val:0}],
+  tiers:[{days:3,eff:'cards',val:4,pk:2},{days:5,eff:'stampPlus',val:2},{days:10,eff:'special',val:0,sv:''}],
   conds:[{on:1,req:1,t:'cc',l:'체크콜을 하나하나 꼼꼼히 잘했어요!',min:0},{on:1,req:1,t:'att',l:'수업 태도가 좋아요!',min:0},{on:1,req:1,t:'hw',l:'숙제를 다 했어요!',min:0},{on:1,req:1,t:'quiz',l:'Quiz 90점 이상!',min:90},{on:1,req:0,t:'dict',l:'받아쓰기 100점!',min:100}],
   stamps:[{on:1,t:'hw',l:'숙제 완료',min:0,n:1},{on:1,t:'quiz',l:'Quiz 90점 이상',min:90,n:1},{on:1,t:'quiz',l:'Quiz 100점',min:100,n:1},{on:1,t:'dict',l:'받아쓰기 만점',min:100,n:1}],
   prizes:[{n:'보너스 스탬프',t:'stamp',w:38},{n:'캔디',t:'snack',w:17},{n:'초콜릿',t:'snack',w:17},{n:'과자',t:'snack',w:5},{n:'자리 고르기 쿠폰',t:'coupon',w:7},{n:'선생님 도우미 쿠폰',t:'coupon',w:6},{n:'보드게임 5분 쿠폰',t:'coupon',w:5},{n:'칭찬 편지 쿠폰',t:'coupon',w:5}]};}
@@ -30207,7 +30209,10 @@ function _spDelSet(){
 }
 
 var _rwEd={work:null,dirty:false,pane:'set',rows:null};
-function _rwW(){if(!_rwEd.work)_rwEd.work=JSON.parse(JSON.stringify(window._rwCfg||_rwDefault()));return _rwEd.work;}
+function _rwW(){if(!_rwEd.work){_rwEd.work=JSON.parse(JSON.stringify(window._rwCfg||_rwDefault()));var w=_rwEd.work;
+  if(!Array.isArray(w.failMsgs)||w.failMsgs.length<6){w.failMsgs=_rwFailList(w);if(window._rwCfg)_rwEd.dirty=true;}
+  (w.tiers||[]).forEach(function(t){if(window._rwCfg&&t.days===3&&t.eff==='cards'&&t.pk===undefined){t.pk=2;_rwEd.dirty=true;}});}
+  return _rwEd.work;}
 function _rwMark(){_rwEd.dirty=true;var b=document.getElementById('rw-dirty');if(b)b.style.display='';}
 function _rwStart(){
   try{db.collection('config').doc('rewards').onSnapshot(function(d){
@@ -30259,21 +30264,23 @@ function _rwDrawSet(){
   h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:10px">학생이 <b>체크콜(태블릿 수업 체크)</b>을 마치면 황금카드 뽑기가 나와요. 저장하기 전에는 학생 태블릿에 아무것도 나오지 않아요. 홈체크(레이싱) 설정은 옆 「🏠 홈체크 보상 설정」 탭에 있어요.</div>';
   h+='<label style="display:flex;gap:8px;align-items:center;font-weight:800;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:9px 12px;cursor:pointer"><input type="checkbox"'+(w.enabled!==0?' checked':'')+' onchange="_rwTop(\'enabled\',this.checked?1:0)"> 🎁 황금카드 보상 사용 <span style="font-weight:400;font-size:11px;color:var(--txt3)">(끄면 학생 화면에 아무것도 나오지 않아요)</span></label>';
   h+='<div class="rw-h">🏆 카드를 뽑을 수 있는 조건 <span style="font-weight:400;font-size:11px;color:var(--txt3)">"필수"인 조건이 모두 맞아야 카드가 나와요 · 필수가 아니면 보너스 줄이에요 · 오늘 수업에 퀴즈·받아쓰기·숙제가 없으면 그 조건은 건너뛰어요</span></div>'+_rwDrawRows('conds');
-  h+='<div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px"><label>수업 태도 통과 기준 <select class="fi" style="width:auto" onchange="_rwTop(\'attMin\',this.value)"><option value="우수"'+(w.attMin!=='매우 우수'?' selected':'')+'>우수 이상</option><option value="매우 우수"'+(w.attMin==='매우 우수'?' selected':'')+'>매우 우수만</option></select></label><label style="flex:1;min-width:240px">조건이 안 맞을 때 문구 <input class="fi" style="width:100%" value="'+_bcEsc(w.failMsg||'')+'" onchange="_rwTop(\'failMsg\',this.value)"></label></div>';
+  h+='<div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px"><label>수업 태도 통과 기준 <select class="fi" style="width:auto" onchange="_rwTop(\'attMin\',this.value)"><option value="우수"'+(w.attMin!=='매우 우수'?' selected':'')+'>우수 이상</option><option value="매우 우수"'+(w.attMin==='매우 우수'?' selected':'')+'>매우 우수만</option></select></label></div>';
+  h+='<div style="margin-top:8px;font-size:12px"><b>조건이 안 맞을 때 문구</b> <span style="color:var(--txt3)">6가지 중 하루에 하나가 학생마다 랜덤으로 나와요 (같은 날에는 다시 열어도 같은 문구) · 빈 칸은 건너뛰어요</span>'+_rwFailList(w).map(function(m,i){return '<div style="display:flex;gap:6px;align-items:center;margin-top:4px"><span style="width:16px;color:var(--txt3)">'+(i+1)+'</span><input class="fi" style="flex:1" value="'+_bcEsc(m)+'" onchange="_rwFail('+i+',this.value)"></div>';}).join('')+'</div</div>';
   h+='<div class="rw-h">⭐ 스탬프 규칙 <span style="font-weight:400;font-size:11px;color:var(--txt3)">카드와 별개로, 맞는 규칙마다 스탬프를 받아요</span></div>'+_rwDrawRows('stamps');
   h+='<div class="rw-h">🔥 연속 달성 보너스 <span style="font-weight:400;font-size:11px;color:var(--txt3)">수업 있는 날만 세요 · 그 날짜가 되면 한 번 적용</span></div><table class="rw-t"><thead><tr><th>연속 일수</th><th>효과</th><th>값</th><th></th></tr></thead><tbody>'
-    +w.tiers.map(function(t,i){return '<tr><td><input class="fi" type="number" style="width:60px" value="'+t.days+'" onchange="_rwSet(\'tiers\','+i+',\'days\',+this.value)"> 일</td><td><select onchange="_rwSet(\'tiers\','+i+',\'eff\',this.value,1)">'+Object.keys(E).map(function(e){return '<option value="'+e+'"'+(t.eff===e?' selected':'')+'>'+E[e]+'</option>';}).join('')+'</select></td><td>'+(t.eff==='special'?'-':'<input class="fi" type="number" style="width:55px" min="1" max="9" value="'+t.val+'" onchange="_rwSet(\'tiers\','+i+',\'val\',+this.value)"> '+(t.eff==='cards'?'장':'개'))+'</td><td><button class="btn btn-outline btn-xs" onclick="_rwDel(\'tiers\','+i+')">✕</button></td></tr>';}).join('')
+    +w.tiers.map(function(t,i){return '<tr><td><input class="fi" type="number" style="width:60px" value="'+t.days+'" onchange="_rwSet(\'tiers\','+i+',\'days\',+this.value)"> 일</td><td><select onchange="_rwSet(\'tiers\','+i+',\'eff\',this.value,1)">'+Object.keys(E).map(function(e){return '<option value="'+e+'"'+(t.eff===e?' selected':'')+'>'+E[e]+'</option>';}).join('')+'</select></td><td>'+(t.eff==='special'?'<input class="fi" style="width:210px" placeholder="예: CU 쿠폰 증정" value="'+_bcEsc(t.sv||'')+'" onchange="_rwSet(\'tiers\','+i+',\'sv\',this.value)">':'<input class="fi" type="number" style="width:55px" min="1" max="9" value="'+t.val+'" onchange="_rwSet(\'tiers\','+i+',\'val\',+this.value,1)"> '+(t.eff==='cards'?'장 중 <input class="fi" type="number" style="width:50px" min="1" max="'+Math.max(1,Math.min(5,t.val))+'" value="'+Math.min(t.pk||1,Math.max(1,Math.min(5,t.val)))+'" onchange="_rwSet(\'tiers\','+i+',\'pk\',Math.max(1,+this.value||1),1)"> 장 뽑기':'개'))+'</td><td><button class="btn btn-outline btn-xs" onclick="_rwDel(\'tiers\','+i+')">✕</button></td></tr>';}).join('')
     +'</tbody></table><button class="btn btn-outline btn-xs" style="margin-top:5px" onclick="_rwAdd(\'tiers\')">＋ 단계 추가</button>'
-    +'<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;align-items:center"><label style="display:flex;gap:5px;align-items:center"><input type="checkbox"'+(w.grace?' checked':'')+' onchange="_rwTop(\'grace\',this.checked?1:0)"> 하루 구제 <span style="color:var(--txt3)">(하루 못해도 연속 유지, 이틀 연달아 못하면 처음부터)</span></label><label style="flex:1;min-width:240px">특별 상 이름 <input class="fi" style="width:100%" value="'+_bcEsc(w.special||'')+'" onchange="_rwTop(\'special\',this.value)"></label></div>';
+    +'<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;font-size:12px;align-items:center"><label style="display:flex;gap:5px;align-items:center"><input type="checkbox"'+(w.grace?' checked':'')+' onchange="_rwTop(\'grace\',this.checked?1:0)"> 하루 구제 <span style="color:var(--txt3)">(하루 못해도 연속 유지, 이틀 연달아 못하면 처음부터)</span></label><label style="flex:1;min-width:240px">특별 상 기본 이름 <span style="color:var(--txt3)">(위 표에 값이 없을 때)</span> <input class="fi" style="width:100%" value="'+_bcEsc(w.special||'')+'" onchange="_rwTop(\'special\',this.value)"></label></div>';
   h+='<div class="rw-h">📅 카드가 나오는 요일</div><div style="display:flex;gap:10px;flex-wrap:wrap">'+RW_DAYN.map(function(d,i){return '<label style="display:flex;gap:3px;align-items:center;font-size:13px"><input type="checkbox"'+(w.days.indexOf(i)>=0?' checked':'')+' onchange="_rwDay('+i+',this.checked)">'+d+'</label>';}).join('')+'</div>';
   h+='<div class="rw-h">⏱ 자동 판정 기준 <span style="font-weight:400;font-size:11px;color:var(--txt3)">"체크콜을 꼼꼼히 했어요" 조건에 쓰여요</span></div><div style="font-size:12px;display:flex;gap:14px;flex-wrap:wrap"><label>항목 사이 간격 <input class="fi" type="number" step="0.5" style="width:60px" value="'+w.minGap+'" onchange="_rwTop(\'minGap\',+this.value)"> 초 이상 <span style="color:var(--txt3)">(수업 준비 구역 제외)</span></label><label>구역 공부 시간은 표준의 <input class="fi" type="number" style="width:60px" value="'+w.pct+'" onchange="_rwTop(\'pct\',+this.value)"> % 이상</label></div>'
     +'<table class="rw-t" style="max-width:420px;margin-top:6px"><thead><tr><th>레벨</th><th>스마트(분)</th><th>교재(분)</th></tr></thead><tbody>'+Object.keys(w.std).map(function(k){return '<tr><td>'+_bcEsc(k)+'</td><td><input class="fi" type="number" style="width:60px" value="'+w.std[k][0]+'" onchange="_rwStd(\''+_bcEsc(k)+'\',0,+this.value)"></td><td><input class="fi" type="number" style="width:60px" value="'+w.std[k][1]+'" onchange="_rwStd(\''+_bcEsc(k)+'\',1,+this.value)"></td></tr>';}).join('')+'</tbody></table>';
   h+='<div class="rw-h">🎴 카드 상품 <span style="font-weight:400;font-size:11px;color:var(--txt3)">확률 = 가중치 ÷ 합계</span></div><table class="rw-t"><thead><tr><th>이름</th><th>종류</th><th>가중치</th><th>확률</th><th></th></tr></thead><tbody>'
-    +w.prizes.map(function(p,i){return '<tr><td><input class="fi" style="min-width:150px" value="'+_bcEsc(p.n)+'" onchange="_rwSet(\'prizes\','+i+',\'n\',this.value)"></td><td><select onchange="_rwSet(\'prizes\','+i+',\'t\',this.value,1)"><option value="stamp"'+(p.t==='stamp'?' selected':'')+'>스탬프</option><option value="snack"'+(p.t==='snack'?' selected':'')+'>간식</option><option value="coupon"'+(p.t==='coupon'?' selected':'')+'>쿠폰</option></select></td><td><input class="fi" type="number" style="width:60px" value="'+p.w+'" onchange="_rwSet(\'prizes\','+i+',\'w\',+this.value,1)"></td><td>'+Math.round(Math.max(0,p.w)/tot*100)+'%</td><td><button class="btn btn-outline btn-xs" onclick="_rwDel(\'prizes\','+i+')">✕</button></td></tr>';}).join('')
-    +'</tbody></table><div style="margin-top:6px;display:flex;gap:10px;align-items:center;font-size:12px;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_rwAdd(\'prizes\')">＋ 상품 추가</button><label>스탬프 카드 보너스 <input class="fi" type="number" min="1" max="9" style="width:55px" value="'+w.bmin+'" onchange="_rwTop(\'bmin\',+this.value)"> ~ <input class="fi" type="number" min="1" max="9" style="width:55px" value="'+w.bmax+'" onchange="_rwTop(\'bmax\',+this.value)"> 개</label></div>';
+    +w.prizes.map(function(p,i){return '<tr><td><input class="fi" style="min-width:150px" value="'+_bcEsc(p.n)+'" onchange="_rwSet(\'prizes\','+i+',\'n\',this.value)"></td><td><select onchange="_rwSet(\'prizes\','+i+',\'t\',this.value,1)"><option value="stamp"'+(p.t==='stamp'?' selected':'')+'>스탬프</option><option value="snack"'+(p.t==='snack'?' selected':'')+'>간식</option><option value="coupon"'+(p.t==='coupon'?' selected':'')+'>쿠폰</option></select></td><td><input class="fi" type="number" style="width:60px" value="'+p.w+'" onchange="_rwSet(\'prizes\','+i+',\'w\',+this.value,1)"></td><td>'+(Math.round(Math.max(0,p.w)/tot*1000)/10)+'%</td><td><button class="btn btn-outline btn-xs" onclick="_rwDel(\'prizes\','+i+')">✕</button></td></tr>';}).join('')
+    +'<tr style="font-weight:800;background:var(--surface2,#f1f3f8)"><td colspan="2">합계</td><td>'+tot+'</td><td>100%'+(tot===100?' <span style="color:#0f766e">✓</span>':'')+'</td><td></td></tr></tbody></table><div style="margin-top:6px;display:flex;gap:10px;align-items:center;font-size:12px;flex-wrap:wrap"><button class="btn btn-outline btn-xs" onclick="_rwAdd(\'prizes\')">＋ 상품 추가</button><label>스탬프 카드 보너스 <input class="fi" type="number" min="1" max="9" style="width:55px" value="'+w.bmin+'" onchange="_rwTop(\'bmin\',+this.value)"> ~ <input class="fi" type="number" min="1" max="9" style="width:55px" value="'+w.bmax+'" onchange="_rwTop(\'bmax\',+this.value)"> 개</label></div>';
   h+=_rwBar();
   body.innerHTML=h;
 }
+function _rwFail(i,v){var w=_rwW();w.failMsgs=_rwFailList(w);w.failMsgs[i]=v;w.failMsg=w.failMsgs.filter(Boolean)[0]||'';_rwMark();}
 function _rwTop(f,v){_rwW()[f]=v;_rwMark();if(f==='enabled'||f==='bmin'||f==='bmax')return;}
 function _rwDay(i,on){var w=_rwW();w.days=w.days.filter(function(x){return x!==i;});if(on)w.days.push(i);_rwMark();}
 function _rwStd(k,i,v){_rwW().std[k][i]=v;_rwMark();}
@@ -30293,6 +30300,7 @@ async function _rwSave(){
   }catch(e){toast('⚠️ 저장 실패: '+((e&&e.message)||e));}
 }
 /* 지급 대기 · 스탬프 현황 */
+function _rwPicked(R){var a=(R&&R.picks&&R.picks.length)?R.picks:[R.pick];return a.map(function(i){return R.cards[i];}).filter(Boolean);}
 function _rwFrom(days){var d=new Date();d.setDate(d.getDate()-days);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 async function _rwLoadRows(){
   var b=document.getElementById('rw-body');if(!b)return;b.innerHTML='<div style="color:var(--txt3);font-size:13px">불러오는 중...</div>';
@@ -30305,13 +30313,13 @@ async function _rwLoadRows(){
 function _rwDrawRows2(){
   var b=document.getElementById('rw-body'),rows=_rwEd.rows||[],h='';
   if(_rwEd.pane==='give'){
-    var pend=rows.filter(function(r){var c=r.R.cards[r.R.pick];return c.t!=='stamp'&&!r.R.given;});
+    var pend=rows.filter(function(r){return _rwPicked(r.R).some(function(c){return c.t!=='stamp';})&&!r.R.given;});
     h='<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">학생이 뽑은 간식·쿠폰 중 아직 주지 않은 것이에요 (최근 120일)</div>';
-    h+=pend.length?'<table class="rw-t"><thead><tr><th>날짜</th><th>학생</th><th>상품</th><th></th></tr></thead><tbody>'+pend.map(function(r){return '<tr><td>'+_bcEsc(r.date)+'</td><td>'+_bcEsc(r.name)+'</td><td><b>'+_bcEsc(_rwPrizeText(r.R.cards[r.R.pick]))+'</b></td><td><button class="btn btn-navy btn-xs" onclick="_rwGive(\''+r.id+'\',true,1)">지급 완료</button></td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="et">지급할 상품이 없어요 🎉</div></div>';
-    var done=rows.filter(function(r){var c=r.R.cards[r.R.pick];return c.t!=='stamp'&&r.R.given;}).slice(0,30);
-    if(done.length)h+='<div class="rw-h" style="font-size:12px">최근 지급 완료</div><table class="rw-t"><tbody>'+done.map(function(r){return '<tr><td>'+_bcEsc(r.date)+'</td><td>'+_bcEsc(r.name)+'</td><td>'+_bcEsc(_rwPrizeText(r.R.cards[r.R.pick]))+'</td><td><button class="btn btn-outline btn-xs" onclick="_rwGive(\''+r.id+'\',false,1)">되돌리기</button></td></tr>';}).join('')+'</tbody></table>';
+    h+=pend.length?'<table class="rw-t"><thead><tr><th>날짜</th><th>학생</th><th>상품</th><th></th></tr></thead><tbody>'+pend.map(function(r){return '<tr><td>'+_bcEsc(r.date)+'</td><td>'+_bcEsc(r.name)+'</td><td><b>'+_bcEsc(_rwPicked(r.R).filter(function(c){return c.t!=='stamp';}).map(_rwPrizeText).join(' + '))+'</b></td><td><button class="btn btn-navy btn-xs" onclick="_rwGive(\''+r.id+'\',true,1)">지급 완료</button></td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="et">지급할 상품이 없어요 🎉</div></div>';
+    var done=rows.filter(function(r){return _rwPicked(r.R).some(function(c){return c.t!=='stamp';})&&r.R.given;}).slice(0,30);
+    if(done.length)h+='<div class="rw-h" style="font-size:12px">최근 지급 완료</div><table class="rw-t"><tbody>'+done.map(function(r){return '<tr><td>'+_bcEsc(r.date)+'</td><td>'+_bcEsc(r.name)+'</td><td>'+_bcEsc(_rwPicked(r.R).filter(function(c){return c.t!=='stamp';}).map(_rwPrizeText).join(' + '))+'</td><td><button class="btn btn-outline btn-xs" onclick="_rwGive(\''+r.id+'\',false,1)">되돌리기</button></td></tr>';}).join('')+'</tbody></table>';
   }else{
-    var m={};rows.forEach(function(r){var c=r.R.cards[r.R.pick],n=(r.R.base||0)+(c.t==='stamp'?(c.bonus||0):0);var o=m[r.sid]||(m[r.sid]={name:r.name,n:0,d:0});o.n+=n;o.d++;});
+    var m={};rows.forEach(function(r){var n=(r.R.base||0);_rwPicked(r.R).forEach(function(c){if(c.t==='stamp')n+=(c.bonus||0);});var o=m[r.sid]||(m[r.sid]={name:r.name,n:0,d:0});o.n+=n;o.d++;});
     var L=Object.keys(m).map(function(k){return m[k];}).sort(function(a,b){return b.n-a.n;});
     h='<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">카드를 뽑은 날 기준으로 받은 스탬프예요 (최근 120일)</div>'+(L.length?'<table class="rw-t" style="max-width:420px"><thead><tr><th>학생</th><th>카드 뽑은 날</th><th>스탬프 합계</th></tr></thead><tbody>'+L.map(function(o){return '<tr><td>'+_bcEsc(o.name)+'</td><td>'+o.d+'일</td><td><b>⭐ '+o.n+'</b></td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="et">아직 기록이 없어요</div></div>');
   }
@@ -30335,8 +30343,8 @@ function _wlRwHtml(L){
   var c=window._rwCfg;if(!c||c.enabled===0||!_wl.log)return '';
   var h='';
   var R=L.rw;
-  if(R&&R.pick!==undefined&&R.cards&&R.cards[R.pick]){var pc=R.cards[R.pick],id=_ccDocId(_wl.date,_wl.sid,_wl.sess);
-    h+='<div style="margin-top:6px;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">🎴 <b>'+_bcEsc(_rwPrizeText(pc))+'</b>'+(R.streak?' <span style="color:#c2410c">🔥'+R.streak+'일 연속</span>':'')+(pc.t==='stamp'?'':(R.given?' <span style="color:#166534">· 지급 완료</span> <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();_rwGive(\''+id+'\',false)">되돌리기</button>':' <button class="btn btn-navy btn-xs" onclick="event.stopPropagation();_rwGive(\''+id+'\',true)">지급 완료</button>'))+'</div>';
+  if(R&&R.pick!==undefined&&R.cards&&R.cards[R.pick]){var pcs=_rwPicked(R),pc={t:pcs.some(function(c){return c.t!=='stamp';})?'gift':'stamp'},id=_ccDocId(_wl.date,_wl.sid,_wl.sess);
+    h+='<div style="margin-top:6px;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">🎴 <b>'+_bcEsc(pcs.map(_rwPrizeText).join(' + '))+'</b>'+(R.streak?' <span style="color:#c2410c">🔥'+R.streak+'일 연속</span>':'')+(pc.t==='stamp'?'':(R.given?' <span style="color:#166534">· 지급 완료</span> <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();_rwGive(\''+id+'\',false)">되돌리기</button>':' <button class="btn btn-navy btn-xs" onclick="event.stopPropagation();_rwGive(\''+id+'\',true)">지급 완료</button>'))+'</div>';
   }else if(R&&R.ok===true)h+='<div style="margin-top:6px;font-size:12px;color:#92400e">🎴 카드 조건을 모두 채웠어요 (아직 안 뽑았어요)</div>';
   else if(R&&R.ok===false)h+='<div style="margin-top:6px;font-size:12px;color:var(--txt3)">🎴 오늘은 카드 조건을 못 채웠어요</div>';
   return h;
