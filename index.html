@@ -633,6 +633,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   <!-- 오른쪽: 최근 2주 학습 흐름 패널 -->
   <div id="write-flow-panel" style="flex:1;min-width:260px;max-width:380px;display:none;align-self:flex-start;position:sticky;top:14px;max-height:calc(100vh - 80px);overflow-y:auto">
     <div class="card" id="write-live-panel" style="padding:12px 14px;margin-bottom:10px;display:none"><div id="write-live-content"></div></div>
+    <div class="card" id="write-stamp-panel" style="padding:12px 14px;margin-bottom:10px;display:none"></div>
     <div class="card" id="write-home-panel" style="padding:12px 14px;margin-bottom:10px;display:none"></div>
     <div class="card" style="padding:14px">
       <div id="write-flow-content"></div>
@@ -1462,6 +1463,7 @@ function _unsavedList(){
   try{if(_ccEd&&Object.keys(_ccEd.dirty||{}).length)L.push('체크콜 단계별 계획표');}catch(e){}
   try{if(_spEd&&_spEd.dirty)L.push('Speak Pop 설정');}catch(e){}
   try{if(window._brandDirty)L.push('앱 로고 설정');}catch(e){}
+  try{if(_sbT&&_sbT.dirty)L.push('스탬프 시작 잔액 입력');}catch(e){}
   try{if(_bcDirty())L.push('체크콜 기본 점검 항목');}catch(e){}
   return L;
 }
@@ -1471,6 +1473,7 @@ function _unsavedDiscard(){
   try{if(_ccEd){_ccEd.dirty={};_ccEd.work={};}}catch(e){}
   try{_spEd.dirty=false;_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.bulk=false;}catch(e){}
   try{window._brandDirty=false;}catch(e){}
+  try{_sbT.dirty=false;_sbT.vals={};_sbT.mode=false;_sbT.pend=null;}catch(e){}
   try{_bcEd=null;}catch(e){}
 }
 function _bcSnap(){return JSON.stringify([_bcEd.tpl,_bcEd.totalMin]);}
@@ -1977,7 +1980,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bv';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-bw';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6207,6 +6210,7 @@ function _whPaint(){
 }
 function _wlShow(sid){
   try{_whShow(sid);}catch(e){console.warn(e);}
+  try{_sbShow(sid);}catch(e){console.warn(e);}
   var p=$('write-live-panel');if(!p)return;
   var s=sid&&students.find(function(x){return x.id===sid;});
   if(!s||!db){_wlStop();p.style.display='none';return;}
@@ -6218,7 +6222,7 @@ function _wlShow(sid){
   _wlStop();_wl.sid=sid;_wl.date=date;_wl.sess=sess;
   try{
     _wl.unsubL=db.collection('checkLogs').doc(_ccDocId(date,sid,sess)).onSnapshot(function(snap){
-      if(_wl.sid!==sid)return;_wl.log=snap.exists?snap.data():null;_wlPaint();
+      if(_wl.sid!==sid)return;_wl.log=snap.exists?snap.data():null;_wlPaint();try{_sbOnLog();}catch(e){}
     },function(e){console.warn('wl log',e);});
     _wl.unsubC=db.collection('bookChecks').where('studentId','==',sid).where('date','==',date).onSnapshot(function(snap){
       if(_wl.sid!==sid)return;_wl.checks={};snap.forEach(function(d){var x=d.data();if((x.sess===2?2:1)!==sess)return;_wl.checks[x.item]=x;});_wlPaint();
@@ -30359,22 +30363,174 @@ async function _rwSave(){
 /* 지급 대기 · 스탬프 현황 */
 function _rwPicked(R){var a=(R&&R.picks&&R.picks.length)?R.picks:[R.pick];return a.map(function(i){return R.cards[i];}).filter(Boolean);}
 function _rwFrom(days){var d=new Date();d.setDate(d.getDate()-days);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+/* ══ 디지털 스탬프북 (stampBook/{학생ID}) ══
+   bal 잔액 · since 시작일 · log 최근 30건 · got 체크콜 적립 기록(중복 적립 방지) · mo 월별 받음/씀 합계
+   체크콜이 카드를 뽑을 때 자동으로 쌓고, 선생님은 여기서 ±·되돌리기를 해요. */
+var _SB_KIND={cc:'체크콜 카드',adj:'선생님 가감',set:'시작 잔액',undo:'되돌림',buy:'교환'};
+var _sb={sid:null,d:undefined,more:false,busy:false,lk:'',lkSid:null};
+function _sbMD(d){var m=/^\d{4}-(\d\d)-(\d\d)/.exec(d||'');return m?(+m[1])+'/'+(+m[2]):'';}
+function _sbChange(sid,mut){   // 트랜잭션: 읽고 → 바꾸고 → 저장 (동시에 체크콜이 적립해도 안전)
+  var dr=db.collection('stampBook').doc(sid),today=todayISO();
+  return db.runTransaction(function(tx){return tx.get(dr).then(function(d){
+    var b=d.exists?d.data():null;
+    var f={bal:(b&&b.bal)||0,log:((b&&b.log)||[]).slice(),got:Object.assign({},(b&&b.got)||{}),mo:JSON.parse(JSON.stringify((b&&b.mo)||{})),since:(b&&b.since)||today};
+    mut(f,b);
+    if(f.bal<0)throw new Error('스탬프가 모자라요');
+    if(f.log.length>30)f.log=f.log.slice(-30);
+    f.upd=Date.now();
+    tx.set(dr,f,{mergeFields:Object.keys(f)});
+    return f;
+  });});
+}
+function _sbShow(sid){
+  var p=$('write-stamp-panel');if(!p)return;
+  var s=sid&&students.find(function(x){return x.id===sid;});
+  if(!s||!db||(s.status&&s.status!=='재원'&&s.status!=='신규')){p.style.display='none';_sb.sid=null;return;}
+  p.style.display='';
+  if(_sb.sid===sid){_sbPaint();return;}
+  _sb.sid=sid;_sb.d=undefined;_sb.more=false;_sbPaint();_sbReload();
+}
+function _sbReload(){
+  var sid=_sb.sid;if(!sid||!db)return;
+  db.collection('stampBook').doc(sid).get().then(function(d){
+    if(_sb.sid!==sid)return;var x=d.exists?d.data():null;_sb.d=(x&&x.since)?x:null;_sbPaint();
+  }).catch(function(e){console.warn('[stamp]',e);if(_sb.sid===sid){_sb.d=null;_sbPaint();}});
+}
+function _sbOnLog(){   // 학생이 카드를 뽑으면 잠시 뒤 잔액을 다시 읽어요 (처음 열 때는 읽지 않아요)
+  var R=_wl.log&&_wl.log.rw,k=(R&&R.pick!==undefined)?'p'+R.pick:'';
+  if(_sb.lkSid!==_wl.sid){_sb.lkSid=_wl.sid;_sb.lk=k;return;}
+  if(k!==_sb.lk){_sb.lk=k;if(_sb.sid===_wl.sid)setTimeout(_sbReload,1500);}
+}
+function _sbPaint(){
+  var p=$('write-stamp-panel');if(!p||!_sb.sid)return;
+  var s=students.find(function(x){return x.id===_sb.sid;});if(!s)return;
+  var d=_sb.d,body='';
+  var head='<div style="display:flex;align-items:center;gap:6px"><b class="wl-head" style="margin:0;flex:1">⭐ '+_bcEsc(s.name)+' · 스탬프북'+(d?' <span style="font-size:15px;color:#b45309;font-weight:900">'+(d.bal|0)+'개</span>':'')+'</b><button class="btn btn-outline btn-xs" onclick="_sbReload()" title="다시 읽기">↻</button></div>';
+  if(d===undefined)body='<div class="wl-meta" style="color:var(--txt3);margin:7px 0 0">불러오는 중…</div>';
+  else if(!d)body='<div class="wl-meta" style="margin:7px 0 6px">아직 시작 전이에요. 종이 스탬프북에 지금 찍힌 개수를 입력하면, 이때부터 체크콜에서 받는 스탬프가 자동으로 쌓여요.</div>'
+    +'<div style="display:flex;gap:6px;align-items:center">종이 스탬프 <input type="number" id="sb-start" min="0" value="0" class="fi" style="width:64px;padding:3px 6px"> 개 <button class="btn btn-navy btn-xs" onclick="_sbStart()">시작하기</button></div>';
+  else{
+    var L=(d.log||[]).slice().reverse(),vis=_sb.more?L:L.slice(0,5);
+    body='<div style="display:flex;gap:5px;align-items:center;margin:8px 0 4px;flex-wrap:wrap"><button class="btn btn-outline btn-xs" style="min-width:30px" onclick="_sbAdjUi(-1)">−</button><input type="number" id="sb-n" min="1" value="1" class="fi" style="width:48px;padding:3px 6px;text-align:center"><button class="btn btn-outline btn-xs" style="min-width:30px" onclick="_sbAdjUi(1)">+</button><input type="text" id="sb-m" class="fi" placeholder="사유 (선택)" style="flex:1;min-width:90px;padding:3px 6px"></div>'
+      +(vis.length?'<div style="border-top:1px solid var(--surface2)">'+vis.map(function(e){
+        var n=e.n|0,lb=e.m||_SB_KIND[e.k]||'',au=e.k==='cc'?' <span style="color:var(--txt3);font-size:10px">(자동)</span>':'';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--surface2);font-size:12px;'+(e.u?'opacity:.45;text-decoration:line-through':'')+'"><span style="width:34px;color:var(--txt3);font-size:11px">'+_bcEsc(_sbMD(e.d))+'</span><span style="flex:1;min-width:0">'+_bcEsc(lb)+au+'</span><b style="color:'+(n>=0?'#15803d':'#dc2626')+'">'+(n>0?'+':'')+n+'</b>'
+          +((!e.u&&e.k!=='undo')?'<button class="btn btn-outline btn-xs" style="font-size:10px;padding:1px 7px" onclick="_sbUndo('+e.t+')">되돌리기</button>':'<span style="width:52px"></span>')+'</div>';
+      }).join('')+'</div>'+(L.length>5?'<button class="btn btn-outline btn-xs" style="margin-top:6px;font-size:11px" onclick="_sb.more=!_sb.more;_sbPaint()">'+(_sb.more?'접기':'내역 더 보기 ('+L.length+'건)')+'</button>':''):'<div class="wl-meta" style="margin:4px 0 0">아직 내역이 없어요</div>');
+  }
+  p.innerHTML=head+body;
+}
+function _sbAdjUi(sign){
+  var n=Math.floor(Number(($('sb-n')||{}).value));if(!(n>=1)){toast('개수를 1 이상으로 입력해 주세요');return;}
+  var m=(($('sb-m')||{}).value||'').trim().slice(0,30);_sbAdj(sign*n,m);
+}
+function _sbAdj(delta,memo){
+  var sid=_sb.sid;if(!sid||!delta||_sb.busy)return;_sb.busy=true;
+  _sbChange(sid,function(f){f.bal+=delta;f.log.push({t:Date.now(),d:todayISO(),k:'adj',n:delta,m:memo||''});})
+  .then(function(f){_sb.busy=false;if(_sb.sid===sid){_sb.d=f;_sbPaint();}toast('⭐ '+(delta>0?'+':'')+delta+' · 지금 '+f.bal+'개');})
+  .catch(function(e){_sb.busy=false;toast('⚠️ '+((e&&e.message)||e));});
+}
+function _sbUndo(t){
+  var sid=_sb.sid;if(!sid||_sb.busy)return;_sb.busy=true;
+  _sbChange(sid,function(f){
+    var e=f.log.filter(function(x){return x.t===t;})[0];
+    if(!e||e.u||e.k==='undo')throw new Error('이미 되돌렸거나 되돌릴 수 없어요');
+    e.u=true;f.bal-=(e.n|0);
+    if(e.k==='cc'&&e.d){var mk=String(e.d).slice(0,7);if(f.mo[mk])f.mo[mk].in=(f.mo[mk].in||0)-(e.n|0);}
+    f.log.push({t:Date.now(),d:todayISO(),k:'undo',n:-(e.n|0),m:'되돌림'});
+  }).then(function(f){_sb.busy=false;if(_sb.sid===sid){_sb.d=f;_sbPaint();}toast('되돌렸어요 · 지금 '+f.bal+'개');})
+  .catch(function(e){_sb.busy=false;toast('⚠️ '+((e&&e.message)||e));});
+}
+function _sbStart(){
+  var sid=_sb.sid,n=Math.floor(Number(($('sb-start')||{}).value));if(!sid)return;if(!(n>=0)){toast('0 이상의 숫자를 입력해 주세요');return;}
+  _sbSetBal(sid,n,'시작 잔액').then(function(f){if(_sb.sid===sid){_sb.d=f;_sbPaint();}toast('⭐ 스탬프북을 시작했어요 ('+n+'개)');}).catch(function(e){toast('⚠️ '+((e&&e.message)||e));});
+}
+function _sbSetBal(sid,n,memo){   // 잔액을 n개로 맞춰요 (차이만큼 내역에 남아요)
+  return _sbChange(sid,function(f){var dl=n-f.bal;f.bal=n;if(dl!==0)f.log.push({t:Date.now(),d:todayISO(),k:'set',n:dl,m:memo});});
+}
+
+/* ── 보상 설정 > 스탬프 현황 (전체) ── */
+var _sbT={docs:null,mode:false,vals:{},dirty:false,img:undefined,pend:null,busy:false};
+function _sbTList(){return (students||[]).filter(function(s){var st=s.status||'재원';return st==='재원'||st==='신규';}).slice().sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''),'ko');});}
 async function _rwLoadRows(){
-  var b=document.getElementById('rw-body');if(!b)return;b.innerHTML='<div style="color:var(--txt3);font-size:13px">불러오는 중...</div>';
+  var b=$('rw-body');if(!b)return;b.innerHTML='<div style="color:var(--txt3);font-size:13px">불러오는 중...</div>';
   try{
-    var snap=await db.collection('checkLogs').where('date','>=',_rwFrom(120)).get(),rows=[];
-    snap.forEach(function(d){var x=d.data(),R=x.rw;if(R&&R.pick!==undefined&&R.cards&&R.cards[R.pick])rows.push({id:d.id,date:x.date,sid:x.studentId,name:x.studentName||'',R:R});});
-    rows.sort(function(a,b){return a.date<b.date?1:-1;});_rwEd.rows=rows;_rwDrawRows2();
+    var snap=await db.collection('stampBook').get(),m={};
+    snap.forEach(function(d){m[d.id]=d.data();});_sbT.docs=m;
+    if(_sbT.img===undefined){var di=await db.collection('config').doc('stampBook').get();var u=di.exists?di.data().img:'';_sbT.img=(typeof u==='string'&&u.indexOf('data:image/')===0)?u:'';}
+    _sbTDraw();
   }catch(e){b.innerHTML='<div style="color:#b91c1c;font-size:13px">불러오지 못했어요: '+_bcEsc((e&&e.message)||e)+'</div>';}
 }
-function _rwDrawRows2(){
-  var b=document.getElementById('rw-body'),rows=_rwEd.rows||[],h='';
-  {
-    var m={};rows.forEach(function(r){var n=(r.R.base||0);_rwPicked(r.R).forEach(function(c){if(c.t==='stamp')n+=(c.bonus||0);});var o=m[r.sid]||(m[r.sid]={name:r.name,n:0,d:0});o.n+=n;o.d++;});
-    var L=Object.keys(m).map(function(k){return m[k];}).sort(function(a,b){return b.n-a.n;});
-    h='<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">카드를 뽑은 날 기준으로 받은 스탬프예요 (최근 120일)</div>'+(L.length?'<table class="rw-t" style="max-width:420px"><thead><tr><th>학생</th><th>카드 뽑은 날</th><th>스탬프 합계</th></tr></thead><tbody>'+L.map(function(o){return '<tr><td>'+_bcEsc(o.name)+'</td><td>'+o.d+'일</td><td><b>⭐ '+o.n+'</b></td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="et">아직 기록이 없어요</div></div>');
+function _sbTDraw(){
+  var b=$('rw-body');if(!b||_rwEd.pane!=='stk')return;
+  var docs=_sbT.docs||{},L=_sbTList(),mk=todayISO().slice(0,7),h='';
+  h+='<style>.rw-t{border-collapse:collapse;width:100%;font-size:12px}.rw-t td,.rw-t th{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}.rw-t th{background:var(--surface2);color:var(--txt2)}.sbt-in{width:64px;padding:3px 6px;text-align:center}</style>';
+  h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><div style="font-size:12px;color:var(--txt3);flex:1;min-width:200px">체크콜에서 받은 스탬프가 자동으로 쌓여요. 이 탭을 열 때만 학생 수만큼 읽어요.</div>'
+    +'<button class="btn '+(_sbT.mode?'btn-navy':'btn-outline')+' btn-sm" onclick="_sbTMode()">✏️ 시작 잔액 입력 모드</button></div>';
+  if(_sbT.mode){
+    h+='<div style="font-size:12px;background:var(--surface2);border-radius:10px;padding:8px 10px;margin-bottom:8px">지금 종이 스탬프북에 찍힌 개수를 한 번에 입력해요 (처음 한 번). 입력한 학생부터 스탬프가 자동으로 쌓이고, 이미 시작한 학생은 입력한 개수로 맞춰져요.'
+      +' <button class="btn btn-outline btn-xs" onclick="_sbTZero()">빈 칸은 모두 0으로</button></div>'
+      +'<table class="rw-t" style="max-width:560px"><thead><tr><th>학생</th><th>지금 잔액</th><th>종이 스탬프북 개수</th></tr></thead><tbody>'
+      +L.map(function(s){var d=docs[s.id],v=_sbT.vals[s.id];return '<tr><td>'+_bcEsc(s.name)+'</td><td>'+(d&&d.since?'⭐ '+(d.bal|0):'<span style="color:var(--txt3)">시작 전</span>')+'</td><td><input type="number" min="0" class="fi sbt-in" value="'+(v===undefined?(d&&d.since?(d.bal|0):''):v)+'" oninput="_sbTIn(\''+s.id+'\',this.value)"></td></tr>';}).join('')+'</tbody></table>'
+      +'<div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-green" onclick="_sbTSave()" '+(_sbT.busy?'disabled':'')+'>💾 시작 잔액으로 저장</button><button class="btn btn-outline" onclick="_sbTMode()">닫기</button></div>';
+  }else{
+    h+=(L.length?'<table class="rw-t" style="max-width:640px"><thead><tr><th>학생</th><th>스탬프 잔액</th><th>이번 달 받음</th><th>이번 달 씀</th><th>마지막 활동</th></tr></thead><tbody>'
+      +L.map(function(s){var d=docs[s.id];if(!d||!d.since)return '<tr><td>'+_bcEsc(s.name)+'</td><td colspan="4" style="color:var(--txt3)">시작 전</td></tr>';
+        var m=(d.mo||{})[mk]||{},lg=(d.log||[]).filter(function(e){return e.k!=='undo'&&!e.u;}),la=lg.length?lg[lg.length-1]:null;
+        return '<tr><td>'+_bcEsc(s.name)+'</td><td><b>⭐ '+(d.bal|0)+'</b></td><td>'+(m.in|0)+'</td><td>'+(m.out|0)+'</td><td style="color:var(--txt2)">'+(la?_bcEsc(_sbMD(la.d)+' '+(la.m||_SB_KIND[la.k]||'')):'-')+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="et">학생이 없어요</div></div>');
   }
-  b.innerHTML='<style>.rw-t{border-collapse:collapse;width:100%;font-size:12px}.rw-t td,.rw-t th{padding:4px;border-bottom:1px solid var(--border);text-align:left}</style>'+h;
+  /* 스탬프 그림 */
+  var cur=_sbT.pend||_sbT.img;
+  h+='<div style="margin-top:22px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;max-width:640px"><div style="font-weight:800;font-size:13px;margin-bottom:8px">🖼️ 스탬프 그림</div>'
+    +'<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="width:72px;height:72px;border-radius:50%;background:#FFF8D8;border:3px solid #1b0f55;display:flex;align-items:center;justify-content:center;font-size:36px;overflow:hidden">'+(cur?'<img src="'+cur+'" style="width:78%;height:78%;object-fit:contain" alt="">':'⭐')+'</div>'
+    +'<div style="flex:1;min-width:220px"><div id="sbt-paste" contenteditable="true" spellcheck="false" onpaste="_sbImgPaste(event)" onkeydown="if(!event.ctrlKey&&!event.metaKey)event.preventDefault()" style="border:2px dashed var(--border);border-radius:10px;padding:10px;font-size:12px;color:var(--txt2);cursor:text;outline:none">여기를 클릭하고 <b>Ctrl+V</b> (복사한 그림 붙여넣기)</div>'
+    +'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><label class="btn btn-outline btn-xs" style="cursor:pointer">파일 고르기<input type="file" accept="image/*" style="display:none" onchange="_sbImgFile(this)"></label>'
+    +(_sbT.pend?'<button class="btn btn-navy btn-xs" onclick="_sbImgSave()">이 그림으로 바꾸기</button><button class="btn btn-outline btn-xs" onclick="_sbT.pend=null;_sbTDraw()">취소</button>':'')
+    +(_sbT.img&&!_sbT.pend?'<button class="btn btn-outline btn-xs" onclick="_sbImgReset()">기본 별 모양으로</button>':'')+'</div></div></div>'
+    +'<div style="font-size:11px;color:var(--txt3);margin-top:8px">큰 그림은 자동으로 128px로 줄여서 저장해요. 모든 학생이 같은 그림을 써요. 학생 화면은 다음에 열 때 바뀌어요.</div></div>';
+  b.innerHTML=h;
+}
+function _sbTMode(){
+  if(_sbT.mode&&_sbT.dirty&&!confirm('입력한 내용이 저장되지 않았어요. 닫을까요?'))return;
+  _sbT.mode=!_sbT.mode;_sbT.vals={};_sbT.dirty=false;_sbTDraw();
+}
+function _sbTIn(id,v){_sbT.vals[id]=v;_sbT.dirty=true;}
+function _sbTZero(){_sbTList().forEach(function(s){var d=(_sbT.docs||{})[s.id];if(!(d&&d.since)&&(_sbT.vals[s.id]===undefined||_sbT.vals[s.id]===''))_sbT.vals[s.id]='0';});_sbT.dirty=true;_sbTDraw();}
+async function _sbTSave(){
+  if(_sbT.busy)return;var docs=_sbT.docs||{},todo=[];
+  _sbTList().forEach(function(s){var v=_sbT.vals[s.id];if(v===undefined||v==='')return;var n=Math.floor(Number(v)),d=docs[s.id];if(!(n>=0))return;if(d&&d.since&&(d.bal|0)===n)return;todo.push({s:s,n:n,have:!!(d&&d.since)});});
+  if(!todo.length){toast('바뀐 내용이 없어요');return;}
+  _sbT.busy=true;var ok=0,bad=0;
+  for(var i=0;i<todo.length;i++){
+    try{var f=await _sbSetBal(todo[i].s.id,todo[i].n,todo[i].have?'잔액 맞춤':'시작 잔액');docs[todo[i].s.id]=f;ok++;}catch(e){console.warn(e);bad++;}
+  }
+  _sbT.busy=false;_sbT.docs=docs;_sbT.vals={};_sbT.dirty=false;_sbT.mode=false;
+  toast(bad?'⚠️ '+ok+'명 저장, '+bad+'명 실패 — 다시 시도해 주세요':'✅ '+ok+'명의 시작 잔액을 저장했어요');
+  try{if(_sb.sid){_sb.d=undefined;_sbReload();}}catch(e){}
+  _sbTDraw();
+}
+function _sbImgBlob(blob){
+  var u=URL.createObjectURL(blob),im=new Image();
+  im.onload=function(){
+    var m=128,r=Math.min(m/im.width,m/im.height,1),w=Math.max(1,Math.round(im.width*r)),h=Math.max(1,Math.round(im.height*r)),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);URL.revokeObjectURL(u);
+    var d=c.toDataURL('image/png');if(d.length>300000){toast('그림이 너무 복잡해요. 더 단순한 그림을 써 주세요');return;}
+    _sbT.pend=d;_sbTDraw();
+  };
+  im.onerror=function(){URL.revokeObjectURL(u);toast('그림을 읽지 못했어요');};
+  im.src=u;
+}
+function _sbImgPaste(e){
+  var it=(e.clipboardData&&e.clipboardData.items)||[];
+  for(var i=0;i<it.length;i++){if(it[i].type.indexOf('image/')===0){e.preventDefault();_sbImgBlob(it[i].getAsFile());return;}}
+  e.preventDefault();toast('복사한 그림이 없어요');
+}
+function _sbImgFile(inp){var f=inp.files&&inp.files[0];inp.value='';if(f)_sbImgBlob(f);}
+function _sbImgSave(){
+  var d=_sbT.pend;if(!d)return;
+  db.collection('config').doc('stampBook').set({img:d,at:Date.now()},{merge:true}).then(function(){_sbT.img=d;_sbT.pend=null;toast('✅ 스탬프 그림을 바꿨어요');_sbTDraw();}).catch(function(e){toast('⚠️ 저장 실패: '+((e&&e.message)||e));});
+}
+function _sbImgReset(){
+  db.collection('config').doc('stampBook').set({img:'',at:Date.now()},{merge:true}).then(function(){_sbT.img='';toast('기본 별 모양으로 돌렸어요');_sbTDraw();}).catch(function(e){toast('⚠️ 저장 실패');});
 }
 function _rwGive(docId,on,fromList){
   db.collection('checkLogs').doc(docId).set({rw:{given:!!on,givenAt:Date.now()}},{merge:true}).then(function(){

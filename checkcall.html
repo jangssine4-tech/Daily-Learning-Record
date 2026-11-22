@@ -190,6 +190,9 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 #rw .cr.miss .seal{display:none}
 #rw .cr.miss:not(.bonus) .tx:after{content:" · 조금만 더!";font-size:12px;opacity:.9}
 #rw .cr .bt{font-size:10px;background:#7c3aed;color:#fff;border-radius:99px;padding:1px 7px;margin-right:4px}
+#rw .sbs{max-width:430px;margin:10px auto 0;background:#fff;color:#2a1a6c;border:3px solid #2a1a6c;border-radius:14px;box-shadow:0 4px 0 #2a1a6c;padding:8px 14px;font-weight:900;font-size:14px;display:flex;justify-content:space-between;align-items:center;animation:rw-pop .5s ease-out}
+#rw .sbs:empty{display:none}
+#rw .sbs b{font-size:16px}
 #rw /* 카드 */
 .cards{display:flex;gap:10px;justify-content:center;margin:16px 0 10px;perspective:900px}
 #rw .card{width:30%;max-width:150px;aspect-ratio:5/7;position:relative;cursor:pointer;transform-style:preserve-3d;transition:transform .8s cubic-bezier(.3,1.4,.5,1);animation:rw-bob 1.6s ease-in-out infinite}
@@ -322,7 +325,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-t</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-u</div>
   </div>
 </div>
 
@@ -1356,6 +1359,38 @@ function flagsDoc(out){var c=calcFlags(),inc=out?c.inc:[];return {ord:c.ord,inc:
 /* ── 황금카드 보상 (운영 메뉴얼 > 보상 설정에서 정한 값을 명단에서 받아와요) ── */
 var RW={open:false,prev:null,tm:[],busy:false};
 var RW_ATT={'매우 우수':3,'우수':2,'산만함':1,'수업 방해':0};
+/* ── 스탬프북 자동 적립 ──
+   같은 체크 기록(날짜_학생)에 대해 '받은 총 개수'를 맞춰 넣어요. 여러 번 불러도 차이만큼만 더해져서 중복 적립이 안 돼요.
+   선생님이 학습 일지에서 스탬프북을 시작해 둔 학생(stampBook 문서에 since가 있는 학생)만 적립돼요. */
+var SB={ok:{},busy:{},q:{},res:null};
+function sbRef(){return S.date+'_'+S.sid+(S.sess===2?'_2':'');}
+function sbCredit(total){
+  if(!db||!S||!(total>=0))return;
+  var ref=sbRef(),date=S.date,dr=db.collection('stampBook').doc(S.sid);
+  if(SB.busy[ref]){SB.q[ref]=total;return;}
+  SB.busy[ref]=1;delete SB.q[ref];
+  db.runTransaction(function(tx){return tx.get(dr).then(function(d){
+    if(!d.exists)return null;var b=d.data();if(!b.since||date<b.since)return null;
+    var bal=b.bal||0,got=Object.assign({},b.got||{}),prev=got[ref]||0,delta=total-prev;
+    if(delta===0)return {bal:bal,add:0};
+    got[ref]=total;
+    var cd=new Date();cd.setDate(cd.getDate()-14);var cut=cd.getFullYear()+'-'+String(cd.getMonth()+1).padStart(2,'0')+'-'+String(cd.getDate()).padStart(2,'0');
+    Object.keys(got).forEach(function(k){if(k!==ref&&k.slice(0,10)<cut)delete got[k];});
+    bal+=delta;
+    var log=(b.log||[]).concat([{t:Date.now(),d:date,k:'cc',n:delta,r:ref}]);if(log.length>30)log=log.slice(-30);
+    var mo=Object.assign({},b.mo||{}),mk=date.slice(0,7),m=Object.assign({in:0,out:0},mo[mk]||{});m.in+=delta;mo[mk]=m;
+    tx.set(dr,{bal:bal,log:log,got:got,mo:mo,upd:Date.now()},{mergeFields:['bal','log','got','mo','upd']});
+    return {bal:bal,add:delta};
+  });}).then(function(r){
+    SB.busy[ref]=0;if(r){SB.ok[ref]=total;SB.res=r;sbPaint();}
+    if(SB.q[ref]!==undefined&&SB.q[ref]!==SB.ok[ref])sbCredit(SB.q[ref]);
+  }).catch(function(e){SB.busy[ref]=0;console.warn('[stamp]',e);});
+}
+function sbEnsure(total){if(!(total>=0)||!S)return;if(SB.ok[sbRef()]===total)return;sbCredit(total);}
+function sbHtml(){var r=SB.res;if(!r)return '';return '<span>⭐ 내 스탬프북</span><b>'+(r.add>0?'+'+r.add+' → ':(r.add<0?r.add+' → ':''))+r.bal+'개</b>';}
+function sbStrip(){return '<div id="sbStrip" class="sbs">'+sbHtml()+'</div>';}
+function sbPaint(){var e=$('sbStrip');if(e)e.innerHTML=sbHtml();}
+function rwTotal(st){var a=(st.picks&&st.picks.length)?st.picks:[st.pick],b=st.base||0;a.forEach(function(i){var c=st.cards&&st.cards[i];if(c&&c.t==='stamp')b+=(c.bonus||0);});return b;}
 function rwCfg(){var c=S&&S.data&&S.data.rw;return (c&&c.enabled!==0&&Array.isArray(c.conds)&&c.conds.length&&Array.isArray(c.prizes)&&c.prizes.length)?c:null;}
 function rwOn(){var c=rwCfg();if(!c||!S)return false;var last=!(S.ses&&S.ses.length>=2)||S.sess===S.ses.length;return last&&(c.days||[]).indexOf(new Date().getDay())>=0;}
 function rwClearTm(){RW.tm.forEach(clearTimeout);RW.tm=[];}
@@ -1462,14 +1497,14 @@ function rwFailMsg(c){   // 조건이 안 맞을 때 문구: 여러 개 중 하�
 function rwPk(t,nc){return (t&&t.eff==='cards')?Math.max(1,Math.min(nc,t.pk||1)):1;}
 function rwFailArea(ev){
   var c=rwCfg(),p=RW.prev||{stk:0},sk=p.stk,ok=c.grace&&sk>0&&!p.ymiss;
-  return '<div class="fade"><div class="ttl sm">'+esc(rwFailMsg(c))+'</div>'+(sk>0?'<div class="msg" style="background:#6b2a9a">'+(ok?'🛡️ 연속 '+sk+'일 기록은 지켜졌어요! 내일 또 도전해요':'🔥 내일 다시 1일부터 도전해요!')+'</div><br>':'')+(ev.n?'<div class="msg">⭐ 그래도 스탬프 '+ev.n+'개 받았어요!</div>':'')+'</div>';
+  return '<div class="fade"><div class="ttl sm">'+esc(rwFailMsg(c))+'</div>'+(sk>0?'<div class="msg" style="background:#6b2a9a">'+(ok?'🛡️ 연속 '+sk+'일 기록은 지켜졌어요! 내일 또 도전해요':'🔥 내일 다시 1일부터 도전해요!')+'</div><br>':'')+(ev.n?'<div class="msg">⭐ 그래도 스탬프 '+ev.n+'개 받았어요!</div>':'')+(ev.n?sbStrip():'')+'</div>';
 }
 function rwFinal(st){
   var pks=(st.picks&&st.picks.length)?st.picks:[st.pick],nc=st.cards.length,bonus=0,hasGift=false;
   var tt=pks.map(function(i){var pk=st.cards[i];if(pk.t==='stamp')bonus+=(pk.bonus||0);else hasGift=true;return pk.t==='stamp'?'⭐ 스탬프 +'+pk.bonus+'!':(pk.t==='coupon'?'🎟️ ':(pk.t==='special'?'🏆 ':'🎁 '))+esc(pk.n)+'!';}).join('<br>');
   return '<div class="ttl'+(pks.length>1?' sm':'')+'">'+tt+'</div>'
    +'<div class="cards'+(nc>3?' c'+nc:'')+'">'+st.cards.map(function(c,i){return '<div class="card flip '+(pks.indexOf(i)>=0?'pick':'dim')+'">'+rwFront()+rwBack(c)+'</div>';}).join('')+'</div>'
-   +'<div class="msg">'+(bonus?'⭐ 오늘 스탬프 '+st.base+' + '+bonus+' = <b>'+(st.base+bonus)+'개</b>'+(hasGift?' · 상품은 선생님께 보여 주세요':''):'⭐ 오늘 스탬프 <b>'+st.base+'개</b> · 선생님께 보여 주세요')+'</div>';
+   +'<div class="msg">'+(bonus?'⭐ 오늘 스탬프 '+st.base+' + '+bonus+' = <b>'+(st.base+bonus)+'개</b>'+(hasGift?' · 상품은 선생님께 보여 주세요':''):'⭐ 오늘 스탬프 <b>'+st.base+'개</b> · 선생님께 보여 주세요')+'</div>'+sbStrip();
 }
 function rwSaveOk(ev){   // 연속 계산에 쓰이도록 오늘 조건 달성 여부를 기록
   if(ev.pend||(LOG.rw&&LOG.rw.ok===ev.all))return;
@@ -1480,8 +1515,9 @@ function rwRender(animate){
   rwClearTm();var el=$('rwStage'),c=rwCfg();if(!el)return;
   if(!c){rwClose();return;}
   var st=LOG.rw;
-  if(st&&st.pick!==undefined&&st.cards&&st.cards[st.pick]){RW.busy=false;el.innerHTML=rwFinal(st);return;}
+  if(st&&st.pick!==undefined&&st.cards&&st.cards[st.pick]){RW.busy=false;el.innerHTML=rwFinal(st);sbEnsure(rwTotal(st));return;}
   var ev=rwEval();rwSaveOk(ev);
+  if(!ev.pend&&!ev.all&&ev.n>0)sbEnsure(ev.n);
   var area=ev.pend?'<div class="fade"><div class="ttl sm">⏳ 선생님이 확인하고 있어요</div><div class="msg">조금만 기다려 주세요!</div></div>':(ev.all?rwCardsArea(ev):rwFailArea(ev));
   if(!animate){RW.busy=false;el.innerHTML='<div class="ttl sm">오늘의 약속 확인!</div>'+rwRows(ev,true)+area;return;}
   RW.busy=true;
@@ -1506,7 +1542,7 @@ function rwPick(i){
   for(var j=0;j<nc;j++)cards.push(rwRoll());   // 카드를 모두 먼저 정해서 저장 → 다시 열어도 같은 결과
   if(t&&t.eff==='special')cards[i]={n:t.sv||rwCfg().special||'특별 상',t:'special'};
   var doc={ok:true,cards:cards,pick:picks[0],picks:picks,base:ev.n+plus,plus:plus,streak:rwStreak(ev),tier:t?t.days:0,at:Date.now(),given:false};
-  LOG.rw=doc;RW.busy=true;
+  LOG.rw=doc;RW.busy=true;sbCredit(rwTotal(doc));
   try{logRef().set({rw:doc},{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});}catch(e){}
   els.forEach(function(c,j){c.onclick=null;c.classList.remove('sel');c.innerHTML=rwFront()+rwBack(cards[j]);c.classList.add(picks.indexOf(j)>=0?'pick':'dim');});
   setTimeout(function(){document.querySelectorAll('#rwStage .card').forEach(function(c){c.classList.add('flip');});},30);
