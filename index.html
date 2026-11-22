@@ -632,8 +632,8 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
   </div></div>
   <!-- 오른쪽: 최근 2주 학습 흐름 패널 -->
   <div id="write-flow-panel" style="flex:1;min-width:260px;max-width:380px;display:none;align-self:flex-start;position:sticky;top:14px;max-height:calc(100vh - 80px);overflow-y:auto">
-    <div class="card" id="write-live-panel" style="padding:12px 14px;margin-bottom:10px;display:none"><div id="write-live-content"></div></div>
     <div class="card" id="write-stamp-panel" style="padding:12px 14px;margin-bottom:10px;display:none"></div>
+    <div class="card" id="write-live-panel" style="padding:12px 14px;margin-bottom:10px;display:none"><div id="write-live-content"></div></div>
     <div class="card" id="write-home-panel" style="padding:12px 14px;margin-bottom:10px;display:none"></div>
     <div class="card" style="padding:14px">
       <div id="write-flow-content"></div>
@@ -1082,7 +1082,7 @@ function showConfirm(msg,okLabel,cancelLabel,danger){
 
 </div>
 
-<div class="view" id="view-reference"><div class="page-top"><h2>운영 매뉴얼</h2><p>교육비 기준 및 레벨별 진도를 관리합니다</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto"><button class="rev-tab active" id="reftab-fees" onclick="switchRefTab('fees')">교육비 기준</button><button class="rev-tab" id="reftab-tuitiontable" onclick="switchRefTab('tuitiontable')">교육비 테이블</button><button class="rev-tab" id="reftab-curriculum" onclick="switchRefTab('curriculum')">레벨별 진도</button><button class="rev-tab" id="reftab-eval" onclick="switchRefTab('eval')">평가 모듈</button><button class="rev-tab" id="reftab-classes" onclick="switchRefTab('classes')">모듈 관리</button><button class="rev-tab" id="reftab-guides" onclick="switchRefTab('guides')">운영 매뉴얼</button><button class="rev-tab" id="reftab-ccset" style="display:none" onclick="switchRefTab('ccset')">체크콜 Study Plan 설정</button><button class="rev-tab" id="reftab-hcset" style="display:none" onclick="switchRefTab('hcset')">홈체크 Plan 설정</button><button class="rev-tab" id="reftab-rwset" style="display:none" onclick="switchRefTab('rwset')">🎁 보상 설정</button><button class="rev-tab" id="reftab-spset" style="display:none" onclick="switchRefTab('spset')">🗣️ Speak Pop 설정</button></div><div id="ref-panel-fees" class="cp">
+<div class="view" id="view-reference"><div class="page-top"><h2>운영 매뉴얼</h2><p>교육비 기준 및 레벨별 진도를 관리합니다</p></div><div style="background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto"><button class="rev-tab active" id="reftab-fees" onclick="switchRefTab('fees')">교육비 기준</button><button class="rev-tab" id="reftab-tuitiontable" onclick="switchRefTab('tuitiontable')">교육비 테이블</button><button class="rev-tab" id="reftab-curriculum" onclick="switchRefTab('curriculum')">레벨별 진도</button><button class="rev-tab" id="reftab-eval" onclick="switchRefTab('eval')">평가 모듈</button><button class="rev-tab" id="reftab-classes" onclick="switchRefTab('classes')">모듈 관리</button><button class="rev-tab" id="reftab-guides" onclick="switchRefTab('guides')">운영 매뉴얼</button><button class="rev-tab" id="reftab-ccset" style="display:none" onclick="switchRefTab('ccset')">체크콜 Study Plan 설정</button><button class="rev-tab" id="reftab-hcset" style="display:none" onclick="switchRefTab('hcset')">홈체크 Plan 설정</button><button class="rev-tab" id="reftab-rwset" style="display:none" onclick="switchRefTab('rwset')">🎁 보상 설정</button><button class="rev-tab" id="reftab-spset" style="display:none" onclick="switchRefTab('spset')">🗣️ Speak Pop 설정</button><button class="rev-tab" id="reftab-shop" style="display:none" onclick="switchRefTab('shop')">🎁 스탬프 상점</button></div><div id="ref-panel-fees" class="cp">
   <div class="expense-section">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <h4 style="margin:0">💰 교육비 기준 설정</h4>
@@ -1464,6 +1464,7 @@ function _unsavedList(){
   try{if(_spEd&&_spEd.dirty)L.push('Speak Pop 설정');}catch(e){}
   try{if(window._brandDirty)L.push('앱 로고 설정');}catch(e){}
   try{if(_sbT&&_sbT.dirty)L.push('스탬프 시작 잔액 입력');}catch(e){}
+  try{if(_shopEd&&_shopEd.dirty)L.push('스탬프 상점');}catch(e){}
   try{if(_bcDirty())L.push('체크콜 기본 점검 항목');}catch(e){}
   return L;
 }
@@ -1474,6 +1475,7 @@ function _unsavedDiscard(){
   try{_spEd.dirty=false;_spEd.work=_spEd.cw=_spEd.tw=null;_spEd.bulk=false;}catch(e){}
   try{window._brandDirty=false;}catch(e){}
   try{_sbT.dirty=false;_sbT.vals={};_sbT.mode=false;_sbT.pend=null;}catch(e){}
+  try{if(_shopEd.dirty){_shopEd.loaded=false;_shopEd.dirty=false;_shopEd.rep='';}}catch(e){}
   try{_bcEd=null;}catch(e){}
 }
 function _bcSnap(){return JSON.stringify([_bcEd.tpl,_bcEd.totalMin]);}
@@ -1980,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-bw';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-by';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3945,7 +3947,7 @@ function _ccCan(k){return !!currentUser&&(currentUser.role==='admin'||!!(current
 // ── 운영 매뉴얼 > 체크콜 Study Plan 설정 탭 ──
 var _ccPaneCur='';
 function _ccCanAny(){return _ccCan('cc_plan')||_ccCan('cc_common');}
-function _ccTabVis(){var sb=document.getElementById('reftab-spset');if(sb)sb.style.display=_ccCan('cc_plan')?'':'none';var rb=document.getElementById('reftab-rwset');if(rb)rb.style.display=_ccCan('cc_plan')?'':'none';var b=document.getElementById('reftab-ccset');if(b)b.style.display=_ccCanAny()?'':'none';var h=document.getElementById('reftab-hcset');if(h)h.style.display=_ccCan('cc_plan')?'':'none';}
+function _ccTabVis(){var sh=document.getElementById('reftab-shop');if(sh)sh.style.display=_ccCan('cc_plan')?'':'none';var sb=document.getElementById('reftab-spset');if(sb)sb.style.display=_ccCan('cc_plan')?'':'none';var rb=document.getElementById('reftab-rwset');if(rb)rb.style.display=_ccCan('cc_plan')?'':'none';var b=document.getElementById('reftab-ccset');if(b)b.style.display=_ccCanAny()?'':'none';var h=document.getElementById('reftab-hcset');if(h)h.style.display=_ccCan('cc_plan')?'':'none';}
 document.addEventListener('click',function(){var h=document.getElementById('ccrost-help');if(h)h.style.display='none';h=document.getElementById('hcrost-help');if(h)h.style.display='none';});
 function _hcRostHelp(){var b=document.getElementById('hcrost-help');if(b)b.style.display=b.style.display==='block'?'none':'block';}
 function _ccRostHelp(){var b=document.getElementById('ccrost-help');if(b)b.style.display=b.style.display==='block'?'none':'block';}
@@ -23868,7 +23870,7 @@ function renderTuitionTable(){
   el.innerHTML='<div style="font-size:13px;color:var(--txt3);margin-bottom:10px">교육비 기준표를 한눈에 확인할 수 있습니다. 수정은 <b>교육비 기준</b> 탭에서 하세요.</div>'
     +'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:13px">'+thead+tbody+'</table></div>';
 }
-function switchRefTab(tab){if(tab!==currentRefTab&&!window._unsavedPass){var _ul=_unsavedList();if(_ul.length){_unsavedBubble(_ul,function(){_unsavedDiscard();window._unsavedPass=1;try{switchRefTab(tab);}finally{window._unsavedPass=0;}});return;}}_ccTabVis();if(tab==='ccset'&&!_ccCanAny())tab='fees';if(tab==='hcset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='rwset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='spset'&&!_ccCan('cc_plan'))tab='fees';currentRefTab=tab;['fees','tuitiontable','curriculum','eval','classes','guides','ccset','hcset','rwset','spset'].forEach(function(t){var btn=$('reftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('ref-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='fees')renderRefFees();else if(tab==='tuitiontable')renderTuitionTable();else if(tab==='curriculum')renderRefCurriculum();else if(tab==='eval')renderEvalModulesPage();else if(tab==='guides')renderRefGuides();else if(tab==='ccset')renderCcSet();else if(tab==='hcset')renderHcSet();else if(tab==='rwset')renderRwSet();else if(tab==='spset')renderSpSet();else if(tab==='classes'){var el=$('class-list-ref');if(el){if(!classes.length){el.innerHTML='<div class="empty"><div class="ei">🏫</div><div class="et">모듈이 없습니다</div></div>';}else{el.innerHTML=classes.map(function(cls2){var stuCount=students.filter(function(s){return s.classId===cls2.id;}).length;return'<div class="card" style="padding:14px;cursor:pointer;margin-bottom:10px" onclick="openClassModal(\''+cls2.id+'\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:14px;font-weight:700">'+cls2.name+'</div><div style="font-size:11px;color:var(--txt3);margin-top:2px">담임: '+(cls2.teacher||'-')+' · 학생: '+stuCount+'명</div></div><span class="badge bg-gray">'+(cls2.evalModule||'평가 없음')+'</span></div></div>';}).join('');}};}}
+function switchRefTab(tab){if(tab!==currentRefTab&&!window._unsavedPass){var _ul=_unsavedList();if(_ul.length){_unsavedBubble(_ul,function(){_unsavedDiscard();window._unsavedPass=1;try{switchRefTab(tab);}finally{window._unsavedPass=0;}});return;}}_ccTabVis();if(tab==='ccset'&&!_ccCanAny())tab='fees';if(tab==='hcset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='rwset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='spset'&&!_ccCan('cc_plan'))tab='fees';if(tab==='shop'&&!_ccCan('cc_plan'))tab='fees';currentRefTab=tab;['fees','tuitiontable','curriculum','eval','classes','guides','ccset','hcset','rwset','spset','shop'].forEach(function(t){var btn=$('reftab-'+t);if(btn)btn.classList.toggle('active',t===tab);var pn=$('ref-panel-'+t);if(pn)pn.style.display=t===tab?'':'none';});if(tab==='fees')renderRefFees();else if(tab==='tuitiontable')renderTuitionTable();else if(tab==='curriculum')renderRefCurriculum();else if(tab==='eval')renderEvalModulesPage();else if(tab==='guides')renderRefGuides();else if(tab==='ccset')renderCcSet();else if(tab==='hcset')renderHcSet();else if(tab==='rwset')renderRwSet();else if(tab==='spset')renderSpSet();else if(tab==='shop')renderShop();else if(tab==='classes'){var el=$('class-list-ref');if(el){if(!classes.length){el.innerHTML='<div class="empty"><div class="ei">🏫</div><div class="et">모듈이 없습니다</div></div>';}else{el.innerHTML=classes.map(function(cls2){var stuCount=students.filter(function(s){return s.classId===cls2.id;}).length;return'<div class="card" style="padding:14px;cursor:pointer;margin-bottom:10px" onclick="openClassModal(\''+cls2.id+'\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:14px;font-weight:700">'+cls2.name+'</div><div style="font-size:11px;color:var(--txt3);margin-top:2px">담임: '+(cls2.teacher||'-')+' · 학생: '+stuCount+'명</div></div><span class="badge bg-gray">'+(cls2.evalModule||'평가 없음')+'</span></div></div>';}).join('');}};}}
 // ── 운영안 Firestore 연동 ──────────────────────────────
 var _opGuides = null; // Firestore에서 불러온 운영안 목록
 var _opGuidesLoaded = false;
@@ -30367,7 +30369,8 @@ function _rwFrom(days){var d=new Date();d.setDate(d.getDate()-days);return d.get
    bal 잔액 · since 시작일 · log 최근 30건 · got 체크콜 적립 기록(중복 적립 방지) · mo 월별 받음/씀 합계
    체크콜이 카드를 뽑을 때 자동으로 쌓고, 선생님은 여기서 ±·되돌리기를 해요. */
 var _SB_KIND={cc:'체크콜 카드',adj:'선생님 가감',set:'시작 잔액',undo:'되돌림',buy:'교환'};
-var _sb={sid:null,d:undefined,more:false,busy:false,lk:'',lkSid:null};
+var _sb={sid:null,d:undefined,more:false,busy:false,lk:'',lkSid:null,open:undefined};
+function _sbToggle(){_sb.open=!_sb.open;try{localStorage.setItem('sb_open',_sb.open?'1':'0');}catch(e){}_sbPaint();}
 function _sbMD(d){var m=/^\d{4}-(\d\d)-(\d\d)/.exec(d||'');return m?(+m[1])+'/'+(+m[2]):'';}
 function _sbChange(sid,mut){   // 트랜잭션: 읽고 → 바꾸고 → 저장 (동시에 체크콜이 적립해도 안전)
   var dr=db.collection('stampBook').doc(sid),today=todayISO();
@@ -30404,8 +30407,9 @@ function _sbOnLog(){   // 학생이 카드를 뽑으면 잠시 뒤 잔액을 다
 function _sbPaint(){
   var p=$('write-stamp-panel');if(!p||!_sb.sid)return;
   var s=students.find(function(x){return x.id===_sb.sid;});if(!s)return;
+  if(_sb.open===undefined){try{_sb.open=localStorage.getItem('sb_open')==='1';}catch(e){_sb.open=false;}}
   var d=_sb.d,body='';
-  var head='<div style="display:flex;align-items:center;gap:6px"><b class="wl-head" style="margin:0;flex:1">⭐ '+_bcEsc(s.name)+' · 스탬프북'+(d?' <span style="font-size:15px;color:#b45309;font-weight:900">'+(d.bal|0)+'개</span>':'')+'</b><button class="btn btn-outline btn-xs" onclick="_sbReload()" title="다시 읽기">↻</button></div>';
+  var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_sbToggle()"><b class="wl-head" style="margin:0;flex:1">⭐ '+_bcEsc(s.name)+' · 스탬프북'+(d?' <span style="font-size:15px;color:#b45309;font-weight:900">'+(d.bal|0)+'개</span>':'')+'</b><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();_sbReload()" title="다시 읽기">↻</button><span style="font-size:12px;color:var(--txt3)">'+(_sb.open?'▲':'▼')+'</span></div>';
   if(d===undefined)body='<div class="wl-meta" style="color:var(--txt3);margin:7px 0 0">불러오는 중…</div>';
   else if(!d)body='<div class="wl-meta" style="margin:7px 0 6px">아직 시작 전이에요. 종이 스탬프북에 지금 찍힌 개수를 입력하면, 이때부터 체크콜에서 받는 스탬프가 자동으로 쌓여요.</div>'
     +'<div style="display:flex;gap:6px;align-items:center">종이 스탬프 <input type="number" id="sb-start" min="0" value="0" class="fi" style="width:64px;padding:3px 6px"> 개 <button class="btn btn-navy btn-xs" onclick="_sbStart()">시작하기</button></div>';
@@ -30413,12 +30417,12 @@ function _sbPaint(){
     var L=(d.log||[]).slice().reverse(),vis=_sb.more?L:L.slice(0,5);
     body='<div style="display:flex;gap:5px;align-items:center;margin:8px 0 4px;flex-wrap:wrap"><button class="btn btn-outline btn-xs" style="min-width:30px" onclick="_sbAdjUi(-1)">−</button><input type="number" id="sb-n" min="1" value="1" class="fi" style="width:48px;padding:3px 6px;text-align:center"><button class="btn btn-outline btn-xs" style="min-width:30px" onclick="_sbAdjUi(1)">+</button><input type="text" id="sb-m" class="fi" placeholder="사유 (선택)" style="flex:1;min-width:90px;padding:3px 6px"></div>'
       +(vis.length?'<div style="border-top:1px solid var(--surface2)">'+vis.map(function(e){
-        var n=e.n|0,lb=e.m||_SB_KIND[e.k]||'',au=e.k==='cc'?' <span style="color:var(--txt3);font-size:10px">(자동)</span>':'';
+        var n=e.n|0,lb=e.m||_SB_KIND[e.k]||'',au=e.k==='cc'?' <span style="color:var(--txt3);font-size:10px">(자동)</span>':(e.k==='buy'?' <span style="color:var(--txt3);font-size:10px">(QR)</span>':'');
         return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--surface2);font-size:12px;'+(e.u?'opacity:.45;text-decoration:line-through':'')+'"><span style="width:34px;color:var(--txt3);font-size:11px">'+_bcEsc(_sbMD(e.d))+'</span><span style="flex:1;min-width:0">'+_bcEsc(lb)+au+'</span><b style="color:'+(n>=0?'#15803d':'#dc2626')+'">'+(n>0?'+':'')+n+'</b>'
           +((!e.u&&e.k!=='undo')?'<button class="btn btn-outline btn-xs" style="font-size:10px;padding:1px 7px" onclick="_sbUndo('+e.t+')">되돌리기</button>':'<span style="width:52px"></span>')+'</div>';
       }).join('')+'</div>'+(L.length>5?'<button class="btn btn-outline btn-xs" style="margin-top:6px;font-size:11px" onclick="_sb.more=!_sb.more;_sbPaint()">'+(_sb.more?'접기':'내역 더 보기 ('+L.length+'건)')+'</button>':''):'<div class="wl-meta" style="margin:4px 0 0">아직 내역이 없어요</div>');
   }
-  p.innerHTML=head+body;
+  p.innerHTML=head+(_sb.open?body:'');
 }
 function _sbAdjUi(sign){
   var n=Math.floor(Number(($('sb-n')||{}).value));if(!(n>=1)){toast('개수를 1 이상으로 입력해 주세요');return;}
@@ -30437,6 +30441,7 @@ function _sbUndo(t){
     if(!e||e.u||e.k==='undo')throw new Error('이미 되돌렸거나 되돌릴 수 없어요');
     e.u=true;f.bal-=(e.n|0);
     if(e.k==='cc'&&e.d){var mk=String(e.d).slice(0,7);if(f.mo[mk])f.mo[mk].in=(f.mo[mk].in||0)-(e.n|0);}
+    if(e.k==='buy'&&e.d){var mk2=String(e.d).slice(0,7);if(f.mo[mk2])f.mo[mk2].out=(f.mo[mk2].out||0)+(e.n|0);}
     f.log.push({t:Date.now(),d:todayISO(),k:'undo',n:-(e.n|0),m:'되돌림'});
   }).then(function(f){_sb.busy=false;if(_sb.sid===sid){_sb.d=f;_sbPaint();}toast('되돌렸어요 · 지금 '+f.bal+'개');})
   .catch(function(e){_sb.busy=false;toast('⚠️ '+((e&&e.message)||e));});
@@ -30531,6 +30536,153 @@ function _sbImgSave(){
 }
 function _sbImgReset(){
   db.collection('config').doc('stampBook').set({img:'',at:Date.now()},{merge:true}).then(function(){_sbT.img='';toast('기본 별 모양으로 돌렸어요');_sbTDraw();}).catch(function(e){toast('⚠️ 저장 실패');});
+}
+/* ══ 운영 매뉴얼 > 🎁 스탬프 상점 (config/stampShop) ══
+   items: [{id,cat,name,cost(필요 스탬프),price,qty,qr(1/0)}] · cap: 월 취득 가능 스탬프
+   상품마다 QR = 홈체크 주소 + ?buy=상품ID. 상품 이름·스탬프를 바꿔도 QR은 그대로 써요. */
+var _shopEd={loaded:false,items:[],cap:20,dirty:false,filter:'',paste:false,sheet:false,rep:'',busy:false};
+var _shopQrC={};
+var _SHOP_PAL={'과자':'#F59E0B','사탕':'#EC4899','젤리':'#22C55E','초콜릿':'#92400E','문구':'#3B82F6','카드':'#8B5CF6','케잌':'#F472B6','음료':'#06B6D4','라면':'#EF4444'};
+function _shopCol(c){c=String(c||'').trim();if(_SHOP_PAL[c])return _SHOP_PAL[c];var h=0,i;for(i=0;i<c.length;i++)h=(h*31+c.charCodeAt(i))>>>0;return ['#0EA5E9','#14B8A6','#A855F7','#F97316','#84CC16','#E11D48'][h%6];}
+function _shopId(){var s='',i,a='abcdefghijkmnpqrstuvwxyz23456789';for(i=0;i<6;i++)s+=a[Math.floor(Math.random()*a.length)];return 'p'+s;}
+function _shopNum(v){var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isNaN(n)?null:n;}
+function _shopUnit(it){return (it.price>0&&it.qty>0)?Math.round(it.price/it.qty):null;}
+function _shopPer(it){var u=_shopUnit(it);return (u&&it.cost>0)?Math.round(u/it.cost):null;}
+function _shopUrl(id){var u=_bcTabletUrl('homecheck.html');return u?u+'&buy='+encodeURIComponent(id):null;}
+function _shopQr(id,cell){
+  var k=id+'|'+(cell||3);if(_shopQrC[k])return _shopQrC[k];
+  var url=_shopUrl(id);if(!url)return '';
+  try{var q=qrcode(0,'L');q.addData(url,'Byte');q.make();_shopQrC[k]=q.createSvgTag({cellSize:cell||3,margin:2,scalable:true});}catch(e){_shopQrC[k]='';}
+  return _shopQrC[k];
+}
+function _shopTsv(t){
+  var rows=[],row=[],c='',q=false,i,ch;t=String(t).replace(/\r\n?/g,'\n');
+  for(i=0;i<t.length;i++){ch=t[i];
+    if(q){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++;}else q=false;}else c+=ch;}
+    else if(ch==='"'&&c==='')q=true;
+    else if(ch==='\t'){row.push(c);c='';}
+    else if(ch==='\n'){row.push(c);rows.push(row);row=[];c='';}
+    else c+=ch;}
+  row.push(c);rows.push(row);return rows;
+}
+function _shopParse(t){
+  var rows=_shopTsv(t).filter(function(r){return r.some(function(c){return String(c).trim();});}),res={items:[],bad:[],cap:null},map=null,last='';
+  var nz=function(c){return String(c==null?'':c).replace(/\s+/g,'');};
+  rows.forEach(function(r){
+    if(/월취득/.test(nz(r[0]))){for(var j=1;j<r.length;j++){var n=_shopNum(r[j]);if(n>0){res.cap=Math.round(n);break;}}return;}
+    if(r.some(function(c){return nz(c)==='상품';})){
+      map={cat:-1,name:-1,price:-1,qty:-1,cost:-1};
+      r.forEach(function(c,ix){var n=nz(c);if(n==='구분')map.cat=ix;else if(n==='상품')map.name=ix;else if(n==='가격')map.price=ix;else if(n==='수량')map.qty=ix;else if(/판매|스탬프|스템프|달러/.test(n)&&!/월|명당/.test(n))map.cost=ix;});
+      if(map.cost<0)map.cost=(map.qty>=0?map.qty+2:4);
+      return;
+    }
+    if(!map)map={cat:0,name:1,price:2,qty:3,cost:r.length>=6?5:4};
+    var cat=String(r[map.cat]==null?'':r[map.cat]).trim()||last;last=cat;
+    var name=String(r[map.name]==null?'':r[map.name]).trim();
+    if(!name){res.bad.push('(상품 이름 없음)');return;}
+    var cost=_shopNum(r[map.cost]);
+    if(!(cost>=1)){res.bad.push(name+' — 필요 스탬프를 읽지 못했어요');return;}
+    res.items.push({cat:cat,name:name,cost:Math.round(cost),price:Math.max(0,Math.round(_shopNum(r[map.price])||0)),qty:Math.max(0,Math.round(_shopNum(r[map.qty])||0))});
+  });
+  return res;
+}
+function _shopPasteAdd(){
+  var ta=$('shop-ta');if(!ta)return;var ov=$('shop-ov')&&$('shop-ov').checked;
+  var r=_shopParse(ta.value);
+  if(!r.items.length&&!r.bad.length){toast('붙여넣은 내용이 비어 있어요');return;}
+  var add=0,upd=0;
+  r.items.forEach(function(n){
+    var ex=ov?_shopEd.items.filter(function(x){return x.name.toLowerCase()===n.name.toLowerCase();})[0]:null;
+    if(ex){ex.cat=n.cat;ex.cost=n.cost;ex.price=n.price;ex.qty=n.qty;upd++;}
+    else{n.id=_shopId();n.qr=1;_shopEd.items.push(n);add++;}
+  });
+  if(r.cap)_shopEd.cap=r.cap;
+  _shopEd.dirty=true;
+  _shopEd.rep='✅ '+add+'개 추가'+(upd?' · '+upd+'개는 값만 바뀌었어요':'')+(r.cap?' · 월 취득 스탬프 '+r.cap+'개':'')+(r.bad.length?' · <span style="color:#b91c1c">읽지 못한 줄 '+r.bad.length+'개: '+r.bad.map(_bcEsc).join(', ')+'</span>':'')+' — 아래 표를 확인하고 [저장]을 눌러야 반영돼요.';
+  ta.value='';_shopDraw();
+}
+function renderShop(){
+  var host=document.getElementById('ref-panel-shop');
+  if(!host){var rw=document.getElementById('ref-panel-rwset');if(!rw)return;host=document.createElement('div');host.id='ref-panel-shop';host.className='cp';rw.parentNode.insertBefore(host,rw.nextSibling);}
+  host.style.display='';
+  if(!_ccCan('cc_plan')){host.innerHTML='<div class="empty"><div class="et">관리자만 볼 수 있어요</div></div>';return;}
+  if(!_shopEd.loaded){
+    host.innerHTML='<div style="padding:20px;color:var(--txt3)">불러오는 중…</div>';
+    db.collection('config').doc('stampShop').get().then(function(d){var x=d.exists?d.data():{};_shopEd.items=(x.items||[]).map(function(i){return Object.assign({},i);});_shopEd.cap=x.cap||20;_shopEd.loaded=true;_shopEd.dirty=false;_shopDraw();})
+    .catch(function(e){host.innerHTML='<div style="padding:20px;color:#b91c1c">불러오지 못했어요: '+_bcEsc((e&&e.message)||e)+'</div>';});
+    return;
+  }
+  _shopDraw();
+}
+function _shopCats(){var c=[];_shopEd.items.forEach(function(i){if(i.cat&&c.indexOf(i.cat)<0)c.push(i.cat);});return c;}
+function _shopDraw(){
+  var host=document.getElementById('ref-panel-shop');if(!host||currentRefTab!=='shop')return;
+  var E=_shopEd,cats=_shopCats(),h='';
+  h+='<style>.shp{padding:16px}.shp .tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.shp table{width:100%;border-collapse:collapse;font-size:12px}.shp th{background:var(--surface2);color:var(--txt2);padding:7px 6px;text-align:left;white-space:nowrap}.shp td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}.shp .fi{padding:3px 6px;font-size:12px;width:100%;box-sizing:border-box}.shp .nb{width:64px;text-align:right}.shp .qrt{width:34px;height:34px;display:block}.shp .qrt svg{width:100%;height:100%}.shp .note{background:var(--surface2);border-radius:10px;padding:9px 12px;font-size:11px;color:var(--txt2);margin-top:10px;line-height:1.7}</style>';
+  h+='<div class="shp"><div class="tb"><button class="btn btn-navy btn-sm" onclick="_shopEd.paste=!_shopEd.paste;_shopDraw()">📋 엑셀 붙여넣기</button><button class="btn btn-navy btn-sm" onclick="_shopAdd()">+ 상품 추가</button><button class="btn btn-outline btn-sm" onclick="_shopEd.sheet=!_shopEd.sheet;_shopDraw()">🖨️ QR 인쇄용 시트 만들기</button>'
+    +'<select class="fi" style="width:auto" onchange="_shopEd.filter=this.value;_shopDraw()"><option value="">구분 필터: 전체</option>'+cats.map(function(c){return '<option value="'+_bcEsc(c)+'"'+(E.filter===c?' selected':'')+'>'+_bcEsc(c)+'</option>';}).join('')+'</select>'
+    +'<span style="flex:1"></span><span style="font-size:12px;color:var(--txt3)">월 취득 가능 스탬프 <input type="number" min="0" class="fi" style="width:56px;display:inline-block" value="'+(E.cap|0)+'" onchange="_shopEd.cap=Math.max(0,Math.floor(Number(this.value))||0);_shopEd.dirty=true"> 개 · 상품 '+E.items.length+'개</span><button class="btn btn-green btn-sm" onclick="_shopSave()" '+(E.busy?'disabled':'')+'>저장</button></div>';
+  if(E.paste){
+    h+='<div class="card" style="padding:12px 14px;margin-bottom:12px"><b style="font-size:13px">📋 엑셀 붙여넣기 창</b><div style="font-size:12px;color:var(--txt3);margin:4px 0 6px">엑셀에서 <b>구분 · 상품 · 가격 · 수량 · 필요 스탬프</b> 열을 복사해서 붙여 넣어요 (첨부 기준표 그대로 가능). 구분이 비어 있으면 위 줄과 같은 구분으로 봐요.</div>'
+      +'<textarea id="shop-ta" class="fi" style="width:100%;height:110px;box-sizing:border-box;font-family:monospace;font-size:12px" placeholder="여기에 붙여넣기 (Ctrl+V)"></textarea>'
+      +'<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn btn-navy btn-sm" onclick="_shopPasteAdd()">표에 추가</button><label style="font-size:12px"><input type="checkbox" id="shop-ov" checked> 같은 이름은 덮어쓰기</label></div></div>';
+  }
+  if(E.rep)h+='<div style="font-size:12px;background:#f0fdf4;border-radius:10px;padding:8px 12px;margin-bottom:10px">'+E.rep+'</div>';
+  var rows=E.items.map(function(it,i){return {it:it,i:i};}).filter(function(x){return !E.filter||x.it.cat===E.filter;});
+  h+='<table><thead><tr><th>QR</th><th>구분</th><th>상품</th><th>필요 스탬프</th><th>구입가(원)</th><th>수량</th><th>개당 단가</th><th>스탬프 1개당 원가</th><th></th><th></th></tr></thead><tbody>';
+  h+=rows.map(function(x){var it=x.it,i=x.i,u=_shopUnit(it),p=_shopPer(it);
+    return '<tr><td><input type="checkbox" '+(it.qr?'checked':'')+' onchange="_shopSet('+i+',\'qr\',this.checked?1:0)"></td>'
+      +'<td style="width:84px"><input class="fi" list="shop-cats" value="'+_bcEsc(it.cat||'')+'" onchange="_shopSet('+i+',\'cat\',this.value)"></td>'
+      +'<td><input class="fi" value="'+_bcEsc(it.name||'')+'" onchange="_shopSet('+i+',\'name\',this.value)"></td>'
+      +'<td><input type="number" min="1" class="fi nb" value="'+(it.cost||'')+'" onchange="_shopSet('+i+',\'cost\',this.value)"></td>'
+      +'<td><input type="number" min="0" class="fi nb" style="width:78px" value="'+(it.price||'')+'" onchange="_shopSet('+i+',\'price\',this.value)"></td>'
+      +'<td><input type="number" min="0" class="fi nb" value="'+(it.qty||'')+'" onchange="_shopSet('+i+',\'qty\',this.value)"></td>'
+      +'<td id="shop-u'+i+'">'+(u?u+'원':'-')+'</td><td id="shop-p'+i+'" style="color:var(--txt3)">'+(p?p+'원':'-')+'</td>'
+      +'<td>'+(it.qr&&!E.dirty?'<span class="qrt">'+_shopQr(it.id,2)+'</span>':(it.qr?'<span style="font-size:10px;color:var(--txt3)">저장 후</span>':'<span style="font-size:10px;color:var(--txt3)">QR 없음</span>'))+'</td>'
+      +'<td><button class="btn btn-outline btn-xs" onclick="_shopDel('+i+')" title="삭제">×</button></td></tr>';}).join('')+'</tbody></table>';
+  if(!rows.length)h+='<div class="empty" style="padding:24px"><div class="et">상품이 없어요. 엑셀을 붙여넣거나 [+ 상품 추가]를 눌러 주세요.</div></div>';
+  h+='<datalist id="shop-cats">'+cats.map(function(c){return '<option value="'+_bcEsc(c)+'">';}).join('')+'</datalist>';
+  h+='<div class="note"><b>알아 두세요</b> · ☑가 된 상품만 QR이 만들어져요 · 필요 스탬프를 바꿔도 QR은 그대로 쓰고(QR에는 상품 번호만 들어 있어서) 교환 금액만 바뀌어요 · 상품을 지우면 그 QR을 찍어도 "판매하지 않는 상품이에요"라고 나와요 · 구입가·수량은 원가 참고용이고 학생 화면에는 안 보여요 · 새 상품은 [저장]한 뒤에 QR이 열려요</div>';
+  if(E.sheet){
+    var its=rows.map(function(x){return x.it;}).filter(function(it){return it.qr;});
+    h+='<div class="card" style="padding:14px;margin-top:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:13px;flex:1">🖨️ QR 인쇄용 시트 (미리보기 · A4 3열)</b><button class="btn btn-navy btn-sm" onclick="_shopPrint()">인쇄</button></div>'
+      +'<style>'+_shopLbCss('.shsh')+'</style><div class="shsh">'+(E.dirty?'<div style="color:#b45309;font-size:12px;margin-bottom:8px">저장하지 않은 변경이 있어요. 먼저 [저장]해 주세요.</div>':'')+its.map(_shopLabel).join('')+'</div>'
+      +(its.length?'':'<div class="empty"><div class="et">QR을 만들 상품이 없어요</div></div>')+'<div style="font-size:11px;color:var(--txt3);margin-top:8px">[인쇄]를 누르면 인쇄 창이 열려요 · 필요 스탬프를 바꾸면 라벨 숫자만 다시 인쇄하면 돼요</div></div>';
+  }
+  host.innerHTML=h;
+}
+function _shopLbCss(sc){return sc+'{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}'+sc+' .lb{border:2px dashed #94a3b8;border-radius:12px;overflow:hidden;text-align:center;break-inside:avoid;page-break-inside:avoid;padding-bottom:8px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+sc+' .bd{color:#fff;font-weight:800;font-size:12px;padding:4px 0;letter-spacing:.08em;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+sc+' .qr{width:62%;margin:8px auto 4px}'+sc+' .qr svg{width:100%;height:auto;display:block}'+sc+' .nm{font-weight:800;font-size:14px;margin:2px 6px}'+sc+' .st{display:inline-block;background:#FFB800;color:#2a1a6c;font-weight:900;border-radius:99px;padding:1px 14px;margin:4px 0;font-size:15px;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+sc+' .ft{font-size:10px;color:#64748b}';}
+function _shopLabel(it){
+  return '<div class="lb"><div class="bd" style="background:'+_shopCol(it.cat)+'">'+_bcEsc(it.cat||'상품')+'</div><div class="qr">'+_shopQr(it.id,3)+'</div><div class="nm">'+_bcEsc(it.name)+'</div><div class="st">⭐ '+(it.cost|0)+'</div><div class="ft">폰 카메라로 찍으면 교환돼요</div></div>';
+}
+function _shopPrint(){
+  var E=_shopEd;if(E.dirty){toast('먼저 [저장]해 주세요 (저장해야 QR이 학생 폰에서 열려요)');return;}
+  var its=E.items.filter(function(it){return it.qr&&(!E.filter||it.cat===E.filter);});if(!its.length){toast('QR을 만들 상품이 없어요');return;}
+  var f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
+  var d=f.contentWindow.document;d.open();d.write('<!doctype html><html><head><meta charset="utf-8"><title>스탬프 상점 QR</title><style>@page{size:A4;margin:10mm}body{margin:0;font-family:"Noto Sans KR","Malgun Gothic",sans-serif}'+_shopLbCss('.shsh')+'</style></head><body><div class="shsh">'+its.map(_shopLabel).join('')+'</div></body></html>');d.close();
+  setTimeout(function(){try{f.contentWindow.focus();f.contentWindow.print();}catch(e){toast('인쇄 창을 열지 못했어요');}setTimeout(function(){f.remove();},60000);},350);
+}
+function _shopAdd(){_shopEd.items.push({id:_shopId(),cat:_shopEd.filter||'',name:'',cost:1,price:0,qty:0,qr:1});_shopEd.dirty=true;_shopDraw();}
+function _shopDel(i){var it=_shopEd.items[i];if(!it)return;_shopEd.items.splice(i,1);_shopEd.dirty=true;_shopDraw();}
+function _shopSet(i,k,v){
+  var it=_shopEd.items[i];if(!it)return;
+  if(k==='cat'||k==='name')it[k]=String(v).trim().slice(0,40);
+  else if(k==='qr')it.qr=v?1:0;
+  else it[k]=Math.max(0,Math.round(Number(v))||0);
+  _shopEd.dirty=true;
+  var u=$('shop-u'+i),p=$('shop-p'+i);if(u)u.textContent=_shopUnit(it)?_shopUnit(it)+'원':'-';if(p)p.textContent=_shopPer(it)?_shopPer(it)+'원':'-';
+  if(k==='qr'||k==='cat')_shopDraw();
+}
+function _shopSave(){
+  var E=_shopEd;if(E.busy)return;
+  var bad=E.items.filter(function(it){return !it.name||!(it.cost>=1);});
+  if(bad.length){toast('⚠️ 상품 이름과 필요 스탬프(1 이상)를 모두 입력해 주세요');return;}
+  var names={},dup=null;E.items.forEach(function(it){var k=it.name.toLowerCase();if(names[k])dup=it.name;names[k]=1;});
+  if(dup&&!confirm('"'+dup+'" 이름이 겹쳐요. 그래도 저장할까요?'))return;
+  E.busy=true;
+  db.collection('config').doc('stampShop').set({items:E.items.map(function(it){return {id:it.id,cat:it.cat||'',name:it.name,cost:it.cost|0,price:it.price|0,qty:it.qty|0,qr:it.qr?1:0};}),cap:E.cap|0,upd:Date.now()})
+  .then(function(){E.busy=false;E.dirty=false;E.rep='';toast('✅ 스탬프 상점을 저장했어요 ('+E.items.length+'개)');_shopDraw();})
+  .catch(function(e){E.busy=false;toast('⚠️ 저장 실패: '+((e&&e.message)||e));});
 }
 function _rwGive(docId,on,fromList){
   db.collection('checkLogs').doc(docId).set({rw:{given:!!on,givenAt:Date.now()}},{merge:true}).then(function(){
