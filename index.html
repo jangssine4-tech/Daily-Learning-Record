@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-cg';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ch';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3314,7 +3314,6 @@ function ccNormProg(p){
   p=p.replace(/^Unt /,'Unit ').replace(/^전체 ?/,'');
   return _gpAlias(p);
 }
-var CC_AUTO_CALL={voca:['단어장 검사 받기','tablet'],storybook:['스토리북 검사 받기','book'],studentbook:['교재 검사 받기','book'],guidebook:['가이드북 검사 받기','book'],workbook:['워크북 검사 받기','tablet'],mainbook:['메인북 검사 받기','book']};
 function ccSplitChecks(text){
   var t=String(text||'').replace(/\s+/g,' ').trim();
   var parts=t.indexOf('□')>=0?t.split('□'):[t];
@@ -3463,15 +3462,7 @@ function ccResolve0(plan,level,progress){
       sec.items.push(it);
     }
   });
-  // 교재 학습 구역 끝에 '검사 받기' 호출 버튼 자동 추가 (선생님 호출 항목이 이미 있으면 생략)
-  secs.forEach(function(sec){
-    var g=sec.grp||'';if(g.indexOf('교재')<0)return;
-    var k=String(sec.title).toLowerCase().replace(/\s+/g,'').replace(/\(.*\)/,'');
-    var def=CC_AUTO_CALL[k];if(!def)return;
-    if(sec.items.some(function(i){return i.t==='call';}))return;
-    if(!sec.items.some(function(i){return i.t==='check';}))return;
-    sec.items.push({id:'ac_'+sec._k.replace(/\W/g,'_'),t:'call',l:def[0],to:def[1]});
-  });
+  // (예전: 교재 학습 구역에 '검사 받기'를 자동으로 붙였어요 → 이제 전체 계획표에 넣은 항목만 나와요)
   // 같은 이름의 구역이 둘이면 묶음 이름을 붙여 구분
   var cnt={};secs.forEach(function(s){cnt[s.title]=(cnt[s.title]||0)+1;});
   secs.forEach(function(s){if(cnt[s.title]>1&&s.grp)s.title=s.grp.replace(/\s+/g,' ')+' '+s.title;s.k=s._k;delete s._k;});
