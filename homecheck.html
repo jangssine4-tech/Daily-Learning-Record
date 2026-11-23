@@ -103,9 +103,10 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .vr video{width:100%;max-width:560px;max-height:62vh;background:#000;border-radius:14px;object-fit:contain}
 .vr .vt{font-size:15px;font-weight:700;margin:10px 0 4px;text-align:center}
 .vr .vs{font-size:13px;color:#B9CBC2;text-align:center;min-height:18px}
-.vr .vb{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center}
-.vr .vb button{padding:13px 22px;border-radius:14px;font-size:16px;font-weight:800;background:#fff;color:#14302B}
+.vr .vb{display:flex;gap:8px;margin-top:14px;flex-wrap:nowrap;justify-content:center;width:100%;max-width:560px}
+.vr .vb button{flex:1 1 0;min-width:0;padding:13px 8px;border-radius:14px;font-size:15px;font-weight:800;background:#fff;color:#14302B;white-space:nowrap}
 .vr .vb button.rec{background:var(--red);color:#fff}.vr .vb button.pri{background:var(--g);color:#fff}
+.vr .vb button.flip{background:#2F6FDE;color:#fff}.vr .vb button.cls{background:#33433D;color:#E3ECE7}
 .tmb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;background:#F2F8F5;border-bottom:1px solid var(--line2)}
 .tmb .tv{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;margin-right:auto;color:var(--g2)}
 .tmb .tv.ps{color:var(--amber)}
@@ -358,7 +359,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zn</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zo</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -1130,7 +1131,7 @@ async function vrecOpen(itemId){
   if(!R||!R.les)return;
   if(!window.MediaRecorder||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('이 기기에서는 앱 안 녹화를 쓸 수 없어요. 아래 "파일 선택"을 눌러 주세요');return;}
   VR.itemId=itemId;$('vr').classList.add('on');vrSet('카메라를 켜는 중...','',
-    '<button onclick="vrClose()">닫기</button>');
+    '<button class="cls" onclick="vrClose()">닫기</button>');
   await vrCam();
 }
 async function vrCam(){
@@ -1142,10 +1143,10 @@ async function vrCam(){
     try{var _fm=VR.stream.getVideoTracks()[0].getSettings().facingMode;if(_fm==='user'||_fm==='environment')VR.face=_fm;}catch(e){}   // 실제로 켜진 카메라 방향
   }catch(e){
     console.warn(e);
-    vrSet('카메라를 켜지 못했어요','카메라와 마이크 사용을 허용해 주세요. 안 되면 "파일 선택"을 눌러 주세요','<button onclick="vrClose()">닫기</button>');return;
+    vrSet('카메라를 켜지 못했어요','카메라와 마이크 사용을 허용해 주세요. 안 되면 "파일 선택"을 눌러 주세요','<button class="cls" onclick="vrClose()">닫기</button>');return;
   }
   v.srcObject=VR.stream;try{var pp=v.play();if(pp&&pp.catch)pp.catch(function(){});}catch(e){}
-  vrSet('준비되면 녹화를 누르세요',(VR.face==='environment'?'뒤쪽 카메라 · ':'앞쪽 카메라 · ')+'최대 '+Math.round(VSEC/60)+'분까지 녹화돼요','<button class="rec" onclick="vrStart()">● 녹화 시작</button>'+'<button onclick="vrFlip()">🔄 카메라 전환</button>'+'<button onclick="vrClose()">닫기</button>');
+  vrSet('준비되면 녹화를 누르세요',(VR.face==='environment'?'뒤쪽 카메라 · ':'앞쪽 카메라 · ')+'최대 '+Math.round(VSEC/60)+'분까지 녹화돼요','<button class="rec" onclick="vrStart()">● 녹화 시작</button>'+'<button class="flip" onclick="vrFlip()">🔄 카메라 전환</button>'+'<button class="cls" onclick="vrClose()">닫기</button>');
 }
 function vrCamId(){try{return VR.stream.getVideoTracks()[0].getSettings().deviceId||'';}catch(e){return '';}}
 async function vrFlip(){
@@ -1179,7 +1180,7 @@ function vrDone(){
   VR.blob=new Blob(VR.chunks,{type:type});vrStopStream();
   var v=$('vrV');v.srcObject=null;VR.url=URL.createObjectURL(VR.blob);v.src=VR.url;v.muted=false;v.controls=true;
   var mb=(VR.blob.size/1048576).toFixed(1);
-  if(VR.blob.size>VMB*1048576){vrSet('영상이 너무 커요','('+mb+'MB) 다시 짧게 찍어 주세요','<button onclick="vrCam()">다시 찍기</button><button onclick="vrClose()">닫기</button>');return;}
+  if(VR.blob.size>VMB*1048576){vrSet('영상이 너무 커요','('+mb+'MB) 다시 짧게 찍어 주세요','<button onclick="vrCam()">다시 찍기</button><button class="cls" onclick="vrClose()">닫기</button>');return;}
   vrSet('잘 찍혔는지 확인해 보세요',fmtT(VR.dur)+' · '+mb+'MB','<button onclick="vrCam()">다시 찍기</button><button class="pri" onclick="vrSend()">올리기</button>');
 }
 async function vrSend(){
