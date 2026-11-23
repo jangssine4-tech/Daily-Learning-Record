@@ -358,7 +358,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zm</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zn</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -1140,15 +1140,21 @@ async function vrCam(){
     if(!VR.face){try{VR.face=localStorage.getItem('hc_vface')||'';}catch(e){}if(VR.face!=='environment')VR.face='user';}
     VR.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:VR.face},width:{ideal:640},height:{ideal:360},frameRate:{ideal:24,max:30}},audio:true});
     try{var _fm=VR.stream.getVideoTracks()[0].getSettings().facingMode;if(_fm==='user'||_fm==='environment')VR.face=_fm;}catch(e){}   // 실제로 켜진 카메라 방향
-    try{var _dv=await navigator.mediaDevices.enumerateDevices();VR.multi=_dv.filter(function(d){return d.kind==='videoinput';}).length>1;}catch(e){VR.multi=true;}   // 카메라가 하나뿐이면 전환 버튼을 숨겨요
   }catch(e){
     console.warn(e);
     vrSet('카메라를 켜지 못했어요','카메라와 마이크 사용을 허용해 주세요. 안 되면 "파일 선택"을 눌러 주세요','<button onclick="vrClose()">닫기</button>');return;
   }
   v.srcObject=VR.stream;try{var pp=v.play();if(pp&&pp.catch)pp.catch(function(){});}catch(e){}
-  vrSet('준비되면 녹화를 누르세요',(VR.face==='environment'?'뒤쪽 카메라 · ':'앞쪽 카메라 · ')+'최대 '+Math.round(VSEC/60)+'분까지 녹화돼요','<button class="rec" onclick="vrStart()">● 녹화 시작</button>'+(VR.multi?'<button onclick="vrFlip()">🔄 카메라 전환</button>':'')+'<button onclick="vrClose()">닫기</button>');
+  vrSet('준비되면 녹화를 누르세요',(VR.face==='environment'?'뒤쪽 카메라 · ':'앞쪽 카메라 · ')+'최대 '+Math.round(VSEC/60)+'분까지 녹화돼요','<button class="rec" onclick="vrStart()">● 녹화 시작</button>'+'<button onclick="vrFlip()">🔄 카메라 전환</button>'+'<button onclick="vrClose()">닫기</button>');
 }
-function vrFlip(){VR.face=VR.face==='environment'?'user':'environment';try{localStorage.setItem('hc_vface',VR.face);}catch(e){}vrCam();}
+function vrCamId(){try{return VR.stream.getVideoTracks()[0].getSettings().deviceId||'';}catch(e){return '';}}
+async function vrFlip(){
+  var old=vrCamId(),want=VR.face==='environment'?'user':'environment';
+  VR.face=want;try{localStorage.setItem('hc_vface',want);}catch(e){}
+  await vrCam();
+  var now=vrCamId();
+  if(old&&now&&old===now){VR.face=want==='user'?'environment':'user';try{localStorage.setItem('hc_vface',VR.face);}catch(e){}$('vrS').textContent=$('vrS').textContent.replace(/^(앞|뒤)쪽 카메라/,VR.face==='environment'?'뒤쪽 카메라':'앞쪽 카메라');toast('이 기기에는 다른 카메라가 없어요');}
+}
 function vrStart(){
   if(!VR.stream)return;
   VR.chunks=[];VR.mime=vrMime();
