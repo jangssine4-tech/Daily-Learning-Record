@@ -330,7 +330,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-af</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-ag</div>
   </div>
 </div>
 
@@ -728,7 +728,8 @@ async function tryLogin(){
       fail('없는 번호예요. 다시 눌러 주세요'+cnt);return;}
     try{sessionStorage.removeItem('cc_fc');}catch(e5){}
     var d=snap.docs[0];
-    startSession(d.id,d.data());
+    var _ok=await startSession(d.id,d.data());
+    if(!_ok){fail(LOCK_MSG);return;}
   }catch(e){console.error(e);fail('연결이 불안정해요. 잠시 후 다시 눌러 주세요');}
   busy=false;
 }
@@ -739,7 +740,7 @@ async function resume(sid){
     show('sLogin');toast('다시 연결하는 중이에요');
     setTimeout(function(){resume(sid);},3000);return;
   }
-  if(d.exists){startSession(sid,d.data());return;}
+  if(d.exists){var _ok=await startSession(sid,d.data());if(!_ok){try{localStorage.removeItem('cc_sid');}catch(e){}show('sLogin');$('err').textContent=LOCK_MSG;}return;}
   try{localStorage.removeItem('cc_sid');}catch(e){}   // 명단에서 정말 빠진 학생일 때만
   show('sLogin');
 }
@@ -777,9 +778,53 @@ function normTpl(t){
   var src=(t&&t.sections&&t.sections.length)?t:CC_DEFAULT_TEMPLATE;
   return src.sections.map(function(sec){return {k:sec.k||'',title:sec.title||'',grp:sec.grp||'',tmx:sec.tmx,items:(sec.items||[]).filter(function(i){return i&&i.l&&i.l!=='받아쓰기 검사 받기';})};}).filter(function(s){return s.items.length;});
 }
+/* ── 한 학생은 한 태블릿에서만 ──
+   checkPresence/{학생}에 '어느 태블릿(dev)이 쓰는 중인지'와 40초마다 갱신하는 확인 시각(hb)을 적어 둬요.
+   다른 태블릿이 130초 안에 확인 시각을 갱신했으면 새 접속은 막혀요. 나가기를 누르거나 130초 동안 신호가 없으면 풀려요. */
+var DEV=(function(){try{var d=localStorage.getItem('cc_dev');if(!d){d='d'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.setItem('cc_dev',d);}return d;}catch(e){return 'm'+Math.random().toString(36).slice(2,10);}})();
+var LOCK_TTL=130000,HB_MS=40000,PR=null,unsubPr=null,hbT=null;
+var LOCK_MSG='이 학생은 다른 태블릿에서 사용 중이에요. 그 태블릿에서 나가기를 눌러 주세요';
+function _lockedByOther(x){return !!(x&&x.status==='in'&&x.dev&&x.dev!==DEV&&x.hb&&Date.now()-x.hb<LOCK_TTL);}
+async function claimLock(sid,name){
+  var ref=db.collection('checkPresence').doc(sid);
+  try{
+    return await db.runTransaction(async function(tx){
+      var d=await tx.get(ref),x=d.exists?d.data():null;
+      if(_lockedByOther(x))return {ok:false};
+      tx.set(ref,{studentId:sid,studentName:name||'',date:todayISO(),status:'in',dev:DEV,hb:Date.now(),at:firebase.firestore.FieldValue.serverTimestamp()});
+      return {ok:true};
+    });
+  }catch(e){console.warn('[동시 접속 확인]',e);return {ok:true};}   // 확인하지 못하면 막지 않아요(수업이 멈추지 않게)
+}
+function heartbeat(){
+  if(!S||(PR&&PR.dev&&PR.dev!==DEV))return;
+  db.collection('checkPresence').doc(S.sid).set({hb:Date.now(),dev:DEV,status:'in',studentId:S.sid,studentName:S.name,date:todayISO()},{merge:true}).catch(function(){});
+}
+function watchLock(sid){
+  if(unsubPr){unsubPr();unsubPr=null;}PR=null;
+  unsubPr=db.collection('checkPresence').doc(sid).onSnapshot(function(d){
+    if(!S||S.sid!==sid||(d.metadata&&d.metadata.fromCache))return;
+    PR=d.exists?d.data():null;
+    if(_lockedByOther(PR))forceOut('다른 태블릿에서 이 학생으로 접속해서 이 화면을 닫았어요');
+  },function(){});
+  clearInterval(hbT);hbT=setInterval(heartbeat,HB_MS);
+}
+document.addEventListener('visibilitychange',function(){if(!document.hidden)heartbeat();});
+// 다른 태블릿에 자리를 뺏겼을 때: 아무것도 기록하지 않고 조용히 로그인 화면으로 돌아가요
+function forceOut(msg){
+  try{rwClose();RW.prev=null;}catch(e){}
+  if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}if(unsubRoster){unsubRoster();unsubRoster=null;}
+  if(unsubPr){unsubPr();unsubPr=null;}clearInterval(hbT);clearInterval(tickT);
+  S=null;checks={};LOG={e:{},v:{}};PR=null;stopRing();$('call').classList.remove('on');
+  try{localStorage.removeItem('cc_sid');localStorage.removeItem('cc_sess');}catch(e){}
+  pin='';paintDots();show('sLogin');$('err').textContent=msg||'';
+}
 async function startSession(sid,data){
+  var lk=await claimLock(sid,data&&data.name);
+  if(!lk.ok)return false;
   var n=await pickSess(sid,data);
   openSession(sid,data,n);
+  return true;
 }
 function openSession(sid,data,sess){
   S={sid:sid,data:data,sess:sess,ses:(data.ses&&data.ses[DN[new Date().getDay()]])||null,name:data.name,plan:data.plan||null,lvl:(sess===2&&data.pg2&&data.lvl2)?data.lvl2:(data.lvl||data.level||''),pg0:(sess===2&&data.pg2&&data.lvl2)?data.pg2:(data.pg||''),fb:data.template||null,secs:normTpl(data.template),secSig:'',totalMin:data.totalMin||CC_DEFAULT_MINUTES,date:todayISO(),gotLog:false,gotChk:false,secInit:false,finished:false};
@@ -813,7 +858,7 @@ function openSession(sid,data,sess){
     S.data=x;S.plan=x.plan||null;var _s2=(S.sess===2&&x.pg2&&x.lvl2);S.lvl=_s2?x.lvl2:(x.lvl||x.level||'');S.pg0=_s2?x.pg2:(x.pg||'');S.fb=x.template||null;S.totalMin=x.totalMin||CC_DEFAULT_MINUTES;
     render();
   },function(e){console.warn(e);});
-  setPresence('in');show('sMain');render();
+  setPresence('in');watchLock(sid);show('sMain');render();
   clearInterval(tickT);tickT=setInterval(paintBar,30000);
 }
 /* ── 어제 하다 만 체크콜 이어받기 ──
@@ -874,6 +919,7 @@ function logout(){
   }catch(e){}}
   setPresence('out');
   if(unsub){unsub();unsub=null;}if(unsubLog){unsubLog();unsubLog=null;}if(unsubRoster){unsubRoster();unsubRoster=null;}
+  if(unsubPr){unsubPr();unsubPr=null;}clearInterval(hbT);PR=null;
   clearInterval(tickT);
   S=null;checks={};LOG={e:{},v:{}};stopRing();$('call').classList.remove('on');
   try{localStorage.removeItem('cc_sid');localStorage.removeItem('cc_sess');}catch(e){}
@@ -1617,7 +1663,8 @@ function ding(){
 }
 function setPresence(status){
   if(!S)return;
-  db.collection('checkPresence').doc(S.sid).set({studentId:S.sid,studentName:S.name,date:todayISO(),status:status,at:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
+  if(status==='out'&&PR&&PR.dev&&PR.dev!==DEV)return;   // 이미 다른 태블릿이 쓰고 있으면 건드리지 않아요
+  db.collection('checkPresence').doc(S.sid).set({studentId:S.sid,studentName:S.name,date:todayISO(),status:status,dev:DEV,hb:status==='in'?Date.now():0,at:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
 }
 // 자정이 지나면 오늘 기록으로 자동 갱신 (로그아웃은 하지 않아요)
 setInterval(function(){if(S&&S.date&&S.date!==todayISO())resume(S.sid);},60000);
