@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-co';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cp';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -30727,9 +30727,17 @@ function renderShop(){
   }
   _shopDraw();
 }
+/* 같은 구분(종류)끼리 모아 정렬해요 · 구분은 처음 나온 순서대로, 구분이 빈 상품은 맨 아래, 같은 구분 안에서는 원래 순서 그대로 */
+function _shopGroup(){
+  var L=_shopEd.items,ord=[];
+  L.forEach(function(it){var c=String(it.cat||'').trim();if(c&&ord.indexOf(c)<0)ord.push(c);});
+  var rk=function(it){var c=String(it.cat||'').trim();return c?ord.indexOf(c):ord.length;};
+  _shopEd.items=L.map(function(it,i){return {it:it,i:i,r:rk(it)};}).sort(function(x,y){return x.r-y.r||x.i-y.i;}).map(function(x){return x.it;});
+}
 function _shopCats(){var c=[];_shopEd.items.forEach(function(i){if(i.cat&&c.indexOf(i.cat)<0)c.push(i.cat);});return c;}
 function _shopDraw(){
   var host=document.getElementById('ref-panel-shop');if(!host||currentRefTab!=='shop')return;
+  _shopGroup();   /* 구분(종류)별로 자동으로 모아서 정리 */
   var E=_shopEd,cats=_shopCats(),h='';
   h+='<style>.shp{padding:16px}.shp .tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.shp table{width:100%;border-collapse:collapse;font-size:12px}.shp th{background:var(--surface2);color:var(--txt2);padding:7px 6px;text-align:left;white-space:nowrap}.shp td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}.shp .fi{padding:3px 6px;font-size:12px;width:100%;box-sizing:border-box}.shp .nb{width:64px;text-align:right}.shp .qrt{width:34px;height:34px;display:block}.shp .qrt svg{width:100%;height:100%}.shp .note{background:var(--surface2);border-radius:10px;padding:9px 12px;font-size:11px;color:var(--txt2);margin-top:10px;line-height:1.7}</style>';
   h+='<div class="shp"><div class="tb"><button class="btn btn-navy btn-sm" onclick="_shopEd.paste=!_shopEd.paste;_shopDraw()">📋 엑셀 붙여넣기</button><button class="btn btn-navy btn-sm" onclick="_shopAdd()">+ 상품 추가</button><button class="btn btn-outline btn-sm" onclick="_shopEd.sheet=!_shopEd.sheet;_shopDraw();if(_shopEd.sheet)setTimeout(function(){var e=document.querySelector(\'.shsh\');if(e){e.parentNode.scrollIntoView({behavior:\'smooth\',block:\'start\'});}},60)">🖨️ QR 인쇄용 시트 '+(E.sheet?'닫기':'만들기')+'</button>'
