@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-cj';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cm';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -26624,7 +26624,8 @@ function hwrRender(){
           +(_hwr.sel?'<span style="position:absolute;top:6px;left:6px;z-index:2;width:22px;height:22px;border-radius:6px;border:2px solid '+(sl?'#dc2626':'#fff')+';background:'+(sl?'#dc2626':'rgba(0,0,0,.35)')+';color:#fff;font-size:15px;font-weight:900;line-height:18px;text-align:center">'+(sl?'✓':'')+'</span>':'')
           +'<div style="height:96px;background:var(--surface2);display:flex;align-items:center;justify-content:center"><img data-hwr="'+u.id+'" alt="" style="width:100%;height:100%;object-fit:cover;display:none"><span class="hwr-ph" style="font-size:22px">'+(u.kind==='video'?'🎬':'🖼')+'</span></div>'
           +'<div style="padding:6px 8px"><div style="font-size:12px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(u.kind==='video'?'🎬 ':'')+_bcEsc(u.name||'이름 없음')+'</div>'
-          +'<div style="font-size:10px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(u.itemLabel||'')+(ts?' · '+ts:'')+(u.size?' · '+_hwrSz(u.size):'')+'</div>'
+          +'<div style="font-size:10px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(u.itemLabel||'')+(ts?' · '+ts:'')+'</div>'
+          +'<div style="font-size:11px;font-weight:800;color:var(--navy)">'+(u.size?'📦 '+_hwrSz(u.size):'<span style="font-weight:500;color:var(--txt3)">크기 정보 없음</span>')+'</div>'
           +'<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:800;background:'+bd[0]+';color:'+bd[1]+'">'+bd[2]+'</span></div></button>';
       });
       h+='</div>';
@@ -30517,8 +30518,9 @@ function _sbTDraw(){
   var docs=_sbT.docs||{},L=_sbTList(),mk=todayISO().slice(0,7),h='';
   h+='<style>.rw-t{border-collapse:collapse;width:100%;font-size:12px}.rw-t td,.rw-t th{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}.rw-t th{background:var(--surface2);color:var(--txt2)}.sbt-in{width:64px;padding:3px 6px;text-align:center}</style>';
   h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><div style="font-size:12px;color:var(--txt3);flex:1;min-width:200px">체크콜에서 받은 스탬프가 자동으로 쌓여요. 이 탭을 열 때만 학생 수만큼 읽어요.</div>'
-    +'<button class="btn '+(_sbT.mode?'btn-navy':'btn-outline')+' btn-sm" onclick="_sbTMode()">✏️ 시작 잔액 입력 모드</button></div>';
-  if(_sbT.mode){
+    +'<button class="btn '+(_sbT.diag?'btn-navy':'btn-outline')+' btn-sm" onclick="_sbTDiag()">🔍 학생 진단</button><button class="btn '+(_sbT.mode?'btn-navy':'btn-outline')+' btn-sm" onclick="_sbTMode()">✏️ 시작 잔액 입력 모드</button></div>';
+  if(_sbT.diag&&!_sbT.mode){h+=_sbTDiagHtml(L,docs);}
+  else if(_sbT.mode){
     h+='<div style="font-size:12px;background:var(--surface2);border-radius:10px;padding:8px 10px;margin-bottom:8px">지금 종이 스탬프북에 찍힌 개수를 한 번에 입력해요 (처음 한 번). 입력한 학생부터 스탬프가 자동으로 쌓이고, 이미 시작한 학생은 입력한 개수로 맞춰져요.'
       +' <button class="btn btn-outline btn-xs" onclick="_sbTZero()">빈 칸은 모두 0으로</button></div>'
       +'<table class="rw-t" style="max-width:560px"><thead><tr><th>학생</th><th>지금 잔액</th><th>종이 스탬프북 개수</th></tr></thead><tbody>'
@@ -30539,6 +30541,33 @@ function _sbTDraw(){
   b.innerHTML=h;
 }
 /* ── 월간 통계 (월 선택 · 정렬 · 합계 · 복사 · 학생별 내역) ── */
+/* 🔍 학생 진단: 이름 ↔ 학생 ID ↔ 체크콜 명단 ↔ 스탬프북 문서 (읽기만 해요) */
+function _sbTDiag(){
+  _sbT.diag=!_sbT.diag;_sbT.dq='';
+  if(_sbT.diag&&!_sbT.roster){
+    _sbT.roster=null;
+    db.collection('checkRoster').get().then(function(q){var m={};q.forEach(function(d){m[d.id]=d.data();});_sbT.roster=m;_sbTDraw();}).catch(function(e){_sbT.roster={};_sbT.rerr=(e&&e.message)||String(e);_sbTDraw();});
+  }
+  _sbTDraw();
+}
+function _sbTDq(v){_sbT.dq=v;var el=document.getElementById('sbt-dg');if(el)el.innerHTML=_sbTDiagRows();}
+function _sbTDiagRows(){
+  var docs=_sbT.docs||{},ro=_sbT.roster,q=String(_sbT.dq||'').trim().toLowerCase();
+  var L=_sbTList().filter(function(s){return !q||String(s.name||'').toLowerCase().indexOf(q)>=0||String(s.id).toLowerCase().indexOf(q)>=0;});
+  var bad=function(t){return '<span style="color:#b91c1c;font-weight:800">'+t+'</span>';},good=function(t){return '<span style="color:#166534;font-weight:800">'+t+'</span>';};
+  return '<table class="rw-t"><thead><tr><th>이름</th><th>학생 ID</th><th>체크콜 명단</th><th>스탬프북</th><th>시작일</th><th>잔액</th><th>홈체크 버튼</th></tr></thead><tbody>'
+   +L.map(function(s){var d=docs[s.id],inR=ro?!!ro[s.id]:null,has=!!d,since=d&&d.since,show=has&&since;
+     return '<tr><td>'+_bcEsc(s.name||'')+'</td><td><code style="font-size:11px;user-select:all">'+_bcEsc(s.id)+'</code></td>'
+      +'<td>'+(inR===null?'<span style="color:var(--txt3)">확인 중…</span>':(inR?good('있음'):bad('없음')))+'</td>'
+      +'<td>'+(has?good('문서 있음'):bad('문서 없음'))+'</td><td>'+(since?_bcEsc(since):(has?bad('비어 있음'):'—'))+'</td><td>'+(has?(d.bal|0):'—')+'</td>'
+      +'<td>'+(show?good('보임'):bad('안 보임'))+'</td></tr>';}).join('')+'</tbody></table>'
+   +(L.length?'':'<div style="padding:14px;color:var(--txt3);font-size:12px">해당하는 학생이 없어요</div>');
+}
+function _sbTDiagHtml(L,docs){
+  var no=L.filter(function(s){var d=docs[s.id];return !(d&&d.since);}).length;
+  return '<div style="font-size:12px;background:var(--surface2);border-radius:10px;padding:8px 10px;margin-bottom:8px">재원·신규 '+L.length+'명 중 홈체크에 스탬프북 버튼이 <b>안 보이는 학생 '+no+'명</b>이에요 (스탬프북 문서가 없거나 시작일이 비어 있어요). 문서가 있는데도 안 보이면 Firestore 규칙(읽기 권한)을 확인해요.'+(_sbT.rerr?'<br><span style="color:#b91c1c">체크콜 명단을 읽지 못했어요: '+_bcEsc(_sbT.rerr)+'</span>':'')+'</div>'
+   +'<input class="fi" placeholder="이름 또는 ID 검색" oninput="_sbTDq(this.value)" style="max-width:240px;margin-bottom:8px"><div id="sbt-dg" style="overflow-x:auto">'+_sbTDiagRows()+'</div>';
+}
 function _sbTMonths(docs){var set={},k;set[todayISO().slice(0,7)]=1;Object.keys(docs).forEach(function(id){var mo=(docs[id]||{}).mo||{};for(k in mo)set[k]=1;});return Object.keys(set).sort();}
 function _sbTRows(L,docs,mk){
   return L.map(function(s){var d=docs[s.id];if(!d||!d.since)return {s:s,no:true};
@@ -30703,7 +30732,7 @@ function _shopDraw(){
   var host=document.getElementById('ref-panel-shop');if(!host||currentRefTab!=='shop')return;
   var E=_shopEd,cats=_shopCats(),h='';
   h+='<style>.shp{padding:16px}.shp .tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.shp table{width:100%;border-collapse:collapse;font-size:12px}.shp th{background:var(--surface2);color:var(--txt2);padding:7px 6px;text-align:left;white-space:nowrap}.shp td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}.shp .fi{padding:3px 6px;font-size:12px;width:100%;box-sizing:border-box}.shp .nb{width:64px;text-align:right}.shp .qrt{width:34px;height:34px;display:block}.shp .qrt svg{width:100%;height:100%}.shp .note{background:var(--surface2);border-radius:10px;padding:9px 12px;font-size:11px;color:var(--txt2);margin-top:10px;line-height:1.7}</style>';
-  h+='<div class="shp"><div class="tb"><button class="btn btn-navy btn-sm" onclick="_shopEd.paste=!_shopEd.paste;_shopDraw()">📋 엑셀 붙여넣기</button><button class="btn btn-navy btn-sm" onclick="_shopAdd()">+ 상품 추가</button><button class="btn btn-outline btn-sm" onclick="_shopEd.sheet=!_shopEd.sheet;_shopDraw()">🖨️ QR 인쇄용 시트 만들기</button>'
+  h+='<div class="shp"><div class="tb"><button class="btn btn-navy btn-sm" onclick="_shopEd.paste=!_shopEd.paste;_shopDraw()">📋 엑셀 붙여넣기</button><button class="btn btn-navy btn-sm" onclick="_shopAdd()">+ 상품 추가</button><button class="btn btn-outline btn-sm" onclick="_shopEd.sheet=!_shopEd.sheet;_shopDraw();if(_shopEd.sheet)setTimeout(function(){var e=document.querySelector(\'.shsh\');if(e){e.parentNode.scrollIntoView({behavior:\'smooth\',block:\'start\'});}},60)">🖨️ QR 인쇄용 시트 '+(E.sheet?'닫기':'만들기')+'</button>'
     +'<select class="fi" style="width:auto" onchange="_shopEd.filter=this.value;_shopDraw()"><option value="">구분 필터: 전체</option>'+cats.map(function(c){return '<option value="'+_bcEsc(c)+'"'+(E.filter===c?' selected':'')+'>'+_bcEsc(c)+'</option>';}).join('')+'</select>'
     +'<span style="flex:1"></span><span style="font-size:12px;color:var(--txt3)">월 취득 가능 스탬프 <input type="number" min="0" class="fi" style="width:56px;display:inline-block" value="'+(E.cap|0)+'" onchange="_shopEd.cap=Math.max(0,Math.floor(Number(this.value))||0);_shopEd.dirty=true"> 개 · 상품 '+E.items.length+'개</span><button class="btn btn-green btn-sm" onclick="_shopSave()" '+(E.busy?'disabled':'')+'>저장</button></div>';
   if(E.paste){
