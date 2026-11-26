@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-cr';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cs';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3937,8 +3937,9 @@ var _BCED_TYPES=[['check','체크칸'],['number','숫자 입력'],['dict','받�
 function _ccCan(k){return !!currentUser&&(currentUser.role==='admin'||!!(currentUser.menuPerms&&currentUser.menuPerms[k]===true));}
 // ── 운영 매뉴얼 > 체크콜 Study Plan 설정 탭 ──
 var _ccPaneCur='';
+function _ccCanSp(){return _ccCan('sp_plan')||_ccCan('cc_plan');}   /* Speak Pop 설정: 전용 권한(sp_plan) 또는 기존 체크콜 설정 권한 */
 function _ccCanAny(){return _ccCan('cc_plan')||_ccCan('cc_common');}
-function _ccTabVis(){var sh=document.getElementById('reftab-shop');if(sh)sh.style.display=_ccCan('cc_plan')?'':'none';var sb=document.getElementById('reftab-spset');if(sb)sb.style.display=_ccCan('cc_plan')?'':'none';var rb=document.getElementById('reftab-rwset');if(rb)rb.style.display=_ccCan('cc_plan')?'':'none';var b=document.getElementById('reftab-ccset');if(b)b.style.display=_ccCanAny()?'':'none';var h=document.getElementById('reftab-hcset');if(h)h.style.display=_ccCan('cc_plan')?'':'none';}
+function _ccTabVis(){var sh=document.getElementById('reftab-shop');if(sh)sh.style.display=_ccCan('cc_plan')?'':'none';var sb=document.getElementById('reftab-spset');if(sb)sb.style.display=_ccCanSp()?'':'none';var rb=document.getElementById('reftab-rwset');if(rb)rb.style.display=_ccCan('cc_plan')?'':'none';var b=document.getElementById('reftab-ccset');if(b)b.style.display=_ccCanAny()?'':'none';var h=document.getElementById('reftab-hcset');if(h)h.style.display=_ccCan('cc_plan')?'':'none';}
 document.addEventListener('click',function(){var h=document.getElementById('ccrost-help');if(h)h.style.display='none';h=document.getElementById('hcrost-help');if(h)h.style.display='none';});
 function _hcRostHelp(){var b=document.getElementById('hcrost-help');if(b)b.style.display=b.style.display==='block'?'none':'block';}
 function _ccRostHelp(){var b=document.getElementById('ccrost-help');if(b)b.style.display=b.style.display==='block'?'none':'block';}
@@ -26215,7 +26216,7 @@ function openMenuPermModal(userId){
     });
   });
   secHTML+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin:14px 0 4px">체크콜 편집 (기본: 관리자만)</div>'
-    +[['cc_plan','📋 체크콜 Study Plan 설정 (단계별 계획표)'],['cc_common','⚙ 기본 점검 항목 · 📱 태블릿 & 핸드폰 연결 방법']].map(function(c){return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="perm-'+c[0]+'"'+(perms[c[0]]===true?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'+c[1]+'</label>';}).join('');
+    +[['cc_plan','📋 체크콜 Study Plan 설정 (단계별 계획표)'],['cc_common','⚙ 기본 점검 항목 · 📱 태블릿 & 핸드폰 연결 방법'],['sp_plan','🗣️ Speak Pop 설정 (말하기 카드 내용 입력)']].map(function(c){return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="perm-'+c[0]+'"'+(perms[c[0]]===true?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'+c[1]+'</label>';}).join('');
   overlay.innerHTML='<div class="ms" style="max-width:360px;max-height:90vh;overflow-y:auto">'
     +'<div class="mh"></div>'
     +'<div class="mt">메뉴 권한 — '+u.name+'</div>'
@@ -26227,7 +26228,7 @@ function openMenuPermModal(userId){
   document.body.appendChild(overlay);
   document.getElementById('perm-save-btn').onclick=async function(){saveMenuPerms(userId,overlay);};
 }
-async function saveMenuPerms(userId,overlay){loading(true);var perms={};_menuStruct.forEach(function(sec){sec.items.forEach(function(m){var el=document.getElementById('perm-'+m.id);perms[m.id]=el?el.checked:true;if(m.subs)m.subs.forEach(function(sub){var sel=document.getElementById('perm-'+sub.id);perms[sub.id]=sel?sel.checked:true;});});});['cc_plan','cc_common'].forEach(function(k){var e=document.getElementById('perm-'+k);perms[k]=!!(e&&e.checked);});await db.collection('userPerms').doc(userId).set({menuPerms:perms,updatedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===userId;});if(u)u.menuPerms=perms;if(overlay)overlay.remove();loading(false);toast('✅ 권한 저장됨');}
+async function saveMenuPerms(userId,overlay){loading(true);var perms={};_menuStruct.forEach(function(sec){sec.items.forEach(function(m){var el=document.getElementById('perm-'+m.id);perms[m.id]=el?el.checked:true;if(m.subs)m.subs.forEach(function(sub){var sel=document.getElementById('perm-'+sub.id);perms[sub.id]=sel?sel.checked:true;});});});['cc_plan','cc_common','sp_plan'].forEach(function(k){var e=document.getElementById('perm-'+k);perms[k]=!!(e&&e.checked);});await db.collection('userPerms').doc(userId).set({menuPerms:perms,updatedAt:new Date().toISOString()});var u=users.find(function(x){return x.id===userId;});if(u)u.menuPerms=perms;if(overlay)overlay.remove();loading(false);toast('✅ 권한 저장됨');}
 
 // ══ SETTINGS ══
 function renderPeriodSettings(){
@@ -30155,7 +30156,7 @@ function renderSpSet(){
   var host=document.getElementById('ref-panel-spset');
   if(!host){var rw=document.getElementById('ref-panel-rwset');if(!rw)return;host=document.createElement('div');host.id='ref-panel-spset';host.className='cp';rw.parentNode.insertBefore(host,rw.nextSibling);}
   host.style.display='';
-  if(!_ccCan('cc_plan')){host.innerHTML='<div class="empty"><div class="et">관리자만 볼 수 있어요</div></div>';return;}
+  if(!_ccCanSp()){host.innerHTML='<div class="empty"><div class="et">관리자만 볼 수 있어요</div></div>';return;}
   var lvs=_spLevels();if(!lvs.length){host.innerHTML='<div class="empty"><div class="et">레벨이 없어요</div></div>';return;}
   if(!_spEd.lv||lvs.indexOf(_spEd.lv)<0)_spEd.lv=lvs[0];
   var lv=_spEd.lv;
