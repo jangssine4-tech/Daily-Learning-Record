@@ -276,6 +276,8 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .sk-s.on{border:0;background:linear-gradient(145deg,#fff8dc,#ffe28a);box-shadow:0 3px 0 #e6b400}
 .sk-s.t.on{background:linear-gradient(145deg,#e6fbee,#a8efc4);box-shadow:0 3px 0 #4cc47e}
 .sk-s img{width:76%;height:76%;object-fit:contain}
+.sk-s img.ink{width:84%;height:84%;transform:rotate(var(--rt,-6deg))}
+.sk-s:nth-child(3n+1) img.ink{--rt:-7deg}.sk-s:nth-child(3n+2) img.ink{--rt:5deg}.sk-s:nth-child(3n) img.ink{--rt:-2deg}.sk-s:nth-child(7n) img.ink{--rt:8deg}
 .sk-more{grid-column:1/-1;text-align:center;font-size:14px;color:#e0457b}
 .sk-li{display:flex;gap:10px;padding:9px 2px;border-bottom:1.5px dashed #eee;font-size:16px;align-items:center}
 .sk-li:last-child{border:0}.sk-li span{color:#aaa;font-size:13px;width:40px;flex:none}
@@ -713,12 +715,31 @@ function sbLoad(force){
     if(S!==sid)return;SBK.sid=sid;SBK.t=Date.now();var x=d.exists?d.data():null;SBK.d=(x&&x.since)?x:null;
   }).catch(function(e){console.warn('[stamp]',e);});
 }
-function sbImgLoad(){
+/* 도장 느낌: 종이(밝은 부분)는 투명하게, 잉크(어두운 부분)만 SB_INK 색으로 찍어요. SB_INK=''이면 원본 그대로 */
+var SB_INK='#2670d2';   /* 기본 색. 선생님이 관리 일지에서 고르면 config/stampBook.ink 값이 우선해요 */
+function sbInkMake(){
+  return new Promise(function(res){
+    var src=SBK.img;if(!SB_INK||!src){SBK.ink='';SBK.inkSrc=src+'|'+SB_INK;return res();}
+    if(SBK.inkSrc===src+'|'+SB_INK)return res();
+    var im=new Image();
+    im.onload=function(){try{
+      var w=Math.min(160,im.width||160),h=Math.min(160,im.height||160),r=Math.min(w/im.width,h/im.height);w=Math.max(1,Math.round(im.width*r));h=Math.max(1,Math.round(im.height*r));
+      var c=document.createElement('canvas');c.width=w;c.height=h;var x=c.getContext('2d');x.drawImage(im,0,0,w,h);
+      var d=x.getImageData(0,0,w,h),p=d.data,o=0,n=0,k=SB_INK.replace('#',''),R=parseInt(k.substr(0,2),16),G=parseInt(k.substr(2,2),16),B=parseInt(k.substr(4,2),16);
+      for(var i=0;i<p.length;i+=4){var a0=p[i+3];if(a0>20)o++;var l=p[i]*.3+p[i+1]*.59+p[i+2]*.11,a=a0*Math.max(0,Math.min(1,(205-l)/70));if(a>20)n++;p[i]=R;p[i+1]=G;p[i+2]=B;p[i+3]=a;}
+      if(o&&n<o*.03){SBK.ink='';}else{x.putImageData(d,0,0);SBK.ink=c.toDataURL('image/png');}   /* 잉크가 거의 안 남으면(밝은 그림) 원본 유지 */
+    }catch(e){SBK.ink='';}SBK.inkSrc=src+'|'+SB_INK;res();};
+    im.onerror=function(){SBK.ink='';SBK.inkSrc=src+'|'+SB_INK;res();};
+    im.src=src;
+  });
+}
+function sbImgLoad(){return sbImgLoad0().then(sbInkMake);}
+function sbImgLoad0(){
   var _n=Date.now();   /* 그림은 3분만 기억해요 (선생님이 바꾸면 곧 새 그림이 보여요) */
   if(SBK.img!==undefined&&_n-(SBK.imgT||0)<180000)return Promise.resolve();
-  try{var c=sessionStorage.getItem('sb_img'),ct=+sessionStorage.getItem('sb_img_t')||0;if(c!==null&&_n-ct<180000){SBK.img=c||'';SBK.imgT=ct;return Promise.resolve();}}catch(e){}
+  try{var c=sessionStorage.getItem('sb_img'),ct=+sessionStorage.getItem('sb_img_t')||0;if(c!==null&&_n-ct<180000){var q2=sessionStorage.getItem('sb_inkc');if(q2)SB_INK=(q2==='none')?'':(/^#[0-9a-fA-F]{6}$/.test(q2)?q2:SB_INK);SBK.img=c||'';SBK.imgT=ct;return Promise.resolve();}}catch(e){}
   return db.collection('config').doc('stampBook').get().then(function(d){
-    var u=d.exists?d.data().img:'';SBK.img=(typeof u==='string'&&u.indexOf('data:image/')===0)?u:'';SBK.imgT=Date.now();
+    var q=d.exists?d.data().ink:undefined;if(typeof q==='string')SB_INK=(q==='none')?'':(/^#[0-9a-fA-F]{6}$/.test(q)?q:SB_INK);try{sessionStorage.setItem('sb_inkc',q==null?'':q);}catch(e){}var u=d.exists?d.data().img:'';SBK.img=(typeof u==='string'&&u.indexOf('data:image/')===0)?u:'';SBK.imgT=Date.now();
     try{sessionStorage.setItem('sb_img',SBK.img);sessionStorage.setItem('sb_img_t',String(SBK.imgT));}catch(e){}
   }).catch(function(e){console.warn('[stamp img]',e);});
 }
@@ -763,7 +784,7 @@ function sbPaint(){
   if(!d){h+='<div class="none">스탬프북은 아직 준비 중이에요<br>선생님께 물어봐요 🙂</div>';}
   else{
     bal=Math.max(0,d.bal|0);go=!SK_PLAYED;SK_PLAYED=true;
-    var max=Math.min(50,Math.max(20,Math.ceil(Math.min(bal,50)/5)*5)),sl='',im='<img src="'+(SBK.img||SB_ST)+'" alt="">',i,fs=String(bal).length<=2?64:String(bal).length===3?52:42;
+    var max=Math.min(50,Math.max(20,Math.ceil(Math.min(bal,50)/5)*5)),sl='',im='<img'+(SBK.ink?' class="ink"':'')+' src="'+(SBK.ink||SBK.img||SB_ST)+'" alt="">',i,fs=String(bal).length<=2?64:String(bal).length===3?52:42;
     for(i=0;i<max;i++)sl+=i<bal?'<div class="sk-s on'+((i+1)%10===0?' t':'')+'" style="--i:'+Math.min(i,30)+'">'+im+'</div>':'<div class="sk-s"></div>';
     if(bal>50)sl+='<div class="sk-more">… 그리고 '+(bal-50)+'개 더!</div>';
     h+='<div class="sk-hero">'+skGem('a')+''
@@ -1281,7 +1302,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-zv";
+var APP_BUILD="1111-zx";
 (function(){
   var NAME="홈체크";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}
