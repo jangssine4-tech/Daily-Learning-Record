@@ -360,7 +360,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
   <div class="outw"><button class="out" onclick="logout()">나가기</button></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zt</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zu</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -789,12 +789,13 @@ function sbYmd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'
 function sbNm(n){var t=String(n||'').replace(/\s*\([^)]*\)?\s*$/,'').trim();return t||String(n||'');}
 function sbBuy(id){
   var el=$('sbb');el.classList.add('on');el.scrollTop=0;
-  SBB={id:id,it:null,state:'load',busy:false,done:null,tm:null,msg:''};sbbPaint();
+  SBB={id:id,it:null,state:'load',busy:false,done:null,tm:null,msg:'',q:1};sbbPaint();
   Promise.all([sbLoad(true),sbImgLoad(),db.collection('config').doc('stampShop').get()]).then(function(r){
     var x=r[2].exists?r[2].data():{},it=(x.items||[]).filter(function(i){return i.id===id&&i.qr;})[0]||null;
     SBB.it=it;SBB.state=!it?'none':(!SBK.d?'nobook':'ask');sbbPaint();
   }).catch(function(e){console.warn('[shop]',e);SBB.state='err';sbbPaint();});
 }
+function sbbQ(d){var it=SBB.it;if(!it||SBB.busy||SBB.state!=='ask')return;var cost=it.cost|0,bal=SBK.d?(SBK.d.bal|0):0,mx=Math.max(1,Math.min(10,cost>0?Math.floor(bal/cost):1));SBB.q=Math.max(1,Math.min(mx,(SBB.q||1)+d));SBB.msg='';sbbPaint();}
 function sbbClose(){
   if(SBB.tm){clearInterval(SBB.tm);SBB.tm=null;}
   var el=$('sbb');if(el)el.classList.remove('on');
@@ -803,6 +804,7 @@ function sbbClose(){
   if(R)render();
 }
 function sbbClock(){var e=$('sbbClk');if(!e)return;var n=new Date();e.innerHTML=n.toLocaleTimeString('ko-KR',{hour12:false})+'<small>'+sbYmd(n)+'</small>';}
+function done0(st){return st==='done';}
 function sbbPaint(){
   var el=$('sbb');if(!el||!el.classList.contains('on'))return;
   var st=SBB.state,it=SBB.it,go=false,h='<div class="in"><div class="tp"><button class="x" onclick="sbbClose()" aria-label="닫기">✕</button><b>스탬프 상점</b><span style="width:36px"></span></div>';
@@ -811,13 +813,13 @@ function sbbPaint(){
   else if(st==='nobook')h+='<div class="none">스탬프북이 아직 준비 중이에요<br><small style="font-weight:600;opacity:.85">선생님께 물어봐요 🙂</small></div><button class="go ghost" onclick="sbbClose()">닫기</button>';
   else if(st==='err')h+='<div class="none">연결이 불안정해요<br><small style="font-weight:600;opacity:.85">잠시 뒤에 다시 찍어 주세요</small></div><button class="go ghost" onclick="sbbClose()">닫기</button>';
   else{
-    var bal=SBK.d?(SBK.d.bal|0):0,cost=it.cost|0,done=st==='done',cl=String(cost).length;
+    var bal=SBK.d?(SBK.d.bal|0):0,u=it.cost|0,mx=Math.max(1,Math.min(10,u>0?Math.floor(bal/u):1)),q=Math.max(1,Math.min(done0(st)?(SBB.q||1):mx,SBB.q||1)),cost=u*q,done=st==='done',cl=String(cost).length;SBB.q=q;
     go=SBB.pl!==st;SBB.pl=st;
     h+='<div class="sb-card"><span class="sb-cat" style="background:'+sbCol(it.cat)+'">'+esc(it.cat||'상품')+'</span>'+(done?'<div class="paid">PAID</div>':'')
       +'<div class="sk-hero">'+skGem('b')+'<div class="sk-num"><b style="font-size:'+(done?44:(cl<=2?48:38))+'px">'+(done?'✓':cost)+'</b><span style="font-size:16px">'+(done?'교환 완료':'스탬프')+'</span></div></div>'
-      +'<h1 class="sb-up" style="--i:0">'+esc(sbNm(it.name))+'</h1>';
+      +'<h1 class="sb-up" style="--i:0">'+esc(sbNm(it.name))+(q>1?' <span style="font-size:.7em;opacity:.9">× '+q+'개</span>':'')+'</h1>';
     if(done)h+='<div class="clk sb-up" id="sbbClk" style="--i:1"></div><div class="bal sb-up" style="--i:2"><span>남은 스탬프</span><b>'+bal+'</b></div>';
-    else h+='<div class="bal sb-up" style="--i:1"><span>내 스탬프</span><b>'+bal+'</b><span>→ 교환 후</span><b>'+Math.max(0,bal-cost)+'</b></div>';
+    else h+=(u>0&&bal>=u?'<div class="sb-up" style="--i:1;display:flex;align-items:center;justify-content:center;gap:16px;margin:2px 0 8px"><button type="button" aria-label="하나 줄이기" onclick="sbbQ(-1)" style="width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.14);color:inherit;font-size:26px;font-weight:900;line-height:1"'+(q<=1?' disabled':'')+'>−</button><div style="min-width:70px;text-align:center"><b style="font-size:30px">'+q+'</b><span style="font-size:14px;font-weight:800"> 개</span></div><button type="button" aria-label="하나 늘리기" onclick="sbbQ(1)" style="width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.14);color:inherit;font-size:26px;font-weight:900;line-height:1"'+(q>=mx?' disabled':'')+'>+</button></div>':'')+'<div class="bal sb-up" style="--i:1"><span>내 스탬프</span><b>'+bal+'</b><span>→ 교환 후</span><b>'+Math.max(0,bal-cost)+'</b></div>';
     h+='</div>';
     if(done)h+='<div class="sb-msg">교환 완료! 선생님께 이 화면을 보여 주세요</div><button class="go ghost" onclick="sbbClose()">확인</button>';
     else if(bal<cost)h+='<div class="warn">스탬프가 모자라요 (필요 '+cost+'개 · 내 '+bal+'개)<br>'+(cost-bal)+'개만 더 모으면 돼요! 💪</div><button class="go ghost" onclick="sbbClose()">닫기</button>';
@@ -829,11 +831,11 @@ function sbbPaint(){
 }
 function sbBuyGo(){
   var it=SBB.it;if(!it||SBB.busy||!S)return;SBB.busy=true;SBB.msg='';sbbPaint();
-  var dr=db.collection('stampBook').doc(S),now=new Date(),today=sbYmd(now),mk=today.slice(0,7),cost=it.cost|0;
+  var q=Math.max(1,Math.min(10,SBB.q|0||1)),dr=db.collection('stampBook').doc(S),now=new Date(),today=sbYmd(now),mk=today.slice(0,7),cost=(it.cost|0)*q;
   db.runTransaction(function(tx){return tx.get(dr).then(function(d){
     if(!d.exists||!d.data().since)throw new Error('nobook');
     var b=d.data(),bal=b.bal||0;if(bal<cost)throw new Error('short');
-    var log=sbMonth(b.log).concat([{t:Date.now(),d:today,k:'buy',n:-cost,m:it.name+' 교환',i:it.id}]);if(log.length>30)log=log.slice(-30);
+    var log=sbMonth(b.log).concat([{t:Date.now(),d:today,k:'buy',n:-cost,m:it.name+(q>1?' × '+q+'개':'')+' 교환',i:it.id,q:q}]);if(log.length>30)log=log.slice(-30);
     var mo=JSON.parse(JSON.stringify(b.mo||{})),m=mo[mk]||{in:0,out:0};m.out=(m.out||0)+cost;mo[mk]=m;
     tx.set(dr,{bal:bal-cost,log:log,mo:mo,upd:Date.now()},{mergeFields:['bal','log','mo','upd']});
     return bal-cost;
@@ -1279,7 +1281,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-zt";
+var APP_BUILD="1111-zu";
 (function(){
   var NAME="홈체크";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}
