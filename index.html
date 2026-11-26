@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-cx';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cy';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -4603,7 +4603,18 @@ function _ccChip(it){
 function _ccSig(t){return JSON.stringify(((t&&t.sections)||[]).map(function(s){if(s.k==='hw')s={k:s.k,title:_ccHwTitleMig(s.title),items:_ccHwItemsMig(s.items||[])};return [s.k||'',s.title||'',(s.items||[]).map(function(i){return [i.id||'',i.t||'',i.l||'',i.to||'',i.u||'',i.link||'',i.hint||'',i.off?1:0,i.del?1:0];})];}));}
 function _ccPlain(p,ln){var q={};for(var k in p)q[k]=p[k];q.ov=null;var r=null;try{r=ccResolve(q,'',ln);}catch(e){}return r;}
 function _ccCustom(p,ln){if(!(p&&p.ov&&p.ov[ln]))return false;return _ccSig(_ccPlain(p,ln))!==_ccSig(p.ov[ln]);}
-function _ccPruneOv(p){var n=0;if(!p||!p.ov)return 0;Object.keys(p.ov).forEach(function(ln){if(!_ccCustom(p,ln)){delete p.ov[ln];if(p.ovDel)delete p.ovDel[ln];n++;}});return n;}
+/* 예전에 코드가 자동으로 붙이던 '○○ 검사 받기' 줄이 레슨별 수정본에 남아 있고, 같은 구역에 계획표 호출 줄이 따로 있으면 중복이라 지워요 */
+var _CC_LEGACY_CALL={'단어장 검사 받기':1,'스토리북 검사 받기':1,'교재 검사 받기':1,'가이드북 검사 받기':1,'워크북 검사 받기':1,'메인북 검사 받기':1};
+function _ccHealLegacy(p){
+  var n=0;if(!p||!p.ov)return 0;
+  Object.keys(p.ov).forEach(function(ln){var o=p.ov[ln];if(!o||!o.sections)return;
+    o.sections.forEach(function(sc){var its=sc.items||[];
+      var other=its.filter(function(i){return i&&i.t==='call'&&!_CC_LEGACY_CALL[String(i.l||'').trim()];}).length;if(!other)return;
+      var keep=its.filter(function(i){return !(i&&i.t==='call'&&_CC_LEGACY_CALL[String(i.l||'').trim()]);});
+      if(keep.length!==its.length){n+=its.length-keep.length;sc.items=keep;}});});
+  return n;
+}
+function _ccPruneOv(p){var n=_ccHealLegacy(p);if(!p||!p.ov)return n;Object.keys(p.ov).forEach(function(ln){if(!_ccCustom(p,ln)){delete p.ov[ln];if(p.ovDel)delete p.ovDel[ln];n++;}});return n;}
 function _ccPurgeDel(p){
   if(!p||!p.ov)return;
   Object.keys(p.ov).forEach(function(ln){
