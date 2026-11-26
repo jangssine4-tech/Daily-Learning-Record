@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-cs';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ct';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -30558,10 +30558,12 @@ function _sbTDiagRows(){
   var docs=_sbT.docs||{},ro=_sbT.roster,q=String(_sbT.dq||'').trim().toLowerCase();
   var L=_sbTList().filter(function(s){return !q||String(s.name||'').toLowerCase().indexOf(q)>=0||String(s.id).toLowerCase().indexOf(q)>=0;});
   var bad=function(t){return '<span style="color:#b91c1c;font-weight:800">'+t+'</span>';},good=function(t){return '<span style="color:#166534;font-weight:800">'+t+'</span>';};
-  return '<table class="rw-t"><thead><tr><th>이름</th><th>학생 ID</th><th>체크콜 명단</th><th>스탬프북</th><th>시작일</th><th>잔액</th><th>홈체크 버튼</th></tr></thead><tbody>'
+  return '<table class="rw-t"><thead><tr><th>이름</th><th>학생 ID</th><th>체크콜 명단</th><th>체크콜 단계·진도</th><th>체크콜 계획표</th><th>스탬프북</th><th>시작일</th><th>잔액</th><th>홈체크 버튼</th></tr></thead><tbody>'
    +L.map(function(s){var d=docs[s.id],inR=ro?!!ro[s.id]:null,has=!!d,since=d&&d.since,show=has&&since;
      return '<tr><td>'+_bcEsc(s.name||'')+'</td><td><code style="font-size:11px;user-select:all">'+_bcEsc(s.id)+'</code></td>'
       +'<td>'+(inR===null?'<span style="color:var(--txt3)">확인 중…</span>':(inR?good('있음'):bad('없음')))+'</td>'
+      +'<td style="font-size:12px">'+(inR?_bcEsc(String(ro[s.id].lvl||ro[s.id].level||'—')+' '+String(ro[s.id].pg||'')):'—')+'</td>'
+      +'<td style="font-size:12px">'+(inR?(ro[s.id].plan&&ro[s.id].plan.key?good('계획표 '+_bcEsc(ro[s.id].plan.key)):bad('없음 → 기본 항목이 떠요 (명단 갱신 필요)')):'—')+'</td>'
       +'<td>'+(has?good('문서 있음'):bad('문서 없음'))+'</td><td>'+(since?_bcEsc(since):(has?bad('비어 있음'):'—'))+'</td><td>'+(has?(d.bal|0):'—')+'</td>'
       +'<td>'+(show?good('보임'):bad('안 보임'))+'</td></tr>';}).join('')+'</tbody></table>'
    +(L.length?'':'<div style="padding:14px;color:var(--txt3);font-size:12px">해당하는 학생이 없어요</div>');
