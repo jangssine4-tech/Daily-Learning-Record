@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ct';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-cv';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6112,7 +6112,7 @@ function _wlOpenToggle(){
 var _wh={sid:null,open:undefined,data:undefined,les:'',busy:false,race:undefined,ev:0};
 function _whToggle(){_wh.open=!_wh.open;try{localStorage.setItem('wh_open',_wh.open?'1':'0');}catch(e){}_whPaint();}
 function _whCtx(s){
-  var r=_hcLatest(s);if(!r)return null;
+  var r=_hcToday(s);if(!r)return null;
   var key=_hcKey(ccPlanKey(r.level||getStudentLevel(s),s.grade)),plan=_hcPlan(key),les=_hcFindLesson(plan,r.progress);
   if(!key||!les)return null;return {key:key,plan:plan,les:les,r:r};
 }
@@ -29853,6 +29853,15 @@ function _hcFindLesson(plan,pg){
   return (plan.order||Object.keys(ls)).filter(function(n){return n.toLowerCase().replace(/\s/g,'')===low;})[0]||'';
 }
 // 학생의 가장 최근 수업 일지 (결석 제외, 진도가 있는 것)
+/* 홈체크 진도 = 체크콜과 같은 규칙 (오늘 일지 → 오늘 고른 진도 → 자동 계산한 오늘 수업 진도), 못 구하면 마지막 일지 */
+function _hcToday(s){
+  try{var i=_bcTodayInfo(s);
+    if(i&&i.pg){var lv=window._hcLive&&window._hcLive[s.id];
+      if(lv&&lv.progress&&lv.date===todayISO())return {studentId:s.id,date:lv.date,level:lv.level,progress:lv.progress,_t:''};   // 일지 입력창에서 방금 고른 값
+      return {studentId:s.id,date:todayISO(),level:i.lvl,progress:i.pg,_t:''};}
+  }catch(e){}
+  return _hcLatest(s);
+}
 function _hcLatest(s,beforeDate){
   var d=todayISO(),best=null;
   (typeof reports!=='undefined'&&reports||[]).forEach(function(r){
@@ -29882,7 +29891,7 @@ function _hcClean(secs,tms){
 function _hcDocFor(s){
   var st=s.status||'재원';if(st!=='재원'&&st!=='신규')return null;
   var pin=String(s.studentNumber||'').trim();if(!pin||pin==='0')return null;
-  var r=_hcLatest(s),lv=(r&&r.level)||getStudentLevel(s),key=_hcKey(ccPlanKey(lv,s.grade)),plan=_hcPlan(key);
+  var r=_hcToday(s),lv=(r&&r.level)||getStudentLevel(s),key=_hcKey(ccPlanKey(lv,s.grade)),plan=_hcPlan(key);
   var les=r?_hcFindLesson(plan,r.progress):'';
   var kk=(window._hcCls||{})[s.id]||{cid:'',mates:[]};
   var _o={name:String(s.name||'').replace(/\s+/g,''),pin:pin,key:key||'',lv:String(lv||''),pg:r?String(r.progress||'').trim():'',les:les,rdate:r?String(r.date||''):'',
@@ -30549,20 +30558,28 @@ function _sbTDiag(){
   _sbT.diag=!_sbT.diag;_sbT.dq='';
   if(_sbT.diag&&!_sbT.roster){
     _sbT.roster=null;
+    db.collection('homeRoster').get().then(function(q){var m={};q.forEach(function(d){m[d.id]=d.data();});_sbT.hroster=m;_sbTDraw();}).catch(function(){_sbT.hroster={};});
     db.collection('checkRoster').get().then(function(q){var m={};q.forEach(function(d){m[d.id]=d.data();});_sbT.roster=m;_sbTDraw();}).catch(function(e){_sbT.roster={};_sbT.rerr=(e&&e.message)||String(e);_sbTDraw();});
   }
   _sbTDraw();
 }
 function _sbTDq(v){_sbT.dq=v;var el=document.getElementById('sbt-dg');if(el)el.innerHTML=_sbTDiagRows();}
+/* 진도 표시 + 관리 일지가 계산한 값과 다르면 '갱신 필요' 표시 (명단이 오래된 경우) */
+function _sbTPg(lv,pg,exp){
+  var t=_bcEsc(String(lv||'—')+' '+String(pg||'')),e='';try{e=String(exp()||'').trim();}catch(x){}
+  if(e&&String(pg||'').trim()!==e)return t+'<br><span style="color:#b91c1c;font-weight:800;font-size:11px">⚠ 갱신 필요 (지금 기준 '+_bcEsc(e)+')</span>';
+  return t;
+}
 function _sbTDiagRows(){
   var docs=_sbT.docs||{},ro=_sbT.roster,q=String(_sbT.dq||'').trim().toLowerCase();
   var L=_sbTList().filter(function(s){return !q||String(s.name||'').toLowerCase().indexOf(q)>=0||String(s.id).toLowerCase().indexOf(q)>=0;});
   var bad=function(t){return '<span style="color:#b91c1c;font-weight:800">'+t+'</span>';},good=function(t){return '<span style="color:#166534;font-weight:800">'+t+'</span>';};
-  return '<table class="rw-t"><thead><tr><th>이름</th><th>학생 ID</th><th>체크콜 명단</th><th>체크콜 단계·진도</th><th>체크콜 계획표</th><th>스탬프북</th><th>시작일</th><th>잔액</th><th>홈체크 버튼</th></tr></thead><tbody>'
+  return '<table class="rw-t"><thead><tr><th>이름</th><th>학생 ID</th><th>체크콜 명단</th><th>체크콜 진도<br><small>(오늘 수업)</small></th><th>홈체크 진도<br><small>(체크콜과 같은 규칙)</small></th><th>체크콜 계획표</th><th>스탬프북</th><th>시작일</th><th>잔액</th><th>홈체크 버튼</th></tr></thead><tbody>'
    +L.map(function(s){var d=docs[s.id],inR=ro?!!ro[s.id]:null,has=!!d,since=d&&d.since,show=has&&since;
      return '<tr><td>'+_bcEsc(s.name||'')+'</td><td><code style="font-size:11px;user-select:all">'+_bcEsc(s.id)+'</code></td>'
       +'<td>'+(inR===null?'<span style="color:var(--txt3)">확인 중…</span>':(inR?good('있음'):bad('없음')))+'</td>'
-      +'<td style="font-size:12px">'+(inR?_bcEsc(String(ro[s.id].lvl||ro[s.id].level||'—')+' '+String(ro[s.id].pg||'')):'—')+'</td>'
+      +'<td style="font-size:12px">'+(inR?_sbTPg(ro[s.id].lvl||ro[s.id].level,ro[s.id].pg,function(){var i=_bcTodayInfo(s);return i&&i.pg;}):'—')+'</td>'
+      +'<td style="font-size:12px">'+(_sbT.hroster&&_sbT.hroster[s.id]?_sbTPg(_sbT.hroster[s.id].lv,_sbT.hroster[s.id].pg,function(){var r=_hcToday(s);return r&&r.progress;}):(_sbT.hroster?bad('없음'):'…'))+'</td>'
       +'<td style="font-size:12px">'+(inR?(ro[s.id].plan&&ro[s.id].plan.key?good('계획표 '+_bcEsc(ro[s.id].plan.key)):bad('없음 → 기본 항목이 떠요 (명단 갱신 필요)')):'—')+'</td>'
       +'<td>'+(has?good('문서 있음'):bad('문서 없음'))+'</td><td>'+(since?_bcEsc(since):(has?bad('비어 있음'):'—'))+'</td><td>'+(has?(d.bal|0):'—')+'</td>'
       +'<td>'+(show?good('보임'):bad('안 보임'))+'</td></tr>';}).join('')+'</tbody></table>'
