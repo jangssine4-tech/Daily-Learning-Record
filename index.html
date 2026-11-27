@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-dl';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-dm';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -12605,8 +12605,10 @@ function _mkParentHint(m){
   return{cls:'',html:''};
 }
 // 학부모 확정 / 응답 대기 배지를 누르면 어떤 학생인지 말풍선으로 보여줘요
+var _mkBubT=0;
+function _mkBubLater(){clearTimeout(_mkBubT);_mkBubT=setTimeout(function(){if(_ccBubKey&&/^mkpb/.test(_ccBubKey))_ccBubbleClose();},300);}   // 마우스를 말풍선 쪽으로 옮길 시간을 조금 줘요
 function _mkParentBubble(e,kind){
-  e.stopPropagation();
+  e.stopPropagation();clearTimeout(_mkBubT);_ccBubKey='';   // 같은 버튼에서 호버·클릭이 겹쳐도 닫히지 않게
   var fd=function(d){return d&&String(d).length>=10?(parseInt(String(d).slice(5,7))+'.'+parseInt(String(d).slice(8,10))):'';};
   var tm=function(t){try{return t?fmt12h(t):'';}catch(x){return t||'';}};
   var L=(makeups||[]).filter(function(m){return kind==='new'?(m.parentStatus==='confirmed'&&m.parentSeen===false):(m.parentStatus==='waiting'&&m.makeupStatus==='pending');});
@@ -12620,6 +12622,7 @@ function _mkParentBubble(e,kind){
   }).join('')+(L.length>40?'<div style="color:var(--txt3)">외 '+(L.length-40)+'건</div>':'')+'</div>';
   h+='<div style="margin-top:8px;text-align:right"><button class="btn btn-outline btn-xs" onclick="_ccBubbleClose();goto(\'makeup\')">보강 관리로 이동</button></div>';
   _ccBubble(e.currentTarget,h,'mkpb'+kind,320);
+  var bb=document.getElementById('ccx-bubble');if(bb){bb.onmouseenter=function(){clearTimeout(_mkBubT);};bb.onmouseleave=_mkBubLater;}
 }
 function updateParentBadges(){
   var el=document.getElementById('sch-parent-badges');if(!el)return;
@@ -12629,8 +12632,8 @@ function updateParentBadges(){
     else if(m.parentStatus==='waiting'&&m.makeupStatus==='pending')nWait++;
   });
   var h='';
-  if(nNew)h+='<span class="sch-pbadge new" onclick="_mkParentBubble(event,\'new\')" title="눌러서 학생·일정 보기">👪 학부모 확정 '+nNew+'건</span>';
-  if(nWait)h+='<span class="sch-pbadge wait" onclick="_mkParentBubble(event,\'wait\')" title="눌러서 학생·일정 보기">⏳ 응답 대기 '+nWait+'건</span>';
+  if(nNew)h+='<span class="sch-pbadge new" onmouseenter="_mkParentBubble(event,\'new\')" onmouseleave="_mkBubLater()" onclick="_mkParentBubble(event,\'new\')" title="">👪 학부모 확정 '+nNew+'건</span>';
+  if(nWait)h+='<span class="sch-pbadge wait" onmouseenter="_mkParentBubble(event,\'wait\')" onmouseleave="_mkBubLater()" onclick="_mkParentBubble(event,\'wait\')" title="">⏳ 응답 대기 '+nWait+'건</span>';
   el.innerHTML=h;
 }
 function _mkBaseLinkUrl(){
