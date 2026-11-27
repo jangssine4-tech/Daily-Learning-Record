@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-dp';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-dq';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -30476,7 +30476,7 @@ function _spCompose(ps){
       if(d.t==='modal'&&d.f.some(function(f){return f.slice(0,2)==='mh';})&&!String(d.mv||'').trim()){toast('3초 챌린지 '+(i+1)+'번: 조동사 + have p.p는 함께 쓸 동사를 써 주세요');return false;}
       if(!(d.f||[]).length||!(d.subj||[]).length){toast('3초 챌린지 '+(i+1)+'번: 주어와 말할 형태를 한 개 이상 골라 주세요');return false;}}}
   if(ps.length)L.ps=ps;
-  if(ch.length)L.ch=ch.map(function(d){var o={t:d.t,sec:+d.sec||3,sh:d.sh===0?0:1};if(d.nm)o.nm=d.nm;
+  if(ch.length)L.ch=ch.map(function(d){var o={t:d.t,sec:+d.sec||3,sh:d.sh===0?0:1};if(d.nm)o.nm=d.nm;if(String(d.desc||'').trim())o.desc=String(d.desc).trim();
     if(d.t==='custom')o.rows=d.rows;else{o.v=String(d.v||'').trim();if(d.t==='do'){o.vp=String(d.vp||'').trim();o.vpp=String(d.vpp||'').trim();}if(d.t==='modal'){var _mv=String(d.mv||'').trim();if(_mv){o.mv=_mv;o.vpp=String(d.vpp||'').trim();}}o.subj=d.subj.slice();o.f=d.f.slice();}return o;});
   if(th.on&&[0,1,2,3,4].every(function(i){return (th.sel||[])[i]===0;})){toast('내 생각 말하기: 보이기를 1개 이상 체크해 주세요');return false;}
   if(th.on){var _hs=[],_sl=[];for(var _i=0;_i<5;_i++){_hs.push(String((th.hints||[])[_i]||'').trim());_sl.push((th.sel||[])[_i]===0?0:1);}L.th={on:1,hints:_hs,sel:_sl};}
@@ -30512,13 +30512,14 @@ function _spChForms(i){
 }
 function _spChHtml(lv){
   var cw=_spEd.cw,h='<div class="card" style="padding:14px"><b style="font-size:15px">'+_bcEsc(lv)+' · '+_bcEsc(_spEd.les)+'</b> <span style="font-size:12px;color:var(--txt3)">— ⏱ 3초 말하기 챌린지</span>'
-   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">주어와 동사를 3초 안에 말하는 매일 연습이에요. <b>연습을 여러 개</b> 만들 수 있고(예: be동사 현재 · be동사 과거), 학생은 형태마다 <b>Step 1(전부 보고 따라 말하기) → Step 2(동사는 가리고 주어만 보고, 위에서 아래까지 전부 제한 시간 안에 말하기)</b>를 해요. 정답은 자동으로 만들어져요.</div>'+_spIrrHtml();
+   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">주어와 동사를 3초 안에 말하는 매일 연습이에요. <b>연습을 여러 개</b> 만들 수 있고(예: be동사 현재 · be동사 과거), 학생은 형태마다 <b>① 듣고 따라하기(전체 한 줄씩) ② 듣고 따라하기(전체) ③ 3초 말하기(전체: 동사는 가리고 주어만 보고 제한 시간 안에 말하기)</b> 상자 중 원하는 것을 골라 해요. 정답은 자동으로 만들어져요.</div>'+_spIrrHtml();
   if(!cw.length)h+='<div style="padding:18px;text-align:center;color:var(--txt3);font-size:13px">아직 연습이 없어요. 아래 ＋ 연습 추가를 눌러 보세요. 이 코너를 비워 두면 학생 화면에 나오지 않아요.</div>';
   var KS=[['be','be동사'],['do','일반동사'],['modal','조동사'],['custom','직접 입력']];
   cw.forEach(function(d,i){
     var modal=d.t==='modal';
     h+='<div class="sp-p"><div style="display:flex;align-items:center;gap:8px"><b style="background:var(--navy);color:#fff;border-radius:99px;padding:2px 10px;font-size:12px">연습 '+(i+1)+'</b><span style="flex:1"></span><button class="btn btn-outline btn-xs" style="color:#b91c1c;border-color:#fca5a5" onclick="_spChDel('+i+')">삭제</button></div>'
      +'<div class="sp-lab">종류</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+KS.map(function(k){return '<button class="btn btn-xs '+(d.t===k[0]?'btn-navy':'btn-outline')+'" onclick="_spChKind('+i+',\''+k[0]+'\')">'+k[1]+'</button>';}).join('')+'</div>';
+    h+='<div class="sp-lab">학생 화면 설명 (선택 · 비우면 자동으로 "'+_bcEsc(spDName(d))+' 연습")</div><input class="fi" value="'+_bcEsc(d.desc||'')+'" placeholder="예: be동사 현재형 연습 · 조동사 can 변화" oninput="_spChIn('+i+',\'desc\',this.value)">';
     if(d.t==='custom'){
       h+='<div class="sp-lab">이름 (학생 화면 위쪽에 보여요)</div><input class="fi" value="'+_bcEsc(d.nm||'')+'" placeholder="예: 인칭대명사 + 조동사" oninput="_spChIn('+i+',\'nm\',this.value)">'
        +'<div class="sp-lab">한 줄에 <b>주어 | 정답 | 우리말(선택)</b> — 엑셀 표를 붙여 넣어도 돼요</div><textarea class="fi" style="min-height:110px" oninput="_spChIn('+i+',\'_tx\',this.value)">'+_bcEsc(d._tx!=null?d._tx:_spChTx(d))+'</textarea>';
@@ -30560,7 +30561,7 @@ function _spThHtml(lv){
 function _spThOn(v){_spEd.tw.on=v?1:0;_spEd.dirty=true;renderSpSet();}
 function _spThSel(i,v){var a=_spEd.tw.sel||(_spEd.tw.sel=[1,1,1,1,1]);while(a.length<5)a.push(1);a[i]=v?1:0;_spEd.dirty=true;}
 function _spThHint(i,v){var h=_spEd.tw.hints||(_spEd.tw.hints=[]);while(h.length<5)h.push('');h[i]=v;_spEd.dirty=true;}
-function _spPvOther(){return '<div style="font-size:12px;line-height:1.7;color:var(--txt2)">'+(_spEd.tab==='ch'?'학생 화면 순서<br>① 형태 이름 칩(예: be동사 · 현재 의문)<br>② Step 1 — 주어 + 동사를 한꺼번에 보고 따라 말하기<br>③ Step 2 — 주어만 보고, 위에서 아래까지 전부 3초 안에 말하기<br>④ 정답 확인 → ✓ 해냈어요 / 🔁 다시 도전':'학생 화면<br>패턴(예: are ~)이 위에 보이고,<br>상황 5칸마다 문장을 말한 뒤 ✓를 눌러요.')+'</div>';}
+function _spPvOther(){return '<div style="font-size:12px;line-height:1.7;color:var(--txt2)">'+(_spEd.tab==='ch'?'학생 화면 순서<br>① 코너 선택 화면에서 ⏱ 3초 말하기 챌린지 상자를 눌러요<br>② 연습 설명(예: be동사 현재형 연습) 아래에 3가지 연습 상자가 나와요<br>&nbsp;&nbsp;1 듣고 따라하기 (전체 한 줄씩) · 2 듣고 따라하기 (전체) · 3 3초 말하기 (전체)<br>③ 상자마다 학습 전 → 학습 중 → 학습 완료가 표시돼요<br>④ 3번(3초 말하기)에서 ✓ 해냈어요를 누르면 다음 연습으로 넘어가요':'학생 화면<br>패턴(예: are ~)이 위에 보이고,<br>상황 5칸마다 문장을 말한 뒤 ✓를 눌러요.')+'</div>';}
 function _spWork(){return _spEd.work||[];}
 function _spCt(r,lb){return (lb||'문장')+' '+r.ok.length+'개'+(r.bad?' <span style="color:#e8590c">· 형식이 맞지 않는 줄 '+r.bad+'개</span>':'');}
 function _spPv(){
