@@ -117,7 +117,7 @@ body.thC{--bg:#F5F7F4;--line:#DCE5DF;--ac:#0F5C4D;--ac2:#E3F3EC;--navy:#0F5C4D}
 <body>
 <div id="app"></div>
 <script>
-var BUILD='Speak Pop 0007-c';
+var BUILD='Speak Pop 0007-d';
 /*SPGEN*/
 var SP_SUBJ=[['I','나는'],['You','너는·너희는'],['We','우리는'],['They','그들은'],['He','그는'],['She','그녀는'],['It','그것은']];
 var SP_FORMS=['pr+','pr-','pr?','pa+','pa-','pa?','fu+','fu-','fu?'];
@@ -447,19 +447,52 @@ var TH_DEF=['우리 교실에서','우리 집에서','친구와 함께','내가 
 function thInit(){
   var t=G.em.set.th||{},hs=[],sl=t.sel||[];for(var i=0;i<5;i++){if(sl[i]===0)continue;hs.push((t.hints&&t.hints[i])||TH_DEF[i]);}
   if(!hs.length)hs.push(TH_DEF[0]);
-  G.th={hints:hs,tx:hs.map(function(){return '';}),ok:hs.map(function(){return 0;})};G.scr='th';render();
+  G.th={hints:hs,tx:hs.map(function(){return '';}),ok:hs.map(function(){return 0;}),au:hs.map(function(){return 0;})};G.scr='th';render();
 }
 function vTh(){
   var T=G.th,s=G.em.set,ps=s.ps||[],cnt=T.ok.filter(Boolean).length,N=T.hints.length;
   var pat=ps.length?ps.map(function(p){return esc(p.pat)+' ~';}).join(' · '):'배운 패턴',pk=ps.length&&ps[0].pk?esc(ps[0].pk):'';
   var h='<div class="top"><button class="ib" onclick="emBack()">✕</button><h1 style="text-align:center;font-size:16px">내 생각 말하기</h1><span style="font-size:12px;color:var(--sub);font-weight:800">'+cnt+' / '+N+'</span></div>'
    +'<div class="pbox" style="padding:12px 10px;margin-bottom:10px"><div class="en" style="font-size:22px">'+pat+'</div>'+(pk?'<div class="ko" style="font-size:14px">'+pk+'</div>':'')+'<div class="note" style="margin-top:4px">이 표현을 쓸 수 있는 상황을 생각해서 '+N+'가지로 말해 봐요!</div></div>';
-  T.hints.forEach(function(x,i){h+='<div class="tcard'+(T.ok[i]?' cd':'')+'"><div class="h"><span class="n">'+(T.ok[i]?'✓':(i+1))+'</span>'+esc(x)+'</div><input placeholder="말한 문장을 적어 둬도 돼요 (선택)" value="'+esc(T.tx[i])+'" oninput="G.th.tx['+i+']=this.value"><button class="sy" onclick="thTog('+i+')">'+(T.ok[i]?'✓ 연습했어요':'🎤 소리 내어 연습했어요')+'</button></div>';});
+  T.hints.forEach(function(x,i){h+='<div class="tcard'+(T.ok[i]?' cd':'')+'"><div class="h"><span class="n">'+(T.ok[i]?'✓':(i+1))+'</span>'+esc(x)+'</div><input placeholder="말한 문장을 적어 둬도 돼요 (선택)" value="'+esc(T.tx[i])+'" oninput="G.th.tx['+i+']=this.value">'+audBtn(i)+'<button class="sy" onclick="thTog('+i+')">'+(T.ok[i]?'✓ 연습했어요':'🎤 소리 내어 연습했어요')+'</button></div>';});
   var up=G.thUp;
   h+='<div class="note" style="text-align:center;margin:2px 0 8px">연습이 끝나면 '+N+'가지를 이어서 말하는 <b>영상</b>을 찍어서 선생님께 보내요 (1분 안쪽이면 좋아요)</div>'
    +'<button class="big" '+((cnt<N||up)?'disabled':'')+' onclick="thFin()">'+(up?'영상을 올리는 중이에요…':(cnt<N?N+'가지를 연습하고 ✓를 눌러요':'🎥 영상으로 말하기'))+'</button>';
   return h;
 }
+/* 상황별 짧은 음성 녹음 (au: 0 없음 · 1 녹음중 · 2 올리는중 · 3 올림 · 4 실패) */
+var AUD=null,AUD_MAX=20;
+function audBtn(i){
+  var a=(G.th.au||[])[i]||0;
+  if(!window.MediaRecorder||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return '';
+  var b=a===1?'<button class="sy" style="background:#e5484d;color:#fff;margin-bottom:6px" onclick="audStop()">⏹ 녹음 끝내기</button>'
+   :a===2?'<button class="sy" disabled style="margin-bottom:6px;opacity:.6">선생님께 보내는 중…</button>'
+   :'<button class="sy" style="margin-bottom:6px" onclick="audStart('+i+')">'+(a===3?'🔁 다시 녹음하기':'🎤 녹음해서 선생님께 보내기')+'</button>';
+  return b+(a===3?'<div class="note" style="text-align:center;margin:-2px 0 6px;color:#0F5C4D;font-weight:800">✓ 선생님께 보냈어요</div>':'')+(a===4?'<div class="note" style="text-align:center;margin:-2px 0 6px;color:#e8590c">보내지 못했어요. 다시 눌러 주세요</div>':'');
+}
+function audPaint(){var y=window.pageYOffset;render();window.scrollTo(0,y);}
+function audStart(i){
+  if(AUD||!G.th)return;
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+    var mt='';try{['audio/mp4','audio/webm;codecs=opus','audio/webm'].some(function(m){if(MediaRecorder.isTypeSupported(m)){mt=m;return true;}});}catch(e){}
+    var rec;try{rec=mt?new MediaRecorder(st,{mimeType:mt,audioBitsPerSecond:32000}):new MediaRecorder(st);}catch(e){try{rec=new MediaRecorder(st);}catch(e2){st.getTracks().forEach(function(t){t.stop();});alert('이 기기에서는 녹음을 쓸 수 없어요');return;}}
+    AUD={i:i,rec:rec,st:st,ch:[],t0:Date.now(),tm:setTimeout(audStop,AUD_MAX*1000)};
+    rec.ondataavailable=function(e){if(e.data&&e.data.size)AUD.ch.push(e.data);};
+    rec.onstop=function(){
+      var A=AUD;AUD=null;clearTimeout(A.tm);A.st.getTracks().forEach(function(t){t.stop();});
+      var m=(A.rec.mimeType||mt||'audio/mp4'),blob=new Blob(A.ch,{type:m}),dur=(Date.now()-A.t0)/1000;
+      if(!G.th||blob.size<800){if(G.th){G.th.au[A.i]=0;if(G.scr==='th')audPaint();}return;}
+      G.th.au[A.i]=2;if(G.scr==='th')audPaint();
+      try{parent.postMessage({type:'speak-aud',i:A.i,label:G.th.hints[A.i],blob:blob,dur:dur,mime:m},'*');}catch(e){G.th.au[A.i]=4;audPaint();}
+    };
+    G.th.au[i]=1;audPaint();rec.start();
+  }).catch(function(){alert('마이크 사용을 허용해 주세요');});
+}
+function audStop(){try{if(AUD&&AUD.rec.state!=='inactive')AUD.rec.stop();}catch(e){}}
+window.addEventListener('message',function(ev){
+  var d=ev.data;if(!d||d.type!=='speak-aud-state'||!G.th)return;
+  G.th.au[d.i]=d.s==='ok'?3:4;if(G.scr==='th')audPaint();
+});
 function thTog(i){G.th.ok[i]=G.th.ok[i]?0:1;var y=window.pageYOffset;render();window.scrollTo(0,y);}
 function thFin(){
   G.thUp=0;

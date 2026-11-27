@@ -876,7 +876,7 @@ function spBtn(){
 var spFrame=null;
 function spOpen(voiceOnly){
   var st=spSet();if(!st||spFrame)return;
-  var f=document.createElement('iframe');f.className='spf';f.setAttribute('allow','autoplay');f.src='speakpop.html?embed=1'+(voiceOnly===true?'&voice=1':'');
+  var f=document.createElement('iframe');f.className='spf';f.setAttribute('allow','autoplay; microphone');f.src='speakpop.html?embed=1'+(voiceOnly===true?'&voice=1':'');
   document.body.appendChild(f);spFrame=f;
   if(voiceOnly!==true)f._set={set:{title:R.les||'Speak Pop!',ps:st.ps||[],ch:st.ch||[],th:st.th||null},theme:spTheme(R.lv),stu:(R.name||''),done:(LOG.sp&&LOG.sp.c)||{}};
 }
@@ -894,12 +894,29 @@ function spRec(texts){
   var i=document.createElement('input');i.type='file';i.accept='video/*';i.setAttribute('capture','user');
   i.onchange=function(){pickVideo(i,'sp-th');};i.click();
 }
+/* 내 생각 말하기 · 상황별 짧은 음성 녹음 → 선생님 숙제 확인 화면(homeUploads, kind:'audio') */
+async function spAud(d){
+  function tell(s){try{if(spFrame)spFrame.contentWindow.postMessage({type:'speak-aud-state',i:d.i,s:s},'*');}catch(e){}}
+  var U=null;try{U=firebase.auth().currentUser;}catch(e){}
+  if(!U||!R||!R.les||!d.blob){toast('로그인이 안 됐어요. 새로고침해 주세요');tell('fail');return;}
+  try{
+    var blob=d.blob,mime=String(d.mime||blob.type||'audio/mp4').split(';')[0];
+    var ext=mime.indexOf('mp4')>=0||mime.indexOf('aac')>=0?'m4a':(mime.indexOf('ogg')>=0?'ogg':'webm');
+    var day=ymd(),base='hw/'+U.uid+'/'+safe(S)+'/'+day+'/spa'+(+d.i+1)+'_'+Date.now();
+    await hwStorage().ref(base+'.'+ext).put(blob,{contentType:mime});
+    var exp=new Date();exp.setMonth(exp.getMonth()+6);
+    await db.collection('homeUploads').add({uid:U.uid,sid:S,name:R.name||'',lk:logKey,key:R.key||'',les:R.les||'',itemId:'sp-a'+(+d.i+1),itemLabel:'🎤 내 생각 '+(+d.i+1)+' · '+String(d.label||'').slice(0,30),kind:'audio',
+      path:base+'.'+ext,thumb:'',bucket:HW_BUCKET||'',size:blob.size,dur:Math.round(+d.dur||0),mime:mime,w:0,h:0,status:'제출',day:day,at:Date.now(),exp:firebase.firestore.Timestamp.fromDate(exp)});
+    tell('ok');
+  }catch(e){console.error(e);toast('녹음을 올리지 못했어요. 인터넷을 확인하고 다시 해 주세요',4000);tell('fail');}
+}
 function spClose(){if(spFrame){spFrame.remove();spFrame=null;}}
 window.addEventListener('message',function(ev){
   var d=ev.data;if(!d||!spFrame||ev.source!==spFrame.contentWindow)return;
   if(d.type==='speak-ready'){if(spFrame._set)try{spFrame.contentWindow.postMessage({type:'speak-set',set:spFrame._set.set,theme:spFrame._set.theme,stu:spFrame._set.stu,done:spFrame._set.done},'*');}catch(e){}}
   else if(d.type==='speak-close')spClose();
   else if(d.type==='speak-rec')spRec(d.texts);
+  else if(d.type==='speak-aud')spAud(d);
   else if(d.type==='speak-done'&&R&&R.les){
     var o=LOG.sp||{},c=Object.assign({},o.c||{}),now=Date.now(),cn=d.corner||'pt';
     var sp=Object.assign({},o,{c:c});c[cn]=now;
@@ -1302,7 +1319,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-zy";
+var APP_BUILD="1111-zz";
 (function(){
   var NAME="홈체크";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}
