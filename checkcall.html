@@ -372,8 +372,7 @@ var AC=null, ringTimers=[], shownCall={}, unsubRoster=null;
 var CC_DEFAULT_TEMPLATE={sections:[
  {title:'수업 준비는 됐나요?',items:[
   {id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},
-  {id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},
-  {id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}]},
+  {id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'}]},
  {title:'스마트 학습 1',items:[
   {id:'vt',t:'check',l:'어휘트레이닝'}]},
  {title:'단어장',items:[
@@ -456,14 +455,15 @@ function _ccOvTm(plan,t){   // 레슨 전용 계획표에도 구역별 시작·�
   });}catch(e){}
 }
 var CC_HW_TITLE='수업 준비는 됐나요?',CC_HW_OLD_TITLE='숙제 했나요?';
-function _ccHwDefault(){return [{id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},{id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'},{id:'hwv',t:'ox',l:'영상 숙제',link:'hwVideo'}];}
+function _ccHwDrop(it){return !!it&&(it.link==='hwVideo'||/^영상숙제/.test(String(it.l||'').replace(/\s+/g,'')));}
+function _ccHwDefault(){return [{id:'hwp',t:'ox',l:'교재 준비',link:'hwPrep'},{id:'hwb',t:'ox',l:'교재 숙제',link:'hwBook'}];}
 function _ccHwTitleMig(t){return (!t||t===CC_HW_OLD_TITLE)?CC_HW_TITLE:t;}
 function _ccHwItemsMig(items){   // 원본은 건드리지 않고 복사본을 돌려줘요
   if(!Array.isArray(items))return items;
   items=JSON.parse(JSON.stringify(items));
   if(items.length===2&&items[0]&&items[1]&&items[0].id==='hwb'&&items[1].id==='hwv'&&items[0].t==='check'&&items[1].t==='check'&&items[0].l==='교재 숙제'&&items[1].l==='영상 숙제')return _ccHwDefault();
   items.forEach(function(it){if(it&&it.t==='check'&&/^(교재준비|교재숙제|영상숙제)/.test(String(it.l||'').replace(/\s+/g,'')))it.t='ox';});
-  return items;
+  return items.filter(function(it){return !_ccHwDrop(it);});
 }
 function _ccHwMigSecs(secs){(secs||[]).forEach(function(sc){if(sc&&sc.k==='hw'){sc.title=_ccHwTitleMig(sc.title);sc.items=_ccHwItemsMig(sc.items||[]);}});return secs;}
 // '문법 복습 & 백지노트 시험' 항목 뒤에 복습 범위를 자동으로 붙여요: Lesson N → (Lesson N-1) / Wrap-Up → (Lesson 1~4)
@@ -1438,11 +1438,21 @@ function rwFacts(){
   var f={hw:[],quiz:null,hasQuiz:false,dict:null,hasDict:false};
   S.secs.forEach(function(sec){sec.items.forEach(function(it){
     var v=LOG.v[it.id];
-    if(it.link==='hwBook'||it.link==='hwVideo'){if(it.t==='check')f.hw.push(!!LOG.e[it.id]);else if(it.t==='ox')f.hw.push(v==='O');}
     if(it.t==='number'&&(it.link==='quiz'||/level ?test|레벨 ?테스트/i.test(String(it.l||'')))){f.hasQuiz=true;var q=parseFloat(v);if(v!==undefined&&v!==''&&v!=='skip'&&!isNaN(q))f.quiz=f.quiz===null?q:Math.max(f.quiz,q);}
     if(it.t==='dict'&&(it.link==='dict'||(!it.link&&!it.nl))){f.hasDict=true;if(v&&+v.t>0&&v.c!==undefined&&v.c!=='')f.dict=Math.round(+v.c/+v.t*100);}
   });});
+  var _H0=S&&S.data&&S.data.hw,_own=!!(_H0&&_H0.cats&&_H0.cats.indexOf('hwBook')>=0&&RW.hw);   // 홈체크에 교재 숙제가 있으면 홈체크 결과가 우선
+  if(!_own)S.secs.forEach(function(sec){sec.items.forEach(function(it){if(it.link==='hwBook'){if(it.t==='check')f.hw.push(!!LOG.e[it.id]);else if(it.t==='ox')f.hw.push(LOG.v[it.id]==='O');}});});   // 체크콜 '교재 숙제' O/X
+  var H=S&&S.data&&S.data.hw;   // 지난 수업 숙제: 홈체크 기록으로 판정 (교재 숙제 완료 · 영상/사진 숙제 제출, 해당 종류가 있을 때 모두)
+  if(H&&H.cats&&H.cats.length&&RW.hw){var J=RW.hw.j||{},OK={hwBook:'완료',hwVideo:'제출',hwPhoto:'제출'};H.cats.forEach(function(c){if(OK[c])f.hw.push(J[c]===OK[c]);});}
   return f;
+}
+function rwLoadHw(cb){   // 홈체크 기록(homeLogs)을 한 번 읽어 와요
+  RW.hw=null;var H=S&&S.data&&S.data.hw;
+  if(!db||!H||!H.id||!H.cats||!H.cats.length){cb();return;}
+  var done=false,fin=function(){if(!done){done=true;cb();}};
+  setTimeout(fin,4000);
+  db.collection('homeLogs').doc(H.id).get().then(function(d){RW.hw=d.exists?d.data():{};fin();}).catch(function(){RW.hw=null;fin();});
 }
 function rwCcOk(c){
   var mg=null,minGap=(+c.minGap||0)*1000,smN=0,bkN=0,sm=0,bk=0,fast=0;
@@ -1592,7 +1602,7 @@ function rwPick(i){
 function rwOpen(){
   if(!rwOn())return;
   RW.open=true;$('rw').style.display='block';$('rw').scrollTop=0;
-  rwLoadPrev(function(){rwRender(!(LOG.rw&&LOG.rw.pick!==undefined));});
+  rwLoadHw(function(){rwLoadPrev(function(){rwRender(!(LOG.rw&&LOG.rw.pick!==undefined));});});
 }
 function rwClose(){RW.open=false;RW.busy=false;rwClearTm();var o=$('rw');if(o)o.style.display='none';}
 
@@ -1703,7 +1713,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-al";
+var APP_BUILD="1111-ao";
 (function(){
   var NAME="체크콜";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}
