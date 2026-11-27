@@ -117,7 +117,7 @@ body.thC{--bg:#F5F7F4;--line:#DCE5DF;--ac:#0F5C4D;--ac2:#E3F3EC;--navy:#0F5C4D}
 <body>
 <div id="app"></div>
 <script>
-var BUILD='Speak Pop 0007-d';
+var BUILD='Speak Pop 0007-e';
 /*SPGEN*/
 var SP_SUBJ=[['I','나는'],['You','너는·너희는'],['We','우리는'],['They','그들은'],['He','그는'],['She','그녀는'],['It','그것은']];
 var SP_FORMS=['pr+','pr-','pr?','pa+','pa-','pa?','fu+','fu-','fu?'];
@@ -404,9 +404,12 @@ function vCh1(){
 }
 function chSay(i){var r=G.ch.u[G.ch.ui].rows[i];speak(r.say);}
 function chStep2(){
-  var c=G.ch,u=c.u[c.ui],d=u.rows.map(function(r){return {s:r.s,ko:r.ko,a:r.a,say:r.say,re:0};});
-  c.deck=u.sh?shuffle(d):d;c.i=0;c.show=false;c.scr2=1;c.dn={};c.total+=d.length;G.scr='ch2';render();chTimer();
+  var c=G.ch,u=c.u[c.ui];
+  if(!c.cnt)c.cnt={};if(!c.cnt[c.ui]){c.cnt[c.ui]=1;c.total+=u.rows.length;}
+  c.run=0;c.tries=c.tries||{};c.tries[c.ui]=c.tries[c.ui]||0;G.scr='ch2';render();
 }
+/* Step 2: 주어와 뜻만 보고, 위에서 아래까지 전부 제한 시간 안에 말해요 */
+function chGo(){var c=G.ch;c.run=1;render();chTimer();}
 function chTimer(){
   var c=G.ch,u=c.u[c.ui],t0=Date.now(),ms=u.sec*1000;chStop();
   _tm=setInterval(function(){
@@ -417,25 +420,24 @@ function chTimer(){
   },80);
 }
 function vCh2(){
-  var c=G.ch,u=c.u[c.ui],k=c.deck[c.i],tot=c.deck.length;
-  var grid='<div class="pgrid">'+u.rows.map(function(r){var d=c.dn[r.s];return '<i class="'+(d?'dn':(r.s===k.s?'on':''))+'">'+esc(r.s)+'</i>';}).join('')+'</div>';
-  var h=chHead(2)+grid+'<div class="prog"><i style="width:'+Math.round(c.i/tot*100)+'%"></i></div><div class="meta"><span>'+(c.i+1)+' / '+tot+'</span><span></span></div>'
-   +'<div class="cur2"><div class="k">'+esc(k.ko)+'</div><div class="s">'+esc(k.s)+'</div>';
-  if(!c.show)h+='<div class="ring" id="ring"><i id="rn">'+u.sec+'</i></div><div class="note">'+u.sec+'초 안에 말해요!</div></div><button class="big" style="margin-top:auto" onclick="chReveal()">정답 보기</button>';
-  else h+='<div class="ans2">'+hlA(k)+'</div><button class="spk" onclick="speak(G.ch.deck[G.ch.i].say)">🔊 듣기</button></div><div class="two"><button class="no" onclick="chMark(0)">🔁 다시 볼래요</button><button class="ok" onclick="chMark(1)">✓ 말했어요</button></div>';
+  var c=G.ch,u=c.u[c.ui],run=c.run||0;
+  var h=chHead(2)+'<div class="sub2">'+(run===2?'정답을 확인해요 (눌러서 들어 보기)':(run===1?'지금! 위에서부터 끝까지 전부 말해요':'주어와 뜻을 보고 <b>'+u.sec+'초 안에</b> 위에서부터 끝까지 전부 말해요'))+'</div>';
+  if(run===1)h+='<div class="ring" id="ring" style="margin:0 auto 8px;width:84px;height:84px"><i id="rn" style="width:64px;height:64px;font-size:32px">'+u.sec+'</i></div>';
+  h+='<div class="lst">'+u.rows.map(function(r,i){
+    var left=run===2?hlA(r):esc(r.s)+' <b style="color:#cfd8d2;letter-spacing:2px">…</b>';
+    return '<button class="lr" style="font-size:24px"'+(run===2?' onclick="chSay('+i+')"':' disabled')+'><div>'+left+'</div><span>'+esc(r.ko)+'</span></button>';}).join('')+'</div>';
+  if(run===0)h+='<button class="big" style="margin-top:auto" onclick="chGo()">▶ 시작! ('+u.sec+'초)</button>';
+  else if(run===1)h+='<button class="big" style="margin-top:auto" onclick="chReveal()">정답 보기</button>';
+  else h+='<div class="two"><button class="no" onclick="chAgain()">🔁 다시 도전</button><button class="ok" onclick="chMark(1)">✓ 해냈어요</button></div>';
   return h;
 }
-function chReveal(){chStop();G.ch.show=true;render();speak(G.ch.deck[G.ch.i].say);}
+function chReveal(){chStop();G.ch.run=2;render();}
+function chAgain(){var c=G.ch;c.tries[c.ui]=(c.tries[c.ui]||0)+1;c.run=0;render();}
 function chMark(ok){
-  var c=G.ch,k=c.deck[c.i],key=c.ui+'|'+k.s;
-  if(ok){if(!c.seen[key])c.first++;c.seen[key]=1;c.dn[k.s]=1;}
-  else{if(!c.seen[key])c.seen[key]=2;c.deck.push({s:k.s,ko:k.ko,a:k.a,say:k.say,re:1});}
-  c.i++;c.show=false;
-  if(c.i>=c.deck.length){
-    if(c.ui+1<c.u.length){c.ui++;G.scr='ch1';render();return;}
-    G.scr='chdone';render();try{parent.postMessage({type:'speak-done',corner:'ch',total:c.total,first:c.first},'*');}catch(e){}if(G.done)G.done.ch=1;return;
-  }
-  render();chTimer();
+  var c=G.ch,u=c.u[c.ui];
+  if(!(c.tries[c.ui]>0))c.first+=u.rows.length;   // 한 번에 해냈으면 전부 '한 번에 말한 카드'로 세요
+  if(c.ui+1<c.u.length){c.ui++;G.scr='ch1';render();return;}
+  G.scr='chdone';render();try{parent.postMessage({type:'speak-done',corner:'ch',total:c.total,first:c.first},'*');}catch(e){}if(G.done)G.done.ch=1;
 }
 function vChDone(){
   var c=G.ch,n=c.total,f=c.first,st=f>=n?'⭐⭐⭐':(f>=n*0.6?'⭐⭐':'⭐');

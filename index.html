@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-db';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-dd';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -26597,7 +26597,27 @@ if(document.readyState==='loading'){
    homeUploads: 최근 14일 분량을 한 번만 읽고, [새로고침]으로 다시 읽습니다(읽기 횟수 절약).
    status: 제출 → 확인 / 재제출 ,  keep:true = 영구 보관(keep/ 폴더로 복사) */
 var _hwr={list:[],loaded:false,loading:false,filter:'new',urls:{},cur:null,sel:null};
-function _hwrBucket(u){var b=u&&u.bucket;return b?firebase.app().storage('gs://'+b):firebase.storage();}
+/* ───── R2(Cloudflare) 파일 보관소 ─────
+   R2_URL 이 있으면 새 파일은 R2로 올라가고(문서에 store:'r2'), 비워 두면 예전처럼 Firebase Storage를 써요.
+   Firebase Storage와 같은 모양(ref().put/delete/getDownloadURL)으로 만들어서 기존 코드를 거의 안 바꿔요. */
+var R2_URL='https://academy-r2.jangssine4.workers.dev';
+function r2Enc(k){return String(k).split('/').map(encodeURIComponent).join('/');}
+function r2Tok(){var u=firebase.auth().currentUser;if(!u)return Promise.reject(new Error('로그인 필요'));return u.getIdToken();}
+function r2Storage(){return {ref:function(key){return {
+  put:function(blob,meta){
+    var cbs=[],p=new Promise(function(res,rej){
+      r2Tok().then(function(t){
+        var x=new XMLHttpRequest();x.open('PUT',R2_URL+'/up/'+r2Enc(key));
+        x.setRequestHeader('Authorization','Bearer '+t);x.setRequestHeader('Content-Type',(meta&&meta.contentType)||blob.type||'application/octet-stream');
+        x.upload.onprogress=function(e){cbs.forEach(function(f){try{f({bytesTransferred:e.loaded,totalBytes:e.total});}catch(_){}});};
+        x.onload=function(){(x.status>=200&&x.status<300)?res({}):rej(new Error('R2 '+x.status));};
+        x.onerror=function(){rej(new Error('R2 연결 실패'));};x.send(blob);
+      }).catch(rej);});
+    p.on=function(ev,f){cbs.push(f);return p;};return p;},
+  delete:function(){return r2Tok().then(function(t){return fetch(R2_URL+'/f/'+r2Enc(key),{method:'DELETE',headers:{Authorization:'Bearer '+t}});}).then(function(r){if(!r.ok&&r.status!==404)throw new Error('R2 '+r.status);});},
+  getDownloadURL:function(){return r2Tok().then(function(t){return R2_URL+'/f/'+r2Enc(key)+'?t='+encodeURIComponent(t);});}
+ };}};}
+function _hwrBucket(u){if(u&&u.store==='r2')return r2Storage();var b=u&&u.bucket;return b?firebase.app().storage('gs://'+b):firebase.storage();}
 function hwrInit(){hwrWatch();}
 var _hwrUnsub=null,_hwrFirst=true;
 /* 실시간: [숙제 사진 확인] 화면을 열어 둔 동안만 연결하고, 다른 화면으로 가면 끊어요.
@@ -30263,7 +30283,7 @@ function _spChTog(i,key,val){var d=_spEd.cw[i],a=d[key]||(d[key]=[]),p=a.indexOf
 function _spChIn(i,f,v){var d=_spEd.cw[i];d[f]=v;_spEd.dirty=true;var el=document.getElementById('sp-chpv'+i);if(el)el.innerHTML=_spChPv(d);}
 function _spChHtml(lv){
   var cw=_spEd.cw,h='<div class="card" style="padding:14px"><b style="font-size:15px">'+_bcEsc(lv)+' · '+_bcEsc(_spEd.les)+'</b> <span style="font-size:12px;color:var(--txt3)">— ⏱ 3초 말하기 챌린지</span>'
-   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">주어와 동사를 3초 안에 말하는 매일 연습이에요. <b>연습을 여러 개</b> 만들 수 있고(예: be동사 현재 · be동사 과거), 학생은 형태마다 <b>Step 1(전부 보고 따라 말하기) → Step 2(주어만 보고 3초 안에 말하기)</b>를 해요. 정답은 자동으로 만들어져요.</div>';
+   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">주어와 동사를 3초 안에 말하는 매일 연습이에요. <b>연습을 여러 개</b> 만들 수 있고(예: be동사 현재 · be동사 과거), 학생은 형태마다 <b>Step 1(전부 보고 따라 말하기) → Step 2(동사는 가리고 주어만 보고, 위에서 아래까지 전부 제한 시간 안에 말하기)</b>를 해요. 정답은 자동으로 만들어져요.</div>';
   if(!cw.length)h+='<div style="padding:18px;text-align:center;color:var(--txt3);font-size:13px">아직 연습이 없어요. 아래 ＋ 연습 추가를 눌러 보세요. 이 코너를 비워 두면 학생 화면에 나오지 않아요.</div>';
   var KS=[['be','be동사'],['do','일반동사'],['modal','조동사'],['custom','직접 입력']];
   cw.forEach(function(d,i){
@@ -30280,7 +30300,7 @@ function _spChHtml(lv){
        +'<div class="sp-lab">말할 형태'+(modal?' (조동사는 현재만)':'')+'</div><table style="border-collapse:collapse;font-size:12px"><tr><th></th><th style="padding:3px 10px">긍정</th><th style="padding:3px 10px">부정</th><th style="padding:3px 10px">의문</th></tr>'
        +(modal?['pr']:['pr','pa','fu']).map(function(t){return '<tr><th style="padding:3px 10px;text-align:left">'+({pr:'현재',pa:'과거',fu:'미래'})[t]+'</th>'+['+','-','?'].map(function(p){var f=t+p,on=(d.f||[]).indexOf(f)>=0;return '<td style="text-align:center;padding:2px"><button class="btn btn-xs '+(on?'btn-navy':'btn-outline')+'" style="min-width:44px" onclick="_spChTog('+i+',\'f\',\''+f+'\')">'+(on?'✓':'·')+'</button></td>';}).join('')+'</tr>';}).join('')+'</table>';
     }
-    h+='<div style="display:flex;gap:14px;align-items:center;margin-top:8px;flex-wrap:wrap"><label style="font-size:12px">제한 시간 <input class="fi" type="number" min="1" max="10" style="width:56px" value="'+(+d.sec||3)+'" oninput="_spChIn('+i+',\'sec\',this.value)"> 초</label>'
+    h+='<div style="display:flex;gap:14px;align-items:center;margin-top:8px;flex-wrap:wrap"><label style="font-size:12px">전체를 말하는 제한 시간 <input class="fi" type="number" min="1" max="15" style="width:56px" value="'+(+d.sec||3)+'" oninput="_spChIn('+i+',\'sec\',this.value)"> 초</label>'
      +'<label style="font-size:12px"><input type="checkbox" '+(d.sh===0?'':'checked')+' onchange="_spChIn('+i+',\'sh\',this.checked?1:0)"> Step 2에서 순서 섞기</label></div>'
      +'<div class="sp-lab">미리보기 (정답은 자동 · 형태마다 Step 1 → Step 2)</div><div id="sp-chpv'+i+'">'+_spChPv(d)+'</div></div>';
   });
@@ -30311,7 +30331,7 @@ function _spThHtml(lv){
 function _spThOn(v){_spEd.tw.on=v?1:0;_spEd.dirty=true;renderSpSet();}
 function _spThSel(i,v){var a=_spEd.tw.sel||(_spEd.tw.sel=[1,1,1,1,1]);while(a.length<5)a.push(1);a[i]=v?1:0;_spEd.dirty=true;}
 function _spThHint(i,v){var h=_spEd.tw.hints||(_spEd.tw.hints=[]);while(h.length<5)h.push('');h[i]=v;_spEd.dirty=true;}
-function _spPvOther(){return '<div style="font-size:12px;line-height:1.7;color:var(--txt2)">'+(_spEd.tab==='ch'?'학생 화면 순서<br>① 형태 이름 칩(예: be동사 · 현재 의문)<br>② Step 1 — 주어 + 동사를 한꺼번에 보고 따라 말하기<br>③ Step 2 — 주어만 보고 3초 안에 말하기<br>④ 정답 확인 → ✓ 말했어요 / 🔁 다시 볼래요':'학생 화면<br>패턴(예: are ~)이 위에 보이고,<br>상황 5칸마다 문장을 말한 뒤 ✓를 눌러요.')+'</div>';}
+function _spPvOther(){return '<div style="font-size:12px;line-height:1.7;color:var(--txt2)">'+(_spEd.tab==='ch'?'학생 화면 순서<br>① 형태 이름 칩(예: be동사 · 현재 의문)<br>② Step 1 — 주어 + 동사를 한꺼번에 보고 따라 말하기<br>③ Step 2 — 주어만 보고, 위에서 아래까지 전부 3초 안에 말하기<br>④ 정답 확인 → ✓ 해냈어요 / 🔁 다시 도전':'학생 화면<br>패턴(예: are ~)이 위에 보이고,<br>상황 5칸마다 문장을 말한 뒤 ✓를 눌러요.')+'</div>';}
 function _spWork(){return _spEd.work||[];}
 function _spCt(r,lb){return (lb||'문장')+' '+r.ok.length+'개'+(r.bad?' <span style="color:#e8590c">· 형식이 맞지 않는 줄 '+r.bad+'개</span>':'');}
 function _spPv(){
