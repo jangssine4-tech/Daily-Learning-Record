@@ -117,13 +117,51 @@ body.thC{--bg:#F5F7F4;--line:#DCE5DF;--ac:#0F5C4D;--ac2:#E3F3EC;--navy:#0F5C4D}
 <body>
 <div id="app"></div>
 <script>
-var BUILD='Speak Pop 0007-e';
+var BUILD='Speak Pop 0008';
 /*SPGEN*/
 var SP_SUBJ=[['I','나는'],['You','너는·너희는'],['We','우리는'],['They','그들은'],['He','그는'],['She','그녀는'],['It','그것은']];
 var SP_FORMS=['pr+','pr-','pr?','pa+','pa-','pa?','fu+','fu-','fu?'];
 function spFLabel(f,modal){var t={pr:'현재',pa:'과거',fu:'미래'}[f.slice(0,2)],p={'+':'긍정','-':'부정','?':'의문'}[f.charAt(2)];return modal?p:t+' · '+p;}
-function spS3(v){v=String(v||'').trim();if(v==='have')return 'has';if(/(s|x|z|ch|sh|o)$/.test(v))return v+'es';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ies';return v+'s';}
-function spEdV(v){v=String(v||'').trim();if(/e$/.test(v))return v+'d';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ied';return v+'ed';}
+function spS3w(v){if(v==='have')return 'has';if(v==='be')return 'is';if(/(s|x|z|ch|sh|o)$/.test(v))return v+'es';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ies';return v+'s';}
+function spEdw(v){if(v==='have')return 'had';if(/e$/.test(v))return v+'d';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ied';return v+'ed';}
+function spFirst(v,fn){v=String(v||'').trim();var m=v.match(/^(\S+)([\s\S]*)$/);return m?fn(m[1])+m[2]:v;}   /* 여러 단어(do homework)는 첫 단어만 바꿔요 */
+function spS3(v){return spFirst(v,spS3w);}
+function spEdV(v){return spFirst(v,spEdw);}
+/* 조동사 표: 현재(pr) · 과거(pa) · 미래(fu)마다 쓰는 표현. m=조동사 자체, be=be+표현, hv=have to, ax=do/does/did, 없으면 그 시제는 연습하지 않아요 */
+var SP_MOD={
+ 'can':{pr:['m','can'],pa:['m','could'],fu:['be','able to'],n:'현재 can · 과거 could · 미래 will be able to (can은 미래형이 없어서 be able to를 써요)'},
+ 'may':{pr:['m','may'],pa:['be','allowed to'],fu:['be','allowed to'],n:'현재 may · 과거 was/were allowed to · 미래 will be allowed to'},
+ 'must':{pr:['m','must'],pa:['hv'],fu:['hv'],n:'현재 must · 과거 had to · 미래 will have to (must의 과거·미래는 have to를 써요)'},
+ 'have to':{pr:['hv'],pa:['hv'],fu:['hv'],n:'현재 have/has to · 과거 had to · 미래 will have to'},
+ 'be able to':{pr:['be','able to'],pa:['be','able to'],fu:['be','able to'],n:'현재 am/is/are able to · 과거 was/were able to · 미래 will be able to'},
+ 'be allowed to':{pr:['be','allowed to'],pa:['be','allowed to'],fu:['be','allowed to'],n:'현재 am/is/are allowed to · 과거 was/were allowed to · 미래 will be allowed to'},
+ 'do':{pr:['ax'],pa:['ax'],n:'현재 do/does · 과거 did (미래형은 없어요)'},
+ 'will':{pr:['m','will'],n:'현재만 연습해요 (과거·미래형이 없어요)'},
+ 'would':{pr:['m','would'],n:'현재만 연습해요'},'could':{pr:['m','could'],n:'현재만 연습해요'},'might':{pr:['m','might'],n:'현재만 연습해요'},
+ 'should':{pr:['m','should'],n:'현재만 연습해요 (과거·미래형이 없어요)'},'shall':{pr:['m','shall'],n:'현재만 연습해요'}
+};
+function spModKey(v){var k=String(v||'').trim().toLowerCase().replace(/\s+/g,' ');
+ if(k==='cannot')k='can';if(k==='has to'||k==='had to')k='have to';if(k==='does'||k==='did')k='do';
+ if(/^(am|is|are|was|were)? ?able to$/.test(k))k='be able to';if(/^(am|is|are|was|were)? ?allowed to$/.test(k))k='be allowed to';
+ return k;}
+function spModForm(v,t){var e=SP_MOD[spModKey(v)];if(e)return e[t]||null;return t==='pr'?['g']:null;}   /* 표에 없는 조동사는 현재만 */
+function spModHas(v,f){return !!spModForm(v,f.slice(0,2));}
+function spModNote(v){var e=SP_MOD[spModKey(v)];return e?e.n:'이 조동사는 현재만 연습해요';}
+function spModGen(sp,v,s,t,p){
+  var th=/^(He|She|It)$/.test(s),lc=s==='I'?'I':s.toLowerCase(),k=sp[0],w=sp[1];
+  if(k==='m'||k==='g'){w=k==='g'?String(v).trim():w;return p==='+'?s+' '+w:p==='-'?s+' '+(w==='can'?'cannot':w+' not'):cap(w)+' '+lc;}
+  if(k==='be'){
+    if(t==='fu')return p==='+'?s+' will be '+w:p==='-'?s+' will not be '+w:'Will '+lc+' be '+w;
+    var b=t==='pa'?((s==='I'||th)?'was':'were'):(s==='I'?'am':(th?'is':'are'));
+    return p==='+'?s+' '+b+' '+w:p==='-'?s+' '+b+' not '+w:cap(b)+' '+lc+' '+w;}
+  if(k==='hv'){
+    if(t==='fu')return p==='+'?s+' will have to':p==='-'?s+' will not have to':'Will '+lc+' have to';
+    if(t==='pa')return p==='+'?s+' had to':p==='-'?s+' did not have to':'Did '+lc+' have to';
+    return p==='+'?s+' '+(th?'has':'have')+' to':p==='-'?s+' '+(th?'does':'do')+' not have to':(th?'Does ':'Do ')+lc+' have to';}
+  /* ax: do / does / did */
+  var a=t==='pa'?'did':(th?'does':'do');
+  return p==='+'?s+' '+a:p==='-'?s+' '+a+' not':cap(a)+' '+lc;
+}
 /* 주어 s, 형태 f(예: 'pr-')에 맞는 정답을 만들어요. 반환 {a:화면에 보이는 정답, say:읽어 줄 말} */
 function spGen(d,s,f){
   var th=/^(He|She|It)$/.test(s),lc=s==='I'?'I':s.toLowerCase(),t=f.slice(0,2),p=f.charAt(2),v=String(d.v||'').trim(),r;
@@ -136,21 +174,33 @@ function spGen(d,s,f){
     else if(t==='pa')r=p==='+'?s+' '+(String(d.vp||'').trim()||spEdV(v)):p==='-'?s+' did not '+v:'Did '+lc+' '+v;
     else r=p==='+'?s+' will '+v:p==='-'?s+' will not '+v:'Will '+lc+' '+v;
   }else{ // modal
-    r=p==='+'?s+' '+v:p==='-'?s+' '+(v==='can'?'cannot':v+' not'):cap(v)+' '+lc;
+    var sp=spModForm(v,t);if(!sp)return {a:'',say:''};
+    r=spModGen(sp,v,s,t,p);
   }
   r=r.replace(/\s+/g,' ').trim();
-  return {a:p==='?'?r+' …?':r,say:r};
+  return {a:p==='?'?r+' …?':r,say:spNat(r+(p==='?'?'?':''))};
+}
+/* 듣고 따라하기용 '자연스러운 말투': 줄여 쓰면(I'm · You're · don't) be동사·조동사가 약하게 들려요. 의문문은 ?를 붙여 올려 읽게 해요 */
+function spNat(t){
+  t=String(t||'').replace(/\s*…\s*\?*\s*$/,'?').replace(/\s+/g,' ').trim();
+  var q=/\?$/.test(t);if(q)t=t.slice(0,-1).trim();
+  t=t.replace(/\bwill not\b/gi,function(m){return m.charAt(0)==='W'?"Won't":"won't";})
+   .replace(/\b(do|does|did|was|were|must|should|would|could|is|are) not\b/gi,function(m,w){return w.charAt(0).toUpperCase()===w.charAt(0)?w+"n't":w+"n't";})
+   .replace(/\bI am\b/g,"I'm").replace(/\b(You|We|They|you|we|they) are\b/g,"$1're").replace(/\b(He|She|It|he|she|it) is\b/g,"$1's")
+   .replace(/\b(I|You|We|They|He|She|It|you|we|they|he|she|it) will\b/g,"$1'll");
+  return t+(q?'?':'');
 }
 function cap(x){x=String(x||'');return x.charAt(0).toUpperCase()+x.slice(1);}
 function spKo(s){for(var i=0;i<SP_SUBJ.length;i++)if(SP_SUBJ[i][0]===s)return SP_SUBJ[i][1];return '';}
 /* 연습 하나(d)를 '형태별 묶음'으로 펼쳐요: [{label,rows:[{s,ko,a,say}]}] */
 function spUnits(d){
   var out=[];
-  if(d.t==='custom'){var rows=(d.rows||[]).filter(function(r){return r&&r.s&&r.a;}).map(function(r){return {s:r.s,ko:r.k||'',a:r.a,say:r.a.replace(/[…?]+$/,'').trim()};});
+  if(d.t==='custom'){var rows=(d.rows||[]).filter(function(r){return r&&r.s&&r.a;}).map(function(r){return {s:r.s,ko:r.k||'',a:r.a,say:spNat(r.a)};});
     if(rows.length)out.push({label:d.nm||'직접 입력',rows:rows});return out;}
   var modal=d.t==='modal',subs=(d.subj&&d.subj.length?d.subj:SP_SUBJ.map(function(x){return x[0];}));
-  SP_FORMS.forEach(function(f){if((d.f||[]).indexOf(f)<0)return;
-    out.push({label:spFLabel(f,modal),kind:({be:'be동사',do:'일반동사',modal:'조동사'})[d.t],rows:subs.map(function(s){var g=spGen(d,s,f);return {s:s,ko:spKo(s),a:g.a,say:g.say};})});});
+  var onlyPr=modal&&(d.f||[]).every(function(f){return f.slice(0,2)==='pr';});
+  SP_FORMS.forEach(function(f){if((d.f||[]).indexOf(f)<0)return;if(modal&&!spModHas(d.v,f))return;
+    out.push({label:spFLabel(f,onlyPr),kind:({be:'be동사',do:'일반동사',modal:'조동사'})[d.t],rows:subs.map(function(s){var g=spGen(d,s,f);return {s:s,ko:spKo(s),a:g.a,say:g.say};})});});
   return out;
 }
 function spDName(d){if(d.nm)return d.nm;if(d.t==='be')return 'be동사';if(d.t==='do')return '일반동사'+(d.v?' ('+d.v+')':'');if(d.t==='modal')return '조동사'+(d.v?' ('+d.v+')':'');return '직접 입력';}
@@ -219,7 +269,7 @@ function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(M
 
 /* ───────── 화면 ───────── */
 function render(){
-  var h='';chStop();
+  var h='';chStop();if(G.scr!=='ch1'&&G.ls)lsStop();
   if(G.scr==='home')h=vHome();
   else if(G.scr==='learn')h=vLearn();
   else if(G.scr==='play')h=vPlay();
@@ -351,7 +401,7 @@ if(window.speechSynthesis){try{speechSynthesis.getVoices();}catch(e){}}
 var CORN={ch:{ico:'⏱',t:'3초 말하기 챌린지',d:'빠르고 정확하게 바로 말하기',n:1},pt:{ico:'🧩',t:'패턴 말하기',d:'핵심 표현을 익히고 연습하기',n:2},th:{ico:'💭',t:'내 생각 말하기',d:'익힌 표현으로 내 생각 말하기',n:3}};
 function corners(){var s=G.em&&G.em.set,o=[];if(!s)return o;if(s.ch&&s.ch.length)o.push('ch');if(s.ps&&s.ps.length)o.push('pt');if(s.th&&s.th.on)o.push('th');return o;}
 function emBack(fromDone){
-  chStop();
+  chStop();lsStop();
   if(G.hubOn&&G.scr!=='hub'){G.scr='hub';render();}
   else{try{parent.postMessage({type:'speak-close'},'*');}catch(e){}}
 }
@@ -399,12 +449,46 @@ function chHead(step){
 function hlA(r){var a=r.a;if(a.indexOf(r.s+' ')===0)return esc(r.s)+' <b>'+esc(a.slice(r.s.length+1))+'</b>';return '<b>'+esc(a)+'</b>';}
 function vCh1(){
   var c=G.ch,u=c.u[c.ui];
-  return chHead(1)+'<div class="sub2">소리 내어 따라 말해 봐요 (눌러서 들어 보기)</div><div class="lst">'+u.rows.map(function(r,i){return '<button class="lr" onclick="chSay('+i+')"><div>'+hlA(r)+'</div><span>'+esc(r.ko)+'</span></button>';}).join('')+'</div>'
+  var L=G.ls;
+  return chHead(1)+'<div class="sub2">'+(L?'듣고 나면 따라 말해 봐요':'소리 내어 따라 말해 봐요 (눌러서 들어 보기)')+'</div>'
+   +'<button class="big ghost" style="margin:0 0 10px;padding:12px;font-size:15px" onclick="chListen()">'+(L?'⏹ 멈추기':'🔊 듣고 따라하기 (전체 한 줄씩)')+'</button>'
+   +'<div class="lst">'+u.rows.map(function(r,i){var on=L&&L.i===i;return '<button class="lr" style="'+(on?'background:#FFF6D6;border-radius:12px':'')+'" onclick="chSay('+i+')"><div>'+hlA(r)+'</div><span>'+(on?(L.ph==='say'?'🔊 듣는 중':'🎤 따라 말해요!'):esc(r.ko))+'</span></button>';}).join('')+'</div>'
    +'<button class="big" style="margin-top:auto" onclick="chStep2()">⏱ Step 2 · '+u.sec+'초 안에 말하기</button>';
+}
+/* 듣고 따라하기: 한 줄 들려주고 → 따라 말할 시간을 주고 → 다음 줄 */
+function speakCb(t,cb){
+  var done=false,fin=function(){if(!done){done=true;cb();}};
+  try{
+    if(!window.speechSynthesis){setTimeout(fin,1200);return;}
+    speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=.85;
+    var r=vResolve()[PREF.voice||'f1']||{voice:null,pitch:1};
+    if(r.voice)u.voice=r.voice;u.pitch=r.pitch;
+    u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);
+    setTimeout(fin,7000);   // 일부 기기는 끝 알림이 안 와서 안전장치
+  }catch(e){setTimeout(fin,1200);}
+}
+function lsPaint(){var y=window.pageYOffset;render();window.scrollTo(0,y);}
+function lsStop(noPaint){var L=G.ls;if(!L)return;L.stop=1;clearTimeout(L.t);G.ls=null;try{window.speechSynthesis&&speechSynthesis.cancel();}catch(e){}if(!noPaint&&G.scr==='ch1')lsPaint();}
+function chListen(){
+  if(G.ls){lsStop();return;}
+  G.ls={i:-1,ph:'',stop:0};lsNext();
+}
+function lsNext(){
+  var L=G.ls;if(!L||L.stop)return;
+  var u=G.ch.u[G.ch.ui];L.i++;
+  if(L.i>=u.rows.length){G.ls=null;lsPaint();return;}
+  L.ph='say';lsPaint();
+  var r=u.rows[L.i];
+  speakCb(r.say,function(){
+    if(G.ls!==L||L.stop)return;
+    L.ph='rep';lsPaint();
+    L.t=setTimeout(lsNext,1300+String(r.say).split(/\s+/).length*550);   // 따라 말할 시간
+  });
 }
 function chSay(i){var r=G.ch.u[G.ch.ui].rows[i];speak(r.say);}
 function chStep2(){
-  var c=G.ch,u=c.u[c.ui];
+  lsStop(true);var c=G.ch,u=c.u[c.ui];
   if(!c.cnt)c.cnt={};if(!c.cnt[c.ui]){c.cnt[c.ui]=1;c.total+=u.rows.length;}
   c.run=0;c.tries=c.tries||{};c.tries[c.ui]=c.tries[c.ui]||0;G.scr='ch2';render();
 }
