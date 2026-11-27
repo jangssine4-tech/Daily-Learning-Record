@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-dn';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-dp';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -30238,33 +30238,63 @@ window._rwCfg=null;
    학생 홈체크는 자기 레벨 문서 한 개만 읽어요. */
 /*SPGEN*/
 var SP_SUBJ=[['I','나는'],['You','너는·너희는'],['We','우리는'],['They','그들은'],['He','그는'],['She','그녀는'],['It','그것은']];
-var SP_FORMS=['pr+','pr-','pr?','pa+','pa-','pa?','fu+','fu-','fu?'];
-function spFLabel(f,modal){var t={pr:'현재',pa:'과거',fu:'미래'}[f.slice(0,2)],p={'+':'긍정','-':'부정','?':'의문'}[f.charAt(2)];return modal?p:t+' · '+p;}
+var SP_FORMS=['pr+','pr-','pr?','pa+','pa-','pa?','fu+','fu-','fu?','pg+','pg-','pg?','ag+','ag-','ag?','fg+','fg-','fg?','pe+','pe-','pe?','ae+','ae-','ae?','fe+','fe-','fe?','pn+','pn-','pn?','an+','an-','an?','fn+','fn-','fn?','mh+','mh-','mh?'];
+/* pr 현재 · pa 과거 · fu 미래 / pg·ag·fg 현재·과거·미래 진행 / pe·ae·fe 현재·과거·미래 완료 */
+function spFLabel(f,modal){var t={pr:'현재',pa:'과거',fu:'미래',pg:'현재 진행',ag:'과거 진행',fg:'미래 진행',pe:'현재 완료',ae:'과거 완료',fe:'미래 완료',pn:'현재 완료 진행',an:'과거 완료 진행',fn:'미래 완료 진행',mh:'조동사 + have p.p'}[f.slice(0,2)],p={'+':'긍정','-':'부정','?':'의문'}[f.charAt(2)];return modal?p:t+' · '+p;}
+/* 불규칙 동사표 (중학교 교과서에 자주 나오는 동사 · 기본형 과거 과거분사). 표에 없는 동사는 -ed로 만들어요 */
+var SP_IRR={};('bet bet bet|burst burst burst|cast cast cast|cost cost cost|cut cut cut|hit hit hit|hurt hurt hurt|let let let|put put put|quit quit quit|read read read|set set set|shut shut shut|spread spread spread|split split split|upset upset upset|broadcast broadcast broadcast|'
++'become became become|come came come|run ran run|overcome overcame overcome|'
++'bend bent bent|bind bound bound|bleed bled bled|bring brought brought|build built built|buy bought bought|catch caught caught|creep crept crept|deal dealt dealt|dig dug dug|feed fed fed|feel felt felt|fight fought fought|find found found|flee fled fled|get got got|hang hung hung|have had had|hear heard heard|hold held held|keep kept kept|lay laid laid|lead led led|leave left left|lend lent lent|light lit lit|lose lost lost|make made made|mean meant meant|meet met met|pay paid paid|say said said|seek sought sought|sell sold sold|send sent sent|shine shone shone|shoot shot shot|sit sat sat|sleep slept slept|slide slid slid|spend spent spent|spin spun spun|stand stood stood|stick stuck stuck|sting stung stung|strike struck struck|sweep swept swept|swing swung swung|teach taught taught|tell told told|think thought thought|understand understood understood|weep wept wept|win won won|'
++'arise arose arisen|awake awoke awoken|be was been|beat beat beaten|begin began begun|bite bit bitten|blow blew blown|break broke broken|choose chose chosen|do did done|draw drew drawn|drink drank drunk|drive drove driven|eat ate eaten|fall fell fallen|fly flew flown|forbid forbade forbidden|forget forgot forgotten|forgive forgave forgiven|freeze froze frozen|give gave given|go went gone|grow grew grown|hide hid hidden|know knew known|ride rode ridden|ring rang rung|rise rose risen|see saw seen|shake shook shaken|show showed shown|shrink shrank shrunk|sing sang sung|sink sank sunk|speak spoke spoken|steal stole stolen|swear swore sworn|swim swam swum|take took taken|tear tore torn|throw threw thrown|wake woke woken|wear wore worn|write wrote written').split('|').forEach(function(x){var a=x.split(' ');SP_IRR[a[0]]=[a[1],a[2]];});
+/* 진행형(-ing)으로 쓰지 않는 상태 동사 */
+var SP_STAT='like love hate dislike want need prefer wish know believe understand remember recognize realize suppose doubt mean belong own owe cost contain include consist depend exist matter seem resemble lack deserve possess'.split(' ');
+var SP_HAVE_ACT=/(breakfast|lunch|dinner|supper|meal|snack|party|fun|good time|great time|nice time|bath|shower|drink|coffee|tea|water|juice|cake|pizza|ice cream|sandwich|rest|break|walk|talk|chat|look|try|swim|class|lesson|trouble|dream|accident|fight|argument|haircut|picnic)/;
+function spStative(v){v=String(v||'').trim().toLowerCase();var m=v.match(/^(\S+)([\s\S]*)$/);if(!m)return false;
+ if(SP_STAT.indexOf(m[1])>=0)return true;
+ if(m[1]==='have')return !SP_HAVE_ACT.test(m[2]);   /* '가지다'의 have는 상태, 'have lunch'처럼 먹다·즐기다는 동작 */
+ return false;}
+function spStativeMsg(v){var w=String(v||'').trim().split(/\s+/)[0];
+ return w.toLowerCase()==='have'?"'have'는 '가지고 있다'의 뜻일 때 진행형(-ing)으로 쓰지 않아요 ('have lunch'처럼 먹다·즐기다 뜻이면 가능). 진행·완료 진행 시제는 켤 수 없어요"
+  :"'"+w+"'는 상태 동사라서 진행형(-ing)으로 쓰지 않아요 (I know ○ / I am knowing ✕). 진행·완료 진행 시제는 켤 수 없어요";}
+var SP_DBL=['begin','forget','admit','prefer','occur','refer','regret','permit','control'];
+function spIngw(w){if(w==='be')return 'being';if(/ie$/.test(w))return w.slice(0,-2)+'ying';if(/e$/.test(w)&&!/(ee|oe|ye)$/.test(w))return w.slice(0,-1)+'ing';
+ if(/^[^aeiou]*[aeiou][^aeiouwxy]$/.test(w)||SP_DBL.indexOf(w)>=0)return w+w.charAt(w.length-1)+'ing';return w+'ing';}
+function spIng(v){return spFirst(v,spIngw);}
+/* 과거분사: 직접 쓴 것 → 불규칙 동사표 → (과거형을 직접 썼으면 그대로) → -ed */
+function spPP(d){var v=String(d.v||'').trim(),x=String(d.vpp||'').trim();if(x)return x;
+ var m=v.match(/^(\S+)([\s\S]*)$/);if(!m)return '';if(SP_IRR[m[1]])return SP_IRR[m[1]][1]+m[2];
+ var y=String(d.vp||'').trim();if(y)return y;return spEdV(v);}
 function spS3w(v){if(v==='have')return 'has';if(v==='be')return 'is';if(/(s|x|z|ch|sh|o)$/.test(v))return v+'es';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ies';return v+'s';}
-function spEdw(v){if(v==='have')return 'had';if(/e$/.test(v))return v+'d';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ied';return v+'ed';}
+function spEdw(v){if(SP_IRR[v])return SP_IRR[v][0];if(/e$/.test(v))return v+'d';if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+'ied';if(/^[^aeiou]*[aeiou][^aeiouwxy]$/.test(v)||SP_DBL.indexOf(v)>=0)return v+v.charAt(v.length-1)+'ed';return v+'ed';}
 function spFirst(v,fn){v=String(v||'').trim();var m=v.match(/^(\S+)([\s\S]*)$/);return m?fn(m[1])+m[2]:v;}   /* 여러 단어(do homework)는 첫 단어만 바꿔요 */
 function spS3(v){return spFirst(v,spS3w);}
 function spEdV(v){return spFirst(v,spEdw);}
 /* 조동사 표: 현재(pr) · 과거(pa) · 미래(fu)마다 쓰는 표현. m=조동사 자체, be=be+표현, hv=have to, ax=do/does/did, 없으면 그 시제는 연습하지 않아요 */
 var SP_MOD={
- 'can':{pr:['m','can'],pa:['m','could'],fu:['be','able to'],n:'현재 can · 과거 could · 미래 will be able to (can은 미래형이 없어서 be able to를 써요)'},
- 'may':{pr:['m','may'],pa:['be','allowed to'],fu:['be','allowed to'],n:'현재 may · 과거 was/were allowed to · 미래 will be allowed to'},
- 'must':{pr:['m','must'],pa:['hv'],fu:['hv'],n:'현재 must · 과거 had to · 미래 will have to (must의 과거·미래는 have to를 써요)'},
+ 'can':{pr:['m','can'],pa:['m','could'],fu:['be','able to'],n:'현재 can · 과거 could · 미래 will be able to (can은 미래형이 없어서 be able to를 써요)',mh:'-',mn:'cannot have p.p (~했을 리 없다)'},
+ 'may':{pr:['m','may'],pa:['be','allowed to'],fu:['be','allowed to'],n:'현재 may · 과거 was/were allowed to · 미래 will be allowed to',mh:'+-',mn:'may have p.p (~했을지도 모른다)'},
+ 'must':{pr:['m','must'],pa:['hv'],fu:['hv'],n:'현재 must · 과거 had to · 미래 will have to (must의 과거·미래는 have to를 써요)',mh:'+-',mn:'must have p.p (~했음에 틀림없다) · 부정은 cannot have p.p (~했을 리 없다)'},
  'have to':{pr:['hv'],pa:['hv'],fu:['hv'],n:'현재 have/has to · 과거 had to · 미래 will have to'},
  'be able to':{pr:['be','able to'],pa:['be','able to'],fu:['be','able to'],n:'현재 am/is/are able to · 과거 was/were able to · 미래 will be able to'},
  'be allowed to':{pr:['be','allowed to'],pa:['be','allowed to'],fu:['be','allowed to'],n:'현재 am/is/are allowed to · 과거 was/were allowed to · 미래 will be allowed to'},
  'do':{pr:['ax'],pa:['ax'],n:'현재 do/does · 과거 did (미래형은 없어요)'},
  'will':{pr:['m','will'],n:'현재만 연습해요 (과거·미래형이 없어요)'},
- 'would':{pr:['m','would'],n:'현재만 연습해요'},'could':{pr:['m','could'],n:'현재만 연습해요'},'might':{pr:['m','might'],n:'현재만 연습해요'},
- 'should':{pr:['m','should'],n:'현재만 연습해요 (과거·미래형이 없어요)'},'shall':{pr:['m','shall'],n:'현재만 연습해요'}
+ 'would':{pr:['m','would'],n:'현재 would',mh:'+-?',mn:'would have p.p (~했을 텐데)'},'could':{pr:['m','could'],n:'현재 could',mh:'+-?',mn:'could have p.p (~했을 수도 있다) · could not have p.p · Could ~ have p.p?'},'might':{pr:['m','might'],n:'현재 might',mh:'+-',mn:'might have p.p (~했을지도 모른다)'},
+ 'should':{pr:['m','should'],n:'현재 should (과거·미래형이 없어요)',mh:'+-?',mn:'should have p.p (~했어야 했는데)'},'shall':{pr:['m','shall'],n:'현재만 연습해요'}
 };
 function spModKey(v){var k=String(v||'').trim().toLowerCase().replace(/\s+/g,' ');
  if(k==='cannot')k='can';if(k==='has to'||k==='had to')k='have to';if(k==='does'||k==='did')k='do';
  if(/^(am|is|are|was|were)? ?able to$/.test(k))k='be able to';if(/^(am|is|are|was|were)? ?allowed to$/.test(k))k='be allowed to';
  return k;}
 function spModForm(v,t){var e=SP_MOD[spModKey(v)];if(e)return e[t]||null;return t==='pr'?['g']:null;}   /* 표에 없는 조동사는 현재만 */
-function spModHas(v,f){return !!spModForm(v,f.slice(0,2));}
-function spModNote(v){var e=SP_MOD[spModKey(v)];return e?e.n:'이 조동사는 현재만 연습해요';}
+function spModHas(v,f){var t=f.slice(0,2);if(t==='mh'){var e=SP_MOD[spModKey(v)];return !!(e&&e.mh&&e.mh.indexOf(f.charAt(2))>=0);}return !!spModForm(v,t);}
+/* 이 연습 종류에서 쓸 수 있는 형태인가: be동사는 진행형(am being)을 쓰지 않고, 조동사는 표에 있는 시제만 */
+function spFormOk(d,f){var t=f.slice(0,2);if(d.t==='modal')return spModHas(d.v,f);
+  if(d.t==='be')return !/^(pg|ag|fg|pn|an|fn|mh)$/.test(t);
+  if(t==='mh')return false;
+  if(/^(pg|ag|fg|pn|an|fn)$/.test(t)&&spStative(d.v))return false;   /* 상태 동사는 진행형을 쓰지 않아요 */
+  return true;}
+function spModNote(v){var e=SP_MOD[spModKey(v)];return e?e.n+(e.mh?' · 조동사+have p.p: '+e.mn:''):'이 조동사는 현재만 연습해요';}
 function spModGen(sp,v,s,t,p){
   var th=/^(He|She|It)$/.test(s),lc=s==='I'?'I':s.toLowerCase(),k=sp[0],w=sp[1];
   if(k==='m'||k==='g'){w=k==='g'?String(v).trim():w;return p==='+'?s+' '+w:p==='-'?s+' '+(w==='can'?'cannot':w+' not'):cap(w)+' '+lc;}
@@ -30283,6 +30313,31 @@ function spModGen(sp,v,s,t,p){
 /* 주어 s, 형태 f(예: 'pr-')에 맞는 정답을 만들어요. 반환 {a:화면에 보이는 정답, say:읽어 줄 말} */
 function spGen(d,s,f){
   var th=/^(He|She|It)$/.test(s),lc=s==='I'?'I':s.toLowerCase(),t=f.slice(0,2),p=f.charAt(2),v=String(d.v||'').trim(),r;
+  if(/^(pn|an|fn)$/.test(t)){
+    if(!spFormOk(d,f))return {a:'',say:''};
+    var ig=spIng(v),h3=th?'has':'have';
+    if(t==='pn')r=p==='+'?s+' '+h3+' been '+ig:p==='-'?s+' '+h3+' not been '+ig:cap(h3)+' '+lc+' been '+ig;
+    else if(t==='an')r=p==='+'?s+' had been '+ig:p==='-'?s+' had not been '+ig:'Had '+lc+' been '+ig;
+    else r=p==='+'?s+' will have been '+ig:p==='-'?s+' will not have been '+ig:'Will '+lc+' have been '+ig;
+    r=r.replace(/\s+/g,' ').trim();var sn=spNat(r+(p==='?'?'?':''));
+    if(p==='+')sn=sn.replace(/^(I|You|We|They) have /,"$1've ").replace(/^(He|She|It) has /,"$1's ").replace(/^(I|You|We|They|He|She|It) had /,"$1'd ");
+    return {a:p==='?'?r+' …?':r,say:sn};
+  }
+  if(/^(pg|ag|fg|pe|ae|fe)$/.test(t)){
+    if(!spFormOk(d,f))return {a:'',say:''};
+    var part,pf=t.charAt(1)==='e',bb,h2;
+    if(pf){part=d.t==='be'?'been':spPP(d);
+      if(t==='pe'){h2=th?'has':'have';r=p==='+'?s+' '+h2+' '+part:p==='-'?s+' '+h2+' not '+part:cap(h2)+' '+lc+' '+part;}
+      else if(t==='ae')r=p==='+'?s+' had '+part:p==='-'?s+' had not '+part:'Had '+lc+' '+part;
+      else r=p==='+'?s+' will have '+part:p==='-'?s+' will not have '+part:'Will '+lc+' have '+part;}
+    else{part=spIng(v);
+      if(t==='fg')r=p==='+'?s+' will be '+part:p==='-'?s+' will not be '+part:'Will '+lc+' be '+part;
+      else{bb=t==='ag'?((s==='I'||th)?'was':'were'):(s==='I'?'am':(th?'is':'are'));r=p==='+'?s+' '+bb+' '+part:p==='-'?s+' '+bb+' not '+part:cap(bb)+' '+lc+' '+part;}}
+    r=r.replace(/\s+/g,' ').trim();
+    var sy=spNat(r+(p==='?'?'?':''));
+    if(pf&&p==='+')sy=sy.replace(/^(I|You|We|They) have /,"$1've ").replace(/^(He|She|It) has /,"$1's ").replace(/^(I|You|We|They|He|She|It) had /,"$1'd ");   /* 완료의 have/has/had는 약하게 */
+    return {a:p==='?'?r+' …?':r,say:sy};
+  }
   if(d.t==='be'){
     if(t==='pr'){var b=s==='I'?'am':(th?'is':'are');r=p==='+'?s+' '+b:p==='-'?s+' '+b+' not':cap(b)+' '+lc;}
     else if(t==='pa'){var b2=(s==='I'||th)?'was':'were';r=p==='+'?s+' '+b2:p==='-'?s+' '+b2+' not':cap(b2)+' '+lc;}
@@ -30292,6 +30347,14 @@ function spGen(d,s,f){
     else if(t==='pa')r=p==='+'?s+' '+(String(d.vp||'').trim()||spEdV(v)):p==='-'?s+' did not '+v:'Did '+lc+' '+v;
     else r=p==='+'?s+' will '+v:p==='-'?s+' will not '+v:'Will '+lc+' '+v;
   }else{ // modal
+    if(t==='mh'){
+      if(!spModHas(v,f)||!String(d.mv||'').trim())return {a:'',say:''};
+      var mk=spModKey(v),pp=spPP({v:d.mv,vpp:d.vpp});
+      r=p==='+'?s+' '+mk+' have '+pp:p==='-'?s+' '+((mk==='must'||mk==='can')?'cannot':mk+' not')+' have '+pp:cap(mk)+' '+lc+' have '+pp;
+      r=r.replace(/\s+/g,' ').trim();var sm=spNat(r+(p==='?'?'?':''));
+      if(p==='+')sm=sm.replace(/\b(should|could|would|must|might) have\b/,"$1've");
+      return {a:p==='?'?r+' …?':r,say:sm};
+    }
     var sp=spModForm(v,t);if(!sp)return {a:'',say:''};
     r=spModGen(sp,v,s,t,p);
   }
@@ -30303,7 +30366,7 @@ function spNat(t){
   t=String(t||'').replace(/\s*…\s*\?*\s*$/,'?').replace(/\s+/g,' ').trim();
   var q=/\?$/.test(t);if(q)t=t.slice(0,-1).trim();
   t=t.replace(/\bwill not\b/gi,function(m){return m.charAt(0)==='W'?"Won't":"won't";})
-   .replace(/\b(do|does|did|was|were|must|should|would|could|is|are) not\b/gi,function(m,w){return w.charAt(0).toUpperCase()===w.charAt(0)?w+"n't":w+"n't";})
+   .replace(/\b(do|does|did|was|were|must|should|would|could|is|are|has|have|had) not\b/gi,function(m,w){return w.charAt(0).toUpperCase()===w.charAt(0)?w+"n't":w+"n't";})
    .replace(/\bI am\b/g,"I'm").replace(/\b(You|We|They|you|we|they) are\b/g,"$1're").replace(/\b(He|She|It|he|she|it) is\b/g,"$1's")
    .replace(/\b(I|You|We|They|He|She|It|you|we|they|he|she|it) will\b/g,"$1'll");
   return t+(q?'?':'');
@@ -30317,7 +30380,7 @@ function spUnits(d){
     if(rows.length)out.push({label:d.nm||'직접 입력',rows:rows});return out;}
   var modal=d.t==='modal',subs=(d.subj&&d.subj.length?d.subj:SP_SUBJ.map(function(x){return x[0];}));
   var onlyPr=modal&&(d.f||[]).every(function(f){return f.slice(0,2)==='pr';});
-  SP_FORMS.forEach(function(f){if((d.f||[]).indexOf(f)<0)return;if(modal&&!spModHas(d.v,f))return;
+  SP_FORMS.forEach(function(f){if((d.f||[]).indexOf(f)<0)return;if(!spFormOk(d,f))return;if(modal&&f.slice(0,2)==='mh'&&!String(d.mv||'').trim())return;
     out.push({label:spFLabel(f,onlyPr),kind:({be:'be동사',do:'일반동사',modal:'조동사'})[d.t],rows:subs.map(function(s){var g=spGen(d,s,f);return {s:s,ko:spKo(s),a:g.a,say:g.say};})});});
   return out;
 }
@@ -30409,11 +30472,12 @@ function _spCompose(ps){
   for(var i=0;i<ch.length;i++){var d=ch[i];
     if(d.t==='custom'){d.rows=_spChRows(d._tx!=null?d._tx:_spChTx(d));delete d._tx;if(!d.rows.length){toast('3초 챌린지 '+(i+1)+'번: 직접 입력 줄을 넣어 주세요');return false;}}
     else{if((d.t==='do'||d.t==='modal')&&!String(d.v||'').trim()){toast('3초 챌린지 '+(i+1)+'번: 동사를 써 주세요');return false;}
-      if(d.t==='modal')d.f=(d.f||[]).filter(function(f){return spModHas(d.v,f);});
+      d.f=(d.f||[]).filter(function(f){return spFormOk(d,f);});
+      if(d.t==='modal'&&d.f.some(function(f){return f.slice(0,2)==='mh';})&&!String(d.mv||'').trim()){toast('3초 챌린지 '+(i+1)+'번: 조동사 + have p.p는 함께 쓸 동사를 써 주세요');return false;}
       if(!(d.f||[]).length||!(d.subj||[]).length){toast('3초 챌린지 '+(i+1)+'번: 주어와 말할 형태를 한 개 이상 골라 주세요');return false;}}}
   if(ps.length)L.ps=ps;
   if(ch.length)L.ch=ch.map(function(d){var o={t:d.t,sec:+d.sec||3,sh:d.sh===0?0:1};if(d.nm)o.nm=d.nm;
-    if(d.t==='custom')o.rows=d.rows;else{o.v=String(d.v||'').trim();if(d.t==='do')o.vp=String(d.vp||'').trim();o.subj=d.subj.slice();o.f=d.f.slice();}return o;});
+    if(d.t==='custom')o.rows=d.rows;else{o.v=String(d.v||'').trim();if(d.t==='do'){o.vp=String(d.vp||'').trim();o.vpp=String(d.vpp||'').trim();}if(d.t==='modal'){var _mv=String(d.mv||'').trim();if(_mv){o.mv=_mv;o.vpp=String(d.vpp||'').trim();}}o.subj=d.subj.slice();o.f=d.f.slice();}return o;});
   if(th.on&&[0,1,2,3,4].every(function(i){return (th.sel||[])[i]===0;})){toast('내 생각 말하기: 보이기를 1개 이상 체크해 주세요');return false;}
   if(th.on){var _hs=[],_sl=[];for(var _i=0;_i<5;_i++){_hs.push(String((th.hints||[])[_i]||'').trim());_sl.push((th.sel||[])[_i]===0?0:1);}L.th={on:1,hints:_hs,sel:_sl};}
   return (L.ps||L.ch||L.th)?L:null;
@@ -30422,21 +30486,33 @@ function _spChTx(d){return (d.rows||[]).map(function(r){return r.s+' | '+r.a+(r.
 function _spChRows(tx){var o=[];String(tx||'').split(/\r?\n/).forEach(function(l){l=l.trim();if(!l)return;var m=l.split(/\t|\|/).map(function(x){return x.trim();});if(m[0]&&m[1])o.push(m[2]?{s:m[0],a:m[1],k:m[2]}:{s:m[0],a:m[1]});});return o;}
 function _spChNew(){_spEd.cw.push({t:'be',v:'',vp:'',subj:SP_SUBJ.map(function(x){return x[0];}),f:['pr+'],sec:3,sh:1});_spEd.dirty=true;renderSpSet();}
 function _spChDel(i){if(!confirm('이 연습을 지울까요?'))return;_spEd.cw.splice(i,1);_spEd.dirty=true;renderSpSet();}
-function _spChKind(i,t){var d=_spEd.cw[i];d.t=t;if(t==='modal'){if(!d.v)d.v='can';d.f=(d.f||[]).filter(function(f){return spModHas(d.v,f);});if(!d.f.length)d.f=['pr+'];}if(t==='custom'&&!d.rows)d.rows=[];_spEd.dirty=true;renderSpSet();}
+function _spChKind(i,t){var d=_spEd.cw[i];d.t=t;if(t==='modal'&&!d.v)d.v='can';if(t==='modal'||t==='be'){d.f=(d.f||[]).filter(function(f){return spFormOk(d,f);});if(!d.f.length)d.f=['pr+'];}if(t==='custom'&&!d.rows)d.rows=[];_spEd.dirty=true;renderSpSet();}
 function _spChTog(i,key,val){var d=_spEd.cw[i],a=d[key]||(d[key]=[]),p=a.indexOf(val);if(p<0)a.push(val);else a.splice(p,1);if(key==='subj')d.subj=SP_SUBJ.map(function(x){return x[0];}).filter(function(x){return d.subj.indexOf(x)>=0;});_spEd.dirty=true;renderSpSet();}
-function _spChIn(i,f,v){var d=_spEd.cw[i];d[f]=v;_spEd.dirty=true;if(f==='v'&&d.t==='modal'){var fm=document.getElementById('sp-chfm'+i);if(fm)fm.innerHTML=_spChForms(i);}var el=document.getElementById('sp-chpv'+i);if(el)el.innerHTML=_spChPv(d);}
+function _spChIn(i,f,v){var d=_spEd.cw[i];d[f]=v;_spEd.dirty=true;if(f==='v'&&(d.t==='modal'||d.t==='do')){var fm=document.getElementById('sp-chfm'+i);if(fm)fm.innerHTML=_spChForms(i);}var el=document.getElementById('sp-chpv'+i);if(el)el.innerHTML=_spChPv(d);}
 function _spChPick(i,v){var d=_spEd.cw[i];d.v=v;_spEd.dirty=true;renderSpSet();}   /* 조동사 바로 고르기 */
 /* 말할 형태 표 (조동사는 그 조동사에 있는 시제만 켜져요) */
+/* 불규칙 동사표 보기 (패턴별) */
+function _spIrrHtml(){
+  var g={AAA:[],ABA:[],ABB:[],ABC:[]},n=0;
+  Object.keys(SP_IRR).forEach(function(k){var a=SP_IRR[k],p=a[0],pp=a[1],c=(k===p&&p===pp)?'AAA':(k===pp?'ABA':(p===pp?'ABB':'ABC'));g[c].push(k+' '+p+' '+pp);n++;});
+  var T={AAA:'AAA (모양이 같아요)',ABA:'ABA (현재형 = 과거분사)',ABB:'ABB (과거형 = 과거분사)',ABC:'ABC (셋 다 달라요)'};
+  return '<details style="margin:0 0 10px;font-size:12px"><summary style="cursor:pointer;font-weight:700;color:#0f5c4d">📖 자동으로 쓰는 불규칙 동사표 ('+n+'개) — 중학교 교과서 수준</summary><div style="margin-top:6px;line-height:1.7;color:var(--txt2)">표에 없는 동사는 -ed로 만들어요. 다르면 연습마다 과거형·과거분사 칸에 직접 쓰면 돼요.<br>'
+   +['AAA','ABA','ABB','ABC'].map(function(c){return '<div style="margin-top:6px"><b>'+T[c]+' · '+g[c].length+'개</b><br>'+g[c].map(function(x){return _bcEsc(x);}).join(' · ')+'</div>';}).join('')+'</div></details>';
+}
 function _spChForms(i){
   var d=_spEd.cw[i],modal=d.t==='modal',h='';
   if(modal)h+='<div style="font-size:11px;color:#0f5c4d;margin:2px 0 6px">'+_bcEsc(spModNote(d.v))+'</div>';
+  if(d.t==='be')h+='<div style="font-size:11px;color:#0f5c4d;margin:2px 0 6px">be동사는 진행형(am being)을 쓰지 않아서 진행·완료 진행 시제는 꺼져 있어요. 완료는 have been · had been · will have been으로 나와요</div>';
+  if(d.t==='do'&&spStative(d.v))h+='<div style="font-size:12px;color:#b91c1c;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:7px 10px;margin:4px 0 6px;line-height:1.5">⚠️ '+_bcEsc(spStativeMsg(d.v))+'</div>';
+  var TS=[['pr','현재'],['pa','과거'],['fu','미래'],['pg','현재 진행'],['ag','과거 진행'],['fg','미래 진행'],['pe','현재 완료'],['ae','과거 완료'],['fe','미래 완료'],['pn','현재 완료 진행'],['an','과거 완료 진행'],['fn','미래 완료 진행']];
+  if(modal)TS.push(['mh','조동사 + have p.p']);
   h+='<table style="border-collapse:collapse;font-size:12px"><tr><th></th><th style="padding:3px 10px">긍정</th><th style="padding:3px 10px">부정</th><th style="padding:3px 10px">의문</th></tr>'
-   +['pr','pa','fu'].map(function(t){var ok=!modal||!!spModForm(d.v,t);return '<tr><th style="padding:3px 10px;text-align:left;'+(ok?'':'color:#bbb')+'">'+({pr:'현재',pa:'과거',fu:'미래'})[t]+'</th>'+['+','-','?'].map(function(p){var f=t+p,on=ok&&(d.f||[]).indexOf(f)>=0;return '<td style="text-align:center;padding:2px"><button class="btn btn-xs '+(on?'btn-navy':'btn-outline')+'" style="min-width:44px;'+(ok?'':'opacity:.35;cursor:not-allowed')+'" '+(ok?'onclick="_spChTog('+i+',\''+'f'+'\',\''+f+'\')"':'disabled')+'>'+(ok?(on?'✓':'·'):'–')+'</button></td>';}).join('')+'</tr>';}).join('')+'</table>';
+   +TS.map(function(x,ti){var t=x[0],anyOk=['+','-','?'].some(function(p){return spFormOk(d,t+p);});return '<tr'+(ti===3||ti===6||ti===9||ti===12?' style="border-top:1px solid #e5e7eb"':'')+'><th style="padding:3px 10px;text-align:left;white-space:nowrap;'+(anyOk?'':'color:#bbb')+'">'+x[1]+'</th>'+['+','-','?'].map(function(p){var f=t+p,ok=spFormOk(d,f),on=ok&&(d.f||[]).indexOf(f)>=0;return '<td style="text-align:center;padding:2px"><button class="btn btn-xs '+(on?'btn-navy':'btn-outline')+'" style="min-width:44px;'+(ok?'':'opacity:.35;cursor:not-allowed')+'" '+(ok?'onclick="_spChTog('+i+',\'f\',\''+f+'\')"':'disabled')+'>'+(ok?(on?'✓':'·'):'–')+'</button></td>';}).join('')+'</tr>';}).join('')+'</table>';
   return h;
 }
 function _spChHtml(lv){
   var cw=_spEd.cw,h='<div class="card" style="padding:14px"><b style="font-size:15px">'+_bcEsc(lv)+' · '+_bcEsc(_spEd.les)+'</b> <span style="font-size:12px;color:var(--txt3)">— ⏱ 3초 말하기 챌린지</span>'
-   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">주어와 동사를 3초 안에 말하는 매일 연습이에요. <b>연습을 여러 개</b> 만들 수 있고(예: be동사 현재 · be동사 과거), 학생은 형태마다 <b>Step 1(전부 보고 따라 말하기) → Step 2(동사는 가리고 주어만 보고, 위에서 아래까지 전부 제한 시간 안에 말하기)</b>를 해요. 정답은 자동으로 만들어져요.</div>';
+   +'<div style="background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.6;margin:10px 0">주어와 동사를 3초 안에 말하는 매일 연습이에요. <b>연습을 여러 개</b> 만들 수 있고(예: be동사 현재 · be동사 과거), 학생은 형태마다 <b>Step 1(전부 보고 따라 말하기) → Step 2(동사는 가리고 주어만 보고, 위에서 아래까지 전부 제한 시간 안에 말하기)</b>를 해요. 정답은 자동으로 만들어져요.</div>'+_spIrrHtml();
   if(!cw.length)h+='<div style="padding:18px;text-align:center;color:var(--txt3);font-size:13px">아직 연습이 없어요. 아래 ＋ 연습 추가를 눌러 보세요. 이 코너를 비워 두면 학생 화면에 나오지 않아요.</div>';
   var KS=[['be','be동사'],['do','일반동사'],['modal','조동사'],['custom','직접 입력']];
   cw.forEach(function(d,i){
@@ -30448,7 +30524,7 @@ function _spChHtml(lv){
        +'<div class="sp-lab">한 줄에 <b>주어 | 정답 | 우리말(선택)</b> — 엑셀 표를 붙여 넣어도 돼요</div><textarea class="fi" style="min-height:110px" oninput="_spChIn('+i+',\'_tx\',this.value)">'+_bcEsc(d._tx!=null?d._tx:_spChTx(d))+'</textarea>';
     }else{
       if(d.t!=='be')h+='<div style="display:flex;gap:10px;flex-wrap:wrap"><div><div class="sp-lab">'+(modal?'조동사 (can, may, must, have to, be able to, do…)':'동사 원형 (like, study…)')+'</div><input class="fi" style="width:150px" value="'+_bcEsc(d.v||'')+'" oninput="_spChIn('+i+',\'v\',this.value)"></div>'
-        +(d.t==='do'?'<div><div class="sp-lab">과거형 (비워 두면 -ed 자동)</div><input class="fi" style="width:150px" value="'+_bcEsc(d.vp||'')+'" placeholder="예: went" oninput="_spChIn('+i+',\'vp\',this.value)"></div>':'')+'</div>';
+        +(d.t==='do'?'<div><div class="sp-lab">과거형 (비우면 자동)</div><input class="fi" style="width:150px" value="'+_bcEsc(d.vp||'')+'" placeholder="예: went" oninput="_spChIn('+i+',\'vp\',this.value)"></div>':'')+'</div>';
       if(modal)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin:4px 0 2px"><span style="font-size:11px;color:var(--txt3);align-self:center">바로 고르기</span>'+['can','may','must','will','should','have to','be able to','do'].map(function(m){return '<button class="btn btn-xs '+(spModKey(d.v)===m?'btn-navy':'btn-outline')+'" onclick="_spChPick('+i+',\''+m+'\')">'+m+'</button>';}).join('')+'</div>';
       h+='<div class="sp-lab">주어 (눌러서 켜고 끄기)</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+SP_SUBJ.map(function(x){var on=(d.subj||[]).indexOf(x[0])>=0;return '<button class="btn btn-xs '+(on?'btn-navy':'btn-outline')+'" onclick="_spChTog('+i+',\'subj\',\''+x[0]+'\')">'+x[0]+'</button>';}).join('')+'</div>'
        +'<div class="sp-lab">말할 형태</div><div id="sp-chfm'+i+'">'+_spChForms(i)+'</div>';
@@ -31748,7 +31824,9 @@ function _brandRedraw(){
     +'<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;cursor:pointer"><input type="checkbox" '+(b.box?'checked ':'')+'onchange="_brandBox(this.checked)"> 로고 뒤에 흰 상자 넣기 (어두운 색 로고가 안 보일 때)</label></div>'
     +'<div class="field"><div class="fl">글자 로고 (이미지가 없을 때)</div><input class="fi" id="brand-name" value="'+_bcEsc(b.name||'')+'" placeholder="예: 우리학원" oninput="_brandName(this.value)" style="max-width:280px"></div>'
     +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-navy" onclick="_brandSave()">저장</button><button class="btn btn-outline" onclick="_brandReset()">기본 로고로 되돌리기</button>'+(inModal?'<button class="btn btn-outline" onclick="_brandClose()">닫기</button>':'')+'</div>'
-    +(inModal?'<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:13px;margin-bottom:6px">📱 다른 기기에서 아이디·비밀번호만으로 접속</div><div style="font-size:12px;color:var(--txt2);line-height:1.7;margin-bottom:8px">연결 링크로 한 번 열면 그 기기에는 Firebase 정보를 다시 입력하지 않아도 됩니다. 이후에는 아이디·비밀번호만 입력합니다. 링크에는 학원 데이터베이스 연결 정보가 들어 있으니 선생님께만 보내 주세요.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="_brandCopyLink()">🔗 연결 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR(\'self\',\'선생님 앱 연결 QR 코드\')">📷 QR 코드</button><button class="btn btn-outline btn-sm" onclick="_brandCopyFix()" title="index.html 파일에 붙여 넣으면 모든 기기가 입력 없이 접속해요">📋 파일 고정용 코드 복사</button></div></div>':'')+'</div>';
+    +(inModal?'<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:13px;margin-bottom:6px">📱 다른 기기에서 아이디·비밀번호만으로 접속</div><div style="font-size:12px;color:var(--txt2);line-height:1.7;margin-bottom:8px">연결 링크로 한 번 열면 그 기기에는 Firebase 정보를 다시 입력하지 않아도 됩니다. 이후에는 아이디·비밀번호만 입력합니다. 링크에는 학원 데이터베이스 연결 정보가 들어 있으니 선생님께만 보내 주세요.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="_brandCopyLink()">🔗 연결 링크 복사</button><button class="btn btn-outline btn-sm" onclick="_bcShowQR(\'self\',\'선생님 앱 연결 QR 코드\')">📷 QR 코드</button><button class="btn btn-outline btn-sm" onclick="_brandCopyFix()" title="index.html 파일에 붙여 넣으면 모든 기기가 입력 없이 접속해요">📋 파일 고정용 코드 복사</button></div></div>':'')
+        +(d.t==='do'?'<div><div class="sp-lab">과거분사 (비우면 자동)</div><input class="fi" style="width:150px" value="'+_bcEsc(d.vpp||'')+'" placeholder="예: gone" oninput="_spChIn('+i+',\'vpp\',this.value)"></div>':'')
+        +(modal?'<div><div class="sp-lab">함께 쓸 동사 (조동사 + have p.p용 · 예: eat)</div><input class="fi" style="width:150px" value="'+_bcEsc(d.mv||'')+'" placeholder="예: eat" oninput="_spChIn('+i+',\'mv\',this.value)"></div><div><div class="sp-lab">과거분사 (비우면 자동)</div><input class="fi" style="width:150px" value="'+_bcEsc(d.vpp||'')+'" placeholder="예: eaten" oninput="_spChIn('+i+',\'vpp\',this.value)"></div>':'')+'</div>';
   _brandPrev();
 }
 function _brandPrev(){
