@@ -117,7 +117,7 @@ body.thC{--bg:#F5F7F4;--line:#DCE5DF;--ac:#0F5C4D;--ac2:#E3F3EC;--navy:#0F5C4D}
 <body>
 <div id="app"></div>
 <script>
-var BUILD='Speak Pop 0007-b';
+var BUILD='Speak Pop 0007-c';
 /*SPGEN*/
 var SP_SUBJ=[['I','나는'],['You','너는·너희는'],['We','우리는'],['They','그들은'],['He','그는'],['She','그녀는'],['It','그것은']];
 var SP_FORMS=['pr+','pr-','pr?','pa+','pa-','pa?','fu+','fu-','fu?'];
@@ -445,18 +445,19 @@ function vChDone(){
 /* 내 생각 말하기 */
 var TH_DEF=['우리 교실에서','우리 집에서','친구와 함께','내가 좋아하는 것','오늘 하루 중에'];
 function thInit(){
-  var t=G.em.set.th||{},hs=[];for(var i=0;i<5;i++)hs.push((t.hints&&t.hints[i])||TH_DEF[i]);
-  G.th={hints:hs,tx:['','','','',''],ok:[0,0,0,0,0]};G.scr='th';render();
+  var t=G.em.set.th||{},hs=[],sl=t.sel||[];for(var i=0;i<5;i++){if(sl[i]===0)continue;hs.push((t.hints&&t.hints[i])||TH_DEF[i]);}
+  if(!hs.length)hs.push(TH_DEF[0]);
+  G.th={hints:hs,tx:hs.map(function(){return '';}),ok:hs.map(function(){return 0;})};G.scr='th';render();
 }
 function vTh(){
-  var T=G.th,s=G.em.set,ps=s.ps||[],cnt=T.ok.filter(Boolean).length;
+  var T=G.th,s=G.em.set,ps=s.ps||[],cnt=T.ok.filter(Boolean).length,N=T.hints.length;
   var pat=ps.length?ps.map(function(p){return esc(p.pat)+' ~';}).join(' · '):'배운 패턴',pk=ps.length&&ps[0].pk?esc(ps[0].pk):'';
-  var h='<div class="top"><button class="ib" onclick="emBack()">✕</button><h1 style="text-align:center;font-size:16px">내 생각 말하기</h1><span style="font-size:12px;color:var(--sub);font-weight:800">'+cnt+' / 5</span></div>'
-   +'<div class="pbox" style="padding:12px 10px;margin-bottom:10px"><div class="en" style="font-size:22px">'+pat+'</div>'+(pk?'<div class="ko" style="font-size:14px">'+pk+'</div>':'')+'<div class="note" style="margin-top:4px">이 표현을 쓸 수 있는 상황을 생각해서 5가지로 말해 봐요!</div></div>';
+  var h='<div class="top"><button class="ib" onclick="emBack()">✕</button><h1 style="text-align:center;font-size:16px">내 생각 말하기</h1><span style="font-size:12px;color:var(--sub);font-weight:800">'+cnt+' / '+N+'</span></div>'
+   +'<div class="pbox" style="padding:12px 10px;margin-bottom:10px"><div class="en" style="font-size:22px">'+pat+'</div>'+(pk?'<div class="ko" style="font-size:14px">'+pk+'</div>':'')+'<div class="note" style="margin-top:4px">이 표현을 쓸 수 있는 상황을 생각해서 '+N+'가지로 말해 봐요!</div></div>';
   T.hints.forEach(function(x,i){h+='<div class="tcard'+(T.ok[i]?' cd':'')+'"><div class="h"><span class="n">'+(T.ok[i]?'✓':(i+1))+'</span>'+esc(x)+'</div><input placeholder="말한 문장을 적어 둬도 돼요 (선택)" value="'+esc(T.tx[i])+'" oninput="G.th.tx['+i+']=this.value"><button class="sy" onclick="thTog('+i+')">'+(T.ok[i]?'✓ 연습했어요':'🎤 소리 내어 연습했어요')+'</button></div>';});
   var up=G.thUp;
-  h+='<div class="note" style="text-align:center;margin:2px 0 8px">연습이 끝나면 5가지를 이어서 말하는 <b>영상</b>을 찍어서 선생님께 보내요 (1분 안쪽이면 좋아요)</div>'
-   +'<button class="big" '+((cnt<5||up)?'disabled':'')+' onclick="thFin()">'+(up?'영상을 올리는 중이에요…':(cnt<5?'5가지를 연습하고 ✓를 눌러요':'🎥 영상으로 말하기'))+'</button>';
+  h+='<div class="note" style="text-align:center;margin:2px 0 8px">연습이 끝나면 '+N+'가지를 이어서 말하는 <b>영상</b>을 찍어서 선생님께 보내요 (1분 안쪽이면 좋아요)</div>'
+   +'<button class="big" '+((cnt<N||up)?'disabled':'')+' onclick="thFin()">'+(up?'영상을 올리는 중이에요…':(cnt<N?N+'가지를 연습하고 ✓를 눌러요':'🎥 영상으로 말하기'))+'</button>';
   return h;
 }
 function thTog(i){G.th.ok[i]=G.th.ok[i]?0:1;var y=window.pageYOffset;render();window.scrollTo(0,y);}
