@@ -313,7 +313,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="pad" id="pad"></div>
     <div class="err" id="err" role="alert"></div>
     <div class="inst" id="inst"></div>
-<div style="margin-top:14px;text-align:center"><button id="upBtn" onclick="appRefresh()" style="background:transparent;border:1.5px solid #6B7280;color:#6B7280;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:800">🔄 최신으로 업데이트</button><div id="upVer" style="font-size:11px;color:#6B7280;opacity:.8;margin-top:6px"></div></div>
+<div style="margin-top:14px;text-align:center"><button id="upBtn" onclick="appRefresh()" style="display:none;background:transparent;border:1.5px solid #6B7280;color:#6B7280;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:800">🔄 최신으로 업데이트</button><div id="upVer" style="font-size:11px;color:#6B7280;opacity:.8;margin-top:6px"></div></div>
   </div>
 </div>
 
@@ -1439,7 +1439,7 @@ function rwFacts(){
   S.secs.forEach(function(sec){sec.items.forEach(function(it){
     var v=LOG.v[it.id];
     if(it.link==='hwBook'||it.link==='hwVideo'){if(it.t==='check')f.hw.push(!!LOG.e[it.id]);else if(it.t==='ox')f.hw.push(v==='O');}
-    if(it.link==='quiz'&&it.t==='number'){f.hasQuiz=true;var q=parseFloat(v);if(v!==undefined&&v!==''&&v!=='skip'&&!isNaN(q))f.quiz=f.quiz===null?q:Math.max(f.quiz,q);}
+    if(it.t==='number'&&(it.link==='quiz'||/level ?test|레벨 ?테스트/i.test(String(it.l||'')))){f.hasQuiz=true;var q=parseFloat(v);if(v!==undefined&&v!==''&&v!=='skip'&&!isNaN(q))f.quiz=f.quiz===null?q:Math.max(f.quiz,q);}
     if(it.t==='dict'&&(it.link==='dict'||(!it.link&&!it.nl))){f.hasDict=true;if(v&&+v.t>0&&v.c!==undefined&&v.c!=='')f.dict=Math.round(+v.c/+v.t*100);}
   });});
   return f;
@@ -1703,7 +1703,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-aj";
+var APP_BUILD="1111-al";
 (function(){
   var NAME="체크콜";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}
@@ -1726,8 +1726,36 @@ var APP_BUILD="1111-aj";
     d.innerHTML='<span>새 버전이 있어요</span><button style="background:#fff;color:#1E293B;border-radius:10px;padding:6px 12px;font-weight:800;font-size:13px" onclick="appRefresh()">업데이트</button>';
     document.body.appendChild(d);
   }
+
+  /* ▼ 서버 최소 버전(config/appMin) 확인 — 이 빌드가 최소 버전보다 낮으면 자동으로 업데이트해요 */
+  var KEY='checkcall',minOk=false,minTries=0,minRun=false;
+  function cmpB(a,b){function p(x){var m=String(x||'').match(/^(\d+)-([a-z]+)$/);return m?[+m[1],m[2]]:null;}var A=p(a),B=p(b);if(!A||!B)return 0;if(A[0]!==B[0])return A[0]<B[0]?-1:1;if(A[1].length!==B[1].length)return A[1].length<B[1].length?-1:1;return A[1]<B[1]?-1:A[1]>B[1]?1:0;}
+  function reveal(){var b=document.getElementById('upBtn');if(b)b.style.display='';}
+  async function minCheck(){
+    if(location.protocol==='file:')return;
+    var ready=false;try{ready=!!(window.db&&firebase.auth().currentUser);}catch(e){}
+    if(!ready){if(++minTries<=60){minRun=true;setTimeout(minCheck,2000);}else{minRun=false;if(!minOk)reveal();}return;}
+    minRun=false;
+    try{
+      var d=await db.collection('config').doc('appMin').get();
+      minOk=true;
+      var x=d.exists?(d.data()||{}):{},min=x[KEY]||'';
+      if(!min||cmpB(APP_BUILD,min)>=0)return;
+      reveal();
+      var key='minTry_'+min,t=0;try{t=+sessionStorage.getItem(key)||0;}catch(e){}
+      if(onLogin()&&t<1){try{sessionStorage.setItem(key,'1');}catch(e){}appRefresh();return;}
+      var to=x.url&&x.url[KEY];   /* 새로고침해도 그대로 옛 버전이면, 옛 주소에서 열린 것이므로 공식 주소로 옮겨요 */
+      if(to&&location.href.indexOf(to)!==0&&onLogin()){
+        var q='';try{var c=localStorage.getItem('fb_cfg');if(c)q='?cfg='+encodeURIComponent(btoa(unescape(encodeURIComponent(c))));}catch(e){}
+        location.replace(to+q);return;
+      }
+      banner();
+    }catch(e){if(!minOk)reveal();}
+  }
+  /* ▲ */
   var busy=false;
   async function check(){
+    if(!minRun){minTries=0;minCheck();}
     if(busy||location.protocol==='file:')return;busy=true;
     try{
       var nb=await remote();

@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-dd';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-df';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -3535,7 +3535,7 @@ function _bcCanon(o){
 function _bcTplFor(s){
   var cfg=window._bcConfig||{},t=cfg.templates||{};
   var mk=s?getEvalModuleForLevel(getStudentLevel(s)):'';
-  return _bcClone((mk&&t[mk])||t['default']||CC_DEFAULT_TEMPLATE);
+  return _bcClone(CC_DEFAULT_TEMPLATE);   // 기본 점검 항목 편집은 없앴어요 — 계획표가 비어 있을 때 쓰는 내장 기본값만 사용
 }
 // 학생이 받아야 하는 '검사 받기' 항목 이름들 (점검 마무리 판단용)
 function _bcItemsFor(s){
@@ -3956,18 +3956,39 @@ function _ccTabletHtml(){
     +'<li><b>아이폰(사파리)</b>: 반드시 사파리로 링크를 열고, 아래쪽 공유 버튼에서 "홈 화면에 추가"를 누릅니다. 크롬 앱에서는 이 메뉴가 안 나옵니다.</li></ul></li>'
     +'<li>번호를 눌러도 "없는 번호예요"가 계속 나오면 🔄 <b>체크콜 명단 갱신</b>을 누른 뒤 다시 해 보세요.</li>'
     +'<li>태블릿 설정을 지우고 싶으면 주소 끝에 <code>?reset=1</code>을 붙여서 여세요.</li>'
-    +'<li>보안 문제로 학생들에게 링크는 학생 폰에만 보내고 단체방에는 올리지 말라고 안내해 주세요.</li></ol></div>';
+    +'<li>보안 문제로 학생들에게 링크는 학생 폰에만 보내고 단체방에는 올리지 말라고 안내해 주세요.</li></ol></div>'
+    +'<div id="appmin-box" style="margin-top:18px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:#f8fafc"><div style="font-weight:800;color:var(--navy);margin-bottom:4px">🔄 앱 자동 업데이트 (최소 버전)</div>'
+    +'<div style="font-size:12px;color:var(--txt2)">배포를 마친 뒤 아래 버튼을 한 번 누르면, 이 버전보다 낮은 체크콜·홈체크는 열 때 스스로 최신으로 업데이트합니다. 옛 주소로 열린 경우에는 공식 주소로 옮겨 줍니다.</div>'
+    +'<div id="appmin-st" style="margin:8px 0;font-size:12px;color:var(--txt3)">현재 설정을 불러오는 중…</div>'
+    +'<button class="btn btn-navy btn-sm" onclick="_appMinSet()">지금 배포된 버전을 최소 버전으로 설정</button></div>';
+}
+async function _appMinLoad(){
+  var el=document.getElementById('appmin-st');if(!el||!db)return;
+  try{var d=await db.collection('config').doc('appMin').get();var x=d.exists?d.data():null;
+    el.innerHTML=x?('현재 설정 — 체크콜 <b>'+_bcEsc(x.checkcall||'-')+'</b> · 홈체크 <b>'+_bcEsc(x.homecheck||'-')+'</b>'):'아직 설정하지 않았습니다.';
+  }catch(e){el.textContent='불러오지 못했습니다.';}
+}
+async function _appMinSet(){
+  var el=document.getElementById('appmin-st');
+  try{
+    var base=location.href.split('#')[0].split('?')[0].replace(/[^\/]*$/,'');
+    async function bld(f){var r=await fetch(base+f+'?_='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(f+' '+r.status);var t=await r.text();var m=t.match(/var APP_BUILD="([^"]+)"/);if(!m)throw new Error(f+' 빌드 표시 없음');return m[1];}
+    var cc=await bld('checkcall.html'),hc=await bld('homecheck.html');
+    if(!confirm('이 주소에 배포된 버전을 최소 버전으로 설정합니다.\n\n체크콜 '+cc+'\n홈체크 '+hc+'\n\n배포가 끝난 버전이 맞나요?'))return;
+    await db.collection('config').doc('appMin').set({checkcall:cc,homecheck:hc,url:{checkcall:base+'checkcall.html',homecheck:base+'homecheck.html'},upd:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('✅ 최소 버전을 설정했어요');_appMinLoad();
+  }catch(e){console.warn(e);if(el)el.textContent='⚠️ 설정 실패: '+(e&&e.message||e);toast('⚠️ 설정 실패');}
 }
 function renderCcSet(){
   var host=document.getElementById('ref-panel-ccset');if(!host)return;
-  var panes=[['plan','📋 단계별 계획표','cc_plan'],['common','⚙ 기본 점검 항목','cc_common'],['tablet','📱 태블릿 & 핸드폰 연결 방법','cc_common']].filter(function(c){return _ccCan(c[2]);});
+  var panes=[['plan','📋 단계별 계획표','cc_plan'],['tablet','📱 태블릿 & 핸드폰 연결 방법','cc_common']].filter(function(c){return _ccCan(c[2]);});
   if(!panes.length){host.innerHTML='<div class="empty"><div class="et">관리자만 볼 수 있어요</div></div>';return;}
   if(!panes.some(function(c){return c[0]===_ccPaneCur;}))_ccPaneCur=panes[0][0];
   host.innerHTML='<div style="display:flex;gap:6px;padding:12px 16px 0;flex-wrap:wrap">'+panes.map(function(c){return '<button class="btn '+(c[0]===_ccPaneCur?'btn-navy':'btn-outline')+' btn-sm" onclick="_ccPaneGo(\''+c[0]+'\')">'+c[1]+'</button>';}).join('')+'</div><div id="ccset-body" style="padding:12px 16px 24px"></div>';
   var body=document.getElementById('ccset-body');
   if(_ccPaneCur==='plan')_ccOpenPlans(body);
   else if(_ccPaneCur==='common')_bcOpenSettings(body);
-  else body.innerHTML=_ccTabletHtml();
+  else{body.innerHTML=_ccTabletHtml();_appMinLoad();}
 }
 function _bcTabletUrl(page){
   var cfg=getCfg();if(!cfg||!cfg.apiKey)return null;
@@ -4400,7 +4421,7 @@ function _ccPlanPrev(reset,target){
     +(own?'<span style="font-size:11px;color:#b45309;background:#fef3c7;border-radius:8px;padding:3px 8px">✎ 이 레슨은 직접 고친 내용을 사용해요</span><button class="btn btn-outline btn-xs" onclick="_ccPvReset()">전체 계획표 내용으로 되돌리기</button>':'<span style="font-size:11px;color:var(--txt3)">계획표 그대로 · 아래에서 고치면 이 레슨 전용 내용으로 저장돼요</span>')+'</div>'
     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">체크콜에서 학생이 보게 될 화면입니다. 위에서 아래 순서가 화면 순서예요. 구역 왼쪽 ⠿ 을 끌거나 ▲▼ 로 순서를 바꾸고, 저장하면 태블릿에 반영돼요.</div>';
   }
-  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 기본 점검 항목이 나옵니다.</div>';t={sections:[]};}
+  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없습니다. 항목을 추가해 주세요. (그 전까지는 내장 기본 항목이 학생에게 나옵니다.)</div>';t={sections:[]};}
   t.sections.forEach(function(sec,si){
     h+='<div ondragover="_ccPvOver(event)" ondragleave="this.style.boxShadow=\'\'" ondrop="_ccPvDrop(event,'+si+')" style="border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--surface2)">'
       +'<div style="display:flex;gap:4px;align-items:center;margin-bottom:6px"><span draggable="true" ondragstart="_ccPvDrag(event,'+si+')" ondragend="_pvDrag=-1" title="끌어서 순서 변경" style="cursor:grab;padding:2px 6px;font-size:16px;color:var(--txt3);user-select:none">⠿</span>'
@@ -4465,9 +4486,9 @@ function _ccPlanDraw0(){
   var _mode=_ccEd.mode||'lesson';
   _ccEd.pr=_ccEd.pr||{};if(!_ccEd.pr[k]){_ccEd.pr[k]=1;if(_ccPruneOv(p))_ccMark();}
   var _more='<details style="display:inline-block;position:relative;margin-left:12px"><summary class="btn btn-outline btn-xs" style="cursor:pointer;list-style:none">⋯ 더보기</summary><div style="position:absolute;z-index:20;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
-    +'<button class="btn btn-outline btn-xs" onclick="_ccLessonAdd()">＋ 레슨 추가</button><button class="btn btn-outline btn-xs" onclick="_ccLessonRename()">✎ 이름 변경</button><button class="btn btn-outline btn-xs" onclick="_ccLessonDel()">🗑 레슨 삭제</button><button class="btn btn-outline btn-xs" onclick="_ccHealAll()">🧹 중복 호출 줄 정리 (모든 단계)</button>'
+    +'<button class="btn btn-outline btn-xs" onclick="_ccLessonAdd()">레슨 추가</button><button class="btn btn-outline btn-xs" onclick="_ccLessonRename()">이름 변경</button><button class="btn btn-outline btn-xs" onclick="_ccLessonDel()">레슨 삭제</button><button class="btn btn-outline btn-xs" onclick="_ccHealAll()">중복 호출 줄 정리 (모든 단계)</button>'
     +'<button class="btn btn-outline btn-xs" onclick="_ccPlanReset()">엑셀 원본으로 되돌리기</button></div></details>';
-  var _tabs='<span class="ccx-tabs"><button class="ccx-tab'+(_mode==='lesson'?' on':'')+'" onclick="_ccPlanMode(\'lesson\')">레슨별 계획표</button><button class="ccx-tab'+(_mode==='grid'?' on':'')+'" onclick="_ccPlanMode(\'grid\')">전체 계획표</button></span>';
+  var _tabs='<span class="ccx-tabs"><button class="ccx-tab'+(_mode==='lesson'?' on':'')+'" onclick="_ccPlanMode(\'lesson\')">레슨별 예외 수정</button><button class="ccx-tab'+(_mode==='grid'?' on':'')+'" onclick="_ccPlanMode(\'grid\')">전체 계획표</button></span>';
   var _tabHost=document.getElementById('ccp-tabs');if(_tabHost)_tabHost.innerHTML=_tabs;
   var _apply=(_ccEd.spec||_mode!=='lesson')?'':'<span style="display:inline-flex;align-items:stretch;gap:3px"><button class="btn btn-navy btn-xs" onclick="_ccApplyOpen()" title="이 레슨의 설정을 다른 레슨에 적용">적용</button><span style="position:relative;display:inline-flex"><button class="ccx-q" onclick="_ccApplyTip(event)" title="안내">?</button><div id="ccx-tip" class="ccx-tip" style="display:none" onclick="event.stopPropagation()">이 레슨의 설정을 다른 레슨에 복사합니다.<br>적용 후에는 맨 아래 <b>"저장 (태블릿에 반영)"</b>을 눌러야 학생 화면에 반영됩니다.</div></span></span>';
   var _tl=document.getElementById('ccp-tools');_tl.style.display=_mode==='grid'?'none':'flex';
@@ -4559,12 +4580,12 @@ function _ccApplyUnit(){
 }
 function _ccInfo(e){
   if(e)e.stopPropagation();
-  _ccBubble(e.currentTarget,'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">📋 체크콜 Study Plan</div>학생이 학원에서 태블릿으로 점검하는 <b>체크콜 항목</b>입니다. 학생에게는 일지에 입력한 <b>단계·진도</b>에 맞는 항목이 나옵니다. <b>레슨별 계획표</b>는 레슨 하나씩, <b>전체 계획표</b>는 모든 레슨을 한 표로 보며 고칩니다. 항목의 <b>일지 연동</b>을 고르면 학생이 입력한 결과가 학습 일지의 해당 칸에 자동으로 들어옵니다. 고친 뒤에는 맨 아래 <b>"저장 (태블릿에 반영)"</b>을 눌러야 학생 화면에 반영됩니다.'
+  _ccBubble(e.currentTarget,'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">📋 체크콜 Study Plan</div>학생이 학원에서 태블릿으로 점검하는 <b>체크콜 항목</b>입니다. 학생에게는 일지에 입력한 <b>단계·진도</b>에 맞는 항목이 나옵니다. <b>레슨별 예외 수정</b>은 특정 레슨만 따로 고칠 때, <b>전체 계획표</b>는 모든 레슨을 한 표로 보며 고칩니다. 항목의 <b>일지 연동</b>을 고르면 학생이 입력한 결과가 학습 일지의 해당 칸에 자동으로 들어옵니다. 고친 뒤에는 맨 아래 <b>"저장 (태블릿에 반영)"</b>을 눌러야 학생 화면에 반영됩니다.'
     +'<div style="margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0;text-align:right"><a href="#" onclick="_ccBubbleClose();_ccHelp();return false" style="color:#2563eb;text-decoration:underline">자세한 편집 방법 보기 ›</a></div>','ccinfo',380);
 }
 function _hcInfo(e){
   if(e)e.stopPropagation();
-  _ccBubble(e.currentTarget,'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">🏠 홈체크 Homework Plan</div>학생이 집에서 폰으로 체크하는 <b>Homework Plan</b>입니다. 학생에게는 <b>가장 최근 수업 일지의 단계·진도</b>에 맞는 숙제가 나옵니다. <b>레슨별 계획표</b>는 레슨 하나씩, <b>전체 계획표</b>는 모든 레슨을 한 표로 보며 고칩니다. 항목의 <b>일지 연동</b>을 고르면 학생이 체크한 결과가 학습 일지의 교재·영상 숙제 칸에 자동으로 들어옵니다. <b>일지 연동 · 사진 숙제</b>로 정한 항목은 학생이 <b>사진을 올려야 체크</b>되고, 항목당 최대 5장까지 올릴 수 있습니다.','hcinfo',380);
+  _ccBubble(e.currentTarget,'<div style="font-weight:800;color:var(--navy);margin-bottom:4px">🏠 홈체크 Homework Plan</div>학생이 집에서 폰으로 체크하는 <b>Homework Plan</b>입니다. 학생에게는 <b>가장 최근 수업 일지의 단계·진도</b>에 맞는 숙제가 나옵니다. <b>레슨별 예외 수정</b>은 특정 레슨만 따로 고칠 때, <b>전체 계획표</b>는 모든 레슨을 한 표로 보며 고칩니다. 항목의 <b>일지 연동</b>을 고르면 학생이 체크한 결과가 학습 일지의 교재·영상 숙제 칸에 자동으로 들어옵니다. <b>일지 연동 · 사진 숙제</b>로 정한 항목은 학생이 <b>사진을 올려야 체크</b>되고, 항목당 최대 5장까지 올릴 수 있습니다.','hcinfo',380);
 }
 function _ccHelp(){
   var h=document.getElementById('ccp-help');if(!h)return;
@@ -5159,7 +5180,7 @@ function _ccSpCards(p){
       +(e?'<button class="btn btn-outline btn-xs" onclick="_ccSpOp(\''+name+'\',\'secadd\')">＋ 구역 추가</button>':'')
       +(own?'<button class="btn btn-outline btn-xs" onclick="_ccSpOp(\''+name+'\',\'reset\')">기본으로 되돌리기</button>':'')+'</div>';
     if(!e){
-      h+='<div style="padding:10px 12px;font-size:12px;color:var(--txt2);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">아직 없습니다. 지금은 기본 점검 항목이 학생에게 나옵니다.</span><button class="btn btn-navy btn-xs" onclick="_ccSpMake(\''+name+'\')">＋ 만들기 (기본 점검 항목 복사)</button></div>';
+      h+='<div style="padding:10px 12px;font-size:12px;color:var(--txt2);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:200px">아직 없습니다. 지금은 내장 기본 항목이 학생에게 나옵니다.</span><button class="btn btn-navy btn-xs" onclick="_ccSpMake(\''+name+'\')">＋ 만들기 (기본 항목 복사)</button></div>';
     }else{
       e.sections.forEach(function(sc,si){
         var _tmOn=sc.tmx===1||(sc.tmx!==0&&CC_TM_RE.test(String(sc.title||'').trim()));
@@ -5229,7 +5250,7 @@ function _ccLessonView(b,sel){
     +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">'
     +'<button class="btn btn-outline btn-xs" onclick="_ccPvOp(\'secadd\')">＋ 구역 추가</button>'+_ccModBtn(p)
     +'</div>';
-  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없어 체크콜에 기본 점검 항목이 나옵니다.</div>';t={sections:[]};}
+  if(!t||!t.sections||!t.sections.length){h+='<div style="padding:18px;text-align:center;color:var(--txt3);border:1px dashed var(--border);border-radius:10px;margin-bottom:8px">이 레슨은 계획표 항목이 없습니다. 항목을 추가해 주세요. (그 전까지는 내장 기본 항목이 학생에게 나옵니다.)</div>';t={sections:[]};}
   // 계획표에서 꺼진 항목을 해당 구역 안에 흐리게 함께 보여줌
   var offBy={},li=spec?-1:sel;
   if(li>=0)b.rows.forEach(function(r,ri){if(r.c.charAt(li)==='x'){var k=(r.g||'')+'|'+(r.s||'');(offBy[k]=offBy[k]||[]).push(ri);}});
@@ -5586,6 +5607,19 @@ function _ccPlanReset(){
   delete _ccEd.work[k];_ccEd.dirty[k]='reset';_ccPlanDraw();
   _ccEd.work[k]=JSON.parse(JSON.stringify(CC_PLANS[k]));_ccPlanDraw();
 }
+function _ccOvAsk(list){
+  return new Promise(function(res){
+    var old=document.getElementById('ccov-ask');if(old)old.remove();
+    var g={};list.forEach(function(x){(g[x.k]=g[x.k]||[]).push(x.ln);});
+    var body=Object.keys(g).map(function(k){return '<div style="margin-top:6px"><b>'+_bcEsc(k)+'</b> ('+g[k].length+'개): '+g[k].slice(0,30).map(_bcEsc).join(', ')+(g[k].length>30?' 외':'')+'</div>';}).join('');
+    var d=document.createElement('div');d.id='ccov-ask';
+    d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px';
+    d.innerHTML='<div style="background:#fff;border-radius:12px;max-width:460px;width:100%;max-height:85vh;overflow:auto;padding:18px;font-size:13px;line-height:1.6"><div style="font-weight:800;font-size:15px;color:var(--navy)">따로 고친 레슨이 있습니다</div><div style="margin-top:6px">아래 레슨은 레슨별로 따로 저장한 내용이 있어서, 이번 전체 계획표 변경이 <b>반영되지 않습니다.</b></div>'+body
+      +'<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px"><button class="btn btn-navy" data-a="revert">이 레슨들을 전체 계획표대로 되돌리고 저장</button><button class="btn btn-outline" data-a="keep">그대로 두고 저장</button><button class="btn btn-outline" data-a="">취소</button></div></div>';
+    d.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('button[data-a]');if(!b)return;d.remove();res(b.getAttribute('data-a'));});
+    document.body.appendChild(d);
+  });
+}
 async function _ccPlanSave(){
   var upd={},any=false;
   Object.keys(_ccEd.dirty).forEach(function(k){
@@ -5595,6 +5629,14 @@ async function _ccPlanSave(){
     else upd[k]=_ccEd.work[k];
   });
   if(!any){toast('바뀐 내용이 없어요');return;}
+  if(_ccEd.mode==='grid'){   // 전체 계획표를 저장할 때: 레슨별로 따로 고친 레슨은 이번 변경이 반영되지 않아요 → 미리 알려요
+    var _wl=[];Object.keys(_ccEd.dirty).forEach(function(k){var w=_ccEd.work[k];if(_ccEd.dirty[k]==='reset'||!w)return;_ccCustomList(w).forEach(function(ln){_wl.push({k:k,ln:ln});});});
+    if(_wl.length){
+      var _ch=await _ccOvAsk(_wl);
+      if(!_ch)return;
+      if(_ch==='revert')_wl.forEach(function(x){var w=_ccEd.work[x.k];if(w&&w.ov){delete w.ov[x.ln];if(w.ovDel)delete w.ovDel[x.ln];}});
+    }
+  }
   try{
     var _ref=db.collection('config').doc('studyPlans');
     try{   // 경로 단위로 통째로 바꿔야 지운 레슨/항목이 서버에서도 사라져요
@@ -26247,7 +26289,7 @@ function openMenuPermModal(userId){
     });
   });
   secHTML+='<div style="font-size:11px;font-weight:700;color:var(--navy);margin:14px 0 4px">체크콜 편집 (기본: 관리자만)</div>'
-    +[['cc_plan','📋 체크콜 Study Plan 설정 (단계별 계획표)'],['cc_common','⚙ 기본 점검 항목 · 📱 태블릿 & 핸드폰 연결 방법'],['sp_plan','🗣️ Speak Pop 설정 (말하기 카드 내용 입력)']].map(function(c){return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="perm-'+c[0]+'"'+(perms[c[0]]===true?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'+c[1]+'</label>';}).join('');
+    +[['cc_plan','📋 체크콜 Study Plan 설정 (단계별 계획표)'],['cc_common','📱 태블릿 & 핸드폰 연결 방법 · 앱 자동 업데이트'],['sp_plan','🗣️ Speak Pop 설정 (말하기 카드 내용 입력)']].map(function(c){return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="perm-'+c[0]+'"'+(perms[c[0]]===true?' checked':'')+' style="width:15px;height:15px;accent-color:var(--navy)">'+c[1]+'</label>';}).join('');
   overlay.innerHTML='<div class="ms" style="max-width:360px;max-height:90vh;overflow-y:auto">'
     +'<div class="mh"></div>'
     +'<div class="mt">메뉴 권한 — '+u.name+'</div>'
