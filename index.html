@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-dq';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-dr';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -31324,6 +31324,7 @@ function _hcGridHtml(p){
     h+='<tr ondragover="_hcDgOver(event,\'sec\')" ondragleave="_hcDgLeave(event)" ondrop="_hcDgDrop(event,\'sec\','+si+',0)"><td colspan="'+ncol+'" style="background:'+gc[0]+';color:'+gc[1]+';padding:4px 8px;border-top:2px solid '+gc[1]+'"><div style="display:flex;gap:6px;align-items:center;position:sticky;left:6px;width:max-content">'
       +'<span class="hc-grip" draggable="true" ondragstart="_hcDgStart(event,\'sec\','+si+',0)" ondragend="_hcDgEnd()" title="끌어서 구역 전체를 옮겨요">⠿</span>'
       +'<input value="'+_bcEsc(S.title)+'" onchange="_hcSecRename('+si+',this.value)" title="구역 이름" style="font-weight:800;font-size:12px;color:inherit;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:3px 7px;width:170px">'
+      +_hcCatSel(p,si,S.title)
       +'<button style="'+cs[0]+'" onclick="_hcRowAdd('+si+')">＋ 항목 추가</button><label style="'+cs[0]+';display:inline-flex;align-items:center;gap:4px" title="켜면 학생 홈체크에 시작·멈춤·끝 버튼이 생겨요"><input type="checkbox"'+((p.tmSecs&&p.tmSecs[S.title])?' checked':'')+' onchange="_hcTmSet('+si+',this.checked)">⏱ 시간 재기</label><button style="'+cs[0]+'" onclick="_hcSecDel('+si+')">구역 삭제</button></div></td></tr>';
     S.items.forEach(function(R,ri){
       h+='<tr ondragover="_hcDgOver(event,\'it\')" ondragleave="_hcDgLeave(event)" ondrop="_hcDgDrop(event,\'it\','+si+','+ri+')"><td style="position:sticky;left:0;z-index:1;background:#fff;border-left:4px solid '+gc[1]+';padding:3px 6px;border-bottom:1px solid var(--border);vertical-align:middle"><div class="pl-row">'
@@ -31412,6 +31413,13 @@ function _hcRowMoveTo(si,from,to){
   var x=S.items.splice(from,1)[0];S.items.splice(to,0,x);_hcRowsCommit(p,rows);
   _hcSortAll(p,'items',ttl);_hcMark();_hcDraw();
 }
+// 구역별 학습 구분(스마트 학습 / 교재 학습). 구역의 grp(복습·예습 등)는 그대로 두고 p.catSecs에 따로 저장해요
+function _hcCatSel(p,si,title){
+  var v=(p.catSecs&&p.catSecs[title])||'';
+  return '<select onchange="_hcCatSet('+si+',this.value)" title="학습 구분" aria-label="학습 구분" style="font-size:11px;padding:3px;border-radius:6px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7);color:inherit">'
+    +['','스마트 학습','교재 학습'].map(function(x){return '<option value="'+x+'"'+(v===x?' selected':'')+'>'+(x||'(묶음 없음)')+'</option>';}).join('')+'</select>';
+}
+function _hcCatSet(si,v){var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;p.catSecs=p.catSecs||{};if(v)p.catSecs[S.title]=v;else delete p.catSecs[S.title];_hcMark();_hcDraw();}
 function _hcTmSet(si,on){var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;p.tmSecs=p.tmSecs||{};if(on)p.tmSecs[S.title]=1;else delete p.tmSecs[S.title];_hcMark();_hcDraw();}
 function _hcSecRename(si,v){
   var p=_hcWork(),rows=_hcRows(p),S=rows[si];v=String(v||'').trim();if(!S||v===S.title)return;
@@ -31420,6 +31428,7 @@ function _hcSecRename(si,v){
   if(p.secOrder){var i=p.secOrder.indexOf(S.title);if(i>=0)p.secOrder[i]=v;}
   if(p.rowOrder&&p.rowOrder[S.title]){p.rowOrder[v]=p.rowOrder[S.title];delete p.rowOrder[S.title];}
   if(p.tmSecs&&p.tmSecs[S.title]){p.tmSecs[v]=1;delete p.tmSecs[S.title];}
+  if(p.catSecs&&p.catSecs[S.title]){p.catSecs[v]=p.catSecs[S.title];delete p.catSecs[S.title];}
   _hcMark();_hcDraw();
 }
 function _hcRowAdd(si){
@@ -31441,6 +31450,7 @@ function _hcSecDel(si){
   var p=_hcWork(),S=_hcRows(p)[si];if(!S)return;
   if(!confirm('"'+S.title+'" 구역을 모든 레슨에서 삭제할까요?'))return;
   _hcFor(p,function(L){for(var i=L.length-1;i>=0;i--)if(L[i].title===S.title)L.splice(i,1);});
+  if(p.catSecs)delete p.catSecs[S.title];
   _hcMark();_hcDraw();
 }
 function _hcSecAdd(){
