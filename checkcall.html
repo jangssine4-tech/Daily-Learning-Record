@@ -331,7 +331,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-au</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-av</div>
   </div>
 </div>
 
@@ -1309,10 +1309,20 @@ function _lockedById(id){
   for(var a=0;a<S.secs.length;a++){var sec=S.secs[a];for(var b=0;b<sec.items.length;b++){if(sec.items[b].id===id)return _startLocked(sec,sec.items[b]);}}
   return false;
 }
+// 항목을 하나라도 했거나 '끝'이 눌렸으면 '시작'을 풀 수 없어요 (다시 눌러서 공부 시간이 초기화되는 것을 막아요)
+function _startUsed(sec){
+  return sec.items.some(function(i){
+    if(i.role==='ts')return false;
+    if(i.role==='te')return !!LOG.e[i.id];
+    if(i.t==='call'){var c=checks[i.l];return !!(c&&c.status&&c.status!=='none');}
+    return itemDone(i);
+  });
+}
 function toggle(si,ii){
   initAudio();var sec=S.secs[si],it=sec.items[ii],o={};
   if(_startLocked(sec,it))return;
   if(it.role==='te'&&!LOG.e[it.id]){var st0=sec.items.filter(function(i){return i.role==='ts';})[0];if(st0&&!LOG.e[st0.id]){toast('먼저 "시작"을 눌러 주세요');return;}}
+  if(it.role==='ts'&&LOG.e[it.id]&&_startUsed(sec)){toast('이미 시작했어요. 공부 시간은 그대로예요');return;}
   if(it.role==='ts'&&LOG.e[it.id]){var en0=sec.items.filter(function(i){return i.role==='te';})[0];if(en0&&LOG.e[en0.id])o[en0.id]=0;}
   o[it.id]=LOG.e[it.id]?0:Date.now();
   if(it.role==='te'){var vp0={};vp0[it.id]=null;commit(o,vp0);render();return;}   // 직접 누른 끝은 자동 표시를 지워요
@@ -1713,7 +1723,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-au";
+var APP_BUILD="1111-av";
 (function(){
   var NAME="체크콜";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}

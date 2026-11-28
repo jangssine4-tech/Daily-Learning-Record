@@ -171,7 +171,8 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
 .rcm{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;line-height:1.2}
 .rcm span{background:#fff;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700;color:#0F5C4D}
 .rcm i{font-style:normal;color:var(--ink2);font-weight:600}
-.pk{z-index:50}
+.pk{z-index:50}.dlg.pk{background:#fff}
+.pk .cf2 img{height:150px;max-width:100%;object-fit:contain}.pk .cf2 .cn2{font-weight:900;font-size:20px;margin:8px 0 14px}
 .rew .rays{position:absolute;left:50%;top:38%;width:230vmax;height:230vmax;margin:-115vmax 0 0 -115vmax;background:repeating-conic-gradient(from 0deg,rgba(255,214,64,.13) 0 9deg,transparent 9deg 18deg);animation:rspin 60s linear infinite}
 @keyframes rspin{to{transform:rotate(360deg)}}
 .rew .fz{position:absolute;bottom:-30px;font-size:22px;opacity:.85;animation:rfz linear infinite}
@@ -398,14 +399,14 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="lvrow"><span class="lv" id="hLv" style="display:none"></span></div>
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zzj</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zzk</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
 <div class="dlg" id="dlg"><div class="bx"><div class="dt2" id="dlgT"></div><div class="db"><button onclick="dlgNo()">취소</button><button class="dn" onclick="dlgYes()">지우기</button></div></div></div>
-<div class="dlg pk" id="pk"><div class="bx"><div class="dt2">🏁 숙제 레이싱</div>
+<div class="dlg pk" id="pk"><div class="bx"><div id="pkA"><div class="dt2">🏁 숙제 레이싱</div>
 <ul class="gm"><li>숙제를 <b>모두 끝낸 날</b>마다 <b>한 칸</b> 앞으로 가요 (하루에 한 번)</li><li><b>12칸</b>을 돌아 한 바퀴를 마치면 도착!</li><li>도착하면 숙제한 증거 사진을 올려요. 선생님이 확인하고 <b>선물</b>을 줘요</li></ul>
-<div class="gt">나의 캐릭터를 골라요</div><div class="gr" id="pkG"></div><div class="gn">캐릭터는 <b>처음 한 번만</b> 고를 수 있어요</div></div></div>
+<div class="gt">나의 캐릭터를 골라요</div><div class="gr" id="pkG"></div><div class="gn">캐릭터는 <b>처음 한 번만</b> 고를 수 있어요</div></div><div id="pkB" class="cf2" style="display:none"><div class="dt2">이 캐릭터로 할까요?</div><div id="pkImg"></div><div class="cn2" id="pkName"></div><div class="gn" style="margin-bottom:12px">정하면 바꿀 수 없어요</div><div class="db"><button onclick="pkBack()">다시 고를래요</button><button style="background:var(--g2);color:#fff" onclick="pkYes()">좋아요!</button></div></div></div></div>
 <div class="cel rew" id="rew"></div>
 <div class="sbk" id="sbk"></div>
 <div class="sbk" id="sbb" style="z-index:42"></div>
@@ -549,18 +550,23 @@ async function raceEvPick(inp){
 }
 function raceNew(){RACE.pos=0;RACE.fin=0;RACE.round++;RS_shown=0;RACE.ev=0;raceSave();render();}
 // 게임을 처음 시작할 때 한 번만: 설명 + 캐릭터 고르기 → 게임 화면. 한 번 고른 캐릭터는 바꾸지 않아요
-var _pkRr=null;
+var _pkRr=null,_pkSel=-1;
 function gameStart(rr){
   if(RACE.loaded&&chList().length&&!chOk(RACE.ch))pkOpen(rr);else rewOpen(rr);
 }
 function pkOpen(rr){
   _pkRr=rr||0;
   var g='';chList().forEach(function(i){g+='<button onclick="pkPick('+i+')">'+chImg(i)+'<div>'+CHS[i].n+'</div></button>';});
-  $('pkG').innerHTML=g;$('pk').classList.add('on');$('pk').firstElementChild.scrollTop=0;
+  $('pkG').innerHTML=g;pkBack();$('pk').classList.add('on');$('pk').firstElementChild.scrollTop=0;
 }
+function pkBack(){_pkSel=-1;$('pkA').style.display='';$('pkB').style.display='none';}
 function pkClose(){_pkRr=null;$('pk').classList.remove('on');}
-function pkPick(i){
+function pkPick(i){   // 고른 뒤 한 번 더 물어봐요
   if(_pkRr===null||!chOk(i))return;
+  _pkSel=i;$('pkImg').innerHTML=chImg(i);$('pkName').textContent=CHS[i].n;$('pkA').style.display='none';$('pkB').style.display='';$('pk').firstElementChild.scrollTop=0;
+}
+function pkYes(){
+  var i=_pkSel;if(_pkRr===null||!chOk(i))return;
   var rr=_pkRr;pkClose();RACE.ch=i;raceSave();rewOpen(rr);
 }
 /* 앱 안 확인창 */
@@ -1030,11 +1036,12 @@ function itemOpen(id,G){
   var sec=null;((R&&R.secs)||[]).forEach(function(s){(s.items||[]).forEach(function(it){if(it.id===id)sec=s;});});
   return !(sec&&secLock(sec));
 }
+function hk(ms){var d=new Date(ms);return ('0'+d.getHours()).slice(-2)+'시 '+('0'+d.getMinutes()).slice(-2)+'분';}
 function tmBar(s,si,G){
   var t=tmOf(s),now=Date.now(),on=!!(t&&t.s),done=!!(on&&t.e),turn=!!(G&&si===G.si),x='';
   var h='<div class="tbs"><button class="tbn'+(on?' on':(turn?' pulse':' dis'))+'" onclick="tmDo('+si+',\'start\')" aria-label="시작'+(on?' 완료':'')+'">'+(on?'✓ 시작':'▶ 시작')+'</button>'
     +'<button class="tbn end'+(done?' on':(on?'':' dis'))+'" onclick="tmDo('+si+',\'end\')" aria-label="끝'+(done?' 완료':'')+'">'+(done?'✓ 끝':'■ 끝')+'</button></div>';
-  if(done)x='<span class="tv">✅ '+Math.max(1,Math.round(tmAct(t,now)/60000))+'분 걸렸어요</span>';
+  if(done)x='<span class="tv">'+hk(t.s)+'~'+hk(t.e)+', '+Math.max(0,Math.round(tmAct(t,now)/60000))+'분 공부</span>';
   else if(on&&t.ps)x='<span class="tv run" data-tk="'+si+'">⏸ '+fmtT(tmAct(t,now)/1000)+'</span><button aria-label="계속" onclick="tmDo('+si+',\'resume\')">▶</button>';
   else if(on)x='<span class="tv run" data-tk="'+si+'">⏱ '+fmtT(tmAct(t,now)/1000)+'</span><button aria-label="잠깐 멈춤" onclick="tmDo('+si+',\'pause\')">⏸</button>';
   return {btn:h,time:x?'<div class="tmr">'+x+'</div>':''};
@@ -1383,7 +1390,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-zzj";
+var APP_BUILD="1111-zzk";
 (function(){
   var NAME="홈체크";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}

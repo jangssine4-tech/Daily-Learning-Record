@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-dr';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-ds';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6661,7 +6661,7 @@ function renderWriteFlowPanel(studentId){
       +'<table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed">'
       +'<colgroup><col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:11%"><col style="width:12%"><col style="width:12%"><col style="width:15%"><col style="width:9%"><col style="width:14%"></colgroup>'
       +'<thead><tr style="border-bottom:1px solid var(--border)">'
-      +'<th rowspan="2" style="'+_th+'">날짜</th><th colspan="2" style="'+_th+'">숙제</th><th rowspan="2" style="'+_th+'">정시<br>출석</th><th colspan="2" style="'+_th+'">학습 시간</th><th rowspan="2" style="'+_th+'">태도</th><th rowspan="2" style="'+_th+'">quiz</th><th rowspan="2" style="'+_th+'">받아쓰기</th></tr>'
+      +'<th rowspan="2" style="'+_th+'">날짜</th><th colspan="2" style="'+_th+'">숙제</th><th rowspan="2" style="'+_th+'">정시<br>출석</th><th colspan="2" style="'+_th+'">학원 학습 시간</th><th rowspan="2" style="'+_th+'">태도</th><th rowspan="2" style="'+_th+'">quiz</th><th rowspan="2" style="'+_th+'">받아쓰기</th></tr>'
       +'<tr style="border-bottom:2px solid var(--border)"><th style="'+_th+'">교재</th><th style="'+_th+'">영상</th><th style="'+_th+'">스마트</th><th style="'+_th+'">교재</th></tr></thead><tbody>';
     sReps.forEach(function(r){
       var attTxt,attCol;
@@ -6697,7 +6697,7 @@ function renderWriteFlowPanel(studentId){
         +'<td style="'+_td+';line-height:1.35">'+dictLabel+'</td>'
         +'</tr>';
     });
-    html+='</tbody></table>';
+    html+='</tbody></table><div id="wf-home"></div>';
   } else {
     html+='<div style="font-size:11px;color:var(--txt3);text-align:center;padding:10px">이번 달 수업 기록 없음</div>';
   }
@@ -6712,6 +6712,49 @@ function renderWriteFlowPanel(studentId){
   }
 
   content.innerHTML=html;
+  _hcHomeTimes(s,sReps);
+}
+/* ── 집 학습 시간: 홈체크에서 잰 구역별 시간을 스마트 학습 / 교재 학습으로 나눠 학원 시간과 따로 보여 줘요 ──
+   각 수업일 줄 = 그날 검사하는 숙제(직전 수업 진도)의 기록이에요. */
+var _hcTmCache={},_hcTmSeq=0;
+function _hcHomeSum(tm,cats,from,to){   // from~to(밀리초) 사이에 시작한 시간만 더해요
+  var o={sm:null,bk:null,etc:0,open:false};
+  var map={};Object.keys(cats||{}).forEach(function(t){map[_hcSafe(t)]=cats[t];});
+  Object.keys(tm||{}).forEach(function(k){
+    var t=tm[k];if(!t||!t.s||t.s<from||t.s>to)return;
+    if(!t.e){o.open=true;return;}
+    var m=Math.max(0,Math.round((t.e-t.s-(t.p||0))/60000));
+    if(map[k]==='스마트 학습')o.sm=(o.sm||0)+m;else if(map[k]==='교재 학습')o.bk=(o.bk||0)+m;else o.etc+=m;
+  });
+  return o;
+}
+async function _hcHomeTimes(s,list){
+  var seq=++_hcTmSeq,box=document.getElementById('wf-home');if(!box||!db||!s)return;
+  try{
+    var rows=await Promise.all(list.map(async function(r){
+      var row={date:r.date,les:'',v:null};if(r.absent)return row;
+      var prev=_hcLatest(s,r.date);if(!prev)return row;
+      var key=_hcKey(ccPlanKey(prev.level||getStudentLevel(s),s.grade)),plan=_hcPlan(key),les=_hcFindLesson(plan,prev.progress);
+      if(!les)return row;
+      var id=_hcLogId(s.id,key,les),c=_hcTmCache[id];
+      if(!c||Date.now()-c.at>60000){var sn=await db.collection('homeLogs').doc(id).get();c=_hcTmCache[id]={at:Date.now(),tm:(sn.exists&&sn.data().tm)||{}};}
+      row.les=les;row.v=_hcHomeSum(c.tm,plan.catSecs,new Date(prev.date+'T00:00:00').getTime(),new Date(r.date+'T23:59:59').getTime());
+      return row;
+    }));
+    if(seq!==_hcTmSeq||document.getElementById('wf-home')!==box)return;   // 그사이 다른 학생·날짜로 바뀌었으면 버려요
+    var td='padding:4px 1px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center',th='padding:3px 1px;font-weight:700;color:var(--txt3);text-align:center';
+    var mt=function(v){return v===null||v===undefined?'-':v+'분';},etc=false;
+    var body=rows.map(function(x){
+      var v=x.v||{sm:null,bk:null,etc:0},tip=[];
+      if(v.etc){etc=true;tip.push('구분 없는 구역 '+v.etc+'분은 제외');}
+      if(v.open)tip.push('끝나지 않은 구역은 제외');
+      return '<tr title="'+tip.join(' · ')+'"><td style="'+td+';color:var(--txt3)">'+x.date.substring(5)+'</td><td style="'+td+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(x.les||'-')+'</td><td style="'+td+'">'+mt(v.sm)+'</td><td style="'+td+'">'+mt(v.bk)+(v.etc?' *':'')+'</td></tr>';
+    }).join('');
+    box.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin:10px 0 5px">🏠 집 학습 시간 <small style="font-weight:500;color:var(--txt3)">(홈체크 · 지난 수업 숙제)</small></div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed"><colgroup><col style="width:14%"><col style="width:46%"><col style="width:20%"><col style="width:20%"></colgroup>'
+      +'<thead><tr style="border-bottom:2px solid var(--border)"><th style="'+th+'">날짜</th><th style="'+th+'">숙제 레슨</th><th style="'+th+'">스마트</th><th style="'+th+'">교재</th></tr></thead><tbody>'+body+'</tbody></table>'
+      +(etc?'<div style="font-size:9px;color:var(--txt3);margin-top:3px">* 스마트/교재를 고르지 않은 구역의 시간이 더 있어요 (홈체크 계획표에서 선택)</div>':'');
+  }catch(e){console.warn('[집 학습 시간]',e);if(seq===_hcTmSeq)box.innerHTML='<div style="font-size:10px;color:var(--txt3);margin-top:8px">🏠 집 학습 시간을 불러오지 못했어요</div>';}
 }
 function returnToSchedule(){
   var sid=window._currentReportStudentId||'';
