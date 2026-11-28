@@ -399,7 +399,7 @@ button{font-family:inherit;cursor:pointer;border:none;color:inherit}
   <div class="lvrow"><span class="lv" id="hLv" style="display:none"></span></div>
   <div class="net" id="net" role="status"></div>
   <div id="body"></div>
-<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zzk</div>
+<div style="text-align:center;color:#8A9C95;font-size:11px;margin-top:6px">홈체크 1111-zzm</div>
 </div></div>
 
 <div class="vr" id="vr"><div class="vt" id="vrT"></div><video id="vrV" playsinline muted></video><div class="vs" id="vrS"></div><div class="vb" id="vrB"></div></div>
@@ -441,15 +441,27 @@ async function raceLoad(){
   RACE={ch:-1,pos:0,round:1,days:[],fin:0,loaded:false,prz:{},ev:0,fr:{},cm:{}};RS_shown=0;
   var loc=null;try{loc=JSON.parse(localStorage.getItem(rkey())||'null');}catch(e){}
   var rem=null;try{var d=await db.collection('homeRace').doc(S).get();rem=d.exists?d.data():null;}catch(e){console.warn('[레이싱] 불러오기 실패',e);}
-  var src=(rem&&(!loc||(rem.upd||0)>=(loc.upd||0)))?rem:loc;
-  if(src){RACE={ch:(src.ch==null||src.ch>=CHS.length)?-1:src.ch,pos:Math.min(RN,src.pos||0),round:src.round||1,days:src.days||[],fin:src.fin||0,loaded:true,prz:(rem&&rem.prz)||{},ev:0,fr:(rem&&rem.fr)||{},cm:{}};}
+  var src=(rem&&(!loc||(rem.upd||0)>=(loc.upd||0)||(rem.rst||0)>(loc.rst||0)))?rem:loc;   // 선생님이 초기화했으면 기기에 남은 기록은 버려요
+  if(src){RACE={ch:(src.ch==null||src.ch>=CHS.length)?-1:src.ch,pos:Math.min(RN,src.pos||0),round:src.round||1,days:src.days||[],fin:src.fin||0,loaded:true,prz:(rem&&rem.prz)||{},ev:0,fr:(rem&&rem.fr)||{},cm:{},rst:src.rst||0};}
   else RACE.loaded=true;
   if(RACE.pos>=RN&&!RACE.fin)RACE.fin=Date.now();
   RS_shown=RACE.pos;render();raceEvCount();
   raceClassLoad().then(function(){render();if(RACE.fin)raceClaim().then(function(){render();});});
 }
+// 선생님이 일지 앱에서 레이싱을 초기화하면, 화면이 열려 있어도 바로 반영해요
+var unsubK=null;
+function raceWatch(){
+  if(unsubK){unsubK();unsubK=null;}
+  try{unsubK=db.collection('homeRace').doc(S).onSnapshot(function(d){
+    var x=d.exists?d.data():null;
+    if(!x||!x.rst||!RACE.loaded||x.rst<=(RACE.rst||0))return;
+    try{localStorage.removeItem(rkey());}catch(e){}
+    pkClose();rewClose();raceLoad();
+  },function(){});}catch(e){console.warn('[레이싱] 초기화 확인 실패',e);}
+}
 function raceSave(){
   var o={sid:S,name:(R&&R.name)||'',ch:RACE.ch,pos:RACE.pos,round:RACE.round,days:RACE.days.slice(-90),fin:RACE.fin||0,upd:Date.now()};
+  if(RACE.rst)o.rst=RACE.rst;
   try{localStorage.setItem(rkey(),JSON.stringify(o));}catch(e){}
   try{db.collection('homeRace').doc(S).set(o,{merge:true}).catch(function(e){console.warn('[레이싱] 저장 실패',e);});}catch(e){}
   try{if(R&&R.cid){var cu={cid:R.cid,upd:o.upd,m:{}};cu.m[S]={n:o.name,ch:o.ch,pos:o.pos,round:o.round,fin:o.fin,upd:o.upd};db.collection('homeRace').doc('class__'+R.cid).set(cu,{merge:true}).catch(function(e){console.warn('[레이싱] 반 기록 실패',e);});}}catch(e){}
@@ -526,7 +538,7 @@ function raceMove(){
 function raceLk(){return 'race__'+S;}
 async function raceEvCount(){
   if(!RACE.fin)return;
-  try{var q=await db.collection('homeUploads').where('lk','==',raceLk()).get();var n=0;q.forEach(function(d){if((d.data().itemId||'')==='race'+RACE.round)n++;});RACE.ev=n;render();}catch(e){console.warn('[증거 수]',e);}
+  try{var q=await db.collection('homeUploads').where('lk','==',raceLk()).get();var n=0;q.forEach(function(d){if((d.data().itemId||'')==='race'+RACE.round&&(d.data().at||0)>(RACE.rst||0))n++;});RACE.ev=n;render();}catch(e){console.warn('[증거 수]',e);}
 }
 async function raceEvPick(inp){
   var files=Array.prototype.slice.call(inp.files||[]);inp.value='';if(!files.length)return;
@@ -704,7 +716,7 @@ function start(sid){
     if(!d.exists){logout();return;}
     R=d.data();watchLog();render();
   },function(){toast('연결이 불안정해요');});
-  show('sMain');raceLoad();
+  show('sMain');raceLoad();raceWatch();
   if(BUY){var bb=BUY;BUY='';try{history.replaceState(null,'',location.pathname);}catch(e){}setTimeout(function(){sbBuy(bb);},400);}
 }
 function watchLog(){
@@ -719,7 +731,7 @@ function watchLog(){
   },function(){});
 }
 function logout(){
-  if(unsubR){unsubR();unsubR=null;}if(unsubL){unsubL();unsubL=null;}if(unsubU){unsubU();unsubU=null;}UPL={};
+  if(unsubR){unsubR();unsubR=null;}if(unsubL){unsubL();unsubL=null;}if(unsubU){unsubU();unsubU=null;}UPL={};if(unsubK){unsubK();unsubK=null;}
   try{localStorage.removeItem('hc_sid');}catch(e){}
   S=null;R=null;pkClose();SBK.d=null;SBK.sid=null;SBK.t=0;try{sbClose();}catch(e){}LOG={e:{},tm:{}};logKey='';pin='';paintDots();$('err').textContent='';show('sLogin');
 }
@@ -1055,7 +1067,10 @@ function tmDo(si,act){
   if(!R||!R.les)return;var s=(R.secs||[])[si];if(!s)return;
   var k=safe(s.title),t=Object.assign({s:0,p:0,ps:0,e:0},(LOG.tm||{})[k]||{}),now=Date.now();
   if(act==='start'){
-    if(t.s)return;   // 이미 시작했으면 시간을 처음부터 다시 재지 않아요
+    if(t.s){   // 다시 누르면 시작 취소. 단, 항목을 하나라도 했으면 잠겨요 (공부 시간이 초기화되지 않게)
+      if(t.e||s.items.some(function(it){return LOG.e[it.id]||(UPL[it.id]||[]).length||UPB[it.id];})){toast('이미 시작했어요. 공부 시간은 그대로예요');return;}
+      var m0=Object.assign({},LOG.tm||{});delete m0[k];LOG.tm=m0;mkP();render();clearTimeout(saveT);saveT=setTimeout(saveLog,350);return;
+    }
     var G=gate();if(si!==G.si){toast(spLocked()?'Speak Pop!을 먼저 끝내 주세요':(s.items.every(function(it){return LOG.e[it.id];})?'이미 끝낸 단계예요':'앞 단계를 먼저 끝내 주세요'));return;}
     t={s:now,p:0,ps:0,e:0};}
   else if(act==='pause'){if(!t.s||t.e||t.ps)return;t.ps=now;}
@@ -1390,7 +1405,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-zzk";
+var APP_BUILD="1111-zzm";
 (function(){
   var NAME="홈체크";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}

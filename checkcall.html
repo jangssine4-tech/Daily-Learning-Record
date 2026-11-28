@@ -98,7 +98,8 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .tbn.end{border-color:#0F766E;color:#0F766E}
 .tbn.end.on{color:#fff}
 .tbn.dis{border-color:#D9D2C3;color:#A3A7B3;background:#F2EEE4}
-.tmr{font-size:clamp(13px,3.3vw,16px);font-weight:800;color:#0F766E;background:#E3F6F1;border-radius:999px;padding:4px 12px;white-space:nowrap}.tmr.run{background:#FFF1D6;color:#9A5B00}
+.tmr{font-size:clamp(13px,3.3vw,16px);font-weight:800;color:#0F766E;background:#E3F6F1;border-radius:999px;padding:4px 12px;white-space:nowrap;font-variant-numeric:tabular-nums}.tmr.run{background:#FFF1D6;color:#9A5B00}
+.sttw .tmrw{margin-left:auto;display:flex;align-items:center;gap:6px}.sttw .tmrw .tmr{margin-left:0}.tpz{width:34px;height:34px;padding:0;border-radius:10px;border:2px solid #D9D2C3;background:#fff;font-size:13px;font-weight:800;flex:none}
 .stt{margin:0 4px 14px;font-size:clamp(21px,4.4vw,27px);font-weight:900;color:#1F2433;letter-spacing:-.04em}
 .bi{display:flex;align-items:center;gap:14px;min-height:clamp(56px,10.5vw,68px);background:#fff;border-radius:18px;padding:0 clamp(14px,3vw,22px);margin-bottom:10px;font-size:clamp(15px,3.1vw,19px);font-weight:700;color:#1F2433;letter-spacing:-.02em}
 .bi .lb{flex:1;min-width:0;line-height:1.25}
@@ -331,7 +332,7 @@ button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     <div class="ask" id="ask"></div>
     <div class="tabs" id="tabs"></div>
     <div id="list"></div>
-    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-av</div>
+    <div class="hint" id="hint"></div><div style="text-align:center;font-size:11px;color:#A3A7B3;margin:18px 0 6px">체크콜 1111-aw</div>
   </div>
 </div>
 
@@ -1025,6 +1026,11 @@ function commit(ePatch,vPatch){
   var _cd={};Object.keys(ue).forEach(function(k){if(LOG.ce&&LOG.ce[k]){_cd[k]=del;delete LOG.ce[k];}});if(Object.keys(_cd).length)u.ce=_cd;
   var fd=flagsDoc(false);if(!LOG.fl||LOG.fl.sig!==fd.sig||LOG.fl.out){u.fl=fd;LOG.fl=fd;}
   if(_psOpen()){u.ps=_psClosed();LOG.ps=u.ps;}   // 멈춤 중에 항목을 체크하면 다시 시작
+  (S.secs||[]).forEach(function(sec){   // 구역 멈춤: 시작을 새로 누르거나 취소하면 지우고, 끝이 눌리면 닫아요
+    var ts=_tsOf(sec),te=sec.items.filter(function(i){return i.role==='te';})[0];if(!ts)return;
+    if(ts.id in ePatch){if(_spList(ts.id).length){u.sps=u.sps||{};u.sps[ts.id]=del;LOG.sps=Object.assign({},LOG.sps);delete LOG.sps[ts.id];}}
+    else if(te&&ePatch[te.id]&&_spOpen(ts.id)){var l=_spList(ts.id).map(function(p){return {a:p.a,b:p.b||Date.now()};});u.sps=u.sps||{};u.sps[ts.id]=l;LOG.sps=Object.assign({},LOG.sps);LOG.sps[ts.id]=l;}
+  });
   u.j=calcJ();u.tl=calcTL();
   logRef().set(u,{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
 }
@@ -1063,7 +1069,7 @@ function render(){
         +'<button class="tbn end'+(_eon?' on':'')+(!_son&&!_eon?' dis':'')+'" onclick="toggle('+curSec+','+_ei+')" aria-label="끝'+(_eon?' 완료':'')+'">'+(_eon?'✓ 끝':'■ 끝')+'</button></div>';
     }
     var _rvT='';try{_rvT=_ccRevShort(_ccRevScope(S.plan,LOG.pg||((!LOG.lv||LOG.lv===S.lvl)?S.pg0:'')));}catch(e){}
-    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="sttw"><div class="stt">'+esc(_hdTitle(sec))+'</div>'+((_rvT&&sec.k!=='hw'&&!/수업 준비/.test(String(sec.title||'')))?'<span class="rgp">'+esc(_rvT)+'</span>':'')+_tb+'<div class="tmr" id="tmr" style="display:none"></div></div>';
+    h+='<div class="now">'+(sec.grp?esc(sec.grp):'지금 단계')+'</div><div class="sttw"><div class="stt">'+esc(_hdTitle(sec))+'</div>'+((_rvT&&sec.k!=='hw'&&!/수업 준비/.test(String(sec.title||'')))?'<span class="rgp">'+esc(_rvT)+'</span>':'')+_tb+'<div class="tmrw" id="tmrw" style="display:none"><div class="tmr" id="tmr"></div><button class="tpz" id="tpz" onclick="secPause()"></button></div></div>';
     sec.items.forEach(function(it,ii){if(it.role)return;h+=itemHtml(it,curSec,ii);});
   }
   var _y=window.pageYOffset;$('list').innerHTML=h;if(_y&&Math.abs(window.pageYOffset-_y)>1)window.scrollTo(0,_y);
@@ -1170,6 +1176,25 @@ function _psList(){return Array.isArray(LOG.ps)?LOG.ps:[];}
 function _psOpen(){var l=_psList();return l.length&&!l[l.length-1].b?l[l.length-1]:null;}
 function _psMs(s,e){var t=0,n=Date.now();_psList().forEach(function(p){var a=Math.max(p.a,s),b=Math.min(p.b||n,e);if(b>a)t+=b-a;});return t;}
 function _psClosed(){var n=Date.now();return _psList().map(function(p){return p.b?{a:p.a,b:p.b}:{a:p.a,b:n};});}
+// 학생이 누른 구역별 일시 정지: LOG.sps[시작 항목 id] = [{a:멈춘 때, b:다시 시작한 때}]
+function _tsOf(sec){return ((sec&&sec.items)||[]).filter(function(i){return i.role==='ts';})[0]||null;}
+function _spList(id){var l=LOG.sps&&LOG.sps[id];return Array.isArray(l)?l:[];}
+function _spOpen(id){var l=_spList(id);return l.length&&!l[l.length-1].b?l[l.length-1]:null;}
+function _secMs(sec,s,e){   // s~e 사이에 멈춰 있던 시간 (전체 멈춤 + 구역 멈춤, 겹치는 부분은 한 번만)
+  var ts=_tsOf(sec),n=Date.now(),t=0,end=0;
+  _psList().concat(ts?_spList(ts.id):[]).map(function(p){return [Math.max(p.a,s),Math.min(p.b||n,e)];}).filter(function(x){return x[1]>x[0];}).sort(function(a,b){return a[0]-b[0];}).forEach(function(x){var a=Math.max(x[0],end);if(x[1]>a){t+=x[1]-a;end=x[1];}});
+  return t;
+}
+function secPause(){
+  if(!S)return;var sec=S.secs[curSec],ts=_tsOf(sec),x=_tmOf(sec);if(!ts||!x||x.e)return;
+  var now=Date.now(),l=_spList(ts.id).map(function(p){return p.b?{a:p.a,b:p.b}:{a:p.a};}),u={date:S.date,studentId:S.sid,studentName:S.name};
+  if(S.sess===2)u.sess=2;
+  if(_spOpen(ts.id)||_psOpen()){if(_spOpen(ts.id))l[l.length-1].b=now;if(_psOpen()){u.ps=_psClosed();LOG.ps=u.ps;}}   // 다시 시작
+  else l.push({a:now});
+  LOG.sps=Object.assign({},LOG.sps||{});LOG.sps[ts.id]=l;u.sps={};u.sps[ts.id]=l;u.tl=calcTL();
+  logRef().set(u,{merge:true}).catch(function(e){console.error(e);toast('저장하지 못했어요. 다시 눌러 주세요');});
+  render();
+}
 function _tmOf(sec){
   if(!sec||!sec.tm)return null;
   var a=sec.items.filter(function(i){return i.role==='ts';})[0],b=sec.items.filter(function(i){return i.role==='te';})[0];
@@ -1178,15 +1203,19 @@ function _tmOf(sec){
 }
 function _tmText(sec){
   var x=_tmOf(sec);if(!x)return '';
-  if(x.e)return _hk(x.s)+'~'+_hk(x.e)+', '+Math.max(0,Math.round((x.e-x.s-_psMs(x.s,x.e))/60000))+'분 공부';
-  if(_psOpen())return _hk(x.s)+'~ 멈춤 중 ⏸ ('+Math.max(0,Math.floor((Date.now()-x.s-_psMs(x.s,Date.now()))/60000))+'분 공부)';
-  return _hk(x.s)+'~ 공부 중 ('+Math.max(0,Math.floor((Date.now()-x.s-_psMs(x.s,Date.now()))/60000))+'분째)';
+  if(x.e)return _hk(x.s)+'~'+_hk(x.e)+', '+Math.max(0,Math.round((x.e-x.s-_secMs(sec,x.s,x.e))/60000))+'분 공부';
+  return '';
 }
-function paintTmr(){
-  var el=$('tmr');if(!el||!S)return;var sec=S.secs[curSec],x=_tmOf(sec);
-  el.textContent=x?_tmText(sec):'';el.style.display=x?'':'none';el.className='tmr'+(x&&!x.e?' run':'');
+function paintTmr(){   // 진행 중에는 홈체크처럼 초 단위 시계, 끝나면 '몇 시~몇 시, 몇 분 공부'
+  var el=$('tmr'),w=$('tmrw'),bt=$('tpz');if(!el||!S)return;var sec=S.secs[curSec],x=_tmOf(sec);
+  w.style.display=x?'':'none';if(!x)return;
+  if(x.e){el.textContent=_tmText(sec);el.className='tmr';bt.style.display='none';return;}
+  var ts=_tsOf(sec),pz=!!(_spOpen(ts.id)||_psOpen()),sec_=Math.max(0,Math.floor((Date.now()-x.s-_secMs(sec,x.s,Date.now()))/1000));
+  el.textContent=(pz?'⏸ ':'⏱ ')+Math.floor(sec_/60)+':'+('0'+sec_%60).slice(-2);el.className='tmr run';
+  bt.style.display='';if(bt.textContent!==(pz?'▶':'⏸')){bt.textContent=pz?'▶':'⏸';bt.setAttribute('aria-label',pz?'다시 시작':'일시 정지');}
 }
-function calcTL(){var o=[];S.secs.forEach(function(sec){var x=_tmOf(sec);if(x){x.p=_psMs(x.s,x.e||Date.now());o.push(x);}});return o;}
+setInterval(function(){if(S)paintTmr();},1000);
+function calcTL(){var o=[];S.secs.forEach(function(sec){var x=_tmOf(sec);if(x){x.p=_secMs(sec,x.s,x.e||Date.now());o.push(x);}});return o;}
 function itemHtml(it,si,ii){
   var chk='<svg viewBox="0 0 24 24"><use href="#i-check"/></svg>',tm=LOG.e[it.id]?((LOG.ce&&LOG.ce[it.id])?'어제':hm(LOG.e[it.id])):'';
   if(it.t==='check'){
@@ -1293,6 +1322,9 @@ function _callLocked(sec,it,q){
 }
 function _startLocked0(sec,it,q){
   if(!sec||!it||it.role||it.t==='call')return false;
+  var _t=_tsOf(sec),_te=sec.items.filter(function(i){return i.role==='te';})[0];
+  if(_t&&_te&&LOG.e[_t.id]&&!LOG.e[_te.id]&&_spOpen(_t.id)&&!itemDone(it)&&(sec.items.indexOf(it)<sec.items.indexOf(_te)||it.t==='number'||it.t==='dict')){   // 홈체크처럼 멈춘 동안에는 잠겨요
+    if(!q)toast('멈춰 있어요. ▶ 를 눌러 다시 시작해 주세요');return true;}
   var ts=null,te_ix=-1,ix=sec.items.indexOf(it);
   sec.items.forEach(function(i,k){if(i.role==='ts')ts=i;if(i.role==='te')te_ix=k;});
   if(!ts||te_ix<0||ix<0||LOG.e[ts.id]||itemDone(it))return false;
@@ -1723,7 +1755,7 @@ window.addEventListener('load',function(){setTimeout(showInst,400);});
 </script>
 <script>
 /* 🔄 최신 버전 확인/업데이트 — 번호 입력 화면의 [최신으로 업데이트] 버튼 + 자동 확인 */
-var APP_BUILD="1111-av";
+var APP_BUILD="1111-aw";
 (function(){
   var NAME="체크콜";
   function base(){var u=new URL(location.href);u.searchParams.delete('cfg');u.searchParams.delete('v');return u;}

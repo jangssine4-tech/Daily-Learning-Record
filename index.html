@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-ds';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-du';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6206,7 +6206,7 @@ async function _whLoad(force){
   if(!force&&_wh.data!==undefined&&_wh.les===c.les&&_wh.race!==undefined)return;
   var sid0=s.id;
   try{var rs=await db.collection('homeRace').doc(sid0).get();if(_wh.sid===sid0){_wh.race=rs.exists?rs.data():null;_wh.ev=0;
-    if(_wh.race&&_wh.race.fin){var eq=await db.collection('homeUploads').where('lk','==','race__'+sid0).get();var n=0;eq.forEach(function(d){if((d.data().itemId||'')==='race'+(_wh.race.round||1))n++;});_wh.ev=n;}}}
+    if(_wh.race&&_wh.race.fin){var eq=await db.collection('homeUploads').where('lk','==','race__'+sid0).get();var n=0;eq.forEach(function(d){if((d.data().itemId||'')==='race'+(_wh.race.round||1)&&(d.data().at||0)>(_wh.race.rst||0))n++;});_wh.ev=n;}}}
   catch(e){console.warn('홈체크 레이싱',e);if(_wh.sid===sid0)_wh.race=null;}
   _wh.les=c.les;_wh.busy=true;_whPaint();
   try{var sn=await db.collection('homeLogs').doc(_hcLogId(s.id,c.key,c.les)).get();if(_wh.sid===s.id)_wh.data=sn.exists?sn.data():null;}
@@ -6227,11 +6227,37 @@ async function _whPay(){
   try{await db.collection('homeRace').doc(_wh.sid).update(o);r.prz=r.prz||{};r.prz[r.round||1]={n:pz,at:Date.now()};toast('🎁 지급 처리했어요');_whPaint();}
   catch(e){console.warn(e);toast('저장하지 못했어요. 다시 눌러 주세요');}
 }
+// 이 학생의 레이싱만 처음(0칸 · 1번째 판 · 캐릭터 다시 고르기)으로 되돌려요. 숙제 체크 기록과 올린 사진은 그대로예요.
+async function _whRaceReset(){
+  var s=students.find(function(x){return x.id===_wh.sid;}),r=_wh.race;if(!s||!db||!r)return;
+  var unpaid=r.fin&&!(r.prz||{})[r.round||1];
+  if(!confirm(s.name+' 학생의 레이싱을 처음부터 다시 시작하게 할까요?\n\n· 칸 수·판 수가 0칸, 1번째 판이 돼요\n· 캐릭터를 다시 고를 수 있어요\n· 선물 지급 기록도 지워져요'+(unpaid?'\n\n⚠️ 도착했는데 아직 선물을 지급하지 않았어요!':'')+'\n\n※ 되돌릴 수 없어요.'))return;
+  var sid0=s.id,now=Date.now();
+  var o={sid:sid0,name:s.name||'',ch:-1,pos:0,round:1,days:[],fin:0,prz:{},fr:{},upd:now,rst:now};
+  try{
+    await db.collection('homeRace').doc(sid0).set(o);   // merge 없이 통째로 새로 써요
+    if(_wh.sid===sid0){_wh.race=o;_wh.ev=0;}
+    _whPaint();
+  }catch(e){console.warn(e);toast('⚠️ 레이싱을 초기화하지 못했어요: '+((e&&e.message)||e));return;}
+  try{   // 반 친구 화면에 남은 위치와 '반에서 1등' 표시도 지워요
+    var cid=((window._hcCls||{})[sid0]||{}).cid;
+    if(!cid){var ro=await db.collection('homeRoster').doc(sid0).get();cid=ro.exists?ro.data().cid:'';}
+    if(cid){
+      var ref=db.collection('homeRace').doc('class__'+cid),cd=await ref.get();
+      if(cd.exists){
+        var del=firebase.firestore.FieldValue.delete(),u={m:{}},first=cd.data().first||{};u.m[sid0]=del;
+        Object.keys(first).forEach(function(k){if(first[k]&&first[k].sid===sid0){u.first=u.first||{};u.first[k]=del;}});
+        await ref.set(u,{merge:true});
+      }
+    }
+    toast('🏁 레이싱을 초기화했어요');
+  }catch(e){console.warn(e);toast('레이싱은 초기화했지만 반 친구 화면의 기록은 지우지 못했어요');}
+}
 // 이 학생의 이 레슨 홈체크 기록(체크·시간·유의사항 읽음)을 지워서 처음부터 다시 하게 해요
 async function _whReset(){
   var s=students.find(function(x){return x.id===_wh.sid;});if(!s||!db)return;
   var c=_whCtx(s);if(!c)return;
-  if(!confirm(s.name+' 학생의 "'+c.les+'" 홈체크 기록(체크·시간 재기·유의사항 읽음)을 모두 지우고 처음부터 다시 하게 할까요?\n\n※ 이미 올린 사진·영상과 레이싱 칸 수는 그대로예요.\n※ 되돌릴 수 없어요.'))return;
+  if(!confirm(s.name+' 학생의 "'+c.les+'" 홈체크 기록(체크·시간 재기·유의사항 읽음)을 모두 지우고 처음부터 다시 하게 할까요?\n\n※ 이미 올린 사진·영상과 레이싱 칸 수는 그대로예요 (레이싱은 아래 \'레이싱 초기화\'로).\n※ 되돌릴 수 없어요.'))return;
   var sid0=s.id;
   try{
     await db.collection('homeLogs').doc(_hcLogId(sid0,c.key,c.les)).delete();
@@ -6317,7 +6343,7 @@ function _whPaint(){
     }catch(e){console.warn('Speak Pop 표시',e);}
   }
   if(_wh.open&&_wh.race){
-    var rc=_wh.race,pzd=(rc.prz||{})[rc.round||1],km=(window._hcCls||{})[_wh.sid],rb='<div class="wl-meta" style="margin:8px 0">🏁 레이싱 <b>'+(rc.pos||0)+'/12칸</b> · '+(rc.round||1)+'번째 판'+((rc.days||[]).length?' · 숙제 완료 '+(rc.days||[]).length+'일':'')+(km&&km.mates.length?' · 반: '+km.mates.map(function(m){return _bcEsc(m.n);}).join(', '):'');
+    var rc=_wh.race,pzd=(rc.prz||{})[rc.round||1],km=(window._hcCls||{})[_wh.sid],rb='<div class="wl-meta" style="margin:8px 0">🏁 레이싱 <b>'+(rc.pos||0)+'/12칸</b> · '+(rc.round||1)+'번째 판'+((rc.days||[]).length?' · 숙제 완료 '+(rc.days||[]).length+'일':'')+(km&&km.mates.length?' · 반: '+km.mates.map(function(m){return _bcEsc(m.n);}).join(', '):'')+' <button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 8px;margin-left:6px;color:#b91c1c;border-color:#fca5a5" onclick="_whRaceReset()">🏁 레이싱 초기화</button>';
     if(rc.fin){
       rb+='<div style="margin-top:5px;color:#b45309;font-weight:800">🏆 도착! 증거 사진 '+_wh.ev+'장'+((rc.fr||{})[rc.round||1]===1?' · <span style="color:#0f766e">🥇 반에서 제일 먼저 도착 (보너스 대상)</span>':'')+'</div>';
       if(pzd)rb+='<div style="margin-top:3px;color:#0f766e;font-weight:800">🎁 지급 완료: '+_bcEsc(pzd.n)+'</div>';
@@ -6457,6 +6483,7 @@ function _wlPaint(){
   var lbl=!_wl.log?'<span style="color:var(--txt3)">아직 시작 전</span>':(L.fin?'<span style="color:#0f766e;font-weight:800">모두 마침</span>':(L.startAt?'진행 중':'시작 전'));
   var _po=_wlPsOpen(),_pm=_wlPsMin();
   var _pb=(_wl.log&&_wl.log.startAt&&!L.fin)?'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 9px;'+(_po?'background:#fef3c7;border-color:#f59e0b;color:#92400e':'')+'" onclick="_wlPause(event)" title="학생 체크콜의 시간을 멈추거나 다시 시작해요">'+(_po?'▶ 재개':'⏸ 멈춤')+'</button>':'';
+  if(Object.keys(L.sps||{}).some(function(k){var a=L.sps[k]||[];return a.length&&!a[a.length-1].b;}))chips.unshift('<span style="color:#92400e;font-weight:700">⏸ 학생이 공부 시간을 멈췄어요</span>');
   if(_pm>0||_po)chips.unshift('<span style="color:#92400e;font-weight:700">⏸ 멈춤 '+_pm+'분'+(_po?' (멈춤 중)':'')+'</span>');
   var head='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="_wlOpenToggle()"><b class="wl-head" style="margin:0;flex:1">📡 '+_bcEsc(s.name)+' · 체크콜'+(_wl.sess===2?' (2회차)':'')+'</b>'+_wlUnpBadge(L)+'<span style="font-size:11px">'+lbl+'</span><span style="font-size:12px;color:var(--txt3)">'+(_wl.open?'▲':'▼')+'</span></div>'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">'+_wlCiHtml()+_pb+'<button class="btn btn-outline btn-xs" style="font-size:11px;padding:1px 9px" onclick="_wlRefresh(event)" title="학생 체크콜을 처음부터 다시 하게 초기화해요 (받은 스탬프는 빼요)">'+(_wl.rf?'…':'↻ 새로고침')+'</button></div>';
@@ -6714,7 +6741,7 @@ function renderWriteFlowPanel(studentId){
   content.innerHTML=html;
   _hcHomeTimes(s,sReps);
 }
-/* ── 집 학습 시간: 홈체크에서 잰 구역별 시간을 스마트 학습 / 교재 학습으로 나눠 학원 시간과 따로 보여 줘요 ──
+/* ── 가정 학습 시간: 홈체크에서 잰 구역별 시간을 스마트 학습 / 교재 학습으로 나눠 학원 시간과 따로 보여 줘요 ──
    각 수업일 줄 = 그날 검사하는 숙제(직전 수업 진도)의 기록이에요. */
 var _hcTmCache={},_hcTmSeq=0;
 function _hcHomeSum(tm,cats,from,to){   // from~to(밀리초) 사이에 시작한 시간만 더해요
@@ -6728,17 +6755,34 @@ function _hcHomeSum(tm,cats,from,to){   // from~to(밀리초) 사이에 시작�
   });
   return o;
 }
+// 시간이 없을 때 칸에 보여 줄 이유
+function _hcRevLast(s,date){   // 바로 전 수업(결석 제외)이 복습 수업이었는지 / 진도를 적지 않았는지
+  var last=null;(typeof reports!=='undefined'&&reports||[]).forEach(function(r){if(r.studentId!==s.id||r.absent||r.makeupId||!(r.date<date))return;if(!last||r.date>last.date)last=r;});
+  if(!last)return '';
+  if(last.reviewYN==='Review'||/review|복습/i.test(String(last.progress||'')))return '복습 수업';
+  return last.progress?'':'진도 안 적음';
+}
 async function _hcHomeTimes(s,list){
   var seq=++_hcTmSeq,box=document.getElementById('wf-home');if(!box||!db||!s)return;
   try{
     var rows=await Promise.all(list.map(async function(r){
-      var row={date:r.date,les:'',v:null};if(r.absent)return row;
-      var prev=_hcLatest(s,r.date);if(!prev)return row;
-      var key=_hcKey(ccPlanKey(prev.level||getStudentLevel(s),s.grade)),plan=_hcPlan(key),les=_hcFindLesson(plan,prev.progress);
-      if(!les)return row;
+      var row={date:r.date,les:'',v:null,why:''};
+      if(r.absent){row.why='결석';return row;}
+      var rev=_hcRevLast(s,r.date),prev=_hcLatest(s,r.date);
+      if(!prev){row.why=rev||'이전 진도 없음';return row;}
+      var key=_hcKey(ccPlanKey(prev.level||getStudentLevel(s),s.grade)),plan=_hcPlan(key);
+      if(!key||!plan){row.why=rev||'홈체크 계획표 없는 단계';return row;}
+      var les=_hcFindLesson(plan,prev.progress),secs=les?_hcClean((plan.lessons||{})[les],plan.tmSecs):[];
+      if(!secs.length){row.why=rev||(/review|복습/i.test(String(prev.progress||''))?'복습 수업':'집 숙제 없는 진도');row.les=les||prev.progress;return row;}
+      row.les=les;
       var id=_hcLogId(s.id,key,les),c=_hcTmCache[id];
-      if(!c||Date.now()-c.at>60000){var sn=await db.collection('homeLogs').doc(id).get();c=_hcTmCache[id]={at:Date.now(),tm:(sn.exists&&sn.data().tm)||{}};}
-      row.les=les;row.v=_hcHomeSum(c.tm,plan.catSecs,new Date(prev.date+'T00:00:00').getTime(),new Date(r.date+'T23:59:59').getTime());
+      if(!c||Date.now()-c.at>60000){var sn=await db.collection('homeLogs').doc(id).get(),d=(sn.exists&&sn.data())||{};c=_hcTmCache[id]={at:Date.now(),tm:d.tm||{},n:Object.keys(d.e||{}).length};}
+      row.v=_hcHomeSum(c.tm,plan.catSecs,new Date(prev.date+'T00:00:00').getTime(),new Date(r.date+'T23:59:59').getTime());
+      if(row.v.sm===null&&row.v.bk===null&&!row.v.etc){
+        var any=Object.keys(c.tm).some(function(k){return c.tm[k]&&c.tm[k].s;});
+        row.why=row.v.open?'끝까지 안 함 (끝 안 누름)':(!secs.some(function(x){return x.tm;})?'시간 재는 구역 없음':(any?'이 기간에 한 기록 없음':(c.n?'시작 버튼 안 누름':'홈체크 안 함')));
+        if(rev&&!c.n&&!any)row.why=rev;
+      }
       return row;
     }));
     if(seq!==_hcTmSeq||document.getElementById('wf-home')!==box)return;   // 그사이 다른 학생·날짜로 바뀌었으면 버려요
@@ -6748,13 +6792,14 @@ async function _hcHomeTimes(s,list){
       var v=x.v||{sm:null,bk:null,etc:0},tip=[];
       if(v.etc){etc=true;tip.push('구분 없는 구역 '+v.etc+'분은 제외');}
       if(v.open)tip.push('끝나지 않은 구역은 제외');
-      return '<tr title="'+tip.join(' · ')+'"><td style="'+td+';color:var(--txt3)">'+x.date.substring(5)+'</td><td style="'+td+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(x.les||'-')+'</td><td style="'+td+'">'+mt(v.sm)+'</td><td style="'+td+'">'+mt(v.bk)+(v.etc?' *':'')+'</td></tr>';
+      var cells=x.why?'<td colspan="2" style="'+td+';color:#b45309;font-weight:700">'+_bcEsc(x.why)+'</td>':'<td style="'+td+'">'+mt(v.sm)+'</td><td style="'+td+'">'+mt(v.bk)+(v.etc?' *':'')+'</td>';
+      return '<tr title="'+tip.join(' · ')+'"><td style="'+td+';color:var(--txt3)">'+x.date.substring(5)+'</td><td style="'+td+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(x.les||'-')+'</td>'+cells+'</tr>';
     }).join('');
-    box.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin:10px 0 5px">🏠 집 학습 시간 <small style="font-weight:500;color:var(--txt3)">(홈체크 · 지난 수업 숙제)</small></div>'
-      +'<table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed"><colgroup><col style="width:14%"><col style="width:46%"><col style="width:20%"><col style="width:20%"></colgroup>'
+    box.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin:10px 0 5px">가정 학습 시간 <small style="font-weight:500;color:var(--txt3)">(홈체크 · 지난 수업 숙제)</small></div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed"><colgroup><col style="width:14%"><col style="width:38%"><col style="width:24%"><col style="width:24%"></colgroup>'
       +'<thead><tr style="border-bottom:2px solid var(--border)"><th style="'+th+'">날짜</th><th style="'+th+'">숙제 레슨</th><th style="'+th+'">스마트</th><th style="'+th+'">교재</th></tr></thead><tbody>'+body+'</tbody></table>'
       +(etc?'<div style="font-size:9px;color:var(--txt3);margin-top:3px">* 스마트/교재를 고르지 않은 구역의 시간이 더 있어요 (홈체크 계획표에서 선택)</div>':'');
-  }catch(e){console.warn('[집 학습 시간]',e);if(seq===_hcTmSeq)box.innerHTML='<div style="font-size:10px;color:var(--txt3);margin-top:8px">🏠 집 학습 시간을 불러오지 못했어요</div>';}
+  }catch(e){console.warn('[가정 학습 시간]',e);if(seq===_hcTmSeq)box.innerHTML='<div style="font-size:10px;color:var(--txt3);margin-top:8px">가정 학습 시간을 불러오지 못했어요</div>';}
 }
 function returnToSchedule(){
   var sid=window._currentReportStudentId||'';
