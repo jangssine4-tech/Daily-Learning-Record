@@ -1982,7 +1982,7 @@ function applyMenuPerms(){
 async function bootApp(){
   buildSidebar(); // _menuStruct에서 사이드바 자동 생성
   $('sb-username').textContent=currentUser.name;
-  $('sb-date').textContent=todayISO()+' · 빌드 1111-du';   // 배포된 버전 확인용 표시
+  $('sb-date').textContent=todayISO()+' · 빌드 1111-dv';   // 배포된 버전 확인용 표시
   // 로그인 시 시간표 날짜 항상 오늘로 초기화
   _scheduleDate=null;
   var dp=$('schedule-date-pick');
@@ -6514,9 +6514,9 @@ function renderWriteFlowPanel(studentId){
   function hwIcon(val,absent){
     if(absent)return '<span style="color:var(--txt3)">-</span>';
     if(!val||val===''||val==='-')return '<span style="color:var(--txt3)">-</span>';
-    if(val==='제출'||val==='완료'||val==='O'||val==='o')return '<span style="color:#16a34a;font-weight:700">O</span>';
-    if(val==='미제출'||val==='미완료'||val==='X'||val==='x')return '<span style="color:#dc2626;font-weight:700">X</span>';
-    return '<span style="color:#d97706;font-weight:700">△</span>';
+    if(val==='제출'||val==='완료'||val==='O'||val==='o')return '<span style="color:#16a34a">O</span>';
+    if(val==='미제출'||val==='미완료'||val==='X'||val==='x')return '<span style="color:#dc2626">X</span>';
+    return '<span style="color:#d97706">△</span>';
   }
   var panel=$('write-flow-panel');var content=$('write-flow-content');
   if(!panel||!content)return;
@@ -6670,7 +6670,7 @@ function renderWriteFlowPanel(studentId){
   // ⑤ 수업 흐름 (이번 달, 날짜별 근거)
   if(sReps.length){
     var _td='padding:4px 1px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center';
-    var _th='padding:3px 1px;font-weight:700;color:var(--txt3);vertical-align:middle;text-align:center';
+    var _th='padding:3px 1px;font-weight:400;color:var(--txt3);vertical-align:middle;text-align:center';
     function _stMin(js){   // 체크콜에서 넘어온 구역별 공부 시간 → 스마트 학습 / 교재 학습 합계(분)
       var a;try{a=JSON.parse(js||'[]');}catch(e){a=[];}
       var sm=0,bk=0,smN=0,bkN=0,open=false;
@@ -6716,7 +6716,7 @@ function renderWriteFlowPanel(studentId){
         +'<td style="'+_td+';color:var(--txt3)">'+r.date.substring(5)+'</td>'
         +'<td style="'+_td+'">'+hwIcon(hwBook,r.absent)+'</td>'
         +'<td style="'+_td+'">'+hwIcon(hwVideo,r.absent)+'</td>'
-        +'<td style="'+_td+';color:'+attCol+';font-weight:700">'+attTxt+'</td>'
+        +'<td style="'+_td+';color:'+attCol+'">'+attTxt+'</td>'
         +'<td style="'+_td+'" title="'+(tm.open?'끝을 누르지 않은 구역은 제외':'')+'">'+_minTxt(tm.sm)+'</td>'
         +'<td style="'+_td+'">'+_minTxt(tm.bk)+'</td>'
         +'<td style="'+_td+';color:'+attColor+'">'+_attTop+'</td>'
@@ -6782,17 +6782,18 @@ async function _hcHomeTimes(s,list){
         var any=Object.keys(c.tm).some(function(k){return c.tm[k]&&c.tm[k].s;});
         row.why=row.v.open?'끝까지 안 함 (끝 안 누름)':(!secs.some(function(x){return x.tm;})?'시간 재는 구역 없음':(any?'이 기간에 한 기록 없음':(c.n?'시작 버튼 안 누름':'홈체크 안 함')));
         if(rev&&!c.n&&!any)row.why=rev;
+        row.bad=row.why!==rev&&(row.v.open||row.why==='홈체크 안 함'||row.why==='이 기간에 한 기록 없음');   // 숙제가 있는데 안 한 경우만 빨간색
       }
       return row;
     }));
     if(seq!==_hcTmSeq||document.getElementById('wf-home')!==box)return;   // 그사이 다른 학생·날짜로 바뀌었으면 버려요
-    var td='padding:4px 1px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center',th='padding:3px 1px;font-weight:700;color:var(--txt3);text-align:center';
+    var td='padding:4px 1px;border-bottom:1px solid var(--border);vertical-align:middle;text-align:center',th='padding:3px 1px;font-weight:400;color:var(--txt3);text-align:center';
     var mt=function(v){return v===null||v===undefined?'-':v+'분';},etc=false;
     var body=rows.map(function(x){
       var v=x.v||{sm:null,bk:null,etc:0},tip=[];
       if(v.etc){etc=true;tip.push('구분 없는 구역 '+v.etc+'분은 제외');}
       if(v.open)tip.push('끝나지 않은 구역은 제외');
-      var cells=x.why?'<td colspan="2" style="'+td+';color:#b45309;font-weight:700">'+_bcEsc(x.why)+'</td>':'<td style="'+td+'">'+mt(v.sm)+'</td><td style="'+td+'">'+mt(v.bk)+(v.etc?' *':'')+'</td>';
+      var cells=x.why?'<td colspan="2" style="'+td+';color:'+(x.bad?'#dc2626':'#000')+'">'+_bcEsc(x.why)+'</td>':'<td style="'+td+'">'+mt(v.sm)+'</td><td style="'+td+'">'+mt(v.bk)+(v.etc?' *':'')+'</td>';
       return '<tr title="'+tip.join(' · ')+'"><td style="'+td+';color:var(--txt3)">'+x.date.substring(5)+'</td><td style="'+td+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_bcEsc(x.les||'-')+'</td>'+cells+'</tr>';
     }).join('');
     box.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--txt2);margin:10px 0 5px">가정 학습 시간 <small style="font-weight:500;color:var(--txt3)">(홈체크 · 지난 수업 숙제)</small></div>'
